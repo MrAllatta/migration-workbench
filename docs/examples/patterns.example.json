@@ -1,0 +1,7 @@
+[
+  {
+    "name": "vlookup",
+    "regex": "VLOOKUP",
+    "ignore_case": true
+  }
+]

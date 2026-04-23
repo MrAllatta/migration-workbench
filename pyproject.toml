@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "migration-workbench"
+version = "0.1.0"
+description = "Reusable profiler and importer chassis for tabular migrations"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "Django>=5.0,<6.0",
+  "google-api-python-client",
+  "google-auth",
+  "google-auth-oauthlib",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-django",
+  "black",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "migration_workbench.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]

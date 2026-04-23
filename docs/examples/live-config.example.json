@@ -1,0 +1,18 @@
+{
+  "provider": "google_sheets",
+  "source_id": "example-live-source",
+  "tabs": [
+    {
+      "spreadsheet_id": "replace-with-google-sheet-id",
+      "worksheet_title": "Blocks",
+      "output_path": "reference/blocks.csv",
+      "required_headers": [
+        "Block",
+        "Block Type",
+        "# of Beds",
+        "Bed Width (feet)",
+        "Bedfeet per Bed"
+      ]
+    }
+  ]
+}
