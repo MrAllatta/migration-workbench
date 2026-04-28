@@ -8,5 +8,5 @@ build/
 dist/
 *.egg-info/
 .env
-
+workbench.code-workspace
 example_data/_import_artifacts/
