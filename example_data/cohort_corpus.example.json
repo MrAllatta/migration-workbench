@@ -1,0 +1,19 @@
+{
+  "folder_id": "REPLACE_ME",
+  "folder_name": "Cohort Corpus",
+  "in_scope_workbooks": ["WB1", "WB2"],
+  "tab_auto_limit": 3,
+  "column_min_score": 4,
+  "tab_selection_overrides": {},
+  "heuristics": {
+    "tab_score": {
+      "operational_tokens": [],
+      "reference_tokens": [],
+      "reference_combo_tokens": [],
+      "support_tokens": []
+    },
+    "column_score": {
+      "domain_keyword_tokens": []
+    }
+  }
+}

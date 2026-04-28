@@ -13,7 +13,7 @@ YEAR_RE = re.compile(r"\b(20\d{2})\b")
 CODE_RE = re.compile(r"\b(\d{3})\b")
 
 
-def build_multiyear_index(discovery_payload: dict, in_scope_codes: set[str]) -> list[dict]:
+def build_cohort_corpus_index(discovery_payload: dict, in_scope_codes: set[str]) -> list[dict]:
     records: list[dict] = []
 
     def walk(node: dict, path_parts: list[str]):
@@ -58,37 +58,50 @@ def build_multiyear_index(discovery_payload: dict, in_scope_codes: set[str]) -> 
     return records
 
 
-def score_tab(title: str, rows: int, cols: int) -> tuple[int, list[str]]:
+def _normalize_tab_heuristics(config: dict | None) -> dict:
+    config = config or {}
+    combo_tokens: list[tuple[str, ...]] = []
+    for entry in config.get("reference_combo_tokens") or []:
+        if isinstance(entry, (list, tuple)) and all(isinstance(token, str) for token in entry):
+            combo_tokens.append(tuple(token.lower() for token in entry))
+    return {
+        "operational_tokens": [token.lower() for token in (config.get("operational_tokens") or []) if isinstance(token, str)],
+        "reference_tokens": [token.lower() for token in (config.get("reference_tokens") or []) if isinstance(token, str)],
+        "reference_combo_tokens": combo_tokens,
+        "support_tokens": [token.lower() for token in (config.get("support_tokens") or []) if isinstance(token, str)],
+    }
+
+
+def _normalize_column_heuristics(config: dict | None) -> dict:
+    config = config or {}
+    return {
+        "domain_keyword_tokens": [
+            token.lower() for token in (config.get("domain_keyword_tokens") or []) if isinstance(token, str)
+        ]
+    }
+
+
+def score_tab(title: str, rows: int, cols: int, *, tab_score_heuristics: dict | None = None) -> tuple[int, list[str]]:
     lowered = title.lower()
     score = 0
     reasons: list[str] = []
 
-    if any(
-        token in lowered
-        for token in (
-            "planner",
-            "plan",
-            "harvest",
-            "field walk",
-            "orders",
-            "market",
-            "records",
-            "crop info",
-            "formats",
-            "block map",
-            "step 3",
-            "seed order",
-        )
-    ):
+    heuristics = _normalize_tab_heuristics(tab_score_heuristics)
+    operational_tokens = heuristics["operational_tokens"]
+    reference_tokens = heuristics["reference_tokens"]
+    reference_combo_tokens = heuristics["reference_combo_tokens"]
+    support_tokens = heuristics["support_tokens"]
+
+    if operational_tokens and any(token in lowered for token in operational_tokens):
         score += 3
         reasons.append("operational_tab_name")
-    # Reference tabs are often small but feed validations/lookups.
-    if ("define" in lowered and "term" in lowered) or "reference" in lowered:
+    if reference_tokens and any(token in lowered for token in reference_tokens):
         score += 3
         reasons.append("reference_lookup_tab_name")
-    if any(
-        token in lowered for token in ("staging", "pivot", "summary", "print", "workflow", "welcome", "index", "reports>>>", "data>>>")
-    ):
+    if reference_combo_tokens and any(all(token in lowered for token in combo) for combo in reference_combo_tokens):
+        score += 3
+        reasons.append("reference_lookup_tab_name")
+    if support_tokens and any(token in lowered for token in support_tokens):
         score -= 2
         reasons.append("likely_support_tab")
 
@@ -108,14 +121,25 @@ def score_tab(title: str, rows: int, cols: int) -> tuple[int, list[str]]:
     return score, reasons
 
 
-def select_tabs_from_inventory(index_records: list[dict], inventory_rows: list[dict], *, min_final_score: float = 2.0) -> list[dict]:
+def select_tabs_from_inventory(
+    index_records: list[dict],
+    inventory_rows: list[dict],
+    *,
+    min_final_score: float = 2.0,
+    tab_score_heuristics: dict | None = None,
+) -> list[dict]:
     by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
     scored: list[dict] = []
     for row in inventory_rows:
         meta = by_sheet_id.get(row["spreadsheet_id"])
         if meta is None:
             continue
-        score, reasons = score_tab(row["tab_title"], row["rows"], row["cols"])
+        score, reasons = score_tab(
+            row["tab_title"],
+            row["rows"],
+            row["cols"],
+            tab_score_heuristics=tab_score_heuristics,
+        )
         scored.append(
             {
                 "year": meta["year"],
@@ -182,7 +206,7 @@ def select_tabs_from_inventory(index_records: list[dict], inventory_rows: list[d
     return selected
 
 
-def auto_gate_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[str, list[str]]:
+def auto_select_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[str, list[str]]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
@@ -193,60 +217,55 @@ def auto_gate_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[
     return approved
 
 
-GATE1_OVERRIDE_KEYS = frozenset({"add", "remove", "replace", "tabs"})
+TAB_SELECTION_OVERRIDE_KEYS = frozenset({"add", "remove", "replace", "tabs"})
 
 
-def apply_gate1_overrides(
+def apply_tab_selection_overrides(
     approved_tabs: dict[str, list[str]],
     overrides: dict | None,
 ) -> dict[str, list[str]]:
-    """Merge user-supplied gate1 overrides into heuristic approved_tabs.
-
-    Each override entry supports either a delta form (``add``/``remove``) or a
-    full replace form (``replace: true`` with ``tabs``). Heuristic order is
-    preserved; ``add`` entries already present are not duplicated.
-    """
+    """Merge user-supplied tab selection overrides into heuristic approved_tabs."""
     merged: dict[str, list[str]] = {code: list(tabs) for code, tabs in approved_tabs.items()}
     if not overrides:
         return merged
 
     if not isinstance(overrides, dict):
-        raise CommandError("gate1_overrides must be a mapping of workbook_code to override entry")
+        raise CommandError("tab_selection_overrides must be a mapping of workbook_code to override entry")
 
     for workbook_code, entry in overrides.items():
         if not isinstance(entry, dict):
             raise CommandError(
-                f"gate1_overrides[{workbook_code!r}] must be a mapping; got {type(entry).__name__}"
+                f"tab_selection_overrides[{workbook_code!r}] must be a mapping; got {type(entry).__name__}"
             )
-        unknown = set(entry.keys()) - GATE1_OVERRIDE_KEYS
+        unknown = set(entry.keys()) - TAB_SELECTION_OVERRIDE_KEYS
         if unknown:
             raise CommandError(
-                f"gate1_overrides[{workbook_code!r}] has unknown keys: {sorted(unknown)}"
+                f"tab_selection_overrides[{workbook_code!r}] has unknown keys: {sorted(unknown)}"
             )
 
         if entry.get("replace"):
             tabs = entry.get("tabs")
             if not isinstance(tabs, list) or not all(isinstance(item, str) for item in tabs):
                 raise CommandError(
-                    f"gate1_overrides[{workbook_code!r}] requires 'tabs' as list[str] when 'replace' is true"
+                    f"tab_selection_overrides[{workbook_code!r}] requires 'tabs' as list[str] when 'replace' is true"
                 )
             merged[workbook_code] = list(tabs)
             continue
 
         if "tabs" in entry:
             raise CommandError(
-                f"gate1_overrides[{workbook_code!r}] uses 'tabs' without 'replace: true'"
+                f"tab_selection_overrides[{workbook_code!r}] uses 'tabs' without 'replace: true'"
             )
 
         add = entry.get("add", []) or []
         remove = entry.get("remove", []) or []
         if not isinstance(add, list) or not all(isinstance(item, str) for item in add):
             raise CommandError(
-                f"gate1_overrides[{workbook_code!r}].add must be a list of strings"
+                f"tab_selection_overrides[{workbook_code!r}].add must be a list of strings"
             )
         if not isinstance(remove, list) or not all(isinstance(item, str) for item in remove):
             raise CommandError(
-                f"gate1_overrides[{workbook_code!r}].remove must be a list of strings"
+                f"tab_selection_overrides[{workbook_code!r}].remove must be a list of strings"
             )
 
         current = merged.get(workbook_code, [])
@@ -265,7 +284,15 @@ def make_slug(text: str) -> str:
     return slug[:50] or "tab"
 
 
-def derive_column_candidates(*, workbook_code: str, year: int | None, spreadsheet_id: str, tab_title: str, payload: dict) -> list[dict]:
+def derive_column_candidates(
+    *,
+    workbook_code: str,
+    year: int | None,
+    spreadsheet_id: str,
+    tab_title: str,
+    payload: dict,
+    column_score_heuristics: dict | None = None,
+) -> list[dict]:
     summary = payload.get("summary", {})
     raw = payload.get("raw", {})
     formula_count = int(summary.get("formula_cell_count") or 0)
@@ -295,35 +322,14 @@ def derive_column_candidates(*, workbook_code: str, year: int | None, spreadshee
     except (KeyError, IndexError, TypeError):
         return []
 
+    heuristics = _normalize_column_heuristics(column_score_heuristics)
+    domain_keyword_tokens = heuristics["domain_keyword_tokens"]
     candidates: list[dict] = []
     for col_letter, header in headers[:40]:
         lowered = header.lower()
         score = 0
         reasons: list[str] = []
-        if any(
-            token in lowered
-            for token in (
-                "date",
-                "week",
-                "year",
-                "crop",
-                "product",
-                "mix",
-                "format",
-                "qty",
-                "quantity",
-                "yield",
-                "harvest",
-                "seed",
-                "block",
-                "bed",
-                "order",
-                "market",
-                "channel",
-                "price",
-                "customer",
-            )
-        ):
+        if domain_keyword_tokens and any(token in lowered for token in domain_keyword_tokens):
             score += 3
             reasons.append("domain_keyword")
         if formula_count > 100:
@@ -374,14 +380,14 @@ def parse_tab_inventory_output(text: str) -> list[dict]:
     return rows
 
 
-def run_multiyear(
+def run_cohort_corpus(
     *,
     drive_service,
     sheets_service,
     config: dict,
     out_dir: Path,
     date_stamp: str,
-    resume_from_gate1: bool = False,
+    resume_from_tab_selection: bool = False,
 ) -> dict:
     from profiler.management.commands.profile_drive_folder import walk_folder
 
@@ -392,13 +398,17 @@ def run_multiyear(
     if not in_scope_codes:
         raise CommandError("Config must include non-empty 'in_scope_workbooks'")
 
+    heuristics_config = config.get("heuristics") or {}
+    tab_score_heuristics = heuristics_config.get("tab_score") or {}
+    column_score_heuristics = heuristics_config.get("column_score") or {}
+
     include_tabs = not bool(config.get("discovery_no_tabs"))
     tree = walk_folder(drive_service, sheets_service, folder_id, include_tabs=include_tabs, max_depth=config.get("max_depth"))
     discovery_payload = {"id": folder_id, "name": config.get("folder_name") or folder_id, **tree}
     discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
     write_json(discovery_path, discovery_payload)
 
-    index_records = build_multiyear_index(discovery_payload, in_scope_codes)
+    index_records = build_cohort_corpus_index(discovery_payload, in_scope_codes)
     index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"
     write_json(index_path, {"generated_from": discovery_path.name, "record_count": len(index_records), "records": index_records})
 
@@ -442,7 +452,7 @@ def run_multiyear(
                 }
             )
 
-    broad_path = out_dir / f"multi_year_broad_profile_coverage_{date_stamp}.json"
+    broad_path = out_dir / f"broad_profile_coverage_{date_stamp}.json"
     write_json(
         broad_path,
         {
@@ -454,7 +464,11 @@ def run_multiyear(
         },
     )
 
-    tab_shortlist = select_tabs_from_inventory(index_records, inventory_rows)
+    tab_shortlist = select_tabs_from_inventory(
+        index_records,
+        inventory_rows,
+        tab_score_heuristics=tab_score_heuristics,
+    )
     tab_shortlist_path = out_dir / f"tab_shortlist_{date_stamp}.json"
     write_json(
         tab_shortlist_path,
@@ -466,16 +480,16 @@ def run_multiyear(
         },
     )
 
-    gate_1_path = out_dir / f"tab_approval_gate1_{date_stamp}.json"
-    if resume_from_gate1:
-        if not gate_1_path.exists():
+    tab_selection_path = out_dir / f"tab_selection_{date_stamp}.json"
+    if resume_from_tab_selection:
+        if not tab_selection_path.exists():
             raise CommandError(
-                f"--resume-from-gate1 requires existing {gate_1_path}; none found"
+                f"--resume-from-tab-selection requires existing {tab_selection_path}; none found"
             )
         try:
-            existing = json.loads(gate_1_path.read_text(encoding="utf-8"))
+            existing = json.loads(tab_selection_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise CommandError(f"Could not parse {gate_1_path}: {exc}") from exc
+            raise CommandError(f"Could not parse {tab_selection_path}: {exc}") from exc
         approved_tabs = existing.get("approved_tabs")
         if not isinstance(approved_tabs, dict) or not all(
             isinstance(code, str)
@@ -484,23 +498,23 @@ def run_multiyear(
             for code, tabs in approved_tabs.items()
         ):
             raise CommandError(
-                f"{gate_1_path} must contain 'approved_tabs' as dict[str, list[str]]"
+                f"{tab_selection_path} must contain 'approved_tabs' as dict[str, list[str]]"
             )
     else:
-        heuristic_tabs = auto_gate_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
-        overrides = config.get("gate1_overrides")
-        approved_tabs = apply_gate1_overrides(heuristic_tabs, overrides)
-        gate_1_payload: dict = {
+        heuristic_tabs = auto_select_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
+        overrides = config.get("tab_selection_overrides")
+        approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
+        tab_selection_payload: dict = {
             "policy": (
-                "auto-approved top tabs per workbook (gate1_overrides applied)"
+                "heuristic tab selection (tab_selection_overrides applied)"
                 if overrides
-                else "auto-approved top tabs per workbook"
+                else "heuristic tab selection"
             ),
             "approved_tabs": approved_tabs,
         }
         if overrides:
-            gate_1_payload["overrides_applied"] = overrides
-        write_json(gate_1_path, gate_1_payload)
+            tab_selection_payload["overrides_applied"] = overrides
+        write_json(tab_selection_path, tab_selection_payload)
 
     deep_results: list[dict] = []
     candidate_columns: list[dict] = []
@@ -530,6 +544,7 @@ def run_multiyear(
                         spreadsheet_id=record["spreadsheet_id"],
                         tab_title=tab_title,
                         payload={"raw": payload, "summary": summary},
+                        column_score_heuristics=column_score_heuristics,
                     )
                 )
             except Exception as exc:  # noqa: BLE001
@@ -577,17 +592,19 @@ def run_multiyear(
             "selected": selected_columns,
         },
     )
-    gate_2_path = out_dir / f"column_approval_gate2_{date_stamp}.json"
-    write_json(gate_2_path, {"policy": "auto-approved columns above min score", "selected_count": len(selected_columns)})
+    column_selection_path = out_dir / f"column_selection_{date_stamp}.json"
+    write_json(
+        column_selection_path,
+        {"policy": "auto-approved columns above min score", "selected_count": len(selected_columns)},
+    )
 
     return {
         "discovery": str(discovery_path),
         "index": str(index_path),
         "broad_coverage": str(broad_path),
         "tab_shortlist": str(tab_shortlist_path),
-        "gate1": str(gate_1_path),
+        "tab_selection": str(tab_selection_path),
         "deep_coverage": str(deep_coverage_path),
         "column_shortlist": str(column_shortlist_path),
-        "gate2": str(gate_2_path),
+        "column_selection": str(column_selection_path),
     }
-
