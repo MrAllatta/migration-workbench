@@ -1,0 +1,15 @@
+{
+  "workbooks": [
+    {
+      "name": "Example Workbook",
+      "spreadsheet_id": "replace-with-real-spreadsheet-id"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "importrange",
+      "regex": "IMPORTRANGE\\(",
+      "ignore_case": true
+    }
+  ]
+}
