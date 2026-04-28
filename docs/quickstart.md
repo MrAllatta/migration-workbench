@@ -43,6 +43,9 @@ These management commands are the read-only profiling surface:
 - `python manage.py profile_tab --spreadsheet-id <sheet-id-or-url> --tab "<tab title>" --out data/profile_snapshots/tab.json`
 - `python manage.py scan_formula_patterns --config scan-config.json --out data/profile_snapshots/formula_matches.json`
 
+Authentication and shared-service-account setup guidance lives in `docs/google-auth-runbook.md`.
+Prefer ADC user login plus service-account impersonation over per-client key files.
+
 `scan_formula_patterns` expects a config JSON shaped like:
 
 ```json
