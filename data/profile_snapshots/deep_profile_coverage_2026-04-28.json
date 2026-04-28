@@ -1,0 +1,709 @@
+{
+  "job_count": 78,
+  "success_count": 55,
+  "failure_count": 23,
+  "results": [
+    {
+      "year": 2023,
+      "workbook_code": "202",
+      "spreadsheet_id": "1Q69o2nnIQj_Uv8yHygYzL8Wu-2P2Q2q6g6qBsCNGGNo",
+      "tab_title": "Resale Formats",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1Q69o2nnIQj_Uv8yHygYzL8Wu-2P2Q2q6g6qBsCNGGNo?ranges=%27Resale+Formats%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Resale Formats'\". Details: \"Unable to parse range: 'Resale Formats'\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "202",
+      "spreadsheet_id": "1Q69o2nnIQj_Uv8yHygYzL8Wu-2P2Q2q6g6qBsCNGGNo",
+      "tab_title": "Define Format Terms",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1Q69o2nnIQj_Uv8yHygYzL8Wu-2P2Q2q6g6qBsCNGGNo?ranges=%27Define+Format+Terms%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_location': 'global', 'service': 'sheets.googleapis.com', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_metric': 'sheets.googleapis.com/read_requests', 'consumer': 'projects/163184400756', 'quota_limit_value': '60', 'quota_unit': '1/min/{project}/{user}'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "402",
+      "spreadsheet_id": "1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE",
+      "tab_title": "Crop Planner",
+      "out_json": "profile_snapshots/deep/402_2023_1QWy4GsP_crop_planner.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2023,
+      "workbook_code": "402",
+      "spreadsheet_id": "1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE",
+      "tab_title": "Crop Plan 501+503+801",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE?ranges=%27Crop+Plan+501%2B503%2B801%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'service': 'sheets.googleapis.com', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'consumer': 'projects/163184400756', 'quota_unit': '1/min/{project}/{user}', 'quota_location': 'global', 'quota_limit_value': '60'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "501",
+      "spreadsheet_id": "1YuiiV41NMr2DJDIFcUodCI090nMNzo0848jf8vcv6js",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1YuiiV41NMr2DJDIFcUodCI090nMNzo0848jf8vcv6js?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Crop Plan 402'\". Details: \"Unable to parse range: 'Crop Plan 402'\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "501",
+      "spreadsheet_id": "1YuiiV41NMr2DJDIFcUodCI090nMNzo0848jf8vcv6js",
+      "tab_title": "Field Records Online",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1YuiiV41NMr2DJDIFcUodCI090nMNzo0848jf8vcv6js?ranges=%27Field+Records+Online%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60', 'quota_location': 'global', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_unit': '1/min/{project}/{user}', 'consumer': 'projects/163184400756', 'service': 'sheets.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "503",
+      "spreadsheet_id": "1BTnY0dIN5W__HX6WwoaXstn7rLFd3lSDxCHcXhp81ws",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1BTnY0dIN5W__HX6WwoaXstn7rLFd3lSDxCHcXhp81ws?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Crop Plan 402'\". Details: \"Unable to parse range: 'Crop Plan 402'\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "503",
+      "spreadsheet_id": "1BTnY0dIN5W__HX6WwoaXstn7rLFd3lSDxCHcXhp81ws",
+      "tab_title": "Crop Plan",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1BTnY0dIN5W__HX6WwoaXstn7rLFd3lSDxCHcXhp81ws?ranges=%27Crop+Plan%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'service': 'sheets.googleapis.com', 'quota_unit': '1/min/{project}/{user}', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_location': 'global', 'quota_limit_value': '60', 'consumer': 'projects/163184400756'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2023,
+      "workbook_code": "601",
+      "spreadsheet_id": "1yqc1yn-owq4BUvDjWdjAnVcVmvbLOrUbxMjzXWw0CQc",
+      "tab_title": "Market",
+      "out_json": "profile_snapshots/deep/601_2023_1yqc1yn-_market.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2023,
+      "workbook_code": "601",
+      "spreadsheet_id": "1yqc1yn-owq4BUvDjWdjAnVcVmvbLOrUbxMjzXWw0CQc",
+      "tab_title": "Orders",
+      "out_json": "profile_snapshots/deep/601_2023_1yqc1yn-_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2023,
+      "workbook_code": "602",
+      "spreadsheet_id": "1AUnxFSL5ZKV7p753ktk6GYIy3hRoDQzWdxwcBUOwZ8I",
+      "tab_title": "Harvest List",
+      "out_json": "profile_snapshots/deep/602_2023_1AUnxFSL_harvest_list.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2023,
+      "workbook_code": "602",
+      "spreadsheet_id": "1AUnxFSL5ZKV7p753ktk6GYIy3hRoDQzWdxwcBUOwZ8I",
+      "tab_title": "Weekly Harvest Plan 601",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1AUnxFSL5ZKV7p753ktk6GYIy3hRoDQzWdxwcBUOwZ8I?ranges=%27Weekly+Harvest+Plan+601%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Weekly Harvest Plan 601'\". Details: \"Unable to parse range: 'Weekly Harvest Plan 601'\">"
+    },
+    {
+      "year": 2024,
+      "workbook_code": "201",
+      "spreadsheet_id": "12IiK6HlzEjz8rynMjjfnrdtQfDIcwNPOYsDYMkx8lsw",
+      "tab_title": "Crop Info",
+      "out_json": "profile_snapshots/deep/201_2024_12IiK6Hl_crop_info.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "201",
+      "spreadsheet_id": "12IiK6HlzEjz8rynMjjfnrdtQfDIcwNPOYsDYMkx8lsw",
+      "tab_title": "Crop by Season",
+      "out_json": "profile_snapshots/deep/201_2024_12IiK6Hl_crop_by_season.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "202",
+      "spreadsheet_id": "1zaHAjvWMHCZsljXz0vsBYXco3WIxGbgr1ROWoUvrXeY",
+      "tab_title": "Resale Formats",
+      "out_json": "profile_snapshots/deep/202_2024_1zaHAjvW_resale_formats.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "202",
+      "spreadsheet_id": "1zaHAjvWMHCZsljXz0vsBYXco3WIxGbgr1ROWoUvrXeY",
+      "tab_title": "Define Format Terms",
+      "out_json": "profile_snapshots/deep/202_2024_1zaHAjvW_define_format_terms.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "301",
+      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
+      "tab_title": "i|Markets",
+      "out_json": "profile_snapshots/deep/301_2024_1-PHM1Rs_i_markets.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "301",
+      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
+      "tab_title": "i|Orders",
+      "out_json": "profile_snapshots/deep/301_2024_1-PHM1Rs_i_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "302",
+      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
+      "tab_title": "Harvest Plan 401+402+801",
+      "out_json": "profile_snapshots/deep/302_2024_1e4V_PsZ_harvest_plan_401_402_801.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "302",
+      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
+      "tab_title": "Sales Plan 301",
+      "out_json": "profile_snapshots/deep/302_2024_1e4V_PsZ_sales_plan_301.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "401",
+      "spreadsheet_id": "1e9j2_5uzpZDdUtWRR4j5CNglbKh2awSPKx4lF61EpK4",
+      "tab_title": "Crop Info 201",
+      "out_json": "profile_snapshots/deep/401_2024_1e9j2_5u_crop_info_201.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "401",
+      "spreadsheet_id": "1e9j2_5uzpZDdUtWRR4j5CNglbKh2awSPKx4lF61EpK4",
+      "tab_title": "Step 3",
+      "out_json": "profile_snapshots/deep/401_2024_1e9j2_5u_step_3.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "402",
+      "spreadsheet_id": "1OGfrhWHTuEfhKooDmN--Tty0BBN8VoLHwIZwzECecBo",
+      "tab_title": "Crop Planner",
+      "out_json": "profile_snapshots/deep/402_2024_1OGfrhWH_crop_planner.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "402",
+      "spreadsheet_id": "1OGfrhWHTuEfhKooDmN--Tty0BBN8VoLHwIZwzECecBo",
+      "tab_title": "Crop Plan 501+503+801",
+      "out_json": "profile_snapshots/deep/402_2024_1OGfrhWH_crop_plan_501_503_801.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "501",
+      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
+      "tab_title": "Crop Plan 402",
+      "out_json": "profile_snapshots/deep/501_2024_1KI6teCu_crop_plan_402.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "501",
+      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
+      "tab_title": "Field Records Online",
+      "out_json": "profile_snapshots/deep/501_2024_1KI6teCu_field_records_online.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "502",
+      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "tab_title": "Nursery Records Online",
+      "out_json": "profile_snapshots/deep/502_2024_1nn54Oic_nursery_records_online.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "502",
+      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "tab_title": "Nursery Plan 402",
+      "out_json": "profile_snapshots/deep/502_2024_1nn54Oic_nursery_plan_402.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "503",
+      "spreadsheet_id": "1_Khn7v2muKSeoXVDz_i8XX6Htp_FKMXxk4RKSFVfX_Q",
+      "tab_title": "Crop Plan 402",
+      "out_json": "profile_snapshots/deep/503_2024_1_Khn7v2_crop_plan_402.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "503",
+      "spreadsheet_id": "1_Khn7v2muKSeoXVDz_i8XX6Htp_FKMXxk4RKSFVfX_Q",
+      "tab_title": "Crop Plan",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1_Khn7v2muKSeoXVDz_i8XX6Htp_FKMXxk4RKSFVfX_Q?ranges=%27Crop+Plan%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Crop Plan'\". Details: \"Unable to parse range: 'Crop Plan'\">"
+    },
+    {
+      "year": 2024,
+      "workbook_code": "601",
+      "spreadsheet_id": "1-uLx2ug18xci0fzVl071f936f0Y81RAJKzmQ5nQ6e4Y",
+      "tab_title": "Market",
+      "out_json": "profile_snapshots/deep/601_2024_1-uLx2ug_market.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "601",
+      "spreadsheet_id": "1-uLx2ug18xci0fzVl071f936f0Y81RAJKzmQ5nQ6e4Y",
+      "tab_title": "Orders",
+      "out_json": "profile_snapshots/deep/601_2024_1-uLx2ug_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "602",
+      "spreadsheet_id": "12IelGLyoDsoIpiDNv-uFpiL0ezODVnAci6P57x-_hmE",
+      "tab_title": "Harvest List",
+      "out_json": "profile_snapshots/deep/602_2024_12IelGLy_harvest_list.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2024,
+      "workbook_code": "602",
+      "spreadsheet_id": "12IelGLyoDsoIpiDNv-uFpiL0ezODVnAci6P57x-_hmE",
+      "tab_title": "Weekly Harvest Plan 601",
+      "out_json": "profile_snapshots/deep/602_2024_12IelGLy_weekly_harvest_plan_601.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "201",
+      "spreadsheet_id": "1ox_GgDLbuRYX2sCmC9BPlVH8xT1RcJaELhGSxv3QW7g",
+      "tab_title": "Crop Info",
+      "out_json": "profile_snapshots/deep/201_2025_1ox_GgDL_crop_info.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "201",
+      "spreadsheet_id": "1ox_GgDLbuRYX2sCmC9BPlVH8xT1RcJaELhGSxv3QW7g",
+      "tab_title": "Crop by Season",
+      "out_json": "profile_snapshots/deep/201_2025_1ox_GgDL_crop_by_season.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "202",
+      "spreadsheet_id": "1RAFxlODPSNMzpIvFucPTepymt4HBxhn6VIZ4V05fkkQ",
+      "tab_title": "Resale Formats",
+      "out_json": "profile_snapshots/deep/202_2025_1RAFxlOD_resale_formats.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "202",
+      "spreadsheet_id": "1RAFxlODPSNMzpIvFucPTepymt4HBxhn6VIZ4V05fkkQ",
+      "tab_title": "Define Format Terms",
+      "out_json": "profile_snapshots/deep/202_2025_1RAFxlOD_define_format_terms.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "301",
+      "spreadsheet_id": "1ADT_YFVgS0ocf6HG113a5_sdCVoR_Fcf-U86ILCkOOY",
+      "tab_title": "i|Markets",
+      "out_json": "profile_snapshots/deep/301_2025_1ADT_YFV_i_markets.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "301",
+      "spreadsheet_id": "1ADT_YFVgS0ocf6HG113a5_sdCVoR_Fcf-U86ILCkOOY",
+      "tab_title": "i|Orders",
+      "out_json": "profile_snapshots/deep/301_2025_1ADT_YFV_i_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "302",
+      "spreadsheet_id": "1YP0t1ENs41YjnOd86xTDbt5sZfehMdwAFhEzY78pav8",
+      "tab_title": "Harvest Plan 401+402+801",
+      "out_json": "profile_snapshots/deep/302_2025_1YP0t1EN_harvest_plan_401_402_801.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "302",
+      "spreadsheet_id": "1YP0t1ENs41YjnOd86xTDbt5sZfehMdwAFhEzY78pav8",
+      "tab_title": "Sales Plan 301",
+      "out_json": "profile_snapshots/deep/302_2025_1YP0t1EN_sales_plan_301.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "401",
+      "spreadsheet_id": "1E825nh1ViC5HSSXrCF5FoL2Zz6HmN14sk_3hZNbN2ro",
+      "tab_title": "Crop Info 201",
+      "out_json": "profile_snapshots/deep/401_2025_1E825nh1_crop_info_201.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "401",
+      "spreadsheet_id": "1E825nh1ViC5HSSXrCF5FoL2Zz6HmN14sk_3hZNbN2ro",
+      "tab_title": "Step 3",
+      "out_json": "profile_snapshots/deep/401_2025_1E825nh1_step_3.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "402",
+      "spreadsheet_id": "1LbeiNGn6cgyuPhPLf12zlGAcRHkN803n8uAJQJxFM0E",
+      "tab_title": "Crop Planner",
+      "out_json": "profile_snapshots/deep/402_2025_1LbeiNGn_crop_planner.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "402",
+      "spreadsheet_id": "1LbeiNGn6cgyuPhPLf12zlGAcRHkN803n8uAJQJxFM0E",
+      "tab_title": "Crop Plan 501+503+801",
+      "out_json": "profile_snapshots/deep/402_2025_1LbeiNGn_crop_plan_501_503_801.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "501",
+      "spreadsheet_id": "1JWVttl8NV4JCfwkT-_ZVLddZYX4OPwFXQvbLOvuCung",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1JWVttl8NV4JCfwkT-_ZVLddZYX4OPwFXQvbLOvuCung?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_limit_value': '60', 'service': 'sheets.googleapis.com', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_location': 'global', 'consumer': 'projects/163184400756', 'quota_unit': '1/min/{project}/{user}'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "501",
+      "spreadsheet_id": "1JWVttl8NV4JCfwkT-_ZVLddZYX4OPwFXQvbLOvuCung",
+      "tab_title": "Field Records Online",
+      "out_json": "profile_snapshots/deep/501_2025_1JWVttl8_field_records_online.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "502",
+      "spreadsheet_id": "1W_cgW6UnPoMu9YKQjRWu68IIbI9cueO4cGQG7jQFdYw",
+      "tab_title": "Nursery Records Online",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1W_cgW6UnPoMu9YKQjRWu68IIbI9cueO4cGQG7jQFdYw?ranges=%27Nursery+Records+Online%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_unit': '1/min/{project}/{user}', 'consumer': 'projects/163184400756', 'quota_location': 'global', 'quota_limit_value': '60', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'service': 'sheets.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "502",
+      "spreadsheet_id": "1W_cgW6UnPoMu9YKQjRWu68IIbI9cueO4cGQG7jQFdYw",
+      "tab_title": "Nursery Plan 402",
+      "out_json": "profile_snapshots/deep/502_2025_1W_cgW6U_nursery_plan_402.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "503",
+      "spreadsheet_id": "1JKiThBHRnzOSj_3nChkJJD6MnZLJFEUtM1JNUjqGOm4",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1JKiThBHRnzOSj_3nChkJJD6MnZLJFEUtM1JNUjqGOm4?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_location': 'global', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_unit': '1/min/{project}/{user}', 'service': 'sheets.googleapis.com', 'quota_limit_value': '60', 'consumer': 'projects/163184400756', 'quota_limit': 'ReadRequestsPerMinutePerUser'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "503",
+      "spreadsheet_id": "1JKiThBHRnzOSj_3nChkJJD6MnZLJFEUtM1JNUjqGOm4",
+      "tab_title": "Crop Plan",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1JKiThBHRnzOSj_3nChkJJD6MnZLJFEUtM1JNUjqGOm4?ranges=%27Crop+Plan%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Crop Plan'\". Details: \"Unable to parse range: 'Crop Plan'\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "601",
+      "spreadsheet_id": "1S6WkVbkoeaTQMM-f-S_Xcx0gqmGkvWLJxUQRtmtBT3U",
+      "tab_title": "Market",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1S6WkVbkoeaTQMM-f-S_Xcx0gqmGkvWLJxUQRtmtBT3U?ranges=%27Market%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_location': 'global', 'service': 'sheets.googleapis.com', 'quota_unit': '1/min/{project}/{user}', 'quota_limit_value': '60', 'consumer': 'projects/163184400756'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "601",
+      "spreadsheet_id": "1S6WkVbkoeaTQMM-f-S_Xcx0gqmGkvWLJxUQRtmtBT3U",
+      "tab_title": "Orders",
+      "out_json": "profile_snapshots/deep/601_2025_1S6WkVbk_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2025,
+      "workbook_code": "602",
+      "spreadsheet_id": "12e3vZfH_4skONJu38QMsKEC1lvwnFnmP9T7xGoD5kGQ",
+      "tab_title": "Harvest List",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/12e3vZfH_4skONJu38QMsKEC1lvwnFnmP9T7xGoD5kGQ?ranges=%27Harvest+List%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_unit': '1/min/{project}/{user}', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_location': 'global', 'service': 'sheets.googleapis.com', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60', 'consumer': 'projects/163184400756'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2025,
+      "workbook_code": "602",
+      "spreadsheet_id": "12e3vZfH_4skONJu38QMsKEC1lvwnFnmP9T7xGoD5kGQ",
+      "tab_title": "Weekly Harvest Plan 601",
+      "out_json": "profile_snapshots/deep/602_2025_12e3vZfH_weekly_harvest_plan_601.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "201",
+      "spreadsheet_id": "1290SHLKSll1yniq5xeBWt4HcsQKNOIqviukvO7DU0r4",
+      "tab_title": "Crop Info",
+      "out_json": "profile_snapshots/deep/201_2026_1290SHLK_crop_info.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "201",
+      "spreadsheet_id": "1290SHLKSll1yniq5xeBWt4HcsQKNOIqviukvO7DU0r4",
+      "tab_title": "Crop by Season",
+      "out_json": "profile_snapshots/deep/201_2026_1290SHLK_crop_by_season.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "202",
+      "spreadsheet_id": "1sAhf4s4Tlisq49FK_KLt8wvZh6C2gesAXB2HLjxOUZw",
+      "tab_title": "Resale Formats",
+      "out_json": "profile_snapshots/deep/202_2026_1sAhf4s4_resale_formats.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "202",
+      "spreadsheet_id": "1sAhf4s4Tlisq49FK_KLt8wvZh6C2gesAXB2HLjxOUZw",
+      "tab_title": "Define Format Terms",
+      "out_json": "profile_snapshots/deep/202_2026_1sAhf4s4_define_format_terms.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "301",
+      "spreadsheet_id": "1RVDv2jY02HpCwnkWyctXGP68XDXBd8vqeibG0pgPp88",
+      "tab_title": "i|Markets",
+      "out_json": "profile_snapshots/deep/301_2026_1RVDv2jY_i_markets.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "301",
+      "spreadsheet_id": "1RVDv2jY02HpCwnkWyctXGP68XDXBd8vqeibG0pgPp88",
+      "tab_title": "i|Orders",
+      "out_json": "profile_snapshots/deep/301_2026_1RVDv2jY_i_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "302",
+      "spreadsheet_id": "1mM9pkhqmmU9ze1M5_tBoZeA8zfuGiJv8YdXdFAh1xi4",
+      "tab_title": "Harvest Plan 401+402+801",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1mM9pkhqmmU9ze1M5_tBoZeA8zfuGiJv8YdXdFAh1xi4?ranges=%27Harvest+Plan+401%2B402%2B801%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_limit': 'ReadRequestsPerMinutePerUser', 'consumer': 'projects/163184400756', 'quota_location': 'global', 'service': 'sheets.googleapis.com', 'quota_unit': '1/min/{project}/{user}', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "302",
+      "spreadsheet_id": "1mM9pkhqmmU9ze1M5_tBoZeA8zfuGiJv8YdXdFAh1xi4",
+      "tab_title": "Sales Plan 301",
+      "out_json": "profile_snapshots/deep/302_2026_1mM9pkhq_sales_plan_301.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "401",
+      "spreadsheet_id": "1T2lkSaMfrt_7FFkckj7VaJ0cQnEy2z1x7m5MBw1f2Pk",
+      "tab_title": "Crop Info 201",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1T2lkSaMfrt_7FFkckj7VaJ0cQnEy2z1x7m5MBw1f2Pk?ranges=%27Crop+Info+201%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60', 'quota_unit': '1/min/{project}/{user}', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'consumer': 'projects/163184400756', 'quota_location': 'global', 'service': 'sheets.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "401",
+      "spreadsheet_id": "1T2lkSaMfrt_7FFkckj7VaJ0cQnEy2z1x7m5MBw1f2Pk",
+      "tab_title": "Step 3",
+      "out_json": "profile_snapshots/deep/401_2026_1T2lkSaM_step_3.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "402",
+      "spreadsheet_id": "1jFhWod0k8s8fpTKK3x-kP_nxOiD6bW47Lh3LYAARXFY",
+      "tab_title": "Crop Planner",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1jFhWod0k8s8fpTKK3x-kP_nxOiD6bW47Lh3LYAARXFY?ranges=%27Crop+Planner%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_limit': 'ReadRequestsPerMinutePerUser', 'consumer': 'projects/163184400756', 'quota_location': 'global', 'service': 'sheets.googleapis.com', 'quota_unit': '1/min/{project}/{user}', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "402",
+      "spreadsheet_id": "1jFhWod0k8s8fpTKK3x-kP_nxOiD6bW47Lh3LYAARXFY",
+      "tab_title": "Crop Plan 501+503+801",
+      "out_json": "profile_snapshots/deep/402_2026_1jFhWod0_crop_plan_501_503_801.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "501",
+      "spreadsheet_id": "10FjgXQj_JDWSF8DTqlLx0GohJViCRDq8fTD93bnVUBs",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/10FjgXQj_JDWSF8DTqlLx0GohJViCRDq8fTD93bnVUBs?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_unit': '1/min/{project}/{user}', 'consumer': 'projects/163184400756', 'service': 'sheets.googleapis.com', 'quota_location': 'global', 'quota_limit_value': '60', 'quota_metric': 'sheets.googleapis.com/read_requests'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "501",
+      "spreadsheet_id": "10FjgXQj_JDWSF8DTqlLx0GohJViCRDq8fTD93bnVUBs",
+      "tab_title": "Field Records Online",
+      "out_json": "profile_snapshots/deep/501_2026_10FjgXQj_field_records_online.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "502",
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
+      "tab_title": "Nursery Records Online",
+      "out_json": "profile_snapshots/deep/502_2026_1aVIqZZP_nursery_records_online.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "502",
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
+      "tab_title": "Nursery Plan 402",
+      "out_json": "profile_snapshots/deep/502_2026_1aVIqZZP_nursery_plan_402.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "503",
+      "spreadsheet_id": "1PmdPjiJnvcvhg48pYDHm09yAQV0_VGpZSNp-HFWE9w8",
+      "tab_title": "Crop Plan 402",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1PmdPjiJnvcvhg48pYDHm09yAQV0_VGpZSNp-HFWE9w8?ranges=%27Crop+Plan+402%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_location': 'global', 'quota_limit_value': '60', 'quota_unit': '1/min/{project}/{user}', 'service': 'sheets.googleapis.com', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'consumer': 'projects/163184400756'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "503",
+      "spreadsheet_id": "1PmdPjiJnvcvhg48pYDHm09yAQV0_VGpZSNp-HFWE9w8",
+      "tab_title": "Crop Plan",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 400 when requesting https://sheets.googleapis.com/v4/spreadsheets/1PmdPjiJnvcvhg48pYDHm09yAQV0_VGpZSNp-HFWE9w8?ranges=%27Crop+Plan%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Unable to parse range: 'Crop Plan'\". Details: \"Unable to parse range: 'Crop Plan'\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "601",
+      "spreadsheet_id": "1ZQqefizNHY25xJfhvuTqfG84Gl2muCITchA3zBfK6cI",
+      "tab_title": "Market",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/1ZQqefizNHY25xJfhvuTqfG84Gl2muCITchA3zBfK6cI?ranges=%27Market%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'service': 'sheets.googleapis.com', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_location': 'global', 'quota_limit_value': '60', 'consumer': 'projects/163184400756', 'quota_unit': '1/min/{project}/{user}', 'quota_limit': 'ReadRequestsPerMinutePerUser'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "601",
+      "spreadsheet_id": "1ZQqefizNHY25xJfhvuTqfG84Gl2muCITchA3zBfK6cI",
+      "tab_title": "Orders",
+      "out_json": "profile_snapshots/deep/601_2026_1ZQqefiz_orders.json",
+      "exit_code": 0,
+      "error": null
+    },
+    {
+      "year": 2026,
+      "workbook_code": "602",
+      "spreadsheet_id": "10_GnHLR_hW1yeJ5RxGm-Hd1rKrxCawwMpjXFerbgK6w",
+      "tab_title": "Harvest List",
+      "out_json": null,
+      "exit_code": 1,
+      "error": "HttpError: <HttpError 429 when requesting https://sheets.googleapis.com/v4/spreadsheets/10_GnHLR_hW1yeJ5RxGm-Hd1rKrxCawwMpjXFerbgK6w?ranges=%27Harvest+List%27&includeGridData=true&fields=properties%28title%29%2Csheets%28properties%28sheetId%2Ctitle%2CgridProperties%29%2Cdata%28startRow%2CstartColumn%2CrowData%28values%28formattedValue%2CuserEnteredValue%2CeffectiveValue%2Cnote%2CdataValidation%29%29%29%29&alt=json returned \"Quota exceeded for quota metric 'Read requests' and limit 'Read requests per minute per user' of service 'sheets.googleapis.com' for consumer 'project_number:163184400756'.\". Details: \"[{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'RATE_LIMIT_EXCEEDED', 'domain': 'googleapis.com', 'metadata': {'quota_location': 'global', 'consumer': 'projects/163184400756', 'quota_limit': 'ReadRequestsPerMinutePerUser', 'quota_unit': '1/min/{project}/{user}', 'quota_metric': 'sheets.googleapis.com/read_requests', 'quota_limit_value': '60', 'service': 'sheets.googleapis.com'}}, {'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Request a higher quota limit.', 'url': 'https://cloud.google.com/docs/quotas/help/request_increase'}]}]\">"
+    },
+    {
+      "year": 2026,
+      "workbook_code": "602",
+      "spreadsheet_id": "10_GnHLR_hW1yeJ5RxGm-Hd1rKrxCawwMpjXFerbgK6w",
+      "tab_title": "Weekly Harvest Plan 601",
+      "out_json": "profile_snapshots/deep/602_2026_10_GnHLR_weekly_harvest_plan_601.json",
+      "exit_code": 0,
+      "error": null
+    }
+  ]
+}

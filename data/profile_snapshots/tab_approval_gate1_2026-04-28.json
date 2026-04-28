@@ -1,0 +1,52 @@
+{
+  "policy": "auto-approved top tabs per workbook",
+  "approved_tabs": {
+    "301": [
+      "i|Markets",
+      "i|Orders"
+    ],
+    "501": [
+      "Crop Plan 402",
+      "Field Records Online"
+    ],
+    "502": [
+      "Nursery Records Online",
+      "Nursery Plan 402"
+    ],
+    "402": [
+      "Crop Planner",
+      "Crop Plan 501+503+801"
+    ],
+    "602": [
+      "Harvest List",
+      "Weekly Harvest Plan 601"
+    ],
+    "302": [
+      "Harvest Plan 401+402+801",
+      "Sales Plan 301"
+    ],
+    "401": [
+      "Crop Info 201",
+      "Step 3"
+    ],
+    "503": [
+      "Crop Plan 402",
+      "Crop Plan"
+    ],
+    "601": [
+      "Market",
+      "Orders"
+    ],
+    "202": [
+      "Resale Formats",
+      "Define Format Terms"
+    ],
+    "201": [
+      "Crop Info",
+      "Crop by Season"
+    ],
+    "103": [
+      "Blocks 201 + 401"
+    ]
+  }
+}
