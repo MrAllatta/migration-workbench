@@ -10,3 +10,4 @@ dist/
 .env
 workbench.code-workspace
 example_data/_import_artifacts/
+data/
