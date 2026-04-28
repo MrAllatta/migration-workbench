@@ -3,7 +3,7 @@ from io import StringIO
 
 from django.core.management import call_command
 
-from profiler.tools.farm.multiyear import build_multiyear_index, select_tabs_from_inventory
+from profiler.tools.farm.multiyear import build_multiyear_index, score_tab, select_tabs_from_inventory
 
 
 def test_build_multiyear_index_filters_in_scope_codes():
@@ -40,6 +40,12 @@ def test_select_tabs_from_inventory_scores_operational_tabs():
     selected = select_tabs_from_inventory(index_records, inventory_rows)
     assert any(row["tab_title"] == "Crop Planner" for row in selected)
     assert not any(row["tab_title"] == "INDEX" for row in selected)
+
+
+def test_score_tab_boosts_define_crop_terms_reference_tabs():
+    score, reasons = score_tab("Define Crop Terms", 52, 17)
+    assert score >= 3
+    assert "reference_lookup_tab_name" in reasons
 
 
 def test_profile_multiyear_smoke_writes_output(tmp_path):

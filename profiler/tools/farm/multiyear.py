@@ -82,6 +82,10 @@ def score_tab(title: str, rows: int, cols: int) -> tuple[int, list[str]]:
     ):
         score += 3
         reasons.append("operational_tab_name")
+    # Reference tabs are often small but feed validations/lookups.
+    if ("define" in lowered and "term" in lowered) or "reference" in lowered:
+        score += 3
+        reasons.append("reference_lookup_tab_name")
     if any(
         token in lowered for token in ("staging", "pivot", "summary", "print", "workflow", "welcome", "index", "reports>>>", "data>>>")
     ):
