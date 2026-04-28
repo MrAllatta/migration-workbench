@@ -18,6 +18,83 @@ def canonicalize_header_row(header_row, aliases=None):
     return canonical
 
 
+def summarize_header_detection_failure(
+    rows,
+    required_headers,
+    aliases=None,
+    max_scan_rows=200,
+    anchor_token=None,
+    header_row_index=None,
+    prefer_anchor_token=False,
+    preview_limit=5,
+):
+    """Return compact diagnostics for header-contract misses.
+
+    This helper is intentionally read-only: it explains why detection failed
+    without changing matching behavior.
+    """
+    normalized_required = {_normalize_text(value) for value in required_headers}
+    scan_limit = min(len(rows), max_scan_rows)
+    alias_map = {_normalize_text(key): value for key, value in (aliases or {}).items()}
+
+    def _row_score(row):
+        canonical = canonicalize_header_row(row, aliases=aliases)
+        normalized = {_normalize_text(value) for value in canonical}
+        match_count = len(normalized_required & normalized)
+        missing = [
+            value
+            for value in required_headers
+            if _normalize_text(value) not in normalized
+        ]
+        return canonical, match_count, missing
+
+    candidates = []
+    for index in range(scan_limit):
+        row = rows[index] if index < len(rows) else []
+        if not row or all(str(cell).strip() == "" for cell in row):
+            continue
+        canonical, match_count, missing = _row_score(row)
+        candidates.append(
+            {
+                "row_index": index,
+                "match_count": match_count,
+                "required_count": len(normalized_required),
+                "missing_required_headers": missing[:8],
+                "header_preview": canonical[:12],
+            }
+        )
+
+    candidates.sort(key=lambda item: (-item["match_count"], item["row_index"]))
+
+    anchor_rows = []
+    if anchor_token:
+        normalized_anchor = _normalize_text(anchor_token)
+        for index in range(scan_limit):
+            first_cell = rows[index][0] if rows[index] else ""
+            if normalized_anchor in _normalize_text(first_cell):
+                candidate_index = index + 1
+                preview = rows[candidate_index] if candidate_index < len(rows) else []
+                anchor_rows.append(
+                    {
+                        "anchor_row_index": index,
+                        "candidate_header_row_index": candidate_index,
+                        "candidate_preview": canonicalize_header_row(preview, aliases=aliases)[:12],
+                    }
+                )
+
+    return {
+        "scan_limit": scan_limit,
+        "required_headers": list(required_headers),
+        "required_header_count": len(normalized_required),
+        "anchor_token": anchor_token,
+        "header_row_index": header_row_index,
+        "prefer_anchor_token": prefer_anchor_token,
+        "alias_keys": list(alias_map.keys())[:20],
+        "top_candidates": candidates[:preview_limit],
+        "anchor_candidates": anchor_rows[:preview_limit],
+    }
+
+
 def _project_rows(rows, output_headers=None, column_map=None, default_values=None):
     if not output_headers:
         return rows
@@ -45,6 +122,38 @@ def _project_rows(rows, output_headers=None, column_map=None, default_values=Non
             projected_row.append(value)
         projected_rows.append(projected_row)
     return projected_rows
+
+
+def _filter_rows_missing_required_outputs(rows, required_output_values=None):
+    """Drop projected rows whose named output columns are blank.
+
+    This runs after projection/defaults/transforms, so lane configs can remove
+    formula-skeleton rows without making importers treat connector padding as
+    source data.
+    """
+    if not required_output_values or len(rows) < 2:
+        return rows
+    header = rows[0]
+    idx = {_normalize_text(h): i for i, h in enumerate(header)}
+    required_indexes = [
+        idx[_normalize_text(name)]
+        for name in required_output_values
+        if _normalize_text(name) in idx
+    ]
+    if not required_indexes:
+        return rows
+
+    filtered = [header]
+    for row in rows[1:]:
+        keep = True
+        for i in required_indexes:
+            value = row[i] if i < len(row) else ""
+            if str(value).strip() == "":
+                keep = False
+                break
+        if keep:
+            filtered.append(row)
+    return filtered
 
 
 def _split_value(value, delimiter):
@@ -259,6 +368,63 @@ def _grid_unpivot_for_product_week_plan(source_rows, grid_unpivot):
     return out
 
 
+def _apply_constant_columns(rows, constant_columns):
+    """Set output cells to fixed literals (e.g. Component Source Type = crop)."""
+    if not constant_columns:
+        return rows
+    header = rows[0] if rows else []
+    idx = {_normalize_text(h): i for i, h in enumerate(header)}
+    for row in rows[1:]:
+        for out_name, value in constant_columns.items():
+            j = idx.get(_normalize_text(out_name))
+            if j is None:
+                continue
+            while len(row) <= j:
+                row.append("")
+            row[j] = value
+    return rows
+
+
+def _apply_fold_into_notes(projected_rows, folds, source_rows):
+    """Append labeled snippets from source columns into a target column (e.g. Notes).
+
+    folds: list of dicts with keys ``into`` (output header), ``from`` (source header),
+    optional ``prefix`` (e.g. ``Variety`` -> ``Variety: value``).
+    """
+    if not folds or len(projected_rows) < 2:
+        return projected_rows
+    projected_header = projected_rows[0]
+    p_idx = {_normalize_text(h): i for i, h in enumerate(projected_header)}
+    source_header = source_rows[0] if source_rows else []
+    s_idx = {_normalize_text(h): i for i, h in enumerate(source_header)}
+
+    for row_i in range(1, len(projected_rows)):
+        prow = projected_rows[row_i]
+        srow = source_rows[row_i] if row_i < len(source_rows) else []
+        for fold in folds:
+            into = fold.get("into", "Notes")
+            frm = fold.get("from")
+            prefix = (fold.get("prefix") or "").strip()
+            if not frm:
+                continue
+            si = s_idx.get(_normalize_text(frm))
+            ti = p_idx.get(_normalize_text(into))
+            if ti is None:
+                continue
+            raw = ""
+            if si is not None and si < len(srow):
+                raw = srow[si]
+            chunk = str(raw).strip() if raw is not None else ""
+            if not chunk:
+                continue
+            label = f"{prefix}: {chunk}" if prefix else chunk
+            prev = str(prow[ti]).strip() if ti < len(prow) else ""
+            while len(prow) <= ti:
+                prow.append("")
+            prow[ti] = f"{prev}\n{label}".strip() if prev else label
+    return projected_rows
+
+
 def _truncate_source_rows(source_rows, stop_on_blank_in=None):
     if not stop_on_blank_in or not source_rows:
         return source_rows
@@ -303,6 +469,9 @@ def _normalize_single_region(
     stop_on_blank_in=None,
     prefer_anchor_token=False,
     grid_unpivot=None,
+    fold_into_notes=None,
+    constant_columns=None,
+    skip_rows_missing=None,
 ):
     header_index, canonical_header, strategy = detect_header_row(
         rows,
@@ -321,16 +490,28 @@ def _normalize_single_region(
         column_map = None
         default_values = None
         row_transforms = None
+        fold_into_notes = None
+        constant_columns = None
     normalized_rows = _project_rows(
         source_rows,
         output_headers=output_headers,
         column_map=column_map,
         default_values=default_values,
     )
+    normalized_rows = _apply_fold_into_notes(
+        normalized_rows, fold_into_notes or [], source_rows
+    )
+    normalized_rows = _apply_constant_columns(
+        normalized_rows, constant_columns or {}
+    )
     normalized_rows = _apply_row_transforms(
         normalized_rows,
         row_transforms=row_transforms,
         source_rows=source_rows,
+    )
+    normalized_rows = _filter_rows_missing_required_outputs(
+        normalized_rows,
+        required_output_values=skip_rows_missing,
     )
     return {
         "header_row_index": header_index,
@@ -402,6 +583,9 @@ def normalize_rows(
     stop_on_blank_in=None,
     prefer_anchor_token=False,
     grid_unpivot=None,
+    fold_into_notes=None,
+    constant_columns=None,
+    skip_rows_missing=None,
 ):
     if grid_unpivot and source_regions:
         raise ValueError("grid_unpivot cannot be combined with source_regions in one tab")
@@ -421,6 +605,9 @@ def normalize_rows(
             stop_on_blank_in=stop_on_blank_in,
             prefer_anchor_token=prefer_anchor_token,
             grid_unpivot=grid_unpivot,
+            fold_into_notes=fold_into_notes,
+            constant_columns=constant_columns,
+            skip_rows_missing=skip_rows_missing,
         )
 
     region_results = []
@@ -440,6 +627,9 @@ def normalize_rows(
                 stop_on_blank_in=region.get("stop_on_blank_in", stop_on_blank_in),
                 prefer_anchor_token=region.get("prefer_anchor_token", prefer_anchor_token),
                 grid_unpivot=region.get("grid_unpivot"),
+                fold_into_notes=region.get("fold_into_notes", fold_into_notes),
+                constant_columns=region.get("constant_columns", constant_columns),
+                skip_rows_missing=region.get("skip_rows_missing", skip_rows_missing),
             )
         )
 
@@ -474,6 +664,9 @@ def normalize_csv_file(
     prefer_anchor_token=False,
     grid_unpivot=None,
     append_without_header=False,
+    fold_into_notes=None,
+    constant_columns=None,
+    skip_rows_missing=None,
 ):
     with Path(source_path).open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.reader(handle))
@@ -493,6 +686,9 @@ def normalize_csv_file(
         stop_on_blank_in=stop_on_blank_in,
         prefer_anchor_token=prefer_anchor_token,
         grid_unpivot=grid_unpivot,
+        fold_into_notes=fold_into_notes,
+        constant_columns=constant_columns,
+        skip_rows_missing=skip_rows_missing,
     )
 
     output_path = Path(output_path)

@@ -9,6 +9,7 @@ from django.db import transaction
 from importer.chassis import ImporterChassisMixin
 from importer.lookups import resolve_fk_by_text
 from importer.parsing import parse_iso_date, split_on, to_decimal, to_decimal_or_none, to_int, to_int_or_none
+from importer.sample_guard import live12_block_message_for_sample_into_dev_sqlite
 from importer.summary import build_escalation_summary, build_failure_signatures, normalized_outcomes, write_summary_json
 
 
