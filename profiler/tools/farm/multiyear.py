@@ -193,6 +193,73 @@ def auto_gate_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[
     return approved
 
 
+GATE1_OVERRIDE_KEYS = frozenset({"add", "remove", "replace", "tabs"})
+
+
+def apply_gate1_overrides(
+    approved_tabs: dict[str, list[str]],
+    overrides: dict | None,
+) -> dict[str, list[str]]:
+    """Merge user-supplied gate1 overrides into heuristic approved_tabs.
+
+    Each override entry supports either a delta form (``add``/``remove``) or a
+    full replace form (``replace: true`` with ``tabs``). Heuristic order is
+    preserved; ``add`` entries already present are not duplicated.
+    """
+    merged: dict[str, list[str]] = {code: list(tabs) for code, tabs in approved_tabs.items()}
+    if not overrides:
+        return merged
+
+    if not isinstance(overrides, dict):
+        raise CommandError("gate1_overrides must be a mapping of workbook_code to override entry")
+
+    for workbook_code, entry in overrides.items():
+        if not isinstance(entry, dict):
+            raise CommandError(
+                f"gate1_overrides[{workbook_code!r}] must be a mapping; got {type(entry).__name__}"
+            )
+        unknown = set(entry.keys()) - GATE1_OVERRIDE_KEYS
+        if unknown:
+            raise CommandError(
+                f"gate1_overrides[{workbook_code!r}] has unknown keys: {sorted(unknown)}"
+            )
+
+        if entry.get("replace"):
+            tabs = entry.get("tabs")
+            if not isinstance(tabs, list) or not all(isinstance(item, str) for item in tabs):
+                raise CommandError(
+                    f"gate1_overrides[{workbook_code!r}] requires 'tabs' as list[str] when 'replace' is true"
+                )
+            merged[workbook_code] = list(tabs)
+            continue
+
+        if "tabs" in entry:
+            raise CommandError(
+                f"gate1_overrides[{workbook_code!r}] uses 'tabs' without 'replace: true'"
+            )
+
+        add = entry.get("add", []) or []
+        remove = entry.get("remove", []) or []
+        if not isinstance(add, list) or not all(isinstance(item, str) for item in add):
+            raise CommandError(
+                f"gate1_overrides[{workbook_code!r}].add must be a list of strings"
+            )
+        if not isinstance(remove, list) or not all(isinstance(item, str) for item in remove):
+            raise CommandError(
+                f"gate1_overrides[{workbook_code!r}].remove must be a list of strings"
+            )
+
+        current = merged.get(workbook_code, [])
+        remove_set = set(remove)
+        kept = [tab for tab in current if tab not in remove_set]
+        for tab in add:
+            if tab not in kept:
+                kept.append(tab)
+        merged[workbook_code] = kept
+
+    return merged
+
+
 def make_slug(text: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_").lower()
     return slug[:50] or "tab"
@@ -314,6 +381,7 @@ def run_multiyear(
     config: dict,
     out_dir: Path,
     date_stamp: str,
+    resume_from_gate1: bool = False,
 ) -> dict:
     from profiler.management.commands.profile_drive_folder import walk_folder
 
@@ -398,9 +466,41 @@ def run_multiyear(
         },
     )
 
-    approved_tabs = auto_gate_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
     gate_1_path = out_dir / f"tab_approval_gate1_{date_stamp}.json"
-    write_json(gate_1_path, {"policy": "auto-approved top tabs per workbook", "approved_tabs": approved_tabs})
+    if resume_from_gate1:
+        if not gate_1_path.exists():
+            raise CommandError(
+                f"--resume-from-gate1 requires existing {gate_1_path}; none found"
+            )
+        try:
+            existing = json.loads(gate_1_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"Could not parse {gate_1_path}: {exc}") from exc
+        approved_tabs = existing.get("approved_tabs")
+        if not isinstance(approved_tabs, dict) or not all(
+            isinstance(code, str)
+            and isinstance(tabs, list)
+            and all(isinstance(tab, str) for tab in tabs)
+            for code, tabs in approved_tabs.items()
+        ):
+            raise CommandError(
+                f"{gate_1_path} must contain 'approved_tabs' as dict[str, list[str]]"
+            )
+    else:
+        heuristic_tabs = auto_gate_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
+        overrides = config.get("gate1_overrides")
+        approved_tabs = apply_gate1_overrides(heuristic_tabs, overrides)
+        gate_1_payload: dict = {
+            "policy": (
+                "auto-approved top tabs per workbook (gate1_overrides applied)"
+                if overrides
+                else "auto-approved top tabs per workbook"
+            ),
+            "approved_tabs": approved_tabs,
+        }
+        if overrides:
+            gate_1_payload["overrides_applied"] = overrides
+        write_json(gate_1_path, gate_1_payload)
 
     deep_results: list[dict] = []
     candidate_columns: list[dict] = []

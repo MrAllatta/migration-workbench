@@ -18,6 +18,14 @@ class Command(BaseCommand):
         parser.add_argument("--out-dir", required=True, help="Output directory for profiling artifacts")
         parser.add_argument("--date-stamp", default=None, help="Optional date stamp override (YYYY-MM-DD)")
         parser.add_argument("--smoke", action="store_true", help="Run without Google API calls")
+        parser.add_argument(
+            "--resume-from-gate1",
+            action="store_true",
+            help=(
+                "Skip Gate 1 generation and read tab_approval_gate1_<date>.json from --out-dir to "
+                "drive the deep-profile pass. Use after hand-editing the gate1 file."
+            ),
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -51,6 +59,7 @@ class Command(BaseCommand):
             config=config,
             out_dir=out_dir,
             date_stamp=date_stamp,
+            resume_from_gate1=options.get("resume_from_gate1", False),
         )
         self.stdout.write(self.style.SUCCESS("profile_multiyear wrote artifacts:"))
         for key, path in outputs.items():

@@ -1,9 +1,16 @@
 import json
 from io import StringIO
 
+import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
-from profiler.tools.farm.multiyear import build_multiyear_index, score_tab, select_tabs_from_inventory
+from profiler.tools.farm.multiyear import (
+    apply_gate1_overrides,
+    build_multiyear_index,
+    score_tab,
+    select_tabs_from_inventory,
+)
 
 
 def test_build_multiyear_index_filters_in_scope_codes():
@@ -69,4 +76,86 @@ def test_profile_preflight_smoke_ok():
     out = StringIO()
     call_command("profile_preflight", smoke=True, stdout=out)
     assert "smoke ok" in out.getvalue()
+
+
+def test_apply_gate1_overrides_no_overrides_returns_copy():
+    approved = {"301": ["A", "B"], "401": ["C"]}
+    merged = apply_gate1_overrides(approved, None)
+    assert merged == approved
+    merged["301"].append("X")
+    assert approved["301"] == ["A", "B"]
+
+
+def test_apply_gate1_overrides_delta_add_and_remove():
+    approved = {"503": ["Crop Plan", "Crop Plan 402"], "601": ["Market", "Orders"]}
+    overrides = {
+        "503": {"add": ["Block Map"], "remove": ["Crop Plan"]},
+        "601": {"add": ["Field Walk"]},
+    }
+    merged = apply_gate1_overrides(approved, overrides)
+    assert merged["503"] == ["Crop Plan 402", "Block Map"]
+    assert merged["601"] == ["Market", "Orders", "Field Walk"]
+
+
+def test_apply_gate1_overrides_add_dedupes_existing_entries():
+    approved = {"602": ["Harvest List", "Pack List"]}
+    merged = apply_gate1_overrides(approved, {"602": {"add": ["Harvest List", "Pack List"]}})
+    assert merged["602"] == ["Harvest List", "Pack List"]
+
+
+def test_apply_gate1_overrides_replace_supersedes_heuristics():
+    approved = {"402": ["Crop Planner", "Crop Plan 501+503+801"]}
+    overrides = {"402": {"replace": True, "tabs": ["Custom Only"]}}
+    merged = apply_gate1_overrides(approved, overrides)
+    assert merged["402"] == ["Custom Only"]
+
+
+def test_apply_gate1_overrides_applies_to_missing_workbook_code():
+    approved: dict[str, list[str]] = {}
+    overrides = {"103": {"add": ["Blocks 201 + 401"]}}
+    merged = apply_gate1_overrides(approved, overrides)
+    assert merged == {"103": ["Blocks 201 + 401"]}
+
+
+def test_apply_gate1_overrides_rejects_unknown_keys():
+    with pytest.raises(CommandError, match="unknown keys"):
+        apply_gate1_overrides({"301": ["A"]}, {"301": {"swap": ["B"]}})
+
+
+def test_apply_gate1_overrides_rejects_tabs_without_replace_flag():
+    with pytest.raises(CommandError, match="without 'replace: true'"):
+        apply_gate1_overrides({"301": ["A"]}, {"301": {"tabs": ["B"]}})
+
+
+def test_apply_gate1_overrides_rejects_replace_without_tabs():
+    with pytest.raises(CommandError, match="requires 'tabs'"):
+        apply_gate1_overrides({"301": ["A"]}, {"301": {"replace": True}})
+
+
+def test_apply_gate1_overrides_rejects_non_string_entries():
+    with pytest.raises(CommandError, match=r"add must be a list of strings"):
+        apply_gate1_overrides({"301": ["A"]}, {"301": {"add": [1]}})
+
+
+def test_apply_gate1_overrides_rejects_non_mapping_entry():
+    with pytest.raises(CommandError, match="must be a mapping"):
+        apply_gate1_overrides({"301": ["A"]}, {"301": ["B"]})
+
+
+def test_profile_multiyear_smoke_accepts_resume_from_gate1_flag(tmp_path):
+    config = {"folder_id": "folder-1", "in_scope_workbooks": ["201"]}
+    config_path = tmp_path / "multiyear.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    out = StringIO()
+    call_command(
+        "profile_multiyear",
+        config=str(config_path),
+        out_dir=str(tmp_path),
+        date_stamp="2026-04-28",
+        smoke=True,
+        resume_from_gate1=True,
+        stdout=out,
+    )
+    assert (tmp_path / "profile_multiyear_smoke_2026-04-28.json").exists()
 
