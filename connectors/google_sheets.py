@@ -49,14 +49,25 @@ def extract_spreadsheet_id(value):
 
 def get_service_account_credentials(scopes=None):
     import google.auth
+    from google.auth import impersonated_credentials
     from google.oauth2 import service_account
 
     credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    impersonate_service_account = os.environ.get("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT")
     requested_scopes = scopes or [SHEETS_READONLY_SCOPE]
 
     # Cloud runtimes can use Application Default Credentials from the attached
     # service account without mounting a JSON key file.
     if not credentials_path:
+        if impersonate_service_account:
+            # Keep user ADC on cloud-platform only, then mint scoped tokens via SA impersonation.
+            source_credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            return impersonated_credentials.Credentials(
+                source_credentials=source_credentials,
+                target_principal=impersonate_service_account,
+                target_scopes=requested_scopes,
+                lifetime=3600,
+            )
         credentials, _ = google.auth.default(scopes=requested_scopes)
         return credentials
 

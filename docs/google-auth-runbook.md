@@ -53,3 +53,20 @@ Minimum WIF migration checklist:
 2. Bind external principals to impersonate `mw-profiler`.
 3. Keep `roles/iam.serviceAccountTokenCreator` scoped to intended operators/CI identities.
 4. Update runbooks to use ADC/WIF credential config instead of service-account key files.
+
+## April 2026 troubleshooting note (personal Google account)
+
+Observed during profiling setup:
+
+- Running `gcloud auth application-default login` with explicit Drive/Sheets scopes hit **"This app is blocked"** in browser consent.
+- Logging in with service-account impersonation worked:
+  - `gcloud auth application-default login --impersonate-service-account=<SA> --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive.readonly,https://www.googleapis.com/auth/spreadsheets.readonly`
+- Required IAM grants on the target service account for the operator:
+  - `roles/iam.serviceAccountTokenCreator`
+  - `roles/iam.serviceAccountUser`
+- With those grants, profiling commands succeeded using the generated ADC file.
+
+Important gotcha:
+
+- Do **not** also set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT` in the shell when ADC is already of type `impersonated_service_account`.
+- That creates a second impersonation hop and can fail with `iam.serviceAccounts.getAccessToken` permission errors.
