@@ -182,7 +182,7 @@ def select_tabs_from_inventory(index_records: list[dict], inventory_rows: list[d
     return selected
 
 
-def auto_gate_tabs(tab_shortlist: list[dict], *, per_workbook: int = 2) -> dict[str, list[str]]:
+def auto_gate_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[str, list[str]]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
@@ -398,7 +398,7 @@ def run_multiyear(
         },
     )
 
-    approved_tabs = auto_gate_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 2)))
+    approved_tabs = auto_gate_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
     gate_1_path = out_dir / f"tab_approval_gate1_{date_stamp}.json"
     write_json(gate_1_path, {"policy": "auto-approved top tabs per workbook", "approved_tabs": approved_tabs})
 
