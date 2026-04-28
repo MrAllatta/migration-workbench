@@ -1,7 +1,7 @@
 {
   "generated_from": "deep_profile_coverage_2026-04-28.json",
-  "candidate_count": 210,
-  "selected_count": 82,
+  "candidate_count": 86,
+  "selected_count": 22,
   "selected": [
     {
       "workbook_code": "402",
@@ -74,27 +74,6 @@
       }
     },
     {
-      "workbook_code": "602",
-      "year": 2024,
-      "spreadsheet_id": "12IelGLyoDsoIpiDNv-uFpiL0ezODVnAci6P57x-_hmE",
-      "tab_title": "Harvest List",
-      "column_letter": "A",
-      "column_header": "HARVEST LIST",
-      "proposed_canonical_field": "harvest_list",
-      "priority_score": 5,
-      "priority_reasons": [
-        "domain_keyword",
-        "formula_rich_tab",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 3512,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
       "workbook_code": "201",
       "year": 2024,
       "spreadsheet_id": "12IiK6HlzEjz8rynMjjfnrdtQfDIcwNPOYsDYMkx8lsw",
@@ -116,8 +95,8 @@
     },
     {
       "workbook_code": "201",
-      "year": 2024,
-      "spreadsheet_id": "12IiK6HlzEjz8rynMjjfnrdtQfDIcwNPOYsDYMkx8lsw",
+      "year": 2026,
+      "spreadsheet_id": "1290SHLKSll1yniq5xeBWt4HcsQKNOIqviukvO7DU0r4",
       "tab_title": "Crop by Season",
       "column_letter": "A",
       "column_header": "Crop Reference Information",
@@ -136,8 +115,8 @@
     },
     {
       "workbook_code": "202",
-      "year": 2024,
-      "spreadsheet_id": "1zaHAjvWMHCZsljXz0vsBYXco3WIxGbgr1ROWoUvrXeY",
+      "year": 2025,
+      "spreadsheet_id": "1RAFxlODPSNMzpIvFucPTepymt4HBxhn6VIZ4V05fkkQ",
       "tab_title": "Resale Formats",
       "column_letter": "A",
       "column_header": "Choose Formats For Resale Products",
@@ -155,566 +134,6 @@
       }
     },
     {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "O",
-      "column_header": "Crop",
-      "proposed_canonical_field": "crop",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "C",
-      "column_header": "Distribution Date",
-      "proposed_canonical_field": "distribution_date",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "B",
-      "column_header": "Distribution Week Number",
-      "proposed_canonical_field": "distribution_week_number",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "A",
-      "column_header": "Distribution Year",
-      "proposed_canonical_field": "distribution_year",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "K",
-      "column_header": "End Qty",
-      "proposed_canonical_field": "end_qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "D",
-      "column_header": "Harvest Date",
-      "proposed_canonical_field": "harvest_date",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "P",
-      "column_header": "Harvest Qty",
-      "proposed_canonical_field": "harvest_qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "N",
-      "column_header": "Harvest Reference",
-      "proposed_canonical_field": "harvest_reference",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "Q",
-      "column_header": "Harvest Unit",
-      "proposed_canonical_field": "harvest_unit",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "I",
-      "column_header": "Price",
-      "proposed_canonical_field": "price",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "F",
-      "column_header": "Product",
-      "proposed_canonical_field": "product",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "R",
-      "column_header": "Qty to Harvest",
-      "proposed_canonical_field": "qty_to_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2025,
-      "spreadsheet_id": "1ADT_YFVgS0ocf6HG113a5_sdCVoR_Fcf-U86ILCkOOY",
-      "tab_title": "i|Markets",
-      "column_letter": "E",
-      "column_header": "Sales Channel",
-      "proposed_canonical_field": "sales_channel",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Markets",
-      "column_letter": "J",
-      "column_header": "Start Qty",
-      "proposed_canonical_field": "start_qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "K",
-      "column_header": "Actual Order",
-      "proposed_canonical_field": "actual_order",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "O",
-      "column_header": "Crop",
-      "proposed_canonical_field": "crop",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "C",
-      "column_header": "Distribution Date",
-      "proposed_canonical_field": "distribution_date",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "B",
-      "column_header": "Distribution Week Number",
-      "proposed_canonical_field": "distribution_week_number",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "A",
-      "column_header": "Distribution Year",
-      "proposed_canonical_field": "distribution_year",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "D",
-      "column_header": "Harvest Date",
-      "proposed_canonical_field": "harvest_date",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "P",
-      "column_header": "Harvest Qty",
-      "proposed_canonical_field": "harvest_qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "N",
-      "column_header": "Harvest Reference",
-      "proposed_canonical_field": "harvest_reference",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "Q",
-      "column_header": "Harvest Unit",
-      "proposed_canonical_field": "harvest_unit",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "I",
-      "column_header": "Price",
-      "proposed_canonical_field": "price",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "F",
-      "column_header": "Product",
-      "proposed_canonical_field": "product",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "J",
-      "column_header": "QTY Available",
-      "proposed_canonical_field": "qty_available",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "S",
-      "column_header": "Qty Forecast Harvest",
-      "proposed_canonical_field": "qty_forecast_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
-      "workbook_code": "301",
-      "year": 2024,
-      "spreadsheet_id": "1-PHM1RsfsBUaeWUUtkgAiJapseI5QTX58q-z_TpnZ3E",
-      "tab_title": "i|Orders",
-      "column_letter": "R",
-      "column_header": "Qty to Harvest",
-      "proposed_canonical_field": "qty_to_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 1,
-        "functions_used": [
-          "IMPORTRANGE"
-        ]
-      }
-    },
-    {
       "workbook_code": "302",
       "year": 2024,
       "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
@@ -837,614 +256,13 @@
         "functions_used": [
           "MAKEARRAY",
           "MATCH"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "K",
-      "column_header": "Approx Harvest Unit Weight",
-      "proposed_canonical_field": "approx_harvest_unit_weight",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "A",
-      "column_header": "Channel",
-      "proposed_canonical_field": "channel",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "H",
-      "column_header": "Crop",
-      "proposed_canonical_field": "crop",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "I",
-      "column_header": "Harvest Qty",
-      "proposed_canonical_field": "harvest_qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "J",
-      "column_header": "Harvest Unit",
-      "proposed_canonical_field": "harvest_unit",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "D",
-      "column_header": "Harvest Week",
-      "proposed_canonical_field": "harvest_week",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "C",
-      "column_header": "Harvest Year",
-      "proposed_canonical_field": "harvest_year",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "B",
-      "column_header": "Product",
-      "proposed_canonical_field": "product",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "E",
-      "column_header": "Qty",
-      "proposed_canonical_field": "qty",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "302",
-      "year": 2024,
-      "spreadsheet_id": "1e4V_PsZ4Iq4heQIIsb_LQkqGA_VS-uOgQndat35pBbQ",
-      "tab_title": "Sales Plan 301",
-      "column_letter": "L",
-      "column_header": "Qty to Harvest",
-      "proposed_canonical_field": "qty_to_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 7,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "401",
-      "year": 2024,
-      "spreadsheet_id": "1e9j2_5uzpZDdUtWRR4j5CNglbKh2awSPKx4lF61EpK4",
-      "tab_title": "Step 3",
-      "column_letter": "A",
-      "column_header": "Bedfeet by Rotation Group",
-      "proposed_canonical_field": "bedfeet_by_rotation_group",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 6,
-        "functions_used": [
-          "MAX",
-          "ABS"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "D",
-      "column_header": "Bed #",
-      "proposed_canonical_field": "bed",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "C",
-      "column_header": "Block",
-      "proposed_canonical_field": "block",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "A",
-      "column_header": "Crop",
-      "proposed_canonical_field": "crop",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "B",
-      "column_header": "CROP & \nVARIETY",
-      "proposed_canonical_field": "crop_variety",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "O",
-      "column_header": "Forecasted Total Harvest",
-      "proposed_canonical_field": "forecasted_total_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "P",
-      "column_header": "Forecasted Weekly Harvest",
-      "proposed_canonical_field": "forecasted_weekly_harvest",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "F",
-      "column_header": "Harvest Weeks",
-      "proposed_canonical_field": "harvest_weeks",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "I",
-      "column_header": "Plan Bedft",
-      "proposed_canonical_field": "plan_bedft",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "K",
-      "column_header": "Plan Field Week",
-      "proposed_canonical_field": "plan_field_week",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "J",
-      "column_header": "Plan Field Year",
-      "proposed_canonical_field": "plan_field_year",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "L",
-      "column_header": "Relative First Harvest Week",
-      "proposed_canonical_field": "relative_first_harvest_week",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "M",
-      "column_header": "Relative Last Harvest Week",
-      "proposed_canonical_field": "relative_last_harvest_week",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "N",
-      "column_header": "Relative Last Storage Week",
-      "proposed_canonical_field": "relative_last_storage_week",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "R",
-      "column_header": "Rows\n/Bed",
-      "proposed_canonical_field": "rows_bed",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "U",
-      "column_header": "Seeder Settings",
-      "proposed_canonical_field": "seeder_settings",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "S",
-      "column_header": "Seeds\n/ft (DS)",
-      "proposed_canonical_field": "seeds_ft_ds",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "G",
-      "column_header": "Weekly Yield Per Bedfoot",
-      "proposed_canonical_field": "weekly_yield_per_bedfoot",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "E",
-      "column_header": "Weeks To Maturity",
-      "proposed_canonical_field": "weeks_to_maturity",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "501",
-      "year": 2024,
-      "spreadsheet_id": "1KI6teCuOo4OCHrASowkRDRW8KdUrzwPmf8f-wzzMxf4",
-      "tab_title": "Crop Plan 402",
-      "column_letter": "H",
-      "column_header": "Yield Units",
-      "proposed_canonical_field": "yield_units",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
         ]
       }
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "A",
       "column_header": "CROP & \nVARIETY",
@@ -1463,8 +281,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "H",
       "column_header": "Nursery Pot Up Week",
@@ -1483,8 +301,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "G",
       "column_header": "Nursery Pot Up Year",
@@ -1503,28 +321,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
-      "tab_title": "Nursery Plan 402",
-      "column_letter": "N",
-      "column_header": "Nursery Seeding Notes",
-      "proposed_canonical_field": "nursery_seeding_notes",
-      "priority_score": 4,
-      "priority_reasons": [
-        "domain_keyword",
-        "function_usage_present"
-      ],
-      "evidence": {
-        "formula_cell_count": 2,
-        "functions_used": [
-          "ARRAY_CONSTRAIN"
-        ]
-      }
-    },
-    {
-      "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "C",
       "column_header": "Nursery Seeding Week",
@@ -1543,8 +341,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "B",
       "column_header": "Nursery Seeding Year",
@@ -1583,8 +381,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "D",
       "column_header": "Seeded \nTray Size",
@@ -1603,8 +401,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "E",
       "column_header": "Seeds Per Cell",
@@ -1623,8 +421,8 @@
     },
     {
       "workbook_code": "502",
-      "year": 2024,
-      "spreadsheet_id": "1nn54Oicy0I2KTI2UuvSi0Lujiaf_gCoK2C9tYR_DoBY",
+      "year": 2026,
+      "spreadsheet_id": "1aVIqZZPZhAG9YxbV-LYxeLV069bPlmOXaDCeKmOjvmI",
       "tab_title": "Nursery Plan 402",
       "column_letter": "F",
       "column_header": "Trays To Seed",
@@ -1642,24 +440,21 @@
       }
     },
     {
-      "workbook_code": "601",
-      "year": 2024,
-      "spreadsheet_id": "1-uLx2ug18xci0fzVl071f936f0Y81RAJKzmQ5nQ6e4Y",
-      "tab_title": "Market",
+      "workbook_code": "602",
+      "year": 2023,
+      "spreadsheet_id": "1AUnxFSL5ZKV7p753ktk6GYIy3hRoDQzWdxwcBUOwZ8I",
+      "tab_title": "Harvest List",
       "column_letter": "A",
-      "column_header": "Market",
-      "proposed_canonical_field": "market",
+      "column_header": "HARVEST LIST",
+      "proposed_canonical_field": "harvest_list",
       "priority_score": 4,
       "priority_reasons": [
         "domain_keyword",
-        "function_usage_present"
+        "formula_rich_tab"
       ],
       "evidence": {
-        "formula_cell_count": 10,
-        "functions_used": [
-          "ARRAY_CONSTRAIN",
-          "WEEKNUM"
-        ]
+        "formula_cell_count": 12090,
+        "functions_used": []
       }
     }
   ]

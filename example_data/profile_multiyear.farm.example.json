@@ -1,7 +1,7 @@
 {
   "folder_id": "1rVKuvkLTF--ogy1rjBQ3N0l3cH3A20nI",
   "folder_name": "Crop Plans",
-  "in_scope_workbooks": ["201", "202", "301", "302", "401", "402", "501", "502", "503", "601", "602"],
+  "in_scope_workbooks": ["103", "201", "202", "301", "302", "401", "402", "501", "502", "503", "601", "602"],
   "tab_auto_limit": 2,
   "column_min_score": 4
 }
