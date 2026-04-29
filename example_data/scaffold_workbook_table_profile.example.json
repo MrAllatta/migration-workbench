@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "doc_name": "Example",
+    "table_id": "grid-xxx",
+    "table_name": "Clients",
+    "columns": [
+      {
+        "name": "First",
+        "format_type": "text",
+        "has_formula": false,
+        "null_rate": 0.1,
+        "unique_count_sample": 42,
+        "is_relation_type": false
+      },
+      {
+        "name": "Last",
+        "format_type": "text",
+        "has_formula": false,
+        "null_rate": 0.05,
+        "unique_count_sample": 40,
+        "is_relation_type": false
+      },
+      {
+        "name": "Notes",
+        "format_type": "richText",
+        "has_formula": false,
+        "null_rate": 0.5,
+        "unique_count_sample": 12,
+        "is_relation_type": false
+      }
+    ]
+  },
+  "columns_raw": [],
+  "rows_sample": []
+}

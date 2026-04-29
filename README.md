@@ -19,6 +19,8 @@ Reusable profiler and importer chassis for tabular workbook-to-app migrations.
 
 Profiling (Google Sheets, Drive, Coda) lives under `manage.py`; see **`docs/quickstart.md`** and **`docs/coda-runbook.md`**. Makefile targets **`profile-coda-preflight`** and **`profile-coda-corpus`** wrap the Coda smoke flows (`CODA_CORPUS_CONFIG` / `CODA_CORPUS_OUT_DIR` for the latter).
 
+Schema scaffolding (**workbook** app): `python manage.py scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out /tmp/schema-contract.yaml` (writes YAML for product repos to refine into Django models; see **`docs/architecture.md`**).
+
 ## Database Modes
 
 - `DB_ENGINE=sqlite` (default)

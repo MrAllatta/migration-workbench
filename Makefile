@@ -79,5 +79,6 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config example_data/coda_corpus.example.json --out-dir build/_out/coda-corpus-smoke --smoke
 	DB_ENGINE=sqlite $(MANAGE) pull_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
+	DB_ENGINE=sqlite $(MANAGE) scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out build/_out/schema-contract-smoke.yaml
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --summary-json build/_out/apply-example.json

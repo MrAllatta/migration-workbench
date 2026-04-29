@@ -13,6 +13,7 @@ dependencies = [
   "google-api-python-client",
   "google-auth",
   "google-auth-oauthlib",
+  "PyYAML>=6.0",
   "requests>=2.31",
 ]
 
@@ -27,7 +28,7 @@ dev = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*"]
+include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*", "workbook*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "migration_workbench.settings"

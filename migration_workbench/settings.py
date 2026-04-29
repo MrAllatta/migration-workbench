@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "profiler",
     "importer",
     "examples",
+    "workbook",
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,13 @@
+{
+  "provider": "coda",
+  "doc_url": "https://coda.io/d/Example_dXXXXXXXX",
+  "doc_id": "XXXXXXXX",
+  "source_id": "example",
+  "tabs": [
+    {
+      "worksheet_title": "Clients",
+      "output_path": "reference/clients.csv",
+      "required_headers": ["First", "Last", "Notes"]
+    }
+  ]
+}
