@@ -1,4 +1,9 @@
+from unittest.mock import patch
+
+from connectors.coda import CodaAdapter
+from connectors.coda_source import extract_coda_doc_id, rows_to_grid
 from connectors.google_sheets import extract_drive_folder_id, resolve_spreadsheet
+from connectors.router import build_provider_adapter
 from connectors.spreadsheet import normalize_rows, summarize_header_detection_failure
 
 
@@ -87,3 +92,51 @@ def test_summarize_header_detection_failure_reports_candidates():
     summary = summarize_header_detection_failure(rows, required_headers=["Crop", "Channel"])
     assert summary["required_header_count"] == 2
     assert summary["top_candidates"]
+
+
+def test_extract_coda_doc_id_from_url():
+    url = "https://coda.io/d/VG-2025_dCMrB5f1AZE"
+    assert extract_coda_doc_id(url) == "dCMrB5f1AZE"
+    assert extract_coda_doc_id("dRawId123") == "dRawId123"
+
+
+def test_rows_to_grid_orders_by_columns():
+    cols = [{"id": "a", "name": "B"}, {"id": "b", "name": "A"}]
+    rows = [{"values": {"A": "1", "B": "2"}}]
+    grid = rows_to_grid(cols, rows)
+    assert grid[0] == ["B", "A"]
+    assert grid[1] == ["2", "1"]
+
+
+def test_coda_adapter_routes_via_router_with_doc_url(monkeypatch):
+    monkeypatch.setenv("CODA_API_TOKEN", "test-token-for-router")
+    adapter = build_provider_adapter({"provider": "coda", "doc_url": "https://coda.io/d/VG-2025_dCMrB5f1AZE"})
+    assert isinstance(adapter, CodaAdapter)
+    assert adapter.doc_id == "dCMrB5f1AZE"
+
+
+def test_coda_adapter_fetch_tab_rows_with_patched_helpers(monkeypatch):
+    monkeypatch.setenv("CODA_API_TOKEN", "t")
+
+    def fake_list_tables(session, doc_id):
+        return [{"id": "tbl-1", "name": "Clients", "type": "table"}]
+
+    def fake_list_columns(session, doc_id, table_id):
+        return [{"id": "c1", "name": "Name", "format": {"type": "text"}}]
+
+    def fake_list_rows(session, doc_id, table_id, **kwargs):
+        return [{"id": "r1", "values": {"Name": "Alice"}}]
+
+    def fake_to_grid(columns, rows):
+        return [["Name"], ["Alice"]]
+
+    with (
+        patch("connectors.coda.list_tables", fake_list_tables),
+        patch("connectors.coda.list_columns", fake_list_columns),
+        patch("connectors.coda.list_rows", fake_list_rows),
+        patch("connectors.coda.rows_to_grid", fake_to_grid),
+    ):
+        adapter = CodaAdapter({"doc_url": "https://coda.io/d/X_doc1"})
+        out = adapter.fetch_tab_rows({"worksheet_title": "Clients"})
+    assert out["rows"] == [["Name"], ["Alice"]]
+    assert out["worksheet_title"] == "Clients"

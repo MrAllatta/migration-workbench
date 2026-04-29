@@ -59,7 +59,10 @@ chassis-gate:
 	DB_ENGINE=sqlite $(PYTEST) connectors profiler/tests importer/tests examples/tests
 	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_tab --smoke
+	DB_ENGINE=sqlite $(MANAGE) profile_coda_doc --smoke
+	DB_ENGINE=sqlite $(MANAGE) profile_coda_table --smoke
 	DB_ENGINE=sqlite $(MANAGE) scan_formula_patterns --config example_data/scan_formula_patterns.example.json --out build/_out/scan-formula-smoke.json --smoke
+	DB_ENGINE=sqlite $(MANAGE) scan_coda_formula_columns --config example_data/scan_coda_formula_columns.example.json --out build/_out/scan-coda-smoke.json --smoke
 	DB_ENGINE=sqlite $(MANAGE) pull_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json

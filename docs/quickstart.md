@@ -34,9 +34,11 @@ Then run:
 python manage.py migrate
 ```
 
-## 3) Profile source spreadsheets before designing import rules
+## 3) Profile source spreadsheets (or Coda docs) before designing import rules
 
-These management commands are the read-only profiling surface:
+These management commands are the read-only profiling surface.
+
+**Google Sheets / Drive**
 
 - `python manage.py profile_preflight --folder <drive-folder-id-or-url>`
 - `python manage.py profile_drive_folder --folder <drive-folder-id-or-url> --out data/profile_snapshots/folder.json`
@@ -45,10 +47,17 @@ These management commands are the read-only profiling surface:
 - `python manage.py scan_formula_patterns --config scan-config.json --out data/profile_snapshots/formula_matches.json`
 - `python manage.py profile_cohort_corpus --config example_data/cohort_corpus.example.json --out-dir data/profile_snapshots`
 
-Authentication and shared-service-account setup guidance lives in `docs/google-auth-runbook.md`.
-Prefer ADC user login plus service-account impersonation over per-client key files.
+**Coda**
 
-`scan_formula_patterns` expects a config JSON shaped like:
+- `python manage.py profile_coda_doc --doc <doc-url-or-id> --out data/profile_snapshots/coda_doc.json`
+- `python manage.py profile_coda_table --doc <doc-url-or-id> --table "<table or view name>" --out data/profile_snapshots/coda_table.json`
+- `python manage.py scan_coda_formula_columns --config scan-coda.json --out data/profile_snapshots/coda_formulas.json`
+
+Sheets authentication and shared-service-account setup: `docs/google-auth-runbook.md` (prefer ADC user login plus service-account impersonation over per-client key files).
+
+Coda setup: `docs/coda-runbook.md` (bearer token `CODA_API_TOKEN`, doc URL vs id, formula scanning at column level).
+
+`scan_formula_patterns` expects:
 
 ```json
 {
@@ -56,6 +65,8 @@ Prefer ADC user login plus service-account impersonation over per-client key fil
   "patterns": [{"name": "importrange", "regex": "IMPORTRANGE\\(" }]
 }
 ```
+
+`scan_coda_formula_columns` expects the same `patterns` array, but each workbook entry uses `doc_url` or `doc_id` instead of `spreadsheet_id` (see `example_data/scan_coda_formula_columns.example.json`).
 
 ## 4) Keep client-specific behavior in the product repo
 

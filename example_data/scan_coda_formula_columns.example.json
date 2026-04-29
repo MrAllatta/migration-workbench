@@ -1,0 +1,20 @@
+{
+  "workbooks": [
+    {
+      "name": "Example Coda doc",
+      "doc_url": "https://coda.io/d/Example_dReplaceWithRealDocId"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "thisrow_lookup",
+      "regex": "thisRow\\.",
+      "ignore_case": true
+    },
+    {
+      "name": "filter_call",
+      "regex": "\\bFilter\\(",
+      "ignore_case": true
+    }
+  ]
+}

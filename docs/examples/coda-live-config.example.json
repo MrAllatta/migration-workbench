@@ -1,0 +1,12 @@
+{
+  "provider": "coda",
+  "doc_url": "https://coda.io/d/Example_dReplaceWithRealDocId",
+  "source_id": "example-coda-source",
+  "tabs": [
+    {
+      "worksheet_title": "ReplaceWithTableName",
+      "output_path": "reference/example.csv",
+      "required_headers": ["Column A", "Column B"]
+    }
+  ]
+}
