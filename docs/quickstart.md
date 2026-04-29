@@ -49,9 +49,11 @@ These management commands are the read-only profiling surface.
 
 **Coda**
 
+- `python manage.py profile_coda_preflight` — optional `--doc <url-or-id>`; use `--smoke` without network
 - `python manage.py profile_coda_doc --doc <doc-url-or-id> --out data/profile_snapshots/coda_doc.json`
 - `python manage.py profile_coda_table --doc <doc-url-or-id> --table "<table or view name>" --out data/profile_snapshots/coda_table.json`
 - `python manage.py scan_coda_formula_columns --config scan-coda.json --out data/profile_snapshots/coda_formulas.json`
+- `python manage.py profile_coda_corpus --config example_data/coda_corpus.example.json --out-dir data/profile_snapshots/coda_corpus` — multi-doc discovery → selection → deep profiles; `--smoke` writes stub artifacts; `--resume-from-table-selection` after editing `table_selection_<date>.json`
 
 Sheets authentication and shared-service-account setup: `docs/google-auth-runbook.md` (prefer ADC user login plus service-account impersonation over per-client key files).
 

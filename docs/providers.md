@@ -30,6 +30,8 @@ Tabs: each tab entry uses `worksheet_title` (table or view **name**) or `table_i
 
 Formulas: Coda returns **column-level** `formulaText`, not per-cell formulas. Use `scan_coda_formula_columns` for regex inventory; see `docs/coda-runbook.md`.
 
+Profiling commands (read-only): **`profile_coda_preflight`** (token / optional doc check), **`profile_coda_doc`**, **`profile_coda_table`** (includes null-rate/ref hints and view vs base flags), **`scan_coda_formula_columns`**, and **`profile_coda_corpus`** (multi-doc pipeline; example config `example_data/coda_corpus.example.json`). Implementation details: `connectors/coda_source.py` (`get_whoami`, `analyze_column_values`, …) and `profiler/tools/coda_corpus.py`.
+
 Operational notes:
 
 - Share-link visibility matches the token’s Coda user; the API cannot read docs the user cannot open.

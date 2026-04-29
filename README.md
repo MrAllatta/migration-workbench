@@ -17,6 +17,8 @@ Reusable profiler and importer chassis for tabular workbook-to-app migrations.
 - `python manage.py import_reference_example example_data --validate-only`
 - `python manage.py import_reference_example example_data`
 
+Profiling (Google Sheets, Drive, Coda) lives under `manage.py`; see **`docs/quickstart.md`** and **`docs/coda-runbook.md`**. Makefile targets **`profile-coda-preflight`** and **`profile-coda-corpus`** wrap the Coda smoke flows (`CODA_CORPUS_CONFIG` / `CODA_CORPUS_OUT_DIR` for the latter).
+
 ## Database Modes
 
 - `DB_ENGINE=sqlite` (default)

@@ -34,6 +34,45 @@ def test_scan_coda_formula_columns_smoke_writes_output(tmp_path):
     assert result["workbooks"] == ["Doc 1"]
 
 
+def test_profile_coda_preflight_smoke():
+    out = StringIO()
+    call_command("profile_coda_preflight", smoke=True, stdout=out)
+    assert "smoke ok" in out.getvalue()
+
+
+def test_profile_coda_corpus_smoke_writes_artifacts(tmp_path):
+    config = {
+        "docs": [
+            {"name": "Doc A", "doc_url": "https://coda.io/d/X_dDocId"},
+            {"name": "Doc B", "doc_url": "https://coda.io/d/Y_dDocId"},
+        ],
+        "table_auto_limit": 5,
+    }
+    config_path = tmp_path / "coda_corpus.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    out_dir = tmp_path / "out"
+    date_stamp = "2026-04-29"
+
+    call_command(
+        "profile_coda_corpus",
+        config=str(config_path),
+        out_dir=str(out_dir),
+        date_stamp=date_stamp,
+        smoke=True,
+    )
+
+    discovery = out_dir / f"coda_discovery_{date_stamp}.json"
+    index = out_dir / f"coda_table_index_{date_stamp}.json"
+    assert discovery.exists()
+    assert index.exists()
+    d = json.loads(discovery.read_text(encoding="utf-8"))
+    idx = json.loads(index.read_text(encoding="utf-8"))
+    assert d["mode"] == "smoke"
+    assert idx["mode"] == "smoke"
+    assert idx["base_tables"] == []
+    assert idx["views"] == []
+
+
 def test_profile_coda_table_lists_tables(monkeypatch):
     monkeypatch.setenv("CODA_API_TOKEN", "test-token")
     fake_tables = [

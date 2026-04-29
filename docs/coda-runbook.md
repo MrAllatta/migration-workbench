@@ -11,6 +11,17 @@ Use this when the source of truth is a Coda doc (tables and views) instead of Go
 
 The token can only see docs your Coda user can open in the browser. If profiling returns empty or 403, confirm doc sharing and token scope.
 
+### Auth check
+
+After setting `CODA_API_TOKEN`, verify the token with **`profile_coda_preflight`** (calls `GET /whoami`). Optionally pass **`--doc <url-or-id>`** to confirm a specific doc is readable.
+
+```bash
+python manage.py profile_coda_preflight
+python manage.py profile_coda_preflight --doc "$CODA_DOC_URL"
+```
+
+Use **`--smoke`** for CI-style checks without network calls (no token required).
+
 ## Doc URL vs doc id
 
 Share links look like `https://coda.io/d/<slug>_<suffix>`. The Coda API doc id is usually the substring after `_d` in that segment (see the official doc ID help on [coda.io/api](https://coda.io/api)). The workbench also calls **`GET /resolveBrowserLink`** when you pass a full `https://coda.io/...` URL so the resolved doc id is used even when the slug pattern is unusual.
@@ -31,7 +42,7 @@ Coda may return HTTP 429. The HTTP client in `connectors/coda_source.py` retries
 
    Add `--no-columns` to skip per-table column calls when the doc is huge.
 
-2. **Per-table drill-down** — column types, formula text, and a bounded row sample:
+2. **Per-table drill-down** — column types, formula text, per-column null rate / cardinality sample, cross-table **ref** hints (`ref_tables_seen`), and view vs base metadata:
 
    ```bash
    python manage.py profile_coda_table --doc "$CODA_DOC_URL" --table "Clients" --out data/profile_snapshots/clients.json
@@ -41,6 +52,8 @@ Coda may return HTTP 429. The HTTP client in `connectors/coda_source.py` retries
 
    `--focus-col` takes a **column name** (Coda headers are names, not A1 letters).
 
+   Summaries include **`is_view`**, **`parent_table`** (for views), and **`etl_importable`**. Normalized bundle import targets **base tables**; profiling views is still useful to understand filters and injected rows, but ETL should not treat a view as the canonical source sheet.
+
 3. **Formula scan** — Coda exposes formulas at the **column** level (`formulaText`), not per-cell like Sheets. Use:
 
    ```bash
@@ -49,7 +62,19 @@ Coda may return HTTP 429. The HTTP client in `connectors/coda_source.py` retries
 
    Config shape matches `scan_formula_patterns` except each workbook entry uses `doc_url` or `doc_id` instead of `spreadsheet_id`. See `example_data/scan_coda_formula_columns.example.json`.
 
-4. **Normalized bundle** — after `required_headers` are known for each tab, run:
+4. **Multi-doc corpus pipeline** (optional, parity with Sheets **`profile_cohort_corpus`**) — discovery across several docs, base-table-only broad profile, heuristic table selection, deep profiles, and column candidate shortlists:
+
+   ```bash
+   python manage.py profile_coda_corpus \
+     --config example_data/coda_corpus.example.json \
+     --out-dir data/profile_snapshots/coda_corpus_run
+   ```
+
+   Artifacts include `coda_discovery_<date>.json`, `coda_table_index_<date>.json`, `coda_broad_profile_<date>.json`, `table_shortlist_<date>.json`, `table_selection_<date>.json`, `deep/*.json`, `coda_deep_coverage_<date>.json`, `column_shortlist_<date>.json`, and `column_selection_<date>.json`. Edit **`table_selection_<date>.json`** (`approved_tables`: doc display name → table names) and re-run with **`--resume-from-table-selection`** to drive the deep pass without regenerating selection.
+
+   From the repo root, **`make profile-coda-corpus`** expects **`CODA_CORPUS_CONFIG`** and optional **`CODA_CORPUS_OUT_DIR`** (see `Makefile`).
+
+5. **Normalized bundle** — after `required_headers` are known for each tab, run:
 
    ```bash
    python manage.py pull_bundle --config coda-live-config.json --output-dir data/bundle
@@ -62,9 +87,11 @@ Coda may return HTTP 429. The HTTP client in `connectors/coda_source.py` retries
 | Topic | Sheets | Coda |
 | --- | --- | --- |
 | Auth | Service account / ADC | Bearer `CODA_API_TOKEN` |
+| Auth smoke | `profile_preflight` | `profile_coda_preflight` |
 | Tab identity | Spreadsheet id + worksheet title | Doc id + table or view id/name |
 | Formulas | Cell-level in grid | Column-level `formulaText` |
-| `profile_drive_folder` | Folder tree of workbooks | N/A — use `profile_coda_doc` |
+| Multi-source automation | `profile_cohort_corpus` (Drive folder) | `profile_coda_corpus` (config list of docs) |
+| `profile_drive_folder` | Folder tree of workbooks | N/A — use `profile_coda_doc` per doc |
 
 ## Troubleshooting
 

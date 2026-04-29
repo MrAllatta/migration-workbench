@@ -1,0 +1,25 @@
+{
+  "docs": [
+    {
+      "name": "Main data",
+      "doc_url": "https://coda.io/d/X_dReplaceMe"
+    },
+    {
+      "name": "Reference",
+      "doc_url": "https://coda.io/d/Y_dReplaceMe"
+    }
+  ],
+  "table_auto_limit": 5,
+  "column_min_score": 3,
+  "max_rows_deep": 500,
+  "table_selection_overrides": {},
+  "heuristics": {
+    "table_score": {
+      "prefer_keywords": [],
+      "deprioritize_keywords": []
+    },
+    "column_score": {
+      "domain_keyword_tokens": []
+    }
+  }
+}
