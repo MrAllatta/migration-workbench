@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import Any
 from unittest.mock import patch
 
 from connectors.coda import CodaAdapter
@@ -37,8 +40,20 @@ def test_extract_drive_folder_id_from_url():
 def test_resolve_spreadsheet_search_descendants():
     drive = _FakeDriveService(
         {
-            "root": [{"id": "child", "name": "Nested", "mimeType": "application/vnd.google-apps.folder"}],
-            "child": [{"id": "sheet1", "name": "Workbook 601", "modifiedTime": "2026-04-28T10:00:00Z"}],
+            "root": [
+                {
+                    "id": "child",
+                    "name": "Nested",
+                    "mimeType": "application/vnd.google-apps.folder",
+                }
+            ],
+            "child": [
+                {
+                    "id": "sheet1",
+                    "name": "Workbook 601",
+                    "modifiedTime": "2026-04-28T10:00:00Z",
+                }
+            ],
         }
     )
     result = resolve_spreadsheet(
@@ -89,7 +104,9 @@ def test_summarize_header_detection_failure_reports_candidates():
         ["Crop", "Format"],
         ["Carrot", "Bunch"],
     ]
-    summary = summarize_header_detection_failure(rows, required_headers=["Crop", "Channel"])
+    summary = summarize_header_detection_failure(
+        rows, required_headers=["Crop", "Channel"]
+    )
     assert summary["required_header_count"] == 2
     assert summary["top_candidates"]
 
@@ -110,7 +127,9 @@ def test_rows_to_grid_orders_by_columns():
 
 def test_coda_adapter_routes_via_router_with_doc_url(monkeypatch):
     monkeypatch.setenv("CODA_API_TOKEN", "test-token-for-router")
-    adapter = build_provider_adapter({"provider": "coda", "doc_url": "https://coda.io/d/VG-2025_dCMrB5f1AZE"})
+    adapter = build_provider_adapter(
+        {"provider": "coda", "doc_url": "https://coda.io/d/VG-2025_dCMrB5f1AZE"}
+    )
     assert isinstance(adapter, CodaAdapter)
     assert adapter.doc_id == "CMrB5f1AZE"
 
@@ -140,3 +159,52 @@ def test_coda_adapter_fetch_tab_rows_with_patched_helpers(monkeypatch):
         out = adapter.fetch_tab_rows({"worksheet_title": "Clients"})
     assert out["rows"] == [["Name"], ["Alice"]]
     assert out["worksheet_title"] == "Clients"
+
+
+def test_coda_adapter_passes_max_rows_and_value_format(monkeypatch):
+    monkeypatch.setenv("CODA_API_TOKEN", "t")
+    captured: dict[str, Any] = {}
+
+    def fake_list_tables(session, doc_id, **kwargs):
+        return [{"id": "tbl-1", "name": "Clients", "type": "table"}]
+
+    def fake_list_columns(session, doc_id, table_id):
+        return [{"id": "c1", "name": "Name", "format": {"type": "text"}}]
+
+    def fake_list_rows(session, doc_id, table_id, **kwargs):
+        captured.update(kwargs)
+        return [{"id": "r1", "values": {"Name": "Alice"}}]
+
+    def fake_to_grid(columns, rows):
+        return [["Name"], ["Alice"]]
+
+    with (
+        patch("connectors.coda.list_tables", fake_list_tables),
+        patch("connectors.coda.list_columns", fake_list_columns),
+        patch("connectors.coda.list_rows", fake_list_rows),
+        patch("connectors.coda.rows_to_grid", fake_to_grid),
+    ):
+        adapter = CodaAdapter(
+            {
+                "doc_url": "https://coda.io/d/X_doc1",
+                "max_rows": 99,
+                "value_format": "simple",
+            }
+        )
+        adapter.fetch_tab_rows({"worksheet_title": "Clients", "max_rows": 5})
+    assert captured.get("max_rows") == 5
+    assert captured.get("value_format") == "simple"
+
+    captured.clear()
+    with (
+        patch("connectors.coda.list_tables", fake_list_tables),
+        patch("connectors.coda.list_columns", fake_list_columns),
+        patch("connectors.coda.list_rows", fake_list_rows),
+        patch("connectors.coda.rows_to_grid", fake_to_grid),
+    ):
+        adapter = CodaAdapter(
+            {"doc_url": "https://coda.io/d/X_doc1", "value_format": "simple"}
+        )
+        adapter.fetch_tab_rows({"worksheet_title": "Clients"})
+    assert captured.get("max_rows") is None
+    assert captured.get("value_format") == "simple"

@@ -22,10 +22,17 @@ class CodaAdapter(ProviderAdapter):
     def _resolve_table(self, tab_config: dict):
         if tab_config.get("table_id"):
             tid = tab_config["table_id"]
-            return tid, tab_config.get("table_name") or tab_config.get("worksheet_title") or tid
+            return (
+                tid,
+                tab_config.get("table_name")
+                or tab_config.get("worksheet_title")
+                or tid,
+            )
         name = tab_config.get("table_name") or tab_config.get("worksheet_title")
         if not name:
-            raise ValueError("Coda tab entry needs table_id, table_name, or worksheet_title")
+            raise ValueError(
+                "Coda tab entry needs table_id, table_name, or worksheet_title"
+            )
         if self._tables_by_name is None:
             tables = list_tables(self.session, self.doc_id)
             self._tables_by_name = {t["name"]: t for t in tables if t.get("name")}
@@ -37,7 +44,18 @@ class CodaAdapter(ProviderAdapter):
     def fetch_tab_rows(self, tab_config: dict) -> dict:
         table_id, table_name = self._resolve_table(tab_config)
         columns = list_columns(self.session, self.doc_id, table_id)
-        rows = list_rows(self.session, self.doc_id, table_id)
+        max_rows = tab_config.get("max_rows")
+        if max_rows is None:
+            max_rows = self.config.get("max_rows")
+        max_rows_i = int(max_rows) if max_rows is not None else None
+        vf = tab_config.get("value_format") or self.config.get("value_format") or "rich"
+        rows = list_rows(
+            self.session,
+            self.doc_id,
+            table_id,
+            max_rows=max_rows_i,
+            value_format=str(vf),
+        )
         grid = rows_to_grid(columns, rows)
         return {
             "rows": grid,

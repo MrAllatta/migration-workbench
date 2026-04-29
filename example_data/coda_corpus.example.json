@@ -9,6 +9,15 @@
       "doc_url": "https://coda.io/d/Y_dReplaceMe"
     }
   ],
+  "exclude_views": false,
+  "table_types": ["table", "view"],
+  "canvas": {
+    "enabled": false,
+    "max_pages": 50,
+    "max_chars_per_page": 50000,
+    "max_content_items": 5000,
+    "use_export": false
+  },
   "table_auto_limit": 5,
   "column_min_score": 3,
   "max_rows_deep": 500,

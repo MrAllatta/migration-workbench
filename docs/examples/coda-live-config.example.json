@@ -2,6 +2,7 @@
   "provider": "coda",
   "doc_url": "https://coda.io/d/Example_dReplaceWithRealDocId",
   "source_id": "example-coda-source",
+  "value_format": "rich",
   "tabs": [
     {
       "worksheet_title": "ReplaceWithTableName",

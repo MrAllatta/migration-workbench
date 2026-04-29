@@ -12,12 +12,17 @@ from django.core.management.base import CommandError
 from connectors.coda_source import (
     analyze_column_values,
     build_coda_session,
+    collect_page_content_items,
     column_has_formula,
+    export_page_markdown,
     formula_text,
     get_doc,
+    get_table,
     list_columns,
+    list_pages,
     list_rows,
     list_tables,
+    page_content_items_to_plain_text,
     resolve_doc_id,
     rows_to_grid,
 )
@@ -96,6 +101,7 @@ def build_coda_table_index(discovery_docs: list[dict[str, Any]]) -> dict[str, An
                 "rowCount": t.get("rowCount"),
                 "columnCount": t.get("columnCount"),
                 "parentTable": t.get("parentTable"),
+                "parent_page": t.get("parent"),
             }
             if str(t.get("type") or "").lower() == "view":
                 entry["is_importable"] = False
@@ -318,6 +324,145 @@ def load_coda_docs_from_config(
     return resolved
 
 
+def list_tables_for_config(
+    session: requests.Session, doc_id: str, config: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Respect *exclude_views* (wins over *table_types*) and optional *table_types*."""
+    if config.get("exclude_views"):
+        return list_tables(session, doc_id, exclude_views=True)
+    tt = config.get("table_types")
+    if isinstance(tt, list) and tt:
+        return list_tables(session, doc_id, table_types=[str(x) for x in tt])
+    return list_tables(session, doc_id)
+
+
+def enrich_table_row_counts(
+    session: requests.Session, doc_id: str, tables: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Fill missing ``rowCount`` via ``GET …/tables/{id}``."""
+    out: list[dict[str, Any]] = []
+    for t in tables:
+        tid = t.get("id")
+        if not tid or t.get("rowCount") is not None:
+            out.append(t)
+            continue
+        try:
+            detail = get_table(session, doc_id, str(tid))
+        except Exception:  # noqa: BLE001
+            out.append(t)
+            continue
+        merged = dict(t)
+        if detail.get("rowCount") is not None:
+            merged["rowCount"] = detail["rowCount"]
+        out.append(merged)
+    return out
+
+
+def collect_relationship_edges_from_summary(
+    doc_name: str,
+    doc_id: str,
+    from_table_id: str,
+    from_table_name: str,
+    summary: dict[str, Any],
+) -> list[dict[str, Any]]:
+    edges: list[dict[str, Any]] = []
+    for col in summary.get("columns") or []:
+        cname = col.get("name")
+        for ref in col.get("ref_tables_seen") or []:
+            tid = ref.get("tableId")
+            if not tid:
+                continue
+            edges.append(
+                {
+                    "doc_name": doc_name,
+                    "doc_id": doc_id,
+                    "from_table_id": from_table_id,
+                    "from_table_name": from_table_name,
+                    "from_column": cname,
+                    "to_table_id": tid,
+                    "to_table_name": ref.get("tableName"),
+                }
+            )
+    return edges
+
+
+def finalize_relationship_summary(
+    edges: list[dict[str, Any]],
+) -> dict[str, Any]:
+    uniq_links: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for e in edges:
+        key = (e["doc_id"], e["from_table_id"], e["to_table_id"])
+        if key not in uniq_links:
+            uniq_links[key] = {
+                "doc_id": e["doc_id"],
+                "from_table_name": e["from_table_name"],
+                "from_table_id": e["from_table_id"],
+                "to_table_id": e["to_table_id"],
+                "to_table_name": e["to_table_name"],
+            }
+    return {
+        "edge_count": len(edges),
+        "unique_table_link_count": len(uniq_links),
+        "edges": edges,
+        "unique_table_links": sorted(
+            uniq_links.values(),
+            key=lambda x: (x["doc_id"], x["from_table_id"], x["to_table_id"]),
+        ),
+    }
+
+
+def build_canvas_artifact_for_doc(
+    session: requests.Session,
+    doc_display_name: str,
+    doc_id: str,
+    canvas_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    """Pull plain text per page (or markdown export) for summarization pipelines."""
+    max_pages = int(canvas_cfg.get("max_pages") or 50)
+    max_chars = int(canvas_cfg.get("max_chars_per_page") or 50_000)
+    max_items = int(canvas_cfg.get("max_content_items") or 5000)
+    use_export = bool(canvas_cfg.get("use_export"))
+    all_pages = list_pages(session, doc_id)
+    pages_out: list[dict[str, Any]] = []
+    for p in all_pages[:max_pages]:
+        pid = p.get("id")
+        pname = p.get("name")
+        text = ""
+        err: str | None = None
+        try:
+            if use_export:
+                text = export_page_markdown(session, doc_id, str(pid))
+            else:
+                items = collect_page_content_items(
+                    session,
+                    doc_id,
+                    str(pid),
+                    max_items=max_items,
+                )
+                text = page_content_items_to_plain_text(items)
+        except Exception as exc:  # noqa: BLE001
+            err = f"{type(exc).__name__}: {exc}"
+        truncated = False
+        if len(text) > max_chars:
+            text = text[:max_chars] + "\n…[truncated]"
+            truncated = True
+        pages_out.append(
+            {
+                "id": pid,
+                "name": pname,
+                "plain_text": text,
+                "truncated": truncated,
+                "error": err,
+                "browserLink": p.get("browserLink"),
+            }
+        )
+    return {
+        "doc_name": doc_display_name,
+        "doc_id": doc_id,
+        "pages": pages_out,
+    }
+
+
 def run_coda_corpus(
     *,
     session: requests.Session,
@@ -339,11 +484,19 @@ def run_coda_corpus(
     doc_entries = load_coda_docs_from_config(session, config)
     discovery_docs: list[dict[str, Any]] = []
     for display_name, doc_id in doc_entries:
-        tables = list_tables(session, doc_id)
+        doc_meta_full = get_doc(session, doc_id)
+        tables = list_tables_for_config(session, doc_id, config)
+        tables = enrich_table_row_counts(session, doc_id, tables)
         discovery_docs.append(
             {
                 "name": display_name,
                 "doc_id": doc_id,
+                "doc_meta": {
+                    "id": doc_meta_full.get("id"),
+                    "name": doc_meta_full.get("name"),
+                    "updatedAt": doc_meta_full.get("updatedAt"),
+                    "docSize": doc_meta_full.get("docSize"),
+                },
                 "tables": tables,
             }
         )
@@ -454,6 +607,7 @@ def run_coda_corpus(
     deep_dir = out_dir / "deep"
     deep_results: list[dict[str, Any]] = []
     candidate_columns: list[dict[str, Any]] = []
+    relationship_edges: list[dict[str, Any]] = []
 
     name_to_doc_id = {d["name"]: d["doc_id"] for d in discovery_docs}
 
@@ -539,6 +693,15 @@ def run_coda_corpus(
                         column_score_heuristics=column_score_heuristics,
                     )
                 )
+                relationship_edges.extend(
+                    collect_relationship_edges_from_summary(
+                        doc_display_name,
+                        doc_id,
+                        str(tid),
+                        str(match_tb.get("name") or tid),
+                        summary,
+                    )
+                )
             except Exception as exc:  # noqa: BLE001
                 deep_results.append(
                     {
@@ -560,6 +723,26 @@ def run_coda_corpus(
             "results": deep_results,
         },
     )
+
+    relationship_path = out_dir / f"coda_relationship_summary_{date_stamp}.json"
+    write_json(
+        relationship_path,
+        finalize_relationship_summary(relationship_edges),
+    )
+
+    canvas_path: Path | None = None
+    canvas_cfg = config.get("canvas")
+    if isinstance(canvas_cfg, dict) and canvas_cfg.get("enabled"):
+        canvas_docs_payload: list[dict[str, Any]] = []
+        for display_name, doc_id in doc_entries:
+            canvas_docs_payload.append(
+                build_canvas_artifact_for_doc(session, display_name, doc_id, canvas_cfg)
+            )
+        canvas_path = out_dir / f"coda_canvas_{date_stamp}.json"
+        write_json(
+            canvas_path,
+            {"generated_at": date_stamp, "docs": canvas_docs_payload},
+        )
 
     deduped: dict[tuple[str, str, str], dict[str, Any]] = {}
     for candidate in candidate_columns:
@@ -602,13 +785,17 @@ def run_coda_corpus(
         },
     )
 
-    return {
+    out: dict[str, str] = {
         "discovery": str(discovery_path),
         "index": str(index_path),
         "broad_profile": str(broad_path),
         "table_shortlist": str(shortlist_path),
         "table_selection": str(table_selection_path),
         "deep_coverage": str(deep_coverage_path),
+        "relationship_summary": str(relationship_path),
         "column_shortlist": str(column_shortlist_path),
         "column_selection": str(column_selection_path),
     }
+    if canvas_path is not None:
+        out["canvas"] = str(canvas_path)
+    return out

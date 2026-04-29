@@ -40,6 +40,12 @@ def test_profile_coda_preflight_smoke():
     assert "smoke ok" in out.getvalue()
 
 
+def test_profile_coda_canvas_smoke():
+    out = StringIO()
+    call_command("profile_coda_canvas", smoke=True, stdout=out)
+    assert "smoke ok" in out.getvalue()
+
+
 def test_profile_coda_corpus_smoke_writes_artifacts(tmp_path):
     config = {
         "docs": [

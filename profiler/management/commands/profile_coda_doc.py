@@ -17,7 +17,9 @@ from connectors.coda_source import (
 )
 
 
-def summarize_table_meta(table: dict[str, Any], columns: list[dict[str, Any]] | None) -> dict[str, Any]:
+def summarize_table_meta(
+    table: dict[str, Any], columns: list[dict[str, Any]] | None
+) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "id": table.get("id"),
         "name": table.get("name"),
@@ -34,22 +36,28 @@ def summarize_table_meta(table: dict[str, Any], columns: list[dict[str, Any]] | 
                 "name": c.get("name"),
                 "format_type": (c.get("format") or {}).get("type"),
                 "has_formula": column_has_formula(c),
-                "formula_preview": (formula_text(c)[:200] + "…")
-                if len(formula_text(c)) > 200
-                else formula_text(c),
+                "formula_preview": (
+                    (formula_text(c)[:200] + "…")
+                    if len(formula_text(c)) > 200
+                    else formula_text(c)
+                ),
             }
             for c in columns
         ]
     return entry
 
 
-def render_doc_tree(doc_meta: dict[str, Any], tables_payload: list[dict[str, Any]]) -> str:
+def render_doc_tree(
+    doc_meta: dict[str, Any], tables_payload: list[dict[str, Any]]
+) -> str:
     name = doc_meta.get("name") or doc_meta.get("id", "")
     lines = [f"[doc] {name}  (id={doc_meta.get('id')})"]
     for item in tables_payload:
         tname = item.get("name") or item.get("id")
         ttype = item.get("type", "table")
-        lines.append(f"  [{ttype}]  {tname!r}  (id={item.get('id')})  rows={item.get('rowCount')}  cols={item.get('columnCount')}")
+        lines.append(
+            f"  [{ttype}]  {tname!r}  (id={item.get('id')})  rows={item.get('rowCount')}  cols={item.get('columnCount')}"
+        )
         cols = item.get("columns")
         if cols:
             for c in cols[:40]:
@@ -68,10 +76,20 @@ class Command(BaseCommand):
     help = "Enumerate tables and views in a Coda doc (and optionally column metadata)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--doc", "--doc-url", dest="doc", help="Coda doc URL or raw doc id")
-        parser.add_argument("--no-columns", action="store_true", help="Skip per-table column enumeration")
-        parser.add_argument("--out", default=None, help="Output JSON path (.md sibling is also written)")
-        parser.add_argument("--smoke", action="store_true", help="Run without network calls")
+        parser.add_argument(
+            "--doc", "--doc-url", dest="doc", help="Coda doc URL or raw doc id"
+        )
+        parser.add_argument(
+            "--no-columns",
+            action="store_true",
+            help="Skip per-table column enumeration",
+        )
+        parser.add_argument(
+            "--out", default=None, help="Output JSON path (.md sibling is also written)"
+        )
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without network calls"
+        )
 
     def handle(self, *args, **options):
         if options["smoke"]:
@@ -109,6 +127,7 @@ class Command(BaseCommand):
             "id": doc_meta.get("id"),
             "name": doc_meta.get("name"),
             "href": doc_meta.get("href"),
+            "docSize": doc_meta.get("docSize"),
             "tables": tables_payload,
         }
 
@@ -117,7 +136,9 @@ class Command(BaseCommand):
         if out:
             out_path = Path(out).resolve()
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(root, indent=2, default=str), encoding="utf-8")
+            out_path.write_text(
+                json.dumps(root, indent=2, default=str), encoding="utf-8"
+            )
             md_path = out_path.with_suffix(".md")
             md_path.write_text(rendered, encoding="utf-8")
             self.stdout.write(f"wrote {out_path}")

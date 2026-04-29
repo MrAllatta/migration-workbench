@@ -6,6 +6,7 @@ from django.core.management.base import CommandError
 from profiler.tools.coda_corpus import (
     apply_table_selection_overrides,
     build_coda_table_index,
+    finalize_relationship_summary,
     score_table,
 )
 
@@ -34,6 +35,33 @@ def test_score_table_deprioritize():
     )
     assert "deprioritize_keyword" in reasons
     assert s <= 0
+
+
+def test_finalize_relationship_summary_dedupes_links():
+    edges = [
+        {
+            "doc_name": "D",
+            "doc_id": "d1",
+            "from_table_id": "a",
+            "from_table_name": "A",
+            "from_column": "c1",
+            "to_table_id": "b",
+            "to_table_name": "B",
+        },
+        {
+            "doc_name": "D",
+            "doc_id": "d1",
+            "from_table_id": "a",
+            "from_table_name": "A",
+            "from_column": "c2",
+            "to_table_id": "b",
+            "to_table_name": "B",
+        },
+    ]
+    summary = finalize_relationship_summary(edges)
+    assert summary["edge_count"] == 2
+    assert summary["unique_table_link_count"] == 1
+    assert len(summary["unique_table_links"]) == 1
 
 
 def test_build_coda_table_index_splits_views():

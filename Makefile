@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -61,6 +61,9 @@ profile-coda-corpus:
 		--config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" \
 		--out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
 
+profile-coda-canvas:
+	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke
+
 chassis-gate:
 	mkdir -p build/_out
 	DB_ENGINE=sqlite $(MANAGE) migrate --noinput
@@ -72,6 +75,7 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) scan_formula_patterns --config example_data/scan_formula_patterns.example.json --out build/_out/scan-formula-smoke.json --smoke
 	DB_ENGINE=sqlite $(MANAGE) scan_coda_formula_columns --config example_data/scan_coda_formula_columns.example.json --out build/_out/scan-coda-smoke.json --smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_preflight --smoke
+	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config example_data/coda_corpus.example.json --out-dir build/_out/coda-corpus-smoke --smoke
 	DB_ENGINE=sqlite $(MANAGE) pull_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
