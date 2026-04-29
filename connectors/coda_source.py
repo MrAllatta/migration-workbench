@@ -514,6 +514,65 @@ def analyze_column_values(
     }
 
 
+def _format_rich_payload(obj: Any, *, _depth: int = 0) -> str:
+    """Turn Coda ``valueFormat=rich`` payloads (JSON-LD-ish dicts, lists) into short labels."""
+    if _depth > 12:
+        return ""
+    if obj is None:
+        return ""
+    if isinstance(obj, str):
+        return obj
+    if isinstance(obj, (int, float, bool)):
+        return str(obj)
+    if isinstance(obj, list):
+        parts = [_format_rich_payload(x, _depth=_depth + 1) for x in obj]
+        return "; ".join(p.strip() for p in parts if p and str(p).strip())
+
+    if isinstance(obj, dict):
+        add = str(obj.get("additionalType") or "").lower()
+        typ = str(obj.get("@type") or obj.get("type") or "")
+
+        name_val = obj.get("name")
+        if name_val is not None and str(name_val).strip():
+            name = str(name_val).strip()
+            if add == "row":
+                return name
+            if "person" in typ.lower():
+                email = obj.get("email")
+                if email:
+                    return f"{name} <{email}>"
+                return name
+            if "monetaryamount" in typ.lower():
+                amt = obj.get("amount")
+                cur = obj.get("currency") or ""
+                if amt is not None:
+                    return f"{amt} {cur}".strip()
+                return name
+            if "webpage" in typ.lower() or typ.endswith("WebPage"):
+                url = obj.get("url")
+                return f"{name} ({url})" if url else name
+            if "imageobject" in typ.lower():
+                url = obj.get("url")
+                return f"{name} [{url}]" if url else name
+            return name
+
+        if add == "row" or typ.lower() == "structuredvalue":
+            rid = obj.get("rowId") or obj.get("id")
+            tid = obj.get("tableId")
+            if rid or tid:
+                return str(rid or tid or "")
+
+        if "monetaryamount" in typ.lower() or obj.get("currency") is not None:
+            amt = obj.get("amount")
+            cur = obj.get("currency") or ""
+            if amt is not None:
+                return f"{amt} {cur}".strip()
+
+        return json.dumps(obj, sort_keys=True, default=str)
+
+    return str(obj)
+
+
 def _cell_to_str(cell: Any) -> str:
     if cell is None:
         return ""
@@ -523,16 +582,21 @@ def _cell_to_str(cell: Any) -> str:
         return str(cell)
     if isinstance(cell, dict):
         if "displayValue" in cell and cell["displayValue"] is not None:
-            return str(cell["displayValue"])
+            dv = cell["displayValue"]
+            if isinstance(dv, (dict, list)):
+                formatted = _format_rich_payload(dv)
+                if formatted:
+                    return formatted
+            return str(dv)
         if "value" in cell:
-            v = cell["value"]
-            if isinstance(v, dict):
-                return json.dumps(v, sort_keys=True, default=str)
-            return str(v)
+            return _format_rich_payload(cell["value"])
         if cell.get("type") == "ref" and "name" in cell:
             return str(cell["name"])
         if cell.get("type") == "ref" and "id" in cell:
             return str(cell["id"])
+        formatted = _format_rich_payload(cell)
+        if formatted:
+            return formatted
         return json.dumps(cell, sort_keys=True, default=str)
     return str(cell)
 

@@ -4,7 +4,7 @@ from typing import Any
 from unittest.mock import patch
 
 from connectors.coda import CodaAdapter
-from connectors.coda_source import extract_coda_doc_id, rows_to_grid
+from connectors.coda_source import _cell_to_str, extract_coda_doc_id, rows_to_grid
 from connectors.google_sheets import extract_drive_folder_id, resolve_spreadsheet
 from connectors.router import build_provider_adapter
 from connectors.spreadsheet import normalize_rows, summarize_header_detection_failure
@@ -115,6 +115,48 @@ def test_extract_coda_doc_id_from_url():
     url = "https://coda.io/d/VG-2025_dCMrB5f1AZE"
     assert extract_coda_doc_id(url) == "CMrB5f1AZE"
     assert extract_coda_doc_id("dRawId123") == "dRawId123"
+
+
+def test_cell_to_str_resolves_rich_lookup_and_person():
+    lookup_row = {
+        "displayValue": None,
+        "value": {
+            "@context": "http://schema.org",
+            "@type": "StructuredValue",
+            "additionalType": "row",
+            "name": "Acme Client",
+            "rowId": "i-abc",
+            "tableId": "grid-xyz",
+        },
+    }
+    assert _cell_to_str(lookup_row) == "Acme Client"
+
+    person = {
+        "value": {
+            "@context": "http://schema.org",
+            "@type": "Person",
+            "name": "Jane Doe",
+            "email": "jane@example.com",
+        }
+    }
+    assert "Jane Doe" in _cell_to_str(person)
+    assert "jane@example.com" in _cell_to_str(person)
+
+    multi = {
+        "value": [
+            {
+                "@type": "StructuredValue",
+                "additionalType": "row",
+                "name": "First",
+            },
+            {
+                "@type": "StructuredValue",
+                "additionalType": "row",
+                "name": "Second",
+            },
+        ]
+    }
+    assert _cell_to_str(multi) == "First; Second"
 
 
 def test_rows_to_grid_orders_by_columns():
