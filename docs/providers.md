@@ -24,7 +24,7 @@ Implementation files:
 
 Authentication: set **`CODA_API_TOKEN`** to a Coda API bearer token (read access to the target doc). Optional per-config override: `api_token` on the live source JSON (prefer env for local development).
 
-Doc identity: top-level `doc_url` (share link) or `doc_id` in the live config, same as `extract_coda_doc_id()` in `coda_source.py`.
+Doc identity: top-level `doc_url` (share link) or `doc_id` in the live config. For HTTP URLs the adapter and profiler commands call **`resolveBrowserLink`** first, then fall back to parsing the `_d…` segment per [Coda’s doc ID guidance](https://coda.io/api) (`extract_coda_doc_id` in `coda_source.py`).
 
 Tabs: each tab entry uses `worksheet_title` (table or view **name**) or `table_id` (stable id from the API), plus `output_path` and `required_headers` like Google Sheets. Views are first-class; row payloads are the view projection.
 
