@@ -9,22 +9,23 @@ from django.core.management.base import BaseCommand, CommandError
 
 from connectors.coda_source import (
     build_coda_session,
-    extract_coda_doc_id,
     formula_text,
     list_columns,
     list_tables,
+    resolve_doc_id,
 )
 from profiler.management.commands.scan_formula_patterns import load_patterns
 
 
-def load_coda_workbooks(config: dict) -> list[tuple[str, str]]:
+def load_coda_workbooks(session, config: dict) -> list[tuple[str, str]]:
     workbooks = config.get("workbooks", [])
     if not workbooks:
         raise CommandError("Config must include a non-empty 'workbooks' list")
     resolved: list[tuple[str, str]] = []
     for item in workbooks:
         name = item.get("name") or "workbook"
-        doc_id = extract_coda_doc_id(item.get("doc_url") or item.get("doc_id"))
+        raw = item.get("doc_url") or item.get("doc_id")
+        doc_id = resolve_doc_id(session, raw) if raw else None
         if not doc_id:
             raise CommandError(f"workbook {name!r} needs doc_url or doc_id")
         resolved.append((name, doc_id))
@@ -74,16 +75,19 @@ class Command(BaseCommand):
             raise CommandError(f"Config not found: {config_path}")
 
         config = json.loads(config_path.read_text(encoding="utf-8"))
-        workbooks = load_coda_workbooks(config)
         patterns = load_patterns(config)
 
         if options["smoke"]:
             out_path.parent.mkdir(parents=True, exist_ok=True)
+            workbooks = config.get("workbooks", [])
+            if not workbooks:
+                raise CommandError("Config must include a non-empty 'workbooks' list")
+            names = [item.get("name") or "workbook" for item in workbooks]
             out_path.write_text(
                 json.dumps(
                     {
                         "mode": "smoke",
-                        "workbooks": [name for name, _ in workbooks],
+                        "workbooks": names,
                         "pattern_count": len(patterns),
                     },
                     indent=2,
@@ -94,6 +98,7 @@ class Command(BaseCommand):
             return
 
         session = build_coda_session()
+        workbooks = load_coda_workbooks(session, config)
         results = []
         for name, doc_id in workbooks:
             results.append(

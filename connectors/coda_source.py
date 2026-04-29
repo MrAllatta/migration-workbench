@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from typing import Any
 from urllib.parse import urlparse
@@ -11,29 +12,82 @@ from urllib.parse import urlparse
 import requests
 
 CODA_API_BASE = "https://coda.io/apis/v1"
+# Coda doc URLs embed the API doc id after "_d" in the /d/<segment> path (see coda.io/api doc ID help).
+_DOC_ID_AFTER_D = re.compile(r"_d([\w-]+)$")
+
+
+def _doc_segment_from_url(url: str) -> str | None:
+    parsed = urlparse(url)
+    parts = [p for p in parsed.path.split("/") if p]
+    if "d" not in parts:
+        return None
+    idx = parts.index("d")
+    if idx + 1 >= len(parts):
+        return None
+    return parts[idx + 1]
 
 
 def extract_coda_doc_id(value: str | None) -> str | None:
-    """Resolve a Coda doc id from a share URL or return a raw id string.
+    """Resolve a Coda API doc id from a share URL or return a raw id string.
 
-    Share links look like ``https://coda.io/d/<slug>_<docId>``; the API doc id
-    is the segment after the last underscore in the path component after ``/d/``.
+    Official pattern (Coda doc ID extractor): the id is the substring after ``_d``
+    in the ``/d/<segment>`` path (e.g. ``..._dCMrB5f1AZE`` → ``CMrB5f1AZE``).
+
+    If that pattern is missing, fall back to the segment after ``/d/``, then to
+    the substring after the last underscore (legacy URLs).
     """
     if not value:
         return None
     text = str(value).strip()
     if text.startswith("http://") or text.startswith("https://"):
-        parsed = urlparse(text)
-        parts = [p for p in parsed.path.split("/") if p]
-        if "d" in parts:
-            idx = parts.index("d")
-            if idx + 1 < len(parts):
-                slug = parts[idx + 1]
-                if "_" in slug:
-                    return slug.rsplit("_", 1)[-1]
-                return slug
-        return None
+        segment = _doc_segment_from_url(text)
+        if not segment:
+            return None
+        match = _DOC_ID_AFTER_D.search(segment)
+        if match:
+            return match.group(1)
+        if "_" in segment:
+            return segment.rsplit("_", 1)[-1]
+        return segment
     return text
+
+
+def resolve_doc_id_via_browser_link(session: requests.Session, share_url: str) -> str | None:
+    """Use ``GET /resolveBrowserLink`` to obtain a doc id when URL parsing is ambiguous."""
+    params = {"url": share_url}
+    data = _request_with_retry(
+        session,
+        "GET",
+        f"{CODA_API_BASE}/resolveBrowserLink",
+        params=params,
+    )
+    resource = data.get("resource") or {}
+    if resource.get("type") == "doc":
+        return resource.get("id")
+    doc = resource.get("doc")
+    if isinstance(doc, dict) and doc.get("id"):
+        return doc.get("id")
+    href = resource.get("href") or ""
+    if "/docs/" in href:
+        tail = href.split("/docs/", 1)[-1].strip("/").split("/", 1)[0]
+        if tail:
+            return tail
+    return None
+
+
+def resolve_doc_id(session: requests.Session, url_or_id: str) -> str | None:
+    """Prefer ``resolveBrowserLink`` for HTTP URLs; otherwise parse or pass through raw id."""
+    text = str(url_or_id).strip()
+    if not text:
+        return None
+    if text.startswith("http://") or text.startswith("https://"):
+        try:
+            rid = resolve_doc_id_via_browser_link(session, text)
+            if rid:
+                return rid
+        except requests.HTTPError:
+            pass
+    return extract_coda_doc_id(text)
 
 
 def build_coda_session(api_token: str | None = None) -> requests.Session:

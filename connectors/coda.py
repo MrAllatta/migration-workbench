@@ -1,10 +1,10 @@
 from connectors.base import ProviderAdapter
 from connectors.coda_source import (
     build_coda_session,
-    extract_coda_doc_id,
     list_columns,
     list_rows,
     list_tables,
+    resolve_doc_id,
     rows_to_grid,
 )
 
@@ -12,10 +12,11 @@ from connectors.coda_source import (
 class CodaAdapter(ProviderAdapter):
     def __init__(self, config: dict):
         self.config = config
-        self.doc_id = extract_coda_doc_id(config.get("doc_url") or config.get("doc_id"))
+        self.session = build_coda_session(config.get("api_token"))
+        raw = config.get("doc_url") or config.get("doc_id")
+        self.doc_id = resolve_doc_id(self.session, raw) if raw else None
         if not self.doc_id:
             raise ValueError("CodaAdapter requires doc_url or doc_id")
-        self.session = build_coda_session(config.get("api_token"))
         self._tables_by_name: dict[str, dict] | None = None
 
     def _resolve_table(self, tab_config: dict):

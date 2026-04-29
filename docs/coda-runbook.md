@@ -13,9 +13,9 @@ The token can only see docs your Coda user can open in the browser. If profiling
 
 ## Doc URL vs doc id
 
-Share links look like `https://coda.io/d/<slug>_<docId>`. The API doc id is the substring after the last `_` in the path segment after `/d/`.
+Share links look like `https://coda.io/d/<slug>_<suffix>`. The Coda API doc id is usually the substring after `_d` in that segment (see the official doc ID help on [coda.io/api](https://coda.io/api)). The workbench also calls **`GET /resolveBrowserLink`** when you pass a full `https://coda.io/...` URL so the resolved doc id is used even when the slug pattern is unusual.
 
-Workbench commands accept either the full URL or the raw doc id.
+You may set **`doc_id`** in live config to a known-good id from the Coda UI or from `profile_coda_doc` output if URL resolution fails.
 
 ## Rate limits
 

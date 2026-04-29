@@ -9,11 +9,11 @@ from django.core.management.base import BaseCommand, CommandError
 from connectors.coda_source import (
     build_coda_session,
     column_has_formula,
-    extract_coda_doc_id,
     formula_text,
     get_doc,
     list_columns,
     list_tables,
+    resolve_doc_id,
 )
 
 
@@ -81,11 +81,11 @@ class Command(BaseCommand):
         doc_value = options.get("doc")
         if not doc_value:
             raise CommandError("--doc is required unless --smoke is used")
-        doc_id = extract_coda_doc_id(doc_value)
+        session = build_coda_session()
+        doc_id = resolve_doc_id(session, doc_value)
         if not doc_id:
             raise CommandError(f"Could not parse Coda doc id from {doc_value!r}")
 
-        session = build_coda_session()
         doc_meta = get_doc(session, doc_id)
         tables = list_tables(session, doc_id)
 

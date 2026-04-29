@@ -96,7 +96,7 @@ def test_summarize_header_detection_failure_reports_candidates():
 
 def test_extract_coda_doc_id_from_url():
     url = "https://coda.io/d/VG-2025_dCMrB5f1AZE"
-    assert extract_coda_doc_id(url) == "dCMrB5f1AZE"
+    assert extract_coda_doc_id(url) == "CMrB5f1AZE"
     assert extract_coda_doc_id("dRawId123") == "dRawId123"
 
 
@@ -112,7 +112,7 @@ def test_coda_adapter_routes_via_router_with_doc_url(monkeypatch):
     monkeypatch.setenv("CODA_API_TOKEN", "test-token-for-router")
     adapter = build_provider_adapter({"provider": "coda", "doc_url": "https://coda.io/d/VG-2025_dCMrB5f1AZE"})
     assert isinstance(adapter, CodaAdapter)
-    assert adapter.doc_id == "dCMrB5f1AZE"
+    assert adapter.doc_id == "CMrB5f1AZE"
 
 
 def test_coda_adapter_fetch_tab_rows_with_patched_helpers(monkeypatch):
