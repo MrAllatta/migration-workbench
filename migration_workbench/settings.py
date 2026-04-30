@@ -166,6 +166,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+# Collected assets for deployment (Docker builder runs collectstatic here).
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 if PRODUCTION:
     if DEBUG:

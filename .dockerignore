@@ -1,0 +1,36 @@
+# Git and IDE
+.git/
+.gitignore
+.cursor/
+
+# Python environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local secrets and env (never bake into images)
+.env
+.env.*
+
+# Local databases and caches (runtime mounts own paths)
+*.sqlite3
+db.sqlite3
+
+# Packaging metadata generated locally
+migration_workbench.egg-info/
+*.egg-info/
+
+# Docs and tooling not needed at runtime in the image
+docs/
+
+# CI / dev artifacts (explicit)
+.github/
+
+# Editor/workspace noise
+*.code-workspace
