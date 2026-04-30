@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas manifest-lint health-smoke
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -31,6 +31,12 @@ test:
 
 check:
 	$(MANAGE) check
+
+manifest-lint:
+	$(PYTHON) -m deployment.wb_cli --manifest deploy/spaces.yml --json manifest lint
+
+health-smoke:
+	$(MANAGE) shell -c "from django.test import Client; r = Client(HTTP_HOST='localhost').get('/healthz'); assert r.status_code == 200"
 
 format:
 	$(BLACK) .
@@ -67,7 +73,9 @@ profile-coda-canvas:
 chassis-gate:
 	mkdir -p build/_out
 	DB_ENGINE=sqlite $(MANAGE) migrate --noinput
-	DB_ENGINE=sqlite $(PYTEST) connectors profiler/tests importer/tests examples/tests
+	DB_ENGINE=sqlite $(PYTEST) connectors profiler/tests importer/tests examples/tests deployment/tests
+	DB_ENGINE=sqlite $(MAKE) manifest-lint
+	DB_ENGINE=sqlite $(MAKE) health-smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_tab --smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_doc --smoke
