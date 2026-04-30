@@ -27,6 +27,8 @@ In your product repo settings, include:
 - `connectors`
 - `profiler`
 - `importer`
+- `workbook`
+- `deployment`
 
 Then run:
 

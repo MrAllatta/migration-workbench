@@ -21,6 +21,18 @@ Profiling (Google Sheets, Drive, Coda) lives under `manage.py`; see **`docs/quic
 
 Schema scaffolding (**workbook** app): `python manage.py scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out /tmp/schema-contract.yaml` (writes YAML for product repos to refine into Django models; see **`docs/architecture.md`**).
 
+Deployment control plane:
+
+- `wb manifest lint --manifest deploy/spaces.yml`
+- `wb deploy <space> --env <preview|production> --dry-run`
+
+## Deployment
+
+- Spec: `docs/deployment-spec-v0.2.md`
+- Acceptance criteria: `docs/deployment-acceptance-criteria.md`
+- Space manifest baseline: `deploy/spaces.yml`
+- Pipeline narrative: `docs/pipeline.md`
+
 ## Database Modes
 
 - `DB_ENGINE=sqlite` (default)

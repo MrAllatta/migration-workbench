@@ -6,6 +6,7 @@
 2. **Profiler** (`profiler/*`): normalizes tabular source rows into a deterministic CSV bundle.
 3. **Importer** (`importer/*`): Django command chassis for preflight/apply, summary artifacts, and structured failures.
 4. **Workbook** (`workbook/*`): turns profiler JSON + bundle config into **schema contract** YAML (and optional `models.py` stubs) for product repos to refine into real Django models.
+5. **Deployment** (`deployment/*`): validates per-space deployment manifests, records release metadata, and provides the `wb` CLI surface (`manifest lint`, `deploy --dry-run`).
 
 ## Django project layout
 

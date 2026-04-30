@@ -17,7 +17,10 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from migration_workbench.views import healthz
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("healthz", healthz),
+    path("healthz/", healthz),
 ]

@@ -17,6 +17,9 @@ dependencies = [
   "requests>=2.31",
 ]
 
+[project.scripts]
+wb = "deployment.wb_cli:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest",
@@ -28,7 +31,7 @@ dev = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*", "workbook*"]
+include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*", "workbook*", "deployment*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "migration_workbench.settings"

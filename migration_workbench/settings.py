@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+from django.db.backends.signals import connection_created
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,11 +31,18 @@ SECRET_KEY = os.environ.get(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+PRODUCTION = os.environ.get("DJANGO_PRODUCTION", "0") == "1"
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if host.strip()
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
 
 
@@ -50,6 +60,7 @@ INSTALLED_APPS = [
     "importer",
     "examples",
     "workbook",
+    "deployment",
 ]
 
 MIDDLEWARE = [
@@ -106,6 +117,18 @@ else:
     }
 
 
+def _configure_sqlite_pragmas(sender, connection, **kwargs):
+    if connection.vendor != "sqlite":
+        return
+    with connection.cursor() as cursor:
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.execute("PRAGMA synchronous=NORMAL;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
+
+
+connection_created.connect(_configure_sqlite_pragmas)
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -141,6 +164,23 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+
+if PRODUCTION:
+    if DEBUG:
+        raise ImproperlyConfigured("DJANGO_PRODUCTION=1 requires DJANGO_DEBUG=0.")
+    if SECRET_KEY == "django-insecure-local-dev-key-change-me":
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set in production.")
+    if not ALLOWED_HOSTS:
+        raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must be set in production.")
+    if not CSRF_TRUSTED_ORIGINS:
+        raise ImproperlyConfigured("CSRF_TRUSTED_ORIGINS must be set in production.")
+
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
