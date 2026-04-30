@@ -1,0 +1,123 @@
+name: Deploy
+
+on:
+  workflow_run:
+    # Must match the `name:` field in .github/workflows/ci.yml exactly.
+    workflows: ['CI']
+    types: [completed]
+
+# One deploy per Fly app at a time; never cancel an in-flight deploy.
+# The group expression resolves to the stable Fly app name:
+#   main        → migration-workbench-production
+#   preview/*   → migration-workbench-preview
+# Other branches are excluded by the job-level `if` below and never reach this lock.
+concurrency:
+  group: >-
+    deploy-${{
+      github.event.workflow_run.head_branch == 'main'
+      && 'migration-workbench-production'
+      || 'migration-workbench-preview'
+    }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Fly
+    runs-on: ubuntu-latest
+
+    # Gate 1: CI must have succeeded.
+    # Gate 2: Only deploy from main (production) or preview/* (preview).
+    #         All other branches are silently skipped — the job simply does not run.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      (
+        github.event.workflow_run.head_branch == 'main' ||
+        startsWith(github.event.workflow_run.head_branch, 'preview/')
+      )
+
+    steps:
+      # Check out the exact commit that CI validated — not the current branch tip.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Mirror the install pattern used in ci.yml so wb_cli is available.
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e ".[dev]"
+
+      # Pin to a released version; bump intentionally (do not silently pick up breaking changes).
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          version: latest
+
+      # Derive all deploy parameters from the manifest and branch name.
+      # Frozen strings that must match deploy/spaces.yml:
+      #   space key       : migration-workbench
+      #   environment keys: production | preview
+      #   app_name_template: migration-workbench-{env}  →  migration-workbench-{environment}
+      # Fly config files (from Work Item 5):
+      #   production : fly.toml
+      #   preview    : fly.preview.toml
+      - name: Resolve deploy parameters
+        id: params
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          if [ "$BRANCH" = "main" ]; then
+            ENVIRONMENT="production"
+            FLY_CONFIG="fly.toml"
+          else
+            # Any preview/* branch maps to the shared preview environment.
+            ENVIRONMENT="preview"
+            FLY_CONFIG="fly.preview.toml"
+          fi
+          # Template: migration-workbench-{env} from spaces.yml provider.app_name_template
+          FLY_APP="migration-workbench-${ENVIRONMENT}"
+          echo "environment=${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+          echo "fly_config=${FLY_CONFIG}"   >> "$GITHUB_OUTPUT"
+          echo "fly_app=${FLY_APP}"         >> "$GITHUB_OUTPUT"
+          echo "Resolved: env=${ENVIRONMENT}  app=${FLY_APP}  config=${FLY_CONFIG}"
+
+      # Validate manifest before touching Fly — fail fast on schema drift.
+      - name: Manifest lint
+        run: >-
+          .venv/bin/python -m deployment.wb_cli
+          --manifest deploy/spaces.yml
+          --json
+          manifest lint
+
+      # FLY_API_TOKEN is the only deploy credential stored in GitHub Actions.
+      # All app-specific secrets live in the Fly secrets store.
+      - name: Deploy to Fly
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: >-
+          flyctl deploy
+          --config "${{ steps.params.outputs.fly_config }}"
+          --remote-only
+
+      # Poll /healthz with a bounded retry (12 × 10 s = 2 min max).
+      # healthcheck_path is /healthz per deploy/spaces.yml runtime.healthcheck_path.
+      - name: Smoke test /healthz
+        run: |
+          FLY_APP="${{ steps.params.outputs.fly_app }}"
+          URL="https://${FLY_APP}.fly.dev/healthz"
+          echo "Polling ${URL} (up to 12 attempts, 10 s apart)"
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 10 "${URL}"; then
+              echo ""
+              echo "healthz returned 200 on attempt ${i}"
+              exit 0
+            fi
+            echo "Attempt ${i}/12 failed — retrying in 10 s..."
+            sleep 10
+          done
+          echo "healthz did not return 200 within 2 minutes; marking deploy failed"
+          exit 1
