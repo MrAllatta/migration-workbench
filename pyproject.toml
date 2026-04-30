@@ -61,6 +61,8 @@ dev = [
   "pytest",
   "pytest-django",
   "black",
+  "build>=1.2",
+  "twine>=5.0",
 ]
 release = [
   "build>=1.2",

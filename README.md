@@ -9,11 +9,20 @@ Reusable profiler and importer chassis for tabular workbook-to-app migrations.
 **As a library (recommended for product repos)**  
 Add the Django apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Django project. Set **`DJANGO_SETTINGS_MODULE`** to your project’s settings module (not `migration_workbench.settings`) in production. Host apps typically depend on a released version, for example `migration-workbench>=0.1.0,<1`.
 
+**New product repository (scaffold)**  
+From a sibling checkout of this repo:
+
+```bash
+make new-product PRODUCT=my-product   # writes ../my-product
+```
+
+Then `cd ../my-product && make install && make migrate && make check`. The scaffold includes `backend/`, `Makefile`, `Dockerfile` (installs **`migration-workbench` from PyPI**), `scripts/entrypoint_product.sh`, and SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas). Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
+
 **Developing this repository (full chassis checkout)**  
 Clone the repo and use an editable install so `manage.py`, docs examples, and `make chassis-gate` match upstream:
 
 1. `python3 -m venv .venv`
-2. `.venv/bin/pip install -e ".[dev]"` (contributors: `.venv/bin/pip install -e ".[dev,release]"` to build wheels locally)
+2. `.venv/bin/pip install -e ".[dev]"` (`build` / `twine` are included for local wheels and manual PyPI uploads)
 3. `. ./.env.example` (or create `.env`)
 4. `.venv/bin/python manage.py migrate`
 5. `make chassis-gate`
@@ -41,7 +50,9 @@ To publish a release:
 3. Configure **Trusted Publishing** on [PyPI](https://pypi.org/manage/account/publishing/) for this GitHub repository (see [`.github/workflows/publish-pypi.yml`](.github/workflows/publish-pypi.yml)).
 4. The **Publish package** workflow uploads the sdist and wheel to PyPI.
 
-Dry-run uploads can be done manually with `twine upload --repository testpypi dist/*` after `python -m build` (optional `[release]` extra installs `build` and `twine`).
+Dry-run uploads can be done manually with `twine upload --repository testpypi dist/*` after `python -m build`, or `make publish` from a maintainer environment with credentials configured.
+
+The **`[release]`** optional dependency remains available for minimal install surfaces that only need `build` / `twine`.
 
 ## Core Commands
 

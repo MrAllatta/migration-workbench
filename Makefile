@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas manifest-lint health-smoke
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas manifest-lint health-smoke new-product publish
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -90,3 +90,11 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out build/_out/schema-contract-smoke.yaml
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --summary-json build/_out/apply-example.json
+
+new-product:
+	@test -n "$(PRODUCT)" || (echo "Usage: make new-product PRODUCT=name"; exit 1)
+	$(PYTHON) scripts/new_product.py $(PRODUCT)
+
+publish:
+	$(PYTHON) -m build
+	$(PYTHON) -m twine upload dist/*
