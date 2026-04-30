@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Stages: `builder` (install app, collectstatic) and `runtime` (Litestream, non-root `app` user).
-# App root: /app. Entrypoint: /app/scripts/entrypoint.sh (see WI3 for full behavior).
+# App root: /app. Entrypoint: /app/scripts/entrypoint.sh (optional Litestream restore, migrate, then Gunicorn).
 #
 # Pin: bump `PYTHON_IMAGE_DIGEST` with `docker buildx imagetools inspect python:3.11-slim-bookworm`
 # and the digest for the linux/amd64 image you intend to support.

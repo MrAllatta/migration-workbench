@@ -17,7 +17,8 @@
 #   SQLITE_PATH resolves under /data (production volume contract), set ALLOW_EMPTY_SQLITE=1 to
 #   allow creating a new empty database; otherwise the script fails fast (avoids silent empty prod).
 #
-# Static/admin assets: full static serving may depend on WI4 (WhiteNoise); /healthz works without it.
+# Static/admin assets: Django admin and app static files require collectstatic output baked into the
+# image and WhiteNoiseMiddleware active at runtime; /healthz works without static assets.
 
 set -eu
 
