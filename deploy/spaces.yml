@@ -43,9 +43,12 @@ spaces:
       image: null
     runtime:
       internal_port: 8080
+      # Migrations run in the container entrypoint on the mounted SQLite volume (Fly release
+      # does not see that volume). Web command documents the gunicorn shape; the real
+      # process is entrypoint-wrapped (litestream replicate -exec) when LITESTREAM_BUCKET is set.
       processes:
-        web: "gunicorn migration_workbench.wsgi:application --bind 0.0.0.0:8080"
-        release: "python manage.py migrate"
+        web: "gunicorn migration_workbench.wsgi:application --bind 0.0.0.0:8080 --workers 1 --threads 4 --worker-class gthread"
+        release: "true"
       healthcheck_path: /healthz
       healthcheck_timeout_s: 60
     storage:

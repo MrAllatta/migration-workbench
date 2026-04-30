@@ -72,6 +72,9 @@ USER app
 
 WORKDIR /app
 
+# Gunicorn may use a stats/control path under $HOME; the `app` user has no /home entry.
+ENV HOME=/tmp
+
 ENV DJANGO_SETTINGS_MODULE=migration_workbench.settings
 
 EXPOSE 8080
