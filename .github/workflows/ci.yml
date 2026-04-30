@@ -19,3 +19,22 @@ jobs:
           .venv/bin/python -m pip install -e ".[dev]"
       - name: Run chassis gate
         run: make chassis-gate
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and check distribution
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check dist/*
+      - name: Smoke test wheel install
+        run: |
+          python -m venv .venv-wheel
+          .venv-wheel/bin/pip install dist/migration_workbench-*.whl
+          .venv-wheel/bin/python -c "import connectors, profiler, importer, workbook, deployment"
+          DJANGO_SETTINGS_MODULE=migration_workbench.settings .venv-wheel/bin/wb --help >/dev/null

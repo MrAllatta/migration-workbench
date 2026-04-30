@@ -7,7 +7,36 @@ name = "migration-workbench"
 version = "0.1.0"
 description = "Reusable profiler and importer chassis for tabular migrations"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
+authors = [
+  { name = "Eric Allatta", email = "ericallatta@gmail.com" },
+]
+keywords = [
+  "django",
+  "migration",
+  "tabular",
+  "workbook",
+  "import",
+  "profiler",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Web Environment",
+  "Framework :: Django",
+  "Framework :: Django :: 5.0",
+  "Framework :: Django :: 5.1",
+  "Framework :: Django :: 5.2",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
   "Django>=5.0,<6.0",
   "gunicorn>=22.0",
@@ -22,11 +51,20 @@ dependencies = [
 [project.scripts]
 wb = "deployment.wb_cli:main"
 
+[project.urls]
+Homepage = "https://github.com/MrAllatta/migration-workbench"
+Repository = "https://github.com/MrAllatta/migration-workbench"
+Issues = "https://github.com/MrAllatta/migration-workbench/issues"
+
 [project.optional-dependencies]
 dev = [
   "pytest",
   "pytest-django",
   "black",
+]
+release = [
+  "build>=1.2",
+  "twine>=5.0",
 ]
 
 [tool.setuptools]
