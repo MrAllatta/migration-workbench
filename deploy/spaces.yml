@@ -59,10 +59,13 @@ spaces:
         required: true
         method: litestream_snapshot
       retention_days: 14
+    environment:
+      required:
+        - SQLITE_PATH
     secrets:
       required:
         - DJANGO_SECRET_KEY
-        - ALLOWED_HOSTS
+        - DJANGO_ALLOWED_HOSTS
         - CSRF_TRUSTED_ORIGINS
         - LITESTREAM_ACCESS_KEY_ID
         - LITESTREAM_SECRET_ACCESS_KEY
@@ -104,10 +107,13 @@ spaces:
         required: true
         method: litestream_snapshot
       retention_days: 14
+    environment:
+      required:
+        - SQLITE_PATH
     secrets:
       required:
         - DJANGO_SECRET_KEY
-        - ALLOWED_HOSTS
+        - DJANGO_ALLOWED_HOSTS
         - CSRF_TRUSTED_ORIGINS
         - LITESTREAM_ACCESS_KEY_ID
         - LITESTREAM_SECRET_ACCESS_KEY
@@ -149,10 +155,13 @@ spaces:
         required: true
         method: litestream_snapshot
       retention_days: 14
+    environment:
+      required:
+        - SQLITE_PATH
     secrets:
       required:
         - DJANGO_SECRET_KEY
-        - ALLOWED_HOSTS
+        - DJANGO_ALLOWED_HOSTS
         - CSRF_TRUSTED_ORIGINS
         - LITESTREAM_ACCESS_KEY_ID
         - LITESTREAM_SECRET_ACCESS_KEY
@@ -194,10 +203,13 @@ spaces:
         required: true
         method: litestream_snapshot
       retention_days: 14
+    environment:
+      required:
+        - SQLITE_PATH
     secrets:
       required:
         - DJANGO_SECRET_KEY
-        - ALLOWED_HOSTS
+        - DJANGO_ALLOWED_HOSTS
         - CSRF_TRUSTED_ORIGINS
         - LITESTREAM_ACCESS_KEY_ID
         - LITESTREAM_SECRET_ACCESS_KEY

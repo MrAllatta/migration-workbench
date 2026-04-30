@@ -16,6 +16,8 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from django.db.backends.signals import connection_created
 
+from migration_workbench.sqlite_path import resolve_sqlite_database_path
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -112,7 +114,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / os.environ.get("SQLITE_PATH", "db.sqlite3"),
+            "NAME": resolve_sqlite_database_path(BASE_DIR, os.environ.get("SQLITE_PATH")),
         }
     }
 

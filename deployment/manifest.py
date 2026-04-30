@@ -11,6 +11,22 @@ class ManifestValidationError(ValueError):
     """Raised when deploy/spaces.yml violates the required contract."""
 
 
+# Frozen contract: secret names must match Django/Fly usage (see deploy docs / .env.example).
+CANONICAL_SECRET_NAMES = frozenset(
+    {
+        "DJANGO_SECRET_KEY",
+        "DJANGO_ALLOWED_HOSTS",
+        "CSRF_TRUSTED_ORIGINS",
+        "LITESTREAM_ACCESS_KEY_ID",
+        "LITESTREAM_SECRET_ACCESS_KEY",
+        "LITESTREAM_BUCKET",
+    }
+)
+
+# Non-secret vars declared under spaces.<name>.environment.required (Fly [env], etc.).
+CANONICAL_RUNTIME_ENV_NAMES = frozenset({"SQLITE_PATH"})
+
+
 @dataclass(frozen=True)
 class ManifestValidationIssue:
     path: str
@@ -142,6 +158,52 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
             issues.append(ManifestValidationIssue(f"{spath}.secrets.required", "must be a non-empty list"))
         elif not all(_is_non_empty_string(item) for item in required_secrets):
             issues.append(ManifestValidationIssue(f"{spath}.secrets.required", "must contain only non-empty strings"))
+        else:
+            for name in required_secrets:
+                if name == "ALLOWED_HOSTS":
+                    issues.append(
+                        ManifestValidationIssue(
+                            f"{spath}.secrets.required",
+                            "must use DJANGO_ALLOWED_HOSTS, not ALLOWED_HOSTS (Django reads DJANGO_ALLOWED_HOSTS)",
+                        )
+                    )
+                elif name not in CANONICAL_SECRET_NAMES:
+                    issues.append(
+                        ManifestValidationIssue(
+                            f"{spath}.secrets.required",
+                            f"unknown or disallowed secret name {name!r}; allowed: {sorted(CANONICAL_SECRET_NAMES)}",
+                        )
+                    )
+
+        env_contract = _require_mapping(s.get("environment"), f"{spath}.environment", issues)
+        required_runtime = env_contract.get("required")
+        if not isinstance(required_runtime, list) or not required_runtime:
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.environment.required",
+                    "must be a non-empty list of non-secret env var names",
+                )
+            )
+        elif not all(_is_non_empty_string(item) for item in required_runtime):
+            issues.append(
+                ManifestValidationIssue(f"{spath}.environment.required", "must contain only non-empty strings")
+            )
+        else:
+            for name in required_runtime:
+                if name not in CANONICAL_RUNTIME_ENV_NAMES:
+                    issues.append(
+                        ManifestValidationIssue(
+                            f"{spath}.environment.required",
+                            f"unknown runtime env name {name!r}; allowed: {sorted(CANONICAL_RUNTIME_ENV_NAMES)}",
+                        )
+                    )
+            if "SQLITE_PATH" not in required_runtime:
+                issues.append(
+                    ManifestValidationIssue(
+                        f"{spath}.environment.required",
+                        "must include SQLITE_PATH for sqlite-backed spaces (match spaces.<name>.storage.sqlite_path at deploy time)",
+                    )
+                )
 
         environments = _require_mapping(s.get("environments"), f"{spath}.environments", issues)
         for env in ("preview", "production"):
