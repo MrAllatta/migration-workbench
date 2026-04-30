@@ -1,0 +1,209 @@
+version: 1
+
+profiles:
+  tiny:
+    cpu:
+      cores: 1
+      type: shared
+    memory_mb: 256
+    volume_gb: 5
+  small:
+    cpu:
+      cores: 1
+      type: shared
+    memory_mb: 512
+    volume_gb: 5
+  small-plus:
+    cpu:
+      cores: 1
+      type: shared
+    memory_mb: 512
+    volume_gb: 10
+
+replication_defaults:
+  provider: s3
+  endpoint_env: LITESTREAM_ENDPOINT
+  bucket_env: LITESTREAM_BUCKET
+  snapshot_interval_minutes: 15
+  retention_days: 14
+
+spaces:
+  migration-workbench:
+    owner: platform
+    project: migration-workbench
+    profile: small
+    provider:
+      type: fly
+      primary_region: ewr
+      regions: [ewr]
+      app_name_template: migration-workbench-{env}
+    build:
+      dockerfile: Dockerfile
+      context: .
+      image: null
+    runtime:
+      internal_port: 8080
+      processes:
+        web: "gunicorn migration_workbench.wsgi:application --bind 0.0.0.0:8080"
+        release: "python manage.py migrate"
+      healthcheck_path: /healthz
+      healthcheck_timeout_s: 60
+    storage:
+      sqlite_path: /data/db.sqlite3
+      media_path: /data/media
+    replication:
+      litestream_enabled: true
+      replica_path_template: migration-workbench/{env}
+    backup:
+      predeploy_checkpoint:
+        required: true
+        method: litestream_snapshot
+      retention_days: 14
+    secrets:
+      required:
+        - DJANGO_SECRET_KEY
+        - ALLOWED_HOSTS
+        - CSRF_TRUSTED_ORIGINS
+        - LITESTREAM_ACCESS_KEY_ID
+        - LITESTREAM_SECRET_ACCESS_KEY
+        - LITESTREAM_BUCKET
+    environments:
+      preview:
+        branch_pattern: "preview/*"
+      production:
+        branch_pattern: main
+
+  farm:
+    owner: product
+    project: farm
+    profile: small-plus
+    provider:
+      type: fly
+      primary_region: ewr
+      regions: [ewr]
+      app_name_template: farm-{env}
+    build:
+      dockerfile: Dockerfile
+      context: .
+      image: null
+    runtime:
+      internal_port: 8080
+      processes:
+        web: "gunicorn config.wsgi:application --bind 0.0.0.0:8080"
+        release: "python manage.py migrate"
+      healthcheck_path: /healthz
+      healthcheck_timeout_s: 60
+    storage:
+      sqlite_path: /data/db.sqlite3
+      media_path: /data/media
+    replication:
+      litestream_enabled: true
+      replica_path_template: farm/{env}
+    backup:
+      predeploy_checkpoint:
+        required: true
+        method: litestream_snapshot
+      retention_days: 14
+    secrets:
+      required:
+        - DJANGO_SECRET_KEY
+        - ALLOWED_HOSTS
+        - CSRF_TRUSTED_ORIGINS
+        - LITESTREAM_ACCESS_KEY_ID
+        - LITESTREAM_SECRET_ACCESS_KEY
+        - LITESTREAM_BUCKET
+    environments:
+      preview:
+        branch_pattern: "preview/*"
+      production:
+        branch_pattern: main
+
+  vizcarra-guitars:
+    owner: product
+    project: vizcarra-guitars
+    profile: small
+    provider:
+      type: fly
+      primary_region: ewr
+      regions: [ewr]
+      app_name_template: vizcarra-guitars-{env}
+    build:
+      dockerfile: Dockerfile
+      context: .
+      image: null
+    runtime:
+      internal_port: 8080
+      processes:
+        web: "gunicorn config.wsgi:application --bind 0.0.0.0:8080"
+        release: "python manage.py migrate"
+      healthcheck_path: /healthz
+      healthcheck_timeout_s: 60
+    storage:
+      sqlite_path: /data/db.sqlite3
+      media_path: /data/media
+    replication:
+      litestream_enabled: true
+      replica_path_template: vizcarra-guitars/{env}
+    backup:
+      predeploy_checkpoint:
+        required: true
+        method: litestream_snapshot
+      retention_days: 14
+    secrets:
+      required:
+        - DJANGO_SECRET_KEY
+        - ALLOWED_HOSTS
+        - CSRF_TRUSTED_ORIGINS
+        - LITESTREAM_ACCESS_KEY_ID
+        - LITESTREAM_SECRET_ACCESS_KEY
+        - LITESTREAM_BUCKET
+    environments:
+      preview:
+        branch_pattern: "preview/*"
+      production:
+        branch_pattern: main
+
+  jewelry:
+    owner: product
+    project: jewelry
+    profile: tiny
+    provider:
+      type: fly
+      primary_region: ewr
+      regions: [ewr]
+      app_name_template: jewelry-{env}
+    build:
+      dockerfile: Dockerfile
+      context: .
+      image: null
+    runtime:
+      internal_port: 8080
+      processes:
+        web: "gunicorn config.wsgi:application --bind 0.0.0.0:8080"
+        release: "python manage.py migrate"
+      healthcheck_path: /healthz
+      healthcheck_timeout_s: 60
+    storage:
+      sqlite_path: /data/db.sqlite3
+      media_path: /data/media
+    replication:
+      litestream_enabled: true
+      replica_path_template: jewelry/{env}
+    backup:
+      predeploy_checkpoint:
+        required: true
+        method: litestream_snapshot
+      retention_days: 14
+    secrets:
+      required:
+        - DJANGO_SECRET_KEY
+        - ALLOWED_HOSTS
+        - CSRF_TRUSTED_ORIGINS
+        - LITESTREAM_ACCESS_KEY_ID
+        - LITESTREAM_SECRET_ACCESS_KEY
+        - LITESTREAM_BUCKET
+    environments:
+      preview:
+        branch_pattern: "preview/*"
+      production:
+        branch_pattern: main
