@@ -385,8 +385,17 @@ def export_page_markdown(
         raise ValueError(f"Unexpected export response: {started!r}")
     deadline = time.monotonic() + max_wait_sec
     status: dict[str, Any] = {}
+    # Coda may return 404 for a short window before the export request is visible.
+    time.sleep(poll_interval_sec)
     while time.monotonic() < deadline:
-        status = get_page_export_status(session, doc_id, page_id_or_name, req_id)
+        try:
+            status = get_page_export_status(session, doc_id, page_id_or_name, req_id)
+        except requests.HTTPError as exc:
+            response = getattr(exc, "response", None)
+            if response is not None and response.status_code == 404:
+                time.sleep(poll_interval_sec)
+                continue
+            raise
         if status.get("downloadLink"):
             return fetch_url_text(str(status["downloadLink"]))
         st = str(status.get("status") or "").lower()
