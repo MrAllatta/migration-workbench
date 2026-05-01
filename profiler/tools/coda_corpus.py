@@ -1,3 +1,27 @@
+"""Multi-document Coda profiling pipeline (corpus mode).
+
+Orchestrates a full corpus run against one or more Coda docs:
+
+1. **Discovery** — list all tables in each doc, capturing ``rowCount`` and
+   ``columnCount`` metadata.
+2. **Indexing** — split tables into base tables and views; mark views as
+   non-importable.
+3. **Broad profile** — fetch column metadata for every base table.
+4. **Scoring / shortlist** — rank tables by heuristic score (row/col counts,
+   name keywords).
+5. **Table selection** — auto-select the top *N* per doc, then apply any
+   manual overrides declared in the config.
+6. **Deep profile** — run ``summarize_coda_table`` on each selected table,
+   writing per-table JSON artifacts under ``out_dir/deep/``.
+7. **Column candidates** — score columns for FK / domain relevance.
+8. **Relationship summary** — collect cross-table links from relation columns.
+9. **Canvas** (optional) — export page plain text for summarization pipelines.
+
+The main entry point is :func:`run_coda_corpus`.  All intermediate artifacts
+are written to *out_dir* with date-stamped filenames so successive runs are
+non-destructive.
+"""
+
 from __future__ import annotations
 
 import json
@@ -119,7 +143,26 @@ def apply_table_selection_overrides(
     approved_tables: dict[str, list[str]],
     overrides: dict[str, Any] | None,
 ) -> dict[str, list[str]]:
-    """Merge user overrides into *approved_tables* (keys are doc names from config)."""
+    """Merge user-supplied table selection overrides into heuristic *approved_tables*.
+
+    Each override entry supports three mutually exclusive operations:
+
+    * ``replace: true`` + ``tables: [...]`` — replace the entire doc's
+      selection with the provided list.
+    * ``add: [...]`` — append table names not already present.
+    * ``remove: [...]`` — remove table names from the current selection.
+
+    Args:
+        approved_tables: Heuristic selection mapping ``{doc_name: [table_name, ...]}``.
+        overrides: Optional ``{doc_name: override_entry}`` dict from the corpus
+            config.  ``None`` or empty returns a copy of *approved_tables* unchanged.
+
+    Returns:
+        dict[str, list[str]]: Merged table selection.
+
+    Raises:
+        CommandError: On type violations or unknown override keys.
+    """
     merged: dict[str, list[str]] = {
         name: list(tabs) for name, tabs in approved_tables.items()
     }
@@ -327,7 +370,19 @@ def load_coda_docs_from_config(
 def list_tables_for_config(
     session: requests.Session, doc_id: str, config: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    """Respect *exclude_views* (wins over *table_types*) and optional *table_types*."""
+    """List tables for *doc_id* applying config-level view/type filters.
+
+    ``exclude_views`` takes precedence over ``table_types`` when both are set.
+
+    Args:
+        session: Authenticated :class:`requests.Session` for the Coda API.
+        doc_id: Coda document ID.
+        config: Corpus config dict.  Recognised keys:
+            ``exclude_views`` (bool) and ``table_types`` (list[str]).
+
+    Returns:
+        list[dict]: Raw table entries from the Coda API.
+    """
     if config.get("exclude_views"):
         return list_tables(session, doc_id, exclude_views=True)
     tt = config.get("table_types")
@@ -339,7 +394,21 @@ def list_tables_for_config(
 def enrich_table_row_counts(
     session: requests.Session, doc_id: str, tables: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Fill missing ``rowCount`` via ``GET …/tables/{id}``."""
+    """Backfill missing ``rowCount`` values via individual table detail requests.
+
+    The list-tables API sometimes omits ``rowCount``; this fetches the detail
+    endpoint for those entries only, leaving already-populated rows untouched
+    to minimise API calls.
+
+    Args:
+        session: Authenticated :class:`requests.Session` for the Coda API.
+        doc_id: Coda document ID.
+        tables: Table entries from :func:`list_tables_for_config`.
+
+    Returns:
+        list[dict]: Same table list with ``rowCount`` filled where possible.
+        Entries that fail the detail request are returned unchanged.
+    """
     out: list[dict[str, Any]] = []
     for t in tables:
         tid = t.get("id")
@@ -417,7 +486,32 @@ def build_canvas_artifact_for_doc(
     doc_id: str,
     canvas_cfg: dict[str, Any],
 ) -> dict[str, Any]:
-    """Pull plain text per page (or markdown export) for summarization pipelines."""
+    """Collect page text content from a Coda doc for downstream summarization.
+
+    Two fetch strategies are supported (controlled by *canvas_cfg*):
+
+    * Default — collect content items via the content API and convert to plain
+      text using :func:`~connectors.coda_source.page_content_items_to_plain_text`.
+    * ``use_export: true`` — use the page export API to obtain markdown
+      directly (higher fidelity but slower and subject to export availability).
+
+    Text exceeding *max_chars_per_page* is truncated with a ``…[truncated]``
+    suffix.  Page fetch errors are captured and stored in ``"error"`` rather
+    than aborting the whole doc.
+
+    Args:
+        session: Authenticated :class:`requests.Session` for the Coda API.
+        doc_display_name: Human-readable doc label used in the output artifact.
+        doc_id: Coda document ID.
+        canvas_cfg: Canvas config sub-dict from the corpus config.  Recognised
+            keys: ``max_pages`` (int, default 50), ``max_chars_per_page`` (int,
+            default 50 000), ``max_content_items`` (int, default 5 000),
+            ``use_export`` (bool, default ``False``).
+
+    Returns:
+        dict: ``{"doc_name": ..., "doc_id": ..., "pages": [{"id": ..., "name": ...,
+        "plain_text": ..., "truncated": bool, "error": str|None, "browserLink": ...}, ...]}``
+    """
     max_pages = int(canvas_cfg.get("max_pages") or 50)
     max_chars = int(canvas_cfg.get("max_chars_per_page") or 50_000)
     max_items = int(canvas_cfg.get("max_content_items") or 5000)
@@ -471,6 +565,39 @@ def run_coda_corpus(
     date_stamp: str,
     resume_from_table_selection: bool = False,
 ) -> dict[str, str]:
+    """Execute the full Coda corpus profiling pipeline and write all artifacts.
+
+    All intermediate JSON files are written to *out_dir* with *date_stamp*
+    suffixes.  Deep-profile per-table files go into ``out_dir/deep/``.
+
+    When *resume_from_table_selection* is ``True``, the
+    ``table_selection_<date_stamp>.json`` file must already exist in *out_dir*
+    (written by a previous run); the pipeline skips discovery / scoring and
+    proceeds directly to deep profiling using that selection.
+
+    Args:
+        session: Authenticated :class:`requests.Session` for the Coda API.
+        config: Parsed corpus config dict.  Required keys: ``docs`` (list of
+            ``{name, doc_url|doc_id}`` entries).  Optional keys include
+            ``heuristics``, ``table_auto_limit``, ``max_rows_deep``,
+            ``column_min_score``, ``table_selection_overrides``, ``canvas``.
+        out_dir: Directory where all artifact JSON files are written.
+        date_stamp: Timestamp string appended to artifact filenames (e.g.
+            ``"20240501T120000"``).
+        resume_from_table_selection: Skip to deep profiling using an existing
+            table selection file.  Defaults to ``False``.
+
+    Returns:
+        dict[str, str]: Mapping from artifact role to file path for every file
+        written (keys: ``"discovery"``, ``"index"``, ``"broad_profile"``,
+        ``"table_shortlist"``, ``"table_selection"``, ``"deep_coverage"``,
+        ``"relationship_summary"``, ``"column_shortlist"``,
+        ``"column_selection"``, and optionally ``"canvas"``).
+
+    Raises:
+        CommandError: If required config keys are missing, a doc ID cannot be
+            resolved, or resume mode is requested but no selection file exists.
+    """
     heuristics_config = config.get("heuristics") or {}
     table_score_heuristics = heuristics_config.get("table_score") or {}
     column_score_heuristics = heuristics_config.get("column_score") or {}

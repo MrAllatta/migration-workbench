@@ -1,3 +1,35 @@
+"""Command-line interface for workbench deployment operations.
+
+Entry point: the ``wb`` script installed by ``pyproject.toml``
+(``[project.scripts] wb = "deployment.wb_cli:main"``).
+
+**Available subcommands**
+
+``wb manifest lint [--manifest PATH]``
+    Validate ``deploy/spaces.yml`` against the full manifest schema.
+
+``wb deploy <space> --env <env> --dry-run``
+    Record a dry-run release event for *space*/*env* (live deploys are not yet
+    implemented; ``--dry-run`` is required until they are).
+
+All subcommands accept ``--json`` to emit machine-readable JSON so CI scripts
+can parse results without screen-scraping.
+
+**Error codes**
+
+``WB-MANIFEST-1001``
+    Manifest failed schema validation.
+
+``WB-DEPLOY-2001``
+    Space name not found in manifest.
+
+``WB-DEPLOY-2002``
+    Environment name not found for the given space.
+
+``WB-GENERAL-9001``
+    Unexpected exception.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -160,6 +192,12 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct and return the ``wb`` argument parser.
+
+    Returns:
+        argparse.ArgumentParser: Fully configured parser with all subcommands
+        and flags registered.
+    """
     parser = argparse.ArgumentParser(prog="wb", description="Migration workbench deployment CLI")
     parser.add_argument("--json", action="store_true", help="Return machine-readable JSON output.")
     parser.add_argument(
@@ -183,6 +221,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Parse arguments and dispatch to the appropriate subcommand handler.
+
+    Returns:
+        int: Exit code — ``0`` on success, ``1`` on failure.  Designed to be
+        passed directly to :func:`sys.exit`.
+
+    Example::
+
+        if __name__ == "__main__":
+            raise SystemExit(main())
+    """
     parser = build_parser()
     args = parser.parse_args()
     try:

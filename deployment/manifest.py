@@ -1,3 +1,19 @@
+"""Load and validate the ``deploy/spaces.yml`` deployment manifest.
+
+The manifest describes every hosted *space* (one Django instance per
+customer/project) and the shared infrastructure profiles, replication
+defaults, and secret contracts they must satisfy.
+
+**Typical call sequence**::
+
+    payload = load_manifest(Path("deploy/spaces.yml"))
+    ensure_manifest_valid(payload)          # raises ManifestValidationError on failure
+    # -- or, to inspect issues without raising --
+    issues = validate_manifest(payload)
+    for issue in issues:
+        print(issue.path, issue.message)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,7 +24,12 @@ import yaml
 
 
 class ManifestValidationError(ValueError):
-    """Raised when deploy/spaces.yml violates the required contract."""
+    """Raised when ``deploy/spaces.yml`` violates the required contract.
+
+    Inherits from :class:`ValueError` so callers can catch it without importing
+    this module specifically.  The message contains a newline-separated list of
+    ``- path: message`` items when multiple issues were found.
+    """
 
 
 # Frozen contract: secret names must match Django/Fly usage (see deploy docs / .env.example).
@@ -29,11 +50,31 @@ CANONICAL_RUNTIME_ENV_NAMES = frozenset({"SQLITE_PATH"})
 
 @dataclass(frozen=True)
 class ManifestValidationIssue:
+    """A single validation failure within the manifest.
+
+    Attributes:
+        path: Dot-separated YAML path to the offending key
+            (e.g. ``"spaces.farm.provider.regions"``).
+        message: Human-readable description of the constraint that was violated.
+    """
+
     path: str
     message: str
 
 
 def load_manifest(path: Path) -> dict[str, Any]:
+    """Read and parse a YAML manifest file.
+
+    Args:
+        path: Filesystem path to the manifest (typically ``deploy/spaces.yml``).
+
+    Returns:
+        dict: Parsed manifest payload.
+
+    Raises:
+        ManifestValidationError: If the YAML root is not a mapping.
+        yaml.YAMLError: On YAML parse failure.
+    """
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         raise ManifestValidationError("Manifest root must be a mapping.")
@@ -63,6 +104,19 @@ def _require_int(obj: dict[str, Any], key: str, path: str, issues: list[Manifest
 
 
 def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
+    """Validate *payload* against the full manifest schema contract.
+
+    Walks every section (``profiles``, ``replication_defaults``, ``spaces``)
+    and collects all constraint violations rather than stopping at the first
+    error.  This lets operators fix all issues in a single edit cycle.
+
+    Args:
+        payload: Parsed manifest dict, as returned by :func:`load_manifest`.
+
+    Returns:
+        list[ManifestValidationIssue]: All issues found.  An empty list means
+        the manifest is valid.
+    """
     issues: list[ManifestValidationIssue] = []
     if payload.get("version") != 1:
         issues.append(ManifestValidationIssue("version", "must equal 1"))
@@ -214,6 +268,19 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
 
 
 def ensure_manifest_valid(payload: dict[str, Any]) -> None:
+    """Assert that *payload* passes all manifest validation checks.
+
+    This is the raising counterpart to :func:`validate_manifest`.  Use it in
+    CLI commands and CI scripts where a single point of failure is preferable
+    to iterating over issues.
+
+    Args:
+        payload: Parsed manifest dict, as returned by :func:`load_manifest`.
+
+    Raises:
+        ManifestValidationError: If any validation issues are found.  The
+            exception message lists all issues prefixed with ``"- path: msg"``.
+    """
     issues = validate_manifest(payload)
     if not issues:
         return

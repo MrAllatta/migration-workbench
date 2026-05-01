@@ -1,3 +1,27 @@
+"""Multi-workbook Google Sheets profiling pipeline (cohort corpus mode).
+
+Orchestrates a full corpus run over a Drive folder hierarchy containing a
+cohort of year-coded workbooks (e.g. ``"101_FarmPlan_2023.xlsx"``):
+
+1. **Discovery** — walk the Drive folder tree, listing all spreadsheets and
+   their tabs.
+2. **Indexing** — filter to in-scope workbook codes; extract year from folder
+   or filename; sort chronologically.
+3. **Broad profile** — list tabs for every in-scope spreadsheet.
+4. **Scoring / shortlist** — rank tabs by heuristic score (row/col counts,
+   name keyword patterns for operational vs. reference vs. support tabs).
+5. **Tab selection** — auto-select the top *N* per workbook code, then apply
+   manual overrides.
+6. **Deep profile** — call ``fetch_tab_grid`` + ``summarize_tab`` on each
+   selected tab, writing per-tab JSON artifacts under ``out_dir/deep/``.
+7. **Column candidates** — score header columns for domain relevance and
+   formula density.
+
+The main entry point is :func:`run_cohort_corpus`.  All intermediate artifacts
+are written to *out_dir* with date-stamped filenames so successive runs are
+non-destructive.
+"""
+
 from __future__ import annotations
 
 import json
@@ -224,7 +248,28 @@ def apply_tab_selection_overrides(
     approved_tabs: dict[str, list[str]],
     overrides: dict | None,
 ) -> dict[str, list[str]]:
-    """Merge user-supplied tab selection overrides into heuristic approved_tabs."""
+    """Merge user-supplied tab selection overrides into heuristic *approved_tabs*.
+
+    Each override entry supports three mutually exclusive operations:
+
+    * ``replace: true`` + ``tabs: [...]`` — replace the workbook's entire
+      selection with the provided list.
+    * ``add: [...]`` — append tab titles not already present.
+    * ``remove: [...]`` — remove tab titles from the current selection.
+
+    Args:
+        approved_tabs: Heuristic selection mapping
+            ``{workbook_code: [tab_title, ...]}``.
+        overrides: Optional ``{workbook_code: override_entry}`` dict from the
+            corpus config.  ``None`` or empty returns a copy of *approved_tabs*
+            unchanged.
+
+    Returns:
+        dict[str, list[str]]: Merged tab selection.
+
+    Raises:
+        CommandError: On type violations or unknown override keys.
+    """
     merged: dict[str, list[str]] = {code: list(tabs) for code, tabs in approved_tabs.items()}
     if not overrides:
         return merged
@@ -389,6 +434,39 @@ def run_cohort_corpus(
     date_stamp: str,
     resume_from_tab_selection: bool = False,
 ) -> dict:
+    """Execute the full cohort corpus profiling pipeline and write all artifacts.
+
+    All intermediate JSON files are written to *out_dir* with *date_stamp*
+    suffixes.  Deep-profile per-tab files go into ``out_dir/deep/``.
+
+    When *resume_from_tab_selection* is ``True``, the
+    ``tab_selection_<date_stamp>.json`` file must already exist in *out_dir*;
+    the pipeline skips discovery / broad profiling / scoring and goes directly
+    to deep profiling using that selection.
+
+    Args:
+        drive_service: Authenticated Google Drive API service object.
+        sheets_service: Authenticated Google Sheets API service object.
+        config: Parsed corpus config dict.  Required keys: ``folder_id``
+            (Drive folder), ``in_scope_workbooks`` (list of code strings).
+            Optional keys include ``heuristics``, ``tab_auto_limit``,
+            ``column_min_score``, ``tab_selection_overrides``,
+            ``discovery_no_tabs``, ``max_depth``.
+        out_dir: Directory where all artifact JSON files are written.
+        date_stamp: Timestamp string appended to artifact filenames.
+        resume_from_tab_selection: Skip to deep profiling using an existing
+            tab selection file.  Defaults to ``False``.
+
+    Returns:
+        dict[str, str]: Mapping from artifact role to file path for every file
+        written (keys: ``"discovery"``, ``"index"``, ``"broad_coverage"``,
+        ``"tab_shortlist"``, ``"tab_selection"``, ``"deep_coverage"``,
+        ``"column_shortlist"``, ``"column_selection"``).
+
+    Raises:
+        CommandError: If required config keys are missing or resume mode is
+            requested but no selection file exists.
+    """
     from profiler.management.commands.profile_drive_folder import walk_folder
 
     folder_id = config.get("folder_id")

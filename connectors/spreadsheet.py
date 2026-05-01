@@ -1,3 +1,26 @@
+"""Header detection, row normalisation, and CSV output for tabular connectors.
+
+The core public functions are:
+
+* :func:`canonicalize_header_row` — apply alias substitutions to a raw header.
+* :func:`detect_header_row` — locate the header row in a raw row list.
+* :func:`normalize_rows` — detect + project + transform a row list in one call.
+* :func:`normalize_csv_file` — read a CSV, normalize it, and write the output.
+
+All functions operate on plain ``list[list]`` data (as returned by
+:mod:`csv.reader`) so they are provider-agnostic and easy to test without
+filesystem or network access.
+
+**Header detection strategies** (in priority order):
+
+1. ``prefer_anchor_token`` — look for a sentinel value in the first cell and
+   use the *following* row as the header (useful when a label row precedes the
+   real header).
+2. Required-header set scan — walk rows until all required headers are present.
+3. ``anchor_token`` fallback — same sentinel strategy without the priority flag.
+4. ``header_row_index`` — use an explicit 0-based row index (last resort).
+"""
+
 import csv
 from datetime import date
 from pathlib import Path
@@ -10,6 +33,20 @@ def _normalize_text(value):
 
 
 def canonicalize_header_row(header_row, aliases=None):
+    """Apply alias substitutions to *header_row* and strip extra whitespace.
+
+    Each cell is looked up in the normalised alias map; if found, the alias
+    value is used as the canonical name.  Otherwise the cell is returned
+    with interior whitespace collapsed (but original casing preserved).
+
+    Args:
+        header_row: List of raw header cell values.
+        aliases: Optional ``{raw_name: canonical_name}`` mapping.  Keys are
+            matched after normalisation (casefold + whitespace collapse).
+
+    Returns:
+        list[str]: Canonicalised header names, same length as *header_row*.
+    """
     alias_map = {_normalize_text(key): value for key, value in (aliases or {}).items()}
     canonical = []
     for cell in header_row:
@@ -529,6 +566,40 @@ def detect_header_row(
     header_row_index=None,
     prefer_anchor_token=False,
 ):
+    """Locate the header row within *rows* and return its canonicalised form.
+
+    Detection strategies are tried in this order (see module docstring for
+    full rationale):
+
+    1. Anchor-token priority (when *prefer_anchor_token* is ``True``).
+    2. Required-header set scan.
+    3. Anchor-token fallback.
+    4. Explicit *header_row_index*.
+
+    Args:
+        rows: Raw row list (list of lists) from a CSV or provider fetch.
+        required_headers: Iterable of column names that must all be present in
+            the detected header row.
+        aliases: Optional ``{raw_name: canonical_name}`` mapping passed to
+            :func:`canonicalize_header_row`.
+        max_scan_rows: Maximum number of rows to examine before giving up.
+            Defaults to ``200``.
+        anchor_token: Sentinel string to search for in the first cell of each
+            row; the *following* row is treated as the header candidate.
+        header_row_index: Explicit 0-based row index to use as a last resort
+            when no strategy succeeds.
+        prefer_anchor_token: When ``True``, try the anchor-token strategy
+            *before* the required-header scan.
+
+    Returns:
+        tuple[int, list[str], str]: ``(header_row_index, canonical_header, strategy)``
+        where *strategy* is one of ``"anchor_token"``,
+        ``"required_header_set_scan"``, or ``"header_row_index"``.
+
+    Raises:
+        ValueError: When no header row is found and *header_row_index* is not
+            provided or is out of range.
+    """
     normalized_required = {_normalize_text(value) for value in required_headers}
     scan_limit = min(len(rows), max_scan_rows)
 
@@ -587,6 +658,58 @@ def normalize_rows(
     constant_columns=None,
     skip_rows_missing=None,
 ):
+    """Detect, project, and transform a raw row list into an import-ready form.
+
+    This is the primary normalisation entry point when working with an
+    in-memory row list (e.g. fetched from a provider).  For file-based
+    workflows use :func:`normalize_csv_file` instead.
+
+    When *source_regions* is provided, each region is normalised independently
+    and their data rows (excluding repeated headers) are concatenated into a
+    single result.  ``grid_unpivot`` and ``source_regions`` are mutually
+    exclusive.
+
+    Args:
+        rows: Raw list of lists (header row + data rows) from the provider.
+        required_headers: Column names that must appear in the detected header.
+        aliases: Header alias mapping (see :func:`canonicalize_header_row`).
+        max_scan_rows: Scan limit for header detection.  Defaults to ``200``.
+        anchor_token: Sentinel first-cell value for anchor-based detection.
+        header_row_index: Explicit header row index (last-resort fallback).
+        output_headers: If provided, the output is projected to exactly these
+            column names (in order), discarding all other columns.
+        column_map: ``{output_header: source_header_or_int}`` remapping applied
+            during projection.
+        default_values: ``{output_header: default}`` applied when the source
+            cell is blank or the column is absent.
+        row_transforms: List of transform dicts (``split``, ``copy``,
+            ``week_monday``) applied after projection.
+        source_regions: List of per-region config dicts.  When supplied, each
+            region is normalised with its own parameters and the results are
+            merged.
+        stop_on_blank_in: List of column names; row scanning stops when any of
+            these columns is blank (useful for sheets with trailing summary rows).
+        prefer_anchor_token: Prioritise anchor-token detection over
+            required-header scan.
+        grid_unpivot: Config dict for wide-to-long (pivot) expansion.  Cannot
+            be combined with *source_regions*.
+        fold_into_notes: List of fold dicts appending source columns into a
+            target notes column.
+        constant_columns: ``{output_header: literal_value}`` applied after all
+            other transforms.
+        skip_rows_missing: Output column names; rows where any of these are
+            blank after all transforms are dropped.
+
+    Returns:
+        dict: Normalised result with keys:
+        ``header_row_index`` (int), ``strategy`` (str), ``rows`` (list of
+        lists, header first).  Multi-region results add
+        ``header_row_indexes`` (list of ints).
+
+    Raises:
+        ValueError: If ``grid_unpivot`` and ``source_regions`` are both set,
+            or if header detection fails without a fallback.
+    """
     if grid_unpivot and source_regions:
         raise ValueError("grid_unpivot cannot be combined with source_regions in one tab")
 
@@ -668,6 +791,45 @@ def normalize_csv_file(
     constant_columns=None,
     skip_rows_missing=None,
 ):
+    """Read *source_path*, normalise it, and write the result to *output_path*.
+
+    All normalisation parameters are forwarded to :func:`normalize_rows`; see
+    that function for full parameter documentation.
+
+    The ``utf-8-sig`` encoding is used on read to strip the BOM that Excel
+    and Google Sheets sometimes prepend to CSV exports.
+
+    When *append_without_header* is ``True`` and *output_path* already exists,
+    data rows are appended without repeating the header line — useful for
+    merging multi-source CSVs in a pipeline step.
+
+    Args:
+        source_path: Path to the raw source CSV file.
+        output_path: Destination path for the normalised CSV.  Parent
+            directories are created automatically.
+        required_headers: Column names that must appear in the detected header.
+        aliases: Header alias mapping.
+        max_scan_rows: Scan limit for header detection.  Defaults to ``200``.
+        anchor_token: Sentinel first-cell value for anchor-based detection.
+        header_row_index: Explicit fallback header row index.
+        output_headers: Projected output column names.
+        column_map: ``{output_header: source_header_or_int}`` remapping.
+        default_values: ``{output_header: default}`` for blank cells.
+        row_transforms: List of transform dicts applied after projection.
+        source_regions: Per-region config list for multi-region sheets.
+        stop_on_blank_in: Columns whose blank value halts row scanning.
+        prefer_anchor_token: Prioritise anchor-token detection.
+        grid_unpivot: Wide-to-long expansion config dict.
+        append_without_header: Append to existing file without writing header.
+        fold_into_notes: Fold config list for note-column accumulation.
+        constant_columns: ``{output_header: literal_value}`` overrides.
+        skip_rows_missing: Drop rows missing values in these output columns.
+
+    Returns:
+        dict: Normalised result dict (from :func:`normalize_rows`) augmented
+        with ``"rows_written"`` (int) — the number of data rows written,
+        excluding the header.
+    """
     with Path(source_path).open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.reader(handle))
 
