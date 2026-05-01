@@ -374,7 +374,91 @@ def render_agents_md() -> str:
 
 
 def render_readme_md(project_name: str) -> str:
-    return f"# {project_name}\n\nDjango product repository using [migration-workbench](https://pypi.org/project/migration-workbench/).\n"
+    return f"""# {project_name}
+
+Django product repository built on **[migration-workbench](https://pypi.org/project/migration-workbench/)** — profiler, importer chassis, and workbook tooling for spreadsheet/Coda → app migrations.
+
+## Quickstart
+
+```bash
+make install          # editable workbench + this package
+make migrate && make check
+```
+
+Develop workbench upstream tests (optional): `make chassis-gate` (runs the workbench repo gate).
+
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| This README | Orientation |
+| [docs/schema-contract.md](docs/schema-contract.md) | Entity and mapping decisions (fill in) |
+| [docs/operator.md](docs/operator.md) | Routine commands and operational checklist |
+
+Upstream chassis documentation lives with **[migration-workbench on PyPI](https://pypi.org/project/migration-workbench/)** — see package metadata for the source repository and files such as `docs/architecture.md`, `docs/deployment.md`, and `docs/schema-design-loop.md`.
+
+## Layout
+
+- `backend/` — Django project (`config.settings`, `manage.py`, `apps/core/`).
+- `Dockerfile` / `scripts/entrypoint_product.sh` — Fly + SQLite + Litestream compatible image.
+
+"""
+
+
+def render_operator_md(project_name: str) -> str:
+    return f"""# Operator notes — {project_name}
+
+Single place for routine commands and decisions that do not belong in code.
+
+## Local development
+
+```bash
+make install
+make migrate
+make check
+```
+
+## Profiling (read-only)
+
+Point `manage.py` profiler commands at client sources; store snapshots under `data/profile_snapshots/` (gitignore large artifacts if needed). See migration-workbench docs for Google (`docs/google-auth.md` in workbench) and Coda (`docs/coda.md` in workbench).
+
+## Imports
+
+- Run validate-only / preflight before apply.
+- Keep bundle YAML and importer subclasses in this repo; avoid editing workbench internals for client rules.
+
+## Deploy
+
+Fly secrets, Litestream, and CI/CD follow the same patterns as the workbench — see **migration-workbench** `docs/deployment.md` and your space entry in `deploy/spaces.yml` when wired.
+
+## Log
+
+(Add dated entries: imports run, profile refreshes, deploys, incidents.)
+"""
+
+
+def render_schema_contract_md(project_name: str) -> str:
+    return f"""# Schema contract — {project_name}
+
+Living document for entities, attributes, and sheet/tab mapping. Align with the **schema design loop** in migration-workbench (`docs/schema-design-loop.md`).
+
+## Sources
+
+- Profile snapshots: `data/profile_snapshots/`
+- Bundle configs: `bundles/` (when present)
+
+## Entities
+
+(Add sections per entity: purpose, source tabs, key columns, formulas, FK targets.)
+
+## Decisions
+
+- Lift / modify / rebuild per area (record rationale).
+
+## Drift
+
+(Re-profile after source changes; note date and what changed.)
+"""
 
 
 def render_gitignore() -> str:
@@ -492,6 +576,8 @@ def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
         (".env.example", render_env_example()),
         ("AGENTS.md", render_agents_md()),
         ("README.md", render_readme_md(product_kebab)),
+        ("docs/operator.md", render_operator_md(product_kebab)),
+        ("docs/schema-contract.md", render_schema_contract_md(product_kebab)),
         (".gitignore", render_gitignore()),
         ("Dockerfile", render_dockerfile()),
     ]
