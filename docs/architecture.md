@@ -1,12 +1,14 @@
 # Architecture
 
-`migration_workbench` separates migration work into four layers:
+`migration_workbench` separates migration work into **five** Django apps (layers):
 
 1. **Connectors** (`connectors/*`): provider adapters (Google Sheets and Coda).
 2. **Profiler** (`profiler/*`): normalizes tabular source rows into a deterministic CSV bundle.
 3. **Importer** (`importer/*`): Django command chassis for preflight/apply, summary artifacts, and structured failures.
 4. **Workbook** (`workbook/*`): turns profiler JSON + bundle config into **schema contract** YAML (and optional `models.py` stubs) for product repos to refine into real Django models.
 5. **Deployment** (`deployment/*`): validates per-space deployment manifests, records release metadata, and provides the `wb` CLI surface (`manifest lint`, `deploy --dry-run`).
+
+See the repository [README](../README.md) for the documentation map; Fly hosting for this repo is documented in [deployment.md](deployment.md).
 
 ## Django project layout
 
