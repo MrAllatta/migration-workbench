@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "migration-workbench"
-version = "0.1.1"
+version = "0.1.2"
 description = "Reusable profiler and importer chassis for tabular migrations"
 readme = "README.md"
 license = { file = "LICENSE" }
