@@ -13,7 +13,7 @@ See the repository [README](../README.md) for the documentation map; Fly hosting
 ## Django project layout
 
 - **Standalone:** this repo’s root [`manage.py`](../manage.py) uses `migration_workbench.settings` for development, `chassis-gate`, and running commands against the packaged apps.
-- **Embedded:** product repositories (e.g. farm, vizcarra-guitars) install `migration-workbench` editable, provide **their own** `manage.py` and `config.settings`, and list the same apps (`connectors`, `profiler`, `importer`, `workbook`, …) in `INSTALLED_APPS`.
+- **Embedded:** product repositories (e.g. farm, vizcarra-guitars) install `migration-workbench` from **PyPI** by default (editable local checkout only when co-developing the chassis), provide **their own** `manage.py` and `config.settings`, and list the same apps (`connectors`, `profiler`, `importer`, `workbook`, …) in `INSTALLED_APPS`.
 
 ```mermaid
 flowchart LR

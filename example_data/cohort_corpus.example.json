@@ -1,7 +1,9 @@
 {
   "folder_id": "REPLACE_ME",
-  "folder_name": "Cohort Corpus",
-  "in_scope_workbooks": ["WB1", "WB2"],
+  "folder_name": "Corpus Root Folder",
+  "workbook_id_regex": "\\b(\\d{3})\\b",
+  "year_regex": "\\b(20\\d{2})\\b",
+  "in_scope_workbooks": ["REPLACE_WITH_CODES_MATCHED_BY_REGEX"],
   "tab_auto_limit": 3,
   "column_min_score": 4,
   "tab_selection_overrides": {},

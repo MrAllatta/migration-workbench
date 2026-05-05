@@ -22,7 +22,7 @@ From a sibling checkout of this repo:
 make new-product PRODUCT=my-product   # writes ../my-product; git init + initial commit
 ```
 
-Then `cd ../my-product && make install && make migrate && make check`. The scaffold includes `backend/`, `Makefile`, `Dockerfile` (installs migration-workbench from PyPI), `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), and starter docs. Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
+Then `cd ../my-product && make install && make migrate && make check`. Local **`make install`** matches the **Dockerfile**: the product package is editable (`pip install -e .`) and **`migration-workbench` comes from PyPI** via `pyproject.toml`. The scaffold also includes `backend/`, `Makefile`, `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), and starter docs. Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
 
 **3. Develop the chassis (this repo)**  
 Clone, editable install, run the full gate:
@@ -153,6 +153,7 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 | [docs/deployment.md](docs/deployment.md)                                                          | Fly, secrets, Litestream/Tigris, CI/CD, control-plane roadmap |
 | [docs/schema-design-loop.md](docs/schema-design-loop.md)                                          | Contract-first importer workflow                              |
 | [docs/google-auth.md](docs/google-auth.md)                                                        | Sheets/Drive profiling auth                                   |
+| [docs/google-corpus.md](docs/google-corpus.md)                                                    | Drive folder / multi-workbook Sheets corpus profiling         |
 | [docs/coda.md](docs/coda.md)                                                                      | Coda profiling                                                |
 | Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
 

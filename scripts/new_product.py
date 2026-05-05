@@ -10,9 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Pin must match published migration-workbench on PyPI (see migration-workbench/pyproject.toml).
-WORKBENCH_VERSION_PIN = "0.1.0"
-
 PYTHON_IMAGE_DIGEST = (
     "sha256:ee710afcfb733f4a750d9be683cf054b5cd247b6c5f5237a6849ea568b90ab15"
 )
@@ -58,7 +55,9 @@ def _git_init_and_initial_commit(repo: Path) -> None:
     repo_s = str(repo.resolve())
     git = ("git", "-C", repo_s)
 
-    def _run(args: tuple[str, ...], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def _run(
+        args: tuple[str, ...], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run((*git, *args), text=True, capture_output=True, **kwargs)
 
     try:
@@ -134,7 +133,7 @@ if __name__ == "__main__":
 
 def render_settings_py(user_model_name: str) -> str:
     # user_model_name e.g. JewelryUser
-    return f'''import os
+    return f"""import os
 import sys
 from pathlib import Path
 
@@ -273,11 +272,11 @@ if PRODUCTION:
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "core.{user_model_name}"
-'''
+"""
 
 
 def render_urls_py() -> str:
-    return '''from django.contrib import admin
+    return """from django.contrib import admin
 from django.urls import path
 from migration_workbench.views import healthz
 
@@ -286,7 +285,7 @@ urlpatterns = [
     path("healthz", healthz),
     path("healthz/", healthz),
 ]
-'''
+"""
 
 
 def render_wsgi_py() -> str:
@@ -307,7 +306,7 @@ application = get_wsgi_application()
 
 
 def render_apps_py(model_prefix: str) -> str:
-    return f'''from django.apps import AppConfig
+    return f"""from django.apps import AppConfig
 
 
 class CoreConfig(AppConfig):
@@ -315,21 +314,21 @@ class CoreConfig(AppConfig):
     name = "core"
     label = "core"
     verbose_name = "{model_prefix} core"
-'''
+"""
 
 
 def render_models_py(model_prefix: str, user_model_name: str) -> str:
-    return f'''from django.contrib.auth.models import AbstractUser
+    return f"""from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
 class {user_model_name}(AbstractUser):
     pass
-'''
+"""
 
 
 def render_pyproject_toml(project_name: str, py_name: str) -> str:
-    return f'''[build-system]
+    return f"""[build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -340,7 +339,7 @@ description = "{project_name} — Django product with migration-workbench"
 requires-python = ">=3.11"
 dependencies = [
   "Django>=5.0,<6.0",
-  "migration-workbench>={WORKBENCH_VERSION_PIN}",
+  "migration-workbench>=0.1.0,<1",
 ]
 
 [project.optional-dependencies]
@@ -349,9 +348,6 @@ dev = [
   "pytest-django",
 ]
 
-[tool.uv.sources]
-migration-workbench = {{ path = "../migration-workbench", editable = true }}
-
 [tool.setuptools]
 py-modules = []
 
@@ -359,15 +355,13 @@ py-modules = []
 testpaths = ["backend"]
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
 DJANGO_SETTINGS_MODULE = "config.settings"
-'''
+"""
 
 
 def render_makefile() -> str:
-    return r'''-include .env
-# .env may set WORKBENCH to empty; fall back to sibling checkout (docs / optional upstream dev only).
-ifeq ($(strip $(WORKBENCH)),)
-WORKBENCH := ../migration-workbench
-endif
+    return r"""-include .env
+# migration-workbench is installed from PyPI via pyproject.toml. Optionally set WORKBENCH in .env to a
+# local checkout path for install-dev-workbench / chassis-gate (upstream chassis development only).
 export WORKBENCH
 
 VENV = .venv
@@ -375,7 +369,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell chassis-gate
+.PHONY: venv install install-dev-workbench migrate check shell chassis-gate profile-coda-corpus profile-cohort-corpus
 
 venv:
 	python3 -m venv $(VENV)
@@ -383,12 +377,12 @@ venv:
 	$(PIP) install --upgrade pip setuptools wheel
 
 install: venv
-	$(PIP) install -e $(WORKBENCH)
 	$(PIP) install -e .
 
-# Use when developing migration-workbench itself (tests/chassis-gate), not for daily product commands.
+# Optional: run after setting WORKBENCH to a migration-workbench checkout path in .env
 install-dev-workbench:
-	$(MAKE) -C $(WORKBENCH) install
+	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
+	$(MAKE) -C "$(WORKBENCH)" install
 
 migrate:
 	$(MANAGE) makemigrations
@@ -401,12 +395,19 @@ shell:
 	$(MANAGE) shell
 
 chassis-gate:
-	$(MAKE) -C $(WORKBENCH) chassis-gate
-'''
+	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
+	$(MAKE) -C "$(WORKBENCH)" chassis-gate
+
+profile-coda-corpus:
+	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
+
+profile-cohort-corpus:
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-build/cohort_corpus}"
+"""
 
 
 def render_env_example() -> str:
-    return '''DJANGO_DEBUG=1
+    return """DJANGO_DEBUG=1
 DJANGO_SECRET_KEY=replace-me
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 # Production: set CSRF_TRUSTED_ORIGINS=https://your-app.fly.dev
@@ -414,14 +415,17 @@ DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 # SQLite: relative paths resolve under backend/; use absolute path in production (e.g. /data/db.sqlite3).
 SQLITE_PATH=db.sqlite3
 
-WORKBENCH=../migration-workbench
-'''
+# Google Drive / Sheets profiling (ADC + SA impersonation — see migration-workbench docs/google-auth.md).
+# GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=mw-profiler@PROJECT.iam.gserviceaccount.com
+
+# Optional chassis development only: WORKBENCH=/absolute/path/to/migration-workbench
+"""
 
 
 def render_agents_md() -> str:
     return """# Agent notes
 
-- **Workbench:** Default path is `../migration-workbench` (override with `WORKBENCH` in `.env`). Use this when running **upstream** `make install` / `chassis-gate` on the workbench itself—not for normal Django commands.
+- **Workbench:** `migration-workbench` is installed from **PyPI** via `make install`. Set `WORKBENCH` in `.env` to a local checkout path only when running upstream `make install-dev-workbench` / `chassis-gate` on the chassis repo—not for normal Django commands.
 - **Runtime:** Prefer `make` from this repo root. Commands use **`.venv/bin/python backend/manage.py`** after `make install`.
 - **Secrets:** `.env` is gitignored; never commit tokens or paste them into tracked files.
 """
@@ -435,11 +439,11 @@ Django product repository built on **[migration-workbench](https://pypi.org/proj
 ## Quickstart
 
 ```bash
-make install          # editable workbench + this package
+make install          # editable product package; migration-workbench from PyPI
 make migrate && make check
 ```
 
-Develop workbench upstream tests (optional): `make chassis-gate` (runs the workbench repo gate).
+Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make chassis-gate` (runs the workbench repo gate).
 
 ## Documentation
 
@@ -474,7 +478,11 @@ make check
 
 ## Profiling (read-only)
 
-Point `manage.py` profiler commands at client sources; store snapshots under `data/profile_snapshots/` (gitignore large artifacts if needed). See migration-workbench docs for Google (`docs/google-auth.md` in workbench) and Coda (`docs/coda.md` in workbench).
+Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Drive / Sheets with ADC (see migration-workbench **`docs/google-auth.md`**). Store artifacts under **`data/profile_snapshots/`** (gitignore large outputs if needed).
+
+**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Convenience: `make profile-cohort-corpus` with `COHORT_CORPUS_CONFIG` and optional `COHORT_CORPUS_OUT_DIR`.
+
+**Coda:** migration-workbench **`docs/coda.md`**; multi-doc: `make profile-coda-corpus` with `CODA_CORPUS_CONFIG`.
 
 ## Imports
 
@@ -639,7 +647,9 @@ def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
     for rel, content in files:
         write_file(output_dir / rel, content, force=force)
 
-    copy_file(entrypoint_src, output_dir / "scripts" / "entrypoint_product.sh", force=force)
+    copy_file(
+        entrypoint_src, output_dir / "scripts" / "entrypoint_product.sh", force=force
+    )
 
     manage = output_dir / "backend" / "manage.py"
     if manage.exists():

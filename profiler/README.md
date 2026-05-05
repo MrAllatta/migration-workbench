@@ -16,7 +16,7 @@ Discover structure, formulas, and corpus-scale signals so product repos can defi
 | `scan_formula_patterns` | Regex inventory of formula usage |
 | `profile_cohort_corpus` | Multi-workbook Drive-folder pipeline |
 
-Auth: see [docs/google-auth.md](../docs/google-auth.md).
+Auth and multi-workbook corpus flow: [docs/google-auth.md](../docs/google-auth.md), [docs/google-corpus.md](../docs/google-corpus.md).
 
 ## Coda
 
@@ -37,7 +37,7 @@ Typically under `build/` (this repo) or product-owned `data/profile_snapshots/`.
 
 ## Configuration / env
 
-- Sheets: ADC / impersonation per [docs/google-auth.md](../docs/google-auth.md).
+- Sheets: ADC / impersonation per [docs/google-auth.md](../docs/google-auth.md). Cohort corpus: `COHORT_CORPUS_CONFIG`, `COHORT_CORPUS_OUT_DIR` for `make profile-cohort-corpus` (see [docs/google-corpus.md](../docs/google-corpus.md)).
 - Coda: `CODA_API_TOKEN`; corpus Makefile targets may use `CODA_CORPUS_CONFIG`, `CODA_CORPUS_OUT_DIR`.
 
 ## Pointers

@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas manifest-lint health-smoke new-product publish
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -66,6 +66,11 @@ profile-coda-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus \
 		--config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" \
 		--out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
+
+profile-cohort-corpus:
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus \
+		--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" \
+		--out-dir "$${COHORT_CORPUS_OUT_DIR:-build/cohort_corpus}"
 
 profile-coda-canvas:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke

@@ -1,7 +1,9 @@
 """Multi-workbook Google Sheets profiling pipeline (cohort corpus mode).
 
 Orchestrates a full corpus run over a Drive folder hierarchy containing a
-cohort of year-coded workbooks (e.g. ``"101_FarmPlan_2023.xlsx"``):
+cohort of workbooks whose **ids and years** are extracted via configurable
+regexes (defaults match e.g. ``"101_FarmPlan_2023"`` — see ``workbook_id_regex``
+and ``year_regex`` in the corpus config):
 
 1. **Discovery** — walk the Drive folder tree, listing all spreadsheets and
    their tabs.
@@ -31,13 +33,67 @@ from pathlib import Path
 
 from django.core.management.base import CommandError
 
-from profiler.management.commands.profile_tab import fetch_tab_grid, list_tabs, summarize_tab
+from profiler.management.commands.profile_tab import (
+    fetch_tab_grid,
+    list_tabs,
+    summarize_tab,
+)
 
-YEAR_RE = re.compile(r"\b(20\d{2})\b")
-CODE_RE = re.compile(r"\b(\d{3})\b")
+DEFAULT_YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
+DEFAULT_WORKBOOK_ID_PATTERN = re.compile(r"\b(\d{3})\b")
 
 
-def build_cohort_corpus_index(discovery_payload: dict, in_scope_codes: set[str]) -> list[dict]:
+def _corpus_regex_from_config(
+    config: dict, key: str, default: re.Pattern[str]
+) -> re.Pattern[str]:
+    """Return a compiled regex from *config*[*key*] or *default*.
+
+    The pattern must include at least one capturing group; group 1 is the
+    extracted workbook id or calendar year string.
+
+    Raises:
+        CommandError: When the value is present but not a valid regex or has
+            no capturing groups.
+    """
+    raw = config.get(key)
+    if raw is None:
+        return default
+    if not isinstance(raw, str) or not raw.strip():
+        return default
+    try:
+        compiled = re.compile(raw)
+    except re.error as exc:
+        raise CommandError(f"Invalid corpus config regex {key!r}: {exc}") from exc
+    if compiled.groups < 1:
+        raise CommandError(
+            f"Corpus config {key!r} must include at least one capturing group (...) for extraction."
+        )
+    return compiled
+
+
+def build_cohort_corpus_index(
+    discovery_payload: dict,
+    in_scope_codes: set[str],
+    *,
+    workbook_id_re: re.Pattern[str] | None = None,
+    year_re: re.Pattern[str] | None = None,
+) -> list[dict]:
+    """Build index rows from a ``profile_drive_folder``-style tree payload.
+
+    Args:
+        discovery_payload: Root folder node with nested ``folders`` and
+            ``spreadsheets``.
+        in_scope_codes: Workbook ids (group 1 of *workbook_id_re*) to retain.
+        workbook_id_re: Pattern for workbook id in each spreadsheet file name.
+            Defaults to three consecutive digits.
+        year_re: Pattern for a four-digit calendar year in folder or file names.
+            Defaults to years 2000--2099.
+
+    Returns:
+        Sorted list of index record dicts.
+    """
+    wb_pat = workbook_id_re or DEFAULT_WORKBOOK_ID_PATTERN
+    year_pat = year_re or DEFAULT_YEAR_PATTERN
     records: list[dict] = []
 
     def walk(node: dict, path_parts: list[str]):
@@ -45,14 +101,14 @@ def build_cohort_corpus_index(discovery_payload: dict, in_scope_codes: set[str])
         current = path_parts + ([name] if name else [])
         folder_year = None
         for part in reversed(current):
-            match = YEAR_RE.search(part)
+            match = year_pat.search(part)
             if match:
                 folder_year = int(match.group(1))
                 break
 
         for sheet in node.get("spreadsheets", []):
             sheet_name = sheet.get("name", "")
-            code_match = CODE_RE.search(sheet_name)
+            code_match = wb_pat.search(sheet_name)
             if not code_match:
                 continue
             code = code_match.group(1)
@@ -60,7 +116,7 @@ def build_cohort_corpus_index(discovery_payload: dict, in_scope_codes: set[str])
                 continue
             year = folder_year
             if year is None:
-                year_match = YEAR_RE.search(sheet_name)
+                year_match = year_pat.search(sheet_name)
                 year = int(year_match.group(1)) if year_match else None
             records.append(
                 {
@@ -78,7 +134,13 @@ def build_cohort_corpus_index(discovery_payload: dict, in_scope_codes: set[str])
             walk(sub, current)
 
     walk(discovery_payload, [])
-    records.sort(key=lambda row: ((row["year"] or 0), row["workbook_code"], row["spreadsheet_name"]))
+    records.sort(
+        key=lambda row: (
+            (row["year"] or 0),
+            row["workbook_code"],
+            row["spreadsheet_name"],
+        )
+    )
     return records
 
 
@@ -86,13 +148,27 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
     config = config or {}
     combo_tokens: list[tuple[str, ...]] = []
     for entry in config.get("reference_combo_tokens") or []:
-        if isinstance(entry, (list, tuple)) and all(isinstance(token, str) for token in entry):
+        if isinstance(entry, (list, tuple)) and all(
+            isinstance(token, str) for token in entry
+        ):
             combo_tokens.append(tuple(token.lower() for token in entry))
     return {
-        "operational_tokens": [token.lower() for token in (config.get("operational_tokens") or []) if isinstance(token, str)],
-        "reference_tokens": [token.lower() for token in (config.get("reference_tokens") or []) if isinstance(token, str)],
+        "operational_tokens": [
+            token.lower()
+            for token in (config.get("operational_tokens") or [])
+            if isinstance(token, str)
+        ],
+        "reference_tokens": [
+            token.lower()
+            for token in (config.get("reference_tokens") or [])
+            if isinstance(token, str)
+        ],
         "reference_combo_tokens": combo_tokens,
-        "support_tokens": [token.lower() for token in (config.get("support_tokens") or []) if isinstance(token, str)],
+        "support_tokens": [
+            token.lower()
+            for token in (config.get("support_tokens") or [])
+            if isinstance(token, str)
+        ],
     }
 
 
@@ -100,12 +176,16 @@ def _normalize_column_heuristics(config: dict | None) -> dict:
     config = config or {}
     return {
         "domain_keyword_tokens": [
-            token.lower() for token in (config.get("domain_keyword_tokens") or []) if isinstance(token, str)
+            token.lower()
+            for token in (config.get("domain_keyword_tokens") or [])
+            if isinstance(token, str)
         ]
     }
 
 
-def score_tab(title: str, rows: int, cols: int, *, tab_score_heuristics: dict | None = None) -> tuple[int, list[str]]:
+def score_tab(
+    title: str, rows: int, cols: int, *, tab_score_heuristics: dict | None = None
+) -> tuple[int, list[str]]:
     lowered = title.lower()
     score = 0
     reasons: list[str] = []
@@ -122,7 +202,9 @@ def score_tab(title: str, rows: int, cols: int, *, tab_score_heuristics: dict | 
     if reference_tokens and any(token in lowered for token in reference_tokens):
         score += 3
         reasons.append("reference_lookup_tab_name")
-    if reference_combo_tokens and any(all(token in lowered for token in combo) for combo in reference_combo_tokens):
+    if reference_combo_tokens and any(
+        all(token in lowered for token in combo) for combo in reference_combo_tokens
+    ):
         score += 3
         reasons.append("reference_lookup_tab_name")
     if support_tokens and any(token in lowered for token in support_tokens):
@@ -201,14 +283,18 @@ def select_tabs_from_inventory(
         bucket["rows_max"] = max(bucket["rows_max"], entry["rows"])
         bucket["cols_max"] = max(bucket["cols_max"], entry["cols"])
         if len(bucket["examples"]) < 3:
-            bucket["examples"].append({"year": entry["year"], "spreadsheet_id": entry["spreadsheet_id"]})
+            bucket["examples"].append(
+                {"year": entry["year"], "spreadsheet_id": entry["spreadsheet_id"]}
+            )
 
     selected: list[dict] = []
     for bucket in aggregate.values():
         avg_score = sum(bucket["scores"]) / len(bucket["scores"])
         coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
         final_score = avg_score + coverage_bonus
-        confidence = "high" if final_score >= 3 else "medium" if final_score >= 2 else "low"
+        confidence = (
+            "high" if final_score >= 3 else "medium" if final_score >= 2 else "low"
+        )
         if final_score < min_final_score:
             continue
         selected.append(
@@ -226,17 +312,23 @@ def select_tabs_from_inventory(
                 "examples": bucket["examples"],
             }
         )
-    selected.sort(key=lambda row: (-row["final_score"], row["workbook_code"], row["tab_title"]))
+    selected.sort(
+        key=lambda row: (-row["final_score"], row["workbook_code"], row["tab_title"])
+    )
     return selected
 
 
-def auto_select_tabs(tab_shortlist: list[dict], *, per_workbook: int = 3) -> dict[str, list[str]]:
+def auto_select_tabs(
+    tab_shortlist: list[dict], *, per_workbook: int = 3
+) -> dict[str, list[str]]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
     approved: dict[str, list[str]] = {}
     for workbook_code, rows in grouped.items():
-        rows.sort(key=lambda row: (-row["final_score"], -row["occurrences"], row["tab_title"]))
+        rows.sort(
+            key=lambda row: (-row["final_score"], -row["occurrences"], row["tab_title"])
+        )
         approved[workbook_code] = [row["tab_title"] for row in rows[:per_workbook]]
     return approved
 
@@ -270,12 +362,16 @@ def apply_tab_selection_overrides(
     Raises:
         CommandError: On type violations or unknown override keys.
     """
-    merged: dict[str, list[str]] = {code: list(tabs) for code, tabs in approved_tabs.items()}
+    merged: dict[str, list[str]] = {
+        code: list(tabs) for code, tabs in approved_tabs.items()
+    }
     if not overrides:
         return merged
 
     if not isinstance(overrides, dict):
-        raise CommandError("tab_selection_overrides must be a mapping of workbook_code to override entry")
+        raise CommandError(
+            "tab_selection_overrides must be a mapping of workbook_code to override entry"
+        )
 
     for workbook_code, entry in overrides.items():
         if not isinstance(entry, dict):
@@ -290,7 +386,9 @@ def apply_tab_selection_overrides(
 
         if entry.get("replace"):
             tabs = entry.get("tabs")
-            if not isinstance(tabs, list) or not all(isinstance(item, str) for item in tabs):
+            if not isinstance(tabs, list) or not all(
+                isinstance(item, str) for item in tabs
+            ):
                 raise CommandError(
                     f"tab_selection_overrides[{workbook_code!r}] requires 'tabs' as list[str] when 'replace' is true"
                 )
@@ -308,7 +406,9 @@ def apply_tab_selection_overrides(
             raise CommandError(
                 f"tab_selection_overrides[{workbook_code!r}].add must be a list of strings"
             )
-        if not isinstance(remove, list) or not all(isinstance(item, str) for item in remove):
+        if not isinstance(remove, list) or not all(
+            isinstance(item, str) for item in remove
+        ):
             raise CommandError(
                 f"tab_selection_overrides[{workbook_code!r}].remove must be a list of strings"
             )
@@ -374,7 +474,9 @@ def derive_column_candidates(
         lowered = header.lower()
         score = 0
         reasons: list[str] = []
-        if domain_keyword_tokens and any(token in lowered for token in domain_keyword_tokens):
+        if domain_keyword_tokens and any(
+            token in lowered for token in domain_keyword_tokens
+        ):
             score += 3
             reasons.append("domain_keyword")
         if formula_count > 100:
@@ -395,7 +497,10 @@ def derive_column_candidates(
                 "proposed_canonical_field": canonical,
                 "priority_score": score,
                 "priority_reasons": reasons,
-                "evidence": {"formula_cell_count": formula_count, "functions_used": functions},
+                "evidence": {
+                    "formula_cell_count": formula_count,
+                    "functions_used": functions,
+                },
             }
         )
     return candidates
@@ -407,7 +512,9 @@ def write_json(path: Path, payload: dict):
 
 
 def parse_tab_inventory_output(text: str) -> list[dict]:
-    pattern = re.compile(r"^\[(\s*\d+)\]\s+sheetId=\s*([0-9]+)\s+rows=\s*([0-9]+)\s+cols=\s*([0-9]+)\s+(.+)$")
+    pattern = re.compile(
+        r"^\[(\s*\d+)\]\s+sheetId=\s*([0-9]+)\s+rows=\s*([0-9]+)\s+cols=\s*([0-9]+)\s+(.+)$"
+    )
     rows: list[dict] = []
     for line in text.splitlines():
         match = pattern.match(line)
@@ -448,10 +555,11 @@ def run_cohort_corpus(
         drive_service: Authenticated Google Drive API service object.
         sheets_service: Authenticated Google Sheets API service object.
         config: Parsed corpus config dict.  Required keys: ``folder_id``
-            (Drive folder), ``in_scope_workbooks`` (list of code strings).
-            Optional keys include ``heuristics``, ``tab_auto_limit``,
-            ``column_min_score``, ``tab_selection_overrides``,
-            ``discovery_no_tabs``, ``max_depth``.
+            (Drive folder), ``in_scope_workbooks`` (list of code strings
+            matching capturing group 1 of ``workbook_id_regex``).
+            Optional keys include ``workbook_id_regex``, ``year_regex``,
+            ``heuristics``, ``tab_auto_limit``, ``column_min_score``,
+            ``tab_selection_overrides``, ``discovery_no_tabs``, ``max_depth``.
         out_dir: Directory where all artifact JSON files are written.
         date_stamp: Timestamp string appended to artifact filenames.
         resume_from_tab_selection: Skip to deep profiling using an existing
@@ -476,19 +584,46 @@ def run_cohort_corpus(
     if not in_scope_codes:
         raise CommandError("Config must include non-empty 'in_scope_workbooks'")
 
+    workbook_id_re = _corpus_regex_from_config(
+        config, "workbook_id_regex", DEFAULT_WORKBOOK_ID_PATTERN
+    )
+    year_re = _corpus_regex_from_config(config, "year_regex", DEFAULT_YEAR_PATTERN)
+
     heuristics_config = config.get("heuristics") or {}
     tab_score_heuristics = heuristics_config.get("tab_score") or {}
     column_score_heuristics = heuristics_config.get("column_score") or {}
 
     include_tabs = not bool(config.get("discovery_no_tabs"))
-    tree = walk_folder(drive_service, sheets_service, folder_id, include_tabs=include_tabs, max_depth=config.get("max_depth"))
-    discovery_payload = {"id": folder_id, "name": config.get("folder_name") or folder_id, **tree}
+    tree = walk_folder(
+        drive_service,
+        sheets_service,
+        folder_id,
+        include_tabs=include_tabs,
+        max_depth=config.get("max_depth"),
+    )
+    discovery_payload = {
+        "id": folder_id,
+        "name": config.get("folder_name") or folder_id,
+        **tree,
+    }
     discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
     write_json(discovery_path, discovery_payload)
 
-    index_records = build_cohort_corpus_index(discovery_payload, in_scope_codes)
+    index_records = build_cohort_corpus_index(
+        discovery_payload,
+        in_scope_codes,
+        workbook_id_re=workbook_id_re,
+        year_re=year_re,
+    )
     index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"
-    write_json(index_path, {"generated_from": discovery_path.name, "record_count": len(index_records), "records": index_records})
+    write_json(
+        index_path,
+        {
+            "generated_from": discovery_path.name,
+            "record_count": len(index_records),
+            "records": index_records,
+        },
+    )
 
     inventory_rows: list[dict] = []
     broad_results: list[dict] = []
@@ -552,7 +687,9 @@ def run_cohort_corpus(
         tab_shortlist_path,
         {
             "generated_from": broad_path.name,
-            "candidate_count": len({(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}),
+            "candidate_count": len(
+                {(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}
+            ),
             "selected_count": len(tab_shortlist),
             "selected": tab_shortlist,
         },
@@ -579,7 +716,9 @@ def run_cohort_corpus(
                 f"{tab_selection_path} must contain 'approved_tabs' as dict[str, list[str]]"
             )
     else:
-        heuristic_tabs = auto_select_tabs(tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3)))
+        heuristic_tabs = auto_select_tabs(
+            tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3))
+        )
         overrides = config.get("tab_selection_overrides")
         approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
         tab_selection_payload: dict = {
@@ -600,9 +739,14 @@ def run_cohort_corpus(
     for record in index_records:
         for tab_title in approved_tabs.get(record["workbook_code"], []):
             try:
-                payload = fetch_tab_grid(sheets_service, record["spreadsheet_id"], tab_title)
+                payload = fetch_tab_grid(
+                    sheets_service, record["spreadsheet_id"], tab_title
+                )
                 summary = summarize_tab(payload)
-                out_path = deep_dir / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}.json"
+                out_path = (
+                    deep_dir
+                    / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}.json"
+                )
                 write_json(out_path, {"raw": payload, "summary": summary})
                 deep_results.append(
                     {
@@ -651,13 +795,26 @@ def run_cohort_corpus(
 
     deduped: dict[tuple[str, str, str], dict] = {}
     for candidate in candidate_columns:
-        key = (candidate["workbook_code"], candidate["tab_title"], candidate["proposed_canonical_field"])
+        key = (
+            candidate["workbook_code"],
+            candidate["tab_title"],
+            candidate["proposed_canonical_field"],
+        )
         previous = deduped.get(key)
         if previous is None or candidate["priority_score"] > previous["priority_score"]:
             deduped[key] = candidate
     selected_columns = sorted(
-        [row for row in deduped.values() if row["priority_score"] >= int(config.get("column_min_score", 4))],
-        key=lambda row: (-row["priority_score"], row["workbook_code"], row["tab_title"], row["proposed_canonical_field"]),
+        [
+            row
+            for row in deduped.values()
+            if row["priority_score"] >= int(config.get("column_min_score", 4))
+        ],
+        key=lambda row: (
+            -row["priority_score"],
+            row["workbook_code"],
+            row["tab_title"],
+            row["proposed_canonical_field"],
+        ),
     )
 
     column_shortlist_path = out_dir / f"column_shortlist_{date_stamp}.json"
@@ -673,7 +830,10 @@ def run_cohort_corpus(
     column_selection_path = out_dir / f"column_selection_{date_stamp}.json"
     write_json(
         column_selection_path,
-        {"policy": "auto-approved columns above min score", "selected_count": len(selected_columns)},
+        {
+            "policy": "auto-approved columns above min score",
+            "selected_count": len(selected_columns),
+        },
     )
 
     return {

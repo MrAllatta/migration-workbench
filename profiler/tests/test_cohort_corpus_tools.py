@@ -1,4 +1,5 @@
 import json
+import re
 from io import StringIO
 
 import pytest
@@ -13,6 +14,33 @@ from profiler.tools.cohort_corpus import (
 )
 
 
+def test_build_cohort_corpus_index_custom_workbook_id_regex():
+    """Non-default filenames are indexed when workbook_id_regex matches."""
+    payload = {
+        "name": "Corpus",
+        "folders": [
+            {
+                "name": "Season 2026",
+                "folders": [],
+                "spreadsheets": [
+                    {"id": "sh1", "name": "Export WB-K master", "tabs": []}
+                ],
+                "other_files": [],
+            }
+        ],
+        "spreadsheets": [],
+        "other_files": [],
+    }
+    rows = build_cohort_corpus_index(
+        payload,
+        {"K"},
+        workbook_id_re=re.compile(r"\bWB-([A-Z])\b"),
+    )
+    assert len(rows) == 1
+    assert rows[0]["workbook_code"] == "K"
+    assert rows[0]["year"] == 2026
+
+
 def test_build_cohort_corpus_index_filters_in_scope_codes():
     payload = {
         "name": "Workbook Corpus",
@@ -21,7 +49,11 @@ def test_build_cohort_corpus_index_filters_in_scope_codes():
                 "name": "2026 Planning",
                 "folders": [],
                 "spreadsheets": [
-                    {"id": "sheet-201", "name": "201 Reference List LSF 2026", "tabs": [{"title": "Reference Info"}]},
+                    {
+                        "id": "sheet-201",
+                        "name": "201 Reference List LSF 2026",
+                        "tabs": [{"title": "Reference Info"}],
+                    },
                     {"id": "sheet-999", "name": "999 Ignore Me 2026", "tabs": []},
                 ],
                 "other_files": [],
@@ -38,11 +70,28 @@ def test_build_cohort_corpus_index_filters_in_scope_codes():
 
 def test_select_tabs_from_inventory_scores_operational_tabs():
     index_records = [
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "sheet-402", "spreadsheet_name": "402 Planning LSF 2026"}
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "sheet-402",
+            "spreadsheet_name": "402 Planning LSF 2026",
+        }
     ]
     inventory_rows = [
-        {"spreadsheet_id": "sheet-402", "sheet_id": 1, "rows": 1200, "cols": 40, "tab_title": "Plan Board"},
-        {"spreadsheet_id": "sheet-402", "sheet_id": 2, "rows": 40, "cols": 6, "tab_title": "INDEX"},
+        {
+            "spreadsheet_id": "sheet-402",
+            "sheet_id": 1,
+            "rows": 1200,
+            "cols": 40,
+            "tab_title": "Plan Board",
+        },
+        {
+            "spreadsheet_id": "sheet-402",
+            "sheet_id": 2,
+            "rows": 40,
+            "cols": 6,
+            "tab_title": "INDEX",
+        },
     ]
     selected = select_tabs_from_inventory(
         index_records,
@@ -124,7 +173,9 @@ def test_apply_tab_selection_overrides_delta_add_and_remove():
 
 def test_apply_tab_selection_overrides_add_dedupes_existing_entries():
     approved = {"602": ["Primary List", "Secondary List"]}
-    merged = apply_tab_selection_overrides(approved, {"602": {"add": ["Primary List", "Secondary List"]}})
+    merged = apply_tab_selection_overrides(
+        approved, {"602": {"add": ["Primary List", "Secondary List"]}}
+    )
     assert merged["602"] == ["Primary List", "Secondary List"]
 
 
