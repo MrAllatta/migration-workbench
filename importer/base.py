@@ -31,6 +31,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from importer.bundle_reader import iter_bundle_tab_rows
 from importer.chassis import ImporterChassisMixin
 from importer.lookups import resolve_fk_by_text
 from importer.parsing import parse_iso_date, split_on, to_decimal, to_decimal_or_none, to_int, to_int_or_none
@@ -225,6 +226,21 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
             f"{exc.__class__.__name__}: {exc} "
             f"[mode={mode}, atomic_apply={self.atomic_apply}, dry_run={self.dry_run}]"
         )
+
+    def read_bundle_tab(self, relative_csv_path, tab_config):
+        """Yield normalized rows from a bundle tab CSV in ``data_dir``.
+
+        Args:
+            relative_csv_path: Path relative to ``self.data_dir`` for the source
+                CSV (for example ``reference/blocks.csv``).
+            tab_config: Bundle tab configuration dict passed to
+                :func:`importer.bundle_reader.iter_bundle_tab_rows`.
+
+        Yields:
+            tuple[int, dict[str, str]]: ``(row_number, normalized_row)`` pairs.
+        """
+        csv_path = os.path.join(self.data_dir, relative_csv_path)
+        yield from iter_bundle_tab_rows(csv_path, tab_config)
 
     # ------------------------------------------------------------------
     # Convenience wrappers — delegate to module-level helpers so subclasses
