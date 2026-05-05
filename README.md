@@ -2,7 +2,7 @@
 
 Reusable Django chassis for **tabular workbook → app migrations**: connectors pull from spreadsheets (Google Sheets) or Coda; profiling produces deterministic bundles; importers validate and apply with structured summaries; the workbook app turns profiles into schema-contract YAML for product repos to harden into real models.
 
-**PyPI:** [`migration-workbench`](https://pypi.org/project/migration-workbench/) — `pip install migration-workbench` (import package `migration_workbench` uses underscores).
+**PyPI:** [migration-workbench](https://pypi.org/project/migration-workbench/) — `pip install migration-workbench` (import package `migration_workbench` uses underscores).
 
 ## Who it is for
 
@@ -13,7 +13,7 @@ Reusable Django chassis for **tabular workbook → app migrations**: connectors 
 ## Three ways to use it
 
 **1. As a library (recommended for product repos)**  
-Add the apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Django project. Set **`DJANGO_SETTINGS_MODULE`** to your project’s settings module (not `migration_workbench.settings`) in production. Depend on a released version, e.g. `migration-workbench>=0.1.0,<1`.
+Add the apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Django project. Set `**DJANGO_SETTINGS_MODULE`** to your project’s settings module (not `migration_workbench.settings`) in production. Depend on a released version, e.g. `migration-workbench>=0.1.0,<1`.
 
 **2. Scaffold a new product repo**  
 From a sibling checkout of this repo:
@@ -52,19 +52,21 @@ python manage.py snapshot_bundle --config docs/examples/offline-config.example.j
 python manage.py import_reference_example example_data --validate-only
 ```
 
-Note: bundled **`migration_workbench.settings`** is for development; production hosts use their own settings module.
+Note: bundled `**migration_workbench.settings**` is for development; production hosts use their own settings module.
 
 ## Architecture at a glance
 
 Five Django apps:
 
-| App | Role |
-|-----|------|
-| [connectors](connectors/README.md) | Provider adapters (Sheets, Coda). |
-| [profiler](profiler/README.md) | Read-only profiling → normalized bundle artifacts. |
-| [importer](importer/README.md) | `BaseImportCommand` chassis, preflight/apply, summary JSON. |
-| [workbook](workbook/README.md) | `scaffold_workbook_schema` → schema-contract YAML. |
+
+| App                                | Role                                                             |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| [connectors](connectors/README.md) | Provider adapters (Sheets, Coda).                                |
+| [profiler](profiler/README.md)     | Read-only profiling → normalized bundle artifacts.               |
+| [importer](importer/README.md)     | `BaseImportCommand` chassis, preflight/apply, summary JSON.      |
+| [workbook](workbook/README.md)     | `scaffold_workbook_schema` → schema-contract YAML.               |
 | [deployment](deployment/README.md) | Manifest validation, `wb` CLI (`manifest lint`, deploy dry-run). |
+
 
 ```mermaid
 flowchart LR
@@ -77,6 +79,8 @@ flowchart LR
   bundle --> importer[BaseImportCommandSubclass]
   importer --> summary[SummaryArtifactJSON]
 ```
+
+
 
 More detail: [docs/architecture.md](docs/architecture.md).
 
@@ -94,13 +98,15 @@ Fly.io + SQLite on a persistent volume + Litestream replication to **Tigris or a
 
 ## CI/CD
 
-| Workflow | File | Trigger | Role |
-|----------|------|---------|------|
-| CI | [.github/workflows/ci.yml](.github/workflows/ci.yml) | push, PR | `make chassis-gate`, wheel smoke |
-| Deploy | [.github/workflows/deploy.yml](.github/workflows/deploy.yml) | after successful CI (`workflow_run`) | manifest lint → `flyctl deploy` → `/healthz` smoke (`main` → production, `preview/*` → preview) |
-| Publish PyPI | [.github/workflows/publish-pypi.yml](.github/workflows/publish-pypi.yml) | tag `v*` | Trusted Publishing to PyPI |
 
-GitHub repository secret **`FLY_API_TOKEN`** is required for Deploy. Product repos inherit CI patterns via `make new-product` scaffolding.
+| Workflow     | File                                                                     | Trigger                              | Role                                                                                            |
+| ------------ | ------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| CI           | [.github/workflows/ci.yml](.github/workflows/ci.yml)                     | push, PR                             | `make chassis-gate`, wheel smoke                                                                |
+| Deploy       | [.github/workflows/deploy.yml](.github/workflows/deploy.yml)             | after successful CI (`workflow_run`) | manifest lint → `flyctl deploy` → `/healthz` smoke (`main` → production, `preview/`* → preview) |
+| Publish PyPI | [.github/workflows/publish-pypi.yml](.github/workflows/publish-pypi.yml) | tag `v*`                             | Trusted Publishing to PyPI                                                                      |
+
+
+GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product repos inherit CI patterns via `make new-product` scaffolding.
 
 ## Status and roadmap
 
@@ -127,27 +133,29 @@ GitHub repository secret **`FLY_API_TOKEN`** is required for Deploy. Product rep
 - Provider interface extraction after a second space is stable on Fly.
 - Postgres mode where concurrent writes demand it.
 
-Semantic versioning applies; **`0.x`** may ship breaking changes — pin ranges in product repos.
+Semantic versioning applies; `**0.x`** may ship breaking changes — pin ranges in product repos.
 
 ## Releases
 
-1. Bump **`version`** in [`pyproject.toml`](pyproject.toml).
-2. Tag **`v` + version** (must match `version = "x.y.z"`).
+1. Bump `**version`** in `[pyproject.toml](pyproject.toml)`.
+2. Tag `**v + version`** (must match `version = "x.y.z"`).
 3. Trusted Publishing on [PyPI](https://pypi.org/manage/account/publishing/) for this repo (see [publish workflow](.github/workflows/publish-pypi.yml)).
 
-Manual upload: `python -m build` then `twine upload dist/*`, or `make publish` with maintainer credentials. Optional extras: `[release]` for build/twine only.
+Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` with maintainer credentials. Optional extras: `[release]` for build/twine only.
 
 ## Documentation map
 
-| Doc | Purpose |
-|-----|---------|
-| This README | Orientation, pipeline, roadmap |
-| [docs/architecture.md](docs/architecture.md) | Layered design |
-| [docs/deployment.md](docs/deployment.md) | Fly, secrets, Litestream/Tigris, CI/CD, control-plane roadmap |
-| [docs/schema-design-loop.md](docs/schema-design-loop.md) | Contract-first importer workflow |
-| [docs/google-auth.md](docs/google-auth.md) | Sheets/Drive profiling auth |
-| [docs/coda.md](docs/coda.md) | Coda profiling |
-| Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces |
+
+| Doc                                                                                               | Purpose                                                       |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| This README                                                                                       | Orientation, pipeline, roadmap                                |
+| [docs/architecture.md](docs/architecture.md)                                                      | Layered design                                                |
+| [docs/deployment.md](docs/deployment.md)                                                          | Fly, secrets, Litestream/Tigris, CI/CD, control-plane roadmap |
+| [docs/schema-design-loop.md](docs/schema-design-loop.md)                                          | Contract-first importer workflow                              |
+| [docs/google-auth.md](docs/google-auth.md)                                                        | Sheets/Drive profiling auth                                   |
+| [docs/coda.md](docs/coda.md)                                                                      | Coda profiling                                                |
+| Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
+
 
 ## Database modes
 

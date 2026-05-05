@@ -4,6 +4,44 @@ Single operator entrypoint for hosting **this repository’s** Django app on Fly
 
 ---
 
+## Stable plan goals and phases
+
+This document tracks the goals from `farm/.cursor/plans/workbench_deploy_bootstrap_41880211.plan.md` and is split into:
+
+- **Current baseline (stable implementation):** what operators can run now.
+- **Phase roadmap (A/B/C):** what this deployment strategy is converging toward.
+
+### Phase objectives
+
+- **Phase A (minimum safe go-live):** production-grade Fly deployment for `migration-workbench` with durable SQLite+Litestream, container boot restore/migrate flow, CI-gated deploys, and documented rollback.
+- **Phase B (durability + preflight safety):** replication freshness checks, restore drills, and deploy preflight gates that fail closed.
+- **Phase C (`wb deploy --execute` lifecycle):** make deploy/rollback first-class `wb` operations with persisted release-state transitions.
+
+### Top-level outcome targets
+
+- `migration-workbench-preview` and `migration-workbench-production` deploy predictably and pass `/healthz`.
+- Pushes to `main` deploy production through CI-gated automation.
+- Rollback remains a documented and repeatable operator action while `wb execute` is phased in.
+
+---
+
+## Current baseline (stable implementation)
+
+- Manifest contract is declared in [`deploy/spaces.yml`](../deploy/spaces.yml) and validated via `wb manifest lint`.
+- Runtime image and startup flow are entrypoint-owned (restore-if-empty, migrate, serve).
+- Deploy automation is branch-routed (`main` => production, `preview/*` => preview) in [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
+- Production and preview Fly app config live in [`fly.toml`](../fly.toml) and [`fly.preview.toml`](../fly.preview.toml).
+- Manual rollback is available with `flyctl deploy --image ...` and post-rollback `/healthz` verification.
+
+### SQLite and rollout safety constraints
+
+- SQLite remains **single-writer** infrastructure; deployments must avoid multi-machine rolling patterns.
+- Migrations run from the runtime container startup path (not Fly release VM logic) to ensure mounted-volume access for SQLite.
+- First boot on an empty volume must be treated as restore-sensitive: restore from replica when configured, then migrate, then serve.
+- Health checks (`/healthz`) are the final gate for release acceptance.
+
+---
+
 ## Why Fly + SQLite + Litestream
 
 - **Platform:** Fly.io primary; VPS adapter deferred until a concrete requirement appears.
@@ -222,14 +260,20 @@ wb manifest lint --manifest deploy/spaces.yml
 
 ---
 
-## Control plane roadmap (`wb` CLI)
+## Phase B/C roadmap (`wb` CLI and durability)
 
 **Today (implemented)**
 
 - `wb manifest lint` — validate `deploy/spaces.yml`
 - `wb deploy <space> --env <preview|production> --dry-run` — plan without provider mutation
 
-**Target commands** (Fly-first; incremental)
+**Phase B target capabilities**
+
+- Preflight checks for secrets, volume presence, and replica reachability before deploy.
+- Replication freshness checks and scheduled restore drills with explicit RTO/RPO evidence.
+- Fail-closed deploy gates for missing prerequisites.
+
+**Phase C target commands** (Fly-first; incremental)
 
 | Command | Goal |
 |---------|------|
@@ -242,7 +286,7 @@ wb manifest lint --manifest deploy/spaces.yml
 
 Acceptance-style criteria (from earlier sprint docs): structured `--json`, deterministic errors, dry-run release ids — tracked as implementation milestones, not blockers for manual Fly operation.
 
-**Phase 2:** Extract a provider interface after a second space is stable on Fly.
+**Later phase:** Extract a provider interface after a second space is stable on Fly.
 
 ---
 
