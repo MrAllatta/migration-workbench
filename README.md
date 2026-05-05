@@ -19,10 +19,10 @@ Add the apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Dja
 From a sibling checkout of this repo:
 
 ```bash
-make new-product PRODUCT=my-product   # writes ../my-product
+make new-product PRODUCT=my-product   # writes ../my-product; git init + initial commit
 ```
 
-Then `cd ../my-product && make install && make migrate && make check`. The scaffold includes `backend/`, `Makefile`, `Dockerfile` (installs migration-workbench from PyPI), `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), and starter docs. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
+Then `cd ../my-product && make install && make migrate && make check`. The scaffold includes `backend/`, `Makefile`, `Dockerfile` (installs migration-workbench from PyPI), `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), and starter docs. Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
 
 **3. Develop the chassis (this repo)**  
 Clone, editable install, run the full gate:

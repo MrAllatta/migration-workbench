@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,6 +51,59 @@ def copy_file(src: Path, dest: Path, *, force: bool) -> None:
         return
     shutil.copy2(src, dest)
     print(f"copied {dest}")
+
+
+def _git_init_and_initial_commit(repo: Path) -> None:
+    """Create a git repo and one commit so the scaffold has a clean baseline."""
+    repo_s = str(repo.resolve())
+    git = ("git", "-C", repo_s)
+
+    def _run(args: tuple[str, ...], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.run((*git, *args), text=True, capture_output=True, **kwargs)
+
+    try:
+        has_git = _run(("rev-parse", "--git-dir"), check=False).returncode == 0
+        if not has_git:
+            init = _run(("init", "-b", "main"))
+            if init.returncode != 0:
+                print(
+                    f"warning: git init failed: {init.stderr.strip() or init.stdout}",
+                    file=sys.stderr,
+                )
+                return
+            print(f"git init {repo}")
+
+        add = _run(("add", "-A"))
+        if add.returncode != 0:
+            print(f"warning: git add failed: {add.stderr.strip()}", file=sys.stderr)
+            return
+
+        commit = subprocess.run(
+            (
+                "git",
+                "-C",
+                repo_s,
+                "-c",
+                "user.name=migration-workbench scaffold",
+                "-c",
+                "user.email=migration-workbench@local",
+                "commit",
+                "-m",
+                "Initial scaffold from migration-workbench",
+            ),
+            text=True,
+            capture_output=True,
+        )
+        if commit.returncode == 0:
+            print(f"git commit initial scaffold in {repo}")
+            return
+        err = (commit.stderr or "").lower()
+        if "nothing to commit" in err or "nothing added to commit" in err:
+            print(f"git: nothing new to commit in {repo}")
+            return
+        print(f"warning: git commit failed: {commit.stderr.strip()}", file=sys.stderr)
+    except FileNotFoundError:
+        print("warning: git not found; skipped repository init", file=sys.stderr)
 
 
 def render_manage_py() -> str:
@@ -590,6 +644,8 @@ def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
     manage = output_dir / "backend" / "manage.py"
     if manage.exists():
         manage.chmod(manage.stat().st_mode | 0o111)
+
+    _git_init_and_initial_commit(output_dir)
 
 
 def main(argv: list[str]) -> int:
