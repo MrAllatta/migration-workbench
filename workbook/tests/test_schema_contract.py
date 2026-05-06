@@ -45,7 +45,7 @@ def test_build_contract_with_table_profile():
     assert tab["suggested_model_name"] == "clients"
     names = [c["source_column"] for c in tab["columns"]]
     assert names[0] == "First"
-    assert tab["columns"][0]["django_field_class"] == "models.CharField"
+    assert tab["columns"][0]["django_field_class"] == "models.TextField"
 
 
 def test_build_contract_bundle_only_falls_back_to_required_headers():

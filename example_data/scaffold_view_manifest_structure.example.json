@@ -1,0 +1,75 @@
+{
+  "schema_version": "structure-draft-1",
+  "source_id": "example",
+  "provider": "google_sheets",
+  "tabs": [
+    {
+      "worksheet_title": "Orders",
+      "tab_position": 0,
+      "hidden": false,
+      "frozen_rows": 1,
+      "frozen_cols": 0,
+      "total_rows": 100,
+      "total_cols": 4,
+      "columns": [
+        {
+          "index": 0,
+          "col_letter": "A",
+          "header_label": "Order ID",
+          "is_formula": false,
+          "data_validation_type": null
+        },
+        {
+          "index": 1,
+          "col_letter": "B",
+          "header_label": "Customer",
+          "is_formula": false,
+          "data_validation_type": null
+        },
+        {
+          "index": 2,
+          "col_letter": "C",
+          "header_label": "Status",
+          "is_formula": false,
+          "data_validation_type": "ONE_OF_LIST"
+        },
+        {
+          "index": 3,
+          "col_letter": "D",
+          "header_label": "Total",
+          "is_formula": true,
+          "data_validation_type": null
+        }
+      ],
+      "named_ranges": [],
+      "filter_views": []
+    },
+    {
+      "worksheet_title": "Staging",
+      "tab_position": 1,
+      "hidden": true,
+      "frozen_rows": 1,
+      "frozen_cols": 0,
+      "total_rows": 50,
+      "total_cols": 2,
+      "columns": [
+        {
+          "index": 0,
+          "col_letter": "A",
+          "header_label": "Note",
+          "is_formula": false,
+          "data_validation_type": null
+        },
+        {
+          "index": 1,
+          "col_letter": "B",
+          "header_label": "Owner",
+          "is_formula": false,
+          "data_validation_type": null
+        }
+      ],
+      "named_ranges": [],
+      "filter_views": []
+    }
+  ]
+}

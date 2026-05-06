@@ -78,7 +78,7 @@ profile-coda-canvas:
 chassis-gate:
 	mkdir -p build/_out
 	DB_ENGINE=sqlite $(MANAGE) migrate --noinput
-	DB_ENGINE=sqlite $(PYTEST) connectors profiler/tests importer/tests examples/tests deployment/tests
+	DB_ENGINE=sqlite $(PYTEST) connectors profiler/tests importer/tests examples/tests deployment/tests workbook/tests
 	DB_ENGINE=sqlite $(MAKE) manifest-lint
 	DB_ENGINE=sqlite $(MAKE) health-smoke
 	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --smoke
@@ -93,6 +93,7 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) pull_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out build/_out/schema-contract-smoke.yaml
+	DB_ENGINE=sqlite $(MANAGE) scaffold_view_manifest --structure example_data/scaffold_view_manifest_structure.example.json --out build/_out/view-manifest-smoke.yaml --summary-json build/_out/view-manifest-smoke.json
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --summary-json build/_out/apply-example.json
 

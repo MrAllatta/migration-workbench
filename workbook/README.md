@@ -28,6 +28,33 @@ Inputs are pull-bundle-style JSON (`tabs[]`, `required_headers`) plus optional `
 
 **Relations:** relation-like columns may emit `ForeignKey` with `django_field_kwargs.to: TODO_TargetModel` until product repos choose real targets.
 
+## View manifest
+
+`scaffold_view_manifest` is a sibling artifact builder — it produces a **first-draft** UI/workflow contract from the profiler `structure.json` (emitted by `pull_bundle --include-structure`) and an optional schema-contract YAML.
+
+```bash
+python manage.py scaffold_view_manifest \
+  --structure build/structure.json \
+  --schema-contract build/schema-contract.yaml \
+  --out build/view-manifest.yaml \
+  --summary-json build/view-manifest.summary.json
+```
+
+Inputs are the structure artifact (required) and the schema contract (optional, used to bind each view to a model and reuse its `suggested_field_name` slugs).
+
+### Schema (`view-manifest-draft-1`)
+
+- **`views[].name`** / **`source_tab`** — slugified tab name and original tab title.
+- **`views[].entity`** — bound `suggested_model_name` from the schema contract, or `null` until the operator decides.
+- **`views[].type`** — defaults to `list`; operator picks `form` / `detail` / `dashboard` during discovery.
+- **`views[].editable_fields`** / **`computed_fields`** — partitioned by the column's `is_formula` flag.
+- **`views[].filterable_by`** — columns with a `data_validation_type` (dropdowns, ranges).
+- **`views[].status_field`** — first dropdown-validated column whose header is `status` / `state` / `stage` (case-insensitive); `null` otherwise.
+- **`workflow_hints.tab_sequence`** — visible tabs in `tab_position` order.
+- **`workflow_hints.role_hints`** / **`weekly_actions`** — empty placeholders filled by the Slice C discovery interview.
+
+The manifest is intended to be human-edited after generation. Treat the YAML as the source of truth once the operator has annotated it.
+
 ## Pointers
 
 - [README](../README.md)
