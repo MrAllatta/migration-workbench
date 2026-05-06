@@ -1,4 +1,4 @@
-"""Tests for the Slice A raw-structure pass.
+"""Tests for the profiler raw-structure pass.
 
 Covers shaping helpers in :mod:`connectors.google_provider` and
 :mod:`connectors.coda`, plus end-to-end ``pull_bundle --include-structure``

@@ -1,4 +1,4 @@
-"""Tests for the Slice B view-manifest builder and management command."""
+"""Tests for the view-manifest builder and management command."""
 
 from __future__ import annotations
 

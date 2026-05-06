@@ -1,11 +1,11 @@
-"""Build view-manifest dicts from a Slice A ``structure.json`` artifact.
+"""Build view-manifest dicts from a profiler ``structure.json`` artifact.
 
 A *view manifest* is a sibling to the schema contract: it captures **UI and
 workflow** concerns (which tab is read by whom, which fields are editable,
 which column drives the status state machine) that the schema contract does
 not own. The builder in this module produces a first-draft manifest from
 structural inference; operators annotate the YAML during discovery and
-downstream consumers (Slice D admin scaffolding) read the annotated artifact.
+downstream consumers (the admin scaffold generator) read the annotated artifact.
 
 The schema-contract YAML is an optional secondary input. When provided, each
 view's ``entity`` field binds to the contract's ``suggested_model_name`` and
@@ -156,7 +156,7 @@ def build_view_manifest(
     *,
     schema_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a ``view-manifest-draft-1`` dict from a Slice A structure artifact.
+    """Build a ``view-manifest-draft-1`` dict from a profiler structure artifact.
 
     The resulting manifest is a sibling artifact to the schema contract: the
     schema contract owns model/field definitions, this manifest owns UI and

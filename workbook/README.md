@@ -51,9 +51,40 @@ Inputs are the structure artifact (required) and the schema contract (optional, 
 - **`views[].filterable_by`** — columns with a `data_validation_type` (dropdowns, ranges).
 - **`views[].status_field`** — first dropdown-validated column whose header is `status` / `state` / `stage` (case-insensitive); `null` otherwise.
 - **`workflow_hints.tab_sequence`** — visible tabs in `tab_position` order.
-- **`workflow_hints.role_hints`** / **`weekly_actions`** — empty placeholders filled by the Slice C discovery interview.
+- **`workflow_hints.role_hints`** / **`weekly_actions`** — empty placeholders filled during the operator discovery interview.
 
 The manifest is intended to be human-edited after generation. Treat the YAML as the source of truth once the operator has annotated it.
+
+## Discovery interview
+
+The discovery interview is the structured conversation a consultant runs with a client to fill in the placeholders the view manifest leaves blank: who owns each tab, what the status field actually means, and the 3-5 weekly actions the operator performs. It is split into two commands so the workflow stays auditable.
+
+### Step 1 — generate the questionnaire
+
+```bash
+python manage.py generate_discovery_interview \
+  --manifest build/view-manifest.yaml \
+  --out build/discovery-interview.md
+```
+
+The output is hand-editable Markdown. Each answerable question is anchored by an HTML comment marker (`<!-- q: TYPE key=val -->`) so the parser can locate answers without matching free-form question prose. The operator either replaces each `> _Your answer:_` placeholder in place or appends a new blockquote line beneath it; both conventions are supported.
+
+### Step 2 — merge the answers back
+
+```bash
+python manage.py merge_discovery_notes \
+  --manifest build/view-manifest.yaml \
+  --interview build/discovery-interview.md \
+  --out build/view-manifest.yaml \
+  --summary-out build/discovery-summary.md
+```
+
+Outputs:
+
+- **Patched manifest** — `workflow_hints.role_hints`, `workflow_hints.weekly_actions`, and per-view `notes` are populated from the interview answers. Existing values are preserved and de-duplicated, so re-runs are additive.
+- **Discovery summary** (optional) — a compact Markdown recap suitable to commit alongside the bundle as an audit artifact.
+
+The same path may be used for `--manifest` and `--out` to overwrite in place; the manifest is fully read into memory before any write.
 
 ## Pointers
 

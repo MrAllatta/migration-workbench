@@ -1,4 +1,4 @@
-"""Emit a view-manifest YAML from a Slice A ``structure.json`` (and optional schema contract)."""
+"""Emit a view-manifest YAML from a profiler ``structure.json`` (and optional schema contract)."""
 
 from __future__ import annotations
 
