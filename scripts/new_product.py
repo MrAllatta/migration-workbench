@@ -360,8 +360,10 @@ DJANGO_SETTINGS_MODULE = "config.settings"
 
 def render_makefile() -> str:
     return r"""-include .env
-# migration-workbench is installed from PyPI via pyproject.toml. Optionally set WORKBENCH in .env to a
-# local checkout path for install-dev-workbench / chassis-gate (upstream chassis development only).
+# migration-workbench is installed from PyPI via pyproject.toml when you run `make install`.
+# Setting WORKBENCH in .env does not change that — use `make install-dev-workbench` after `make install`
+# to replace the PyPI package with an editable install from your checkout (same venv as this project).
+# WORKBENCH is also required for `chassis-gate` (runs the workbench repo gate in that checkout).
 export WORKBENCH
 
 VENV = .venv
@@ -379,10 +381,11 @@ venv:
 install: venv
 	$(PIP) install -e .
 
-# Optional: run after setting WORKBENCH to a migration-workbench checkout path in .env
-install-dev-workbench:
+# Run after `make install`. Reinstalls migration-workbench from WORKBENCH into this project's venv (editable).
+install-dev-workbench: venv
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
-	$(MAKE) -C "$(WORKBENCH)" install
+	@test -d "$(WORKBENCH)" || (echo >&2 "WORKBENCH path does not exist: $(WORKBENCH)"; exit 1)
+	$(PIP) install -e "$(WORKBENCH)"
 
 migrate:
 	$(MANAGE) makemigrations
@@ -425,7 +428,7 @@ SQLITE_PATH=db.sqlite3
 def render_agents_md() -> str:
     return """# Agent notes
 
-- **Workbench:** `migration-workbench` is installed from **PyPI** via `make install`. Set `WORKBENCH` in `.env` to a local checkout path only when running upstream `make install-dev-workbench` / `chassis-gate` on the chassis repo—not for normal Django commands.
+- **Workbench:** `migration-workbench` is installed from **PyPI** via `make install`. Setting `WORKBENCH` in `.env` does not change that. After `make install`, run `make install-dev-workbench` to replace PyPI with an editable install from that checkout in this project's venv. `WORKBENCH` is also required for `make chassis-gate` (runs the gate in that checkout).
 - **Runtime:** Prefer `make` from this repo root. Commands use **`.venv/bin/python backend/manage.py`** after `make install`.
 - **Secrets:** `.env` is gitignored; never commit tokens or paste them into tracked files.
 """
@@ -443,7 +446,7 @@ make install          # editable product package; migration-workbench from PyPI
 make migrate && make check
 ```
 
-Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make chassis-gate` (runs the workbench repo gate).
+Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make install-dev-workbench` after `make install` to use that checkout instead of PyPI, or `make chassis-gate` to run the workbench repo gate.
 
 ## Documentation
 

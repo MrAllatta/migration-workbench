@@ -19,10 +19,10 @@ Inputs are pull-bundle-style JSON (`tabs[]`, `required_headers`) plus optional `
 
 ## Schema contract format (v1)
 
-- **`version`** — required; currently `1.0`.
-- **`source`** — informational metadata (may be null).
-- **`tables[].bundle_worksheet_title`** / **`tables[].bundle_output_path`** — traceability to bundle tabs.
-- **`tables[].columns[]`** — ordered; required bundle headers first.
+- `**version**` — required; currently `1.0`.
+- `**source**` — informational metadata (may be null).
+- `**tables[].bundle_worksheet_title**` / `**tables[].bundle_output_path**` — traceability to bundle tabs.
+- `**tables[].columns[]**` — ordered; required bundle headers first.
 
 **Advisory fields** (human review required): `suggested_model_name`, `suggested_field_name`, `django_field_class`, `django_field_kwargs`, `notes`.
 
@@ -44,14 +44,14 @@ Inputs are the structure artifact (required) and the schema contract (optional, 
 
 ### Schema (`view-manifest-draft-1`)
 
-- **`views[].name`** / **`source_tab`** — slugified tab name and original tab title.
-- **`views[].entity`** — bound `suggested_model_name` from the schema contract, or `null` until the operator decides.
-- **`views[].type`** — defaults to `list`; operator picks `form` / `detail` / `dashboard` during discovery.
-- **`views[].editable_fields`** / **`computed_fields`** — partitioned by the column's `is_formula` flag.
-- **`views[].filterable_by`** — columns with a `data_validation_type` (dropdowns, ranges).
-- **`views[].status_field`** — first dropdown-validated column whose header is `status` / `state` / `stage` (case-insensitive); `null` otherwise.
-- **`workflow_hints.tab_sequence`** — visible tabs in `tab_position` order.
-- **`workflow_hints.role_hints`** / **`weekly_actions`** — empty placeholders filled during the operator discovery interview.
+- `**views[].name**` / `**source_tab**` — slugified tab name and original tab title.
+- `**views[].entity**` — bound `suggested_model_name` from the schema contract, or `null` until the operator decides.
+- `**views[].type**` — defaults to `list`; operator picks `form` / `detail` / `dashboard` during discovery.
+- `**views[].editable_fields**` / `**computed_fields**` — partitioned by the column's `is_formula` flag.
+- `**views[].filterable_by**` — columns with a `data_validation_type` (dropdowns, ranges).
+- `**views[].status_field**` — first dropdown-validated column whose header is `status` / `state` / `stage` (case-insensitive); `null` otherwise.
+- `**workflow_hints.tab_sequence**` — visible tabs in `tab_position` order.
+- `**workflow_hints.role_hints**` / `**weekly_actions**` — empty placeholders filled during the operator discovery interview.
 
 The manifest is intended to be human-edited after generation. Treat the YAML as the source of truth once the operator has annotated it.
 
@@ -91,3 +91,4 @@ The same path may be used for `--manifest` and `--out` to overwrite in place; th
 - [README](../README.md)
 - [docs/schema-design-loop.md](../docs/schema-design-loop.md)
 - Examples: [example_data/scaffold_workbook_bundle.example.json](../example_data/scaffold_workbook_bundle.example.json)
+
