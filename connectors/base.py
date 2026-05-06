@@ -32,3 +32,24 @@ class ProviderAdapter(ABC):
             a list of lists (header row first), plus any provider-specific
             metadata (e.g. ``"spreadsheet_id"``, ``"tab_id"``).
         """
+
+    def fetch_tab_structure(self, tab_config: dict) -> dict | None:
+        """Return UI/structural metadata for a single tab.
+
+        This is an optional, additive companion to :meth:`fetch_tab_rows`.
+        Adapters that have not yet implemented a structural pass should leave
+        the default ``None`` return in place so callers (e.g. ``pull_bundle
+        --include-structure``) can silently skip them.
+
+        Args:
+            tab_config: Same shape as the dict passed to :meth:`fetch_tab_rows`.
+                Callers may inject already-resolved identifiers (for example
+                ``spreadsheet_id``) so the adapter does not need to re-resolve
+                names.
+
+        Returns:
+            dict | None: Per-tab structural envelope conforming to the
+            ``structure-draft-1`` shape (``worksheet_title``, ``columns``,
+            ``hidden``, ...) when the adapter supports it; ``None`` otherwise.
+        """
+        return None

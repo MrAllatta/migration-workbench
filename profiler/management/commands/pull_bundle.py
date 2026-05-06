@@ -9,12 +9,24 @@ from connectors.spreadsheet import normalize_rows
 from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
 
+STRUCTURE_SCHEMA_VERSION = "structure-draft-1"
+
+
 class Command(BaseCommand):
     help = "Fetch provider tabs and normalize them into a bundle"
 
     def add_arguments(self, parser):
         parser.add_argument("--config", required=True, help="JSON config describing live source tabs")
         parser.add_argument("--output-dir", required=True, help="Directory for the normalized bundle")
+        parser.add_argument(
+            "--include-structure",
+            action="store_true",
+            help=(
+                "Also emit structure.json with per-tab UI metadata (headers, "
+                "formula columns, validation types, frozen panes). Adapters that "
+                "do not implement structure capture are silently skipped."
+            ),
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -39,6 +51,9 @@ class Command(BaseCommand):
             "tabs": [],
         }
 
+        include_structure = bool(options.get("include_structure"))
+        structure_tabs: list[dict] = []
+
         default_scan_rows = LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"]["max_scan_rows"]
 
         for tab in tabs:
@@ -52,6 +67,16 @@ class Command(BaseCommand):
                 raise CommandError(
                     f"Worksheet '{worksheet_title}' returned no rows from provider '{provider_name}'"
                 )
+
+            if include_structure:
+                # Reuse the resolved spreadsheet id so the adapter avoids a
+                # second name->id lookup against Drive.
+                tab_with_resolved = dict(tab)
+                if pulled.get("spreadsheet_id"):
+                    tab_with_resolved.setdefault("spreadsheet_id", pulled["spreadsheet_id"])
+                structure_entry = provider.fetch_tab_structure(tab_with_resolved)
+                if structure_entry is not None:
+                    structure_tabs.append(structure_entry)
 
             normalized = normalize_rows(
                 rows,
@@ -108,3 +133,20 @@ class Command(BaseCommand):
         manifest_path = output_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote bundle manifest: {manifest_path}"))
+
+        if include_structure and structure_tabs:
+            structure = {
+                "schema_version": STRUCTURE_SCHEMA_VERSION,
+                "source_id": manifest["source_id"],
+                "provider": provider_name,
+                "tabs": structure_tabs,
+            }
+            structure_path = output_dir / "structure.json"
+            structure_path.write_text(
+                json.dumps(structure, indent=2, sort_keys=True), encoding="utf-8"
+            )
+            self.stdout.write(self.style.SUCCESS(f"wrote bundle structure: {structure_path}"))
+        elif include_structure:
+            self.stdout.write(
+                "include-structure requested but no adapter returned structural metadata; skipping structure.json"
+            )

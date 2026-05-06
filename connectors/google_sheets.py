@@ -216,3 +216,49 @@ def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service):
         .execute()
     )
     return response.get("values", [])
+
+
+def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
+    """Fetch raw structural metadata for one worksheet tab.
+
+    Issues a single ``spreadsheets().get()`` call scoped to rows 1-2 of the
+    target tab so we recover header labels, a sample data row (used to flag
+    formula columns), tab properties, filter views, and named ranges in one
+    round trip. Shaping into the bundle ``structure.json`` envelope is the
+    caller's responsibility (see :func:`connectors.google_provider.shape_sheet_structure`).
+
+    Args:
+        sheets_service: An authenticated Google Sheets v4 service client.
+        spreadsheet_id: Resolved spreadsheet id (already extracted from any URL).
+        worksheet_title: Tab title to scope the grid data fetch to.
+
+    Returns:
+        dict: Raw Sheets API response with ``sheets``, ``namedRanges``, and
+        ``properties`` keys populated.
+    """
+    quoted_title = worksheet_title.replace("'", "''")
+    # Header row plus one sample data row keeps payload tiny while still
+    # letting us detect formula-driven columns (rows past row 2 are typically
+    # formulaic in the same way as row 2 in spreadsheet UX patterns).
+    range_ = f"'{quoted_title}'!1:2"
+    fields = (
+        "properties(title),"
+        "namedRanges,"
+        "sheets("
+        "properties(sheetId,title,index,hidden,gridProperties),"
+        "filterViews,"
+        "data(startRow,startColumn,rowData(values("
+        "formattedValue,userEnteredValue,dataValidation"
+        ")))"
+        ")"
+    )
+    return (
+        sheets_service.spreadsheets()
+        .get(
+            spreadsheetId=spreadsheet_id,
+            ranges=[range_],
+            includeGridData=True,
+            fields=fields,
+        )
+        .execute()
+    )
