@@ -5,6 +5,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from profiler.management.commands._config_helpers import load_folder_id_from_config
 from connectors.google_sheets import DRIVE_READONLY_SCOPE, SHEETS_READONLY_SCOPE, build_google_service, extract_drive_folder_id
 
 
@@ -13,6 +14,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--folder", help="Drive folder id or URL to validate read access")
+        parser.add_argument(
+            "--config",
+            default=None,
+            help="Cohort corpus JSON config path; uses folder_id when --folder is omitted",
+        )
         parser.add_argument("--smoke", action="store_true", help="Run local-only checks without network calls")
 
     def handle(self, *args, **options):
@@ -34,7 +40,7 @@ class Command(BaseCommand):
         sheets_service = build_google_service("sheets", "v4", scopes)
         self.stdout.write("drive/sheets clients initialized")
 
-        folder = options.get("folder")
+        folder = options.get("folder") or load_folder_id_from_config(options.get("config"))
         if folder:
             folder_id = extract_drive_folder_id(folder)
             meta = (

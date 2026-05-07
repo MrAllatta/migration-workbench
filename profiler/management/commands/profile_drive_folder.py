@@ -13,6 +13,7 @@ from connectors.google_sheets import (
     build_google_service,
     extract_drive_folder_id,
 )
+from profiler.management.commands._config_helpers import load_folder_id_from_config
 
 FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
@@ -164,6 +165,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--folder", help="Drive folder id or URL")
+        parser.add_argument(
+            "--config",
+            default=None,
+            help="Cohort corpus JSON config path; uses folder_id when --folder is omitted",
+        )
         parser.add_argument("--no-tabs", action="store_true", help="Skip spreadsheet tab enumeration")
         parser.add_argument("--max-depth", type=int, default=None, help="Maximum folder recursion depth")
         parser.add_argument("--out", default=None, help="Output JSON path (.md sibling is also written)")
@@ -174,9 +180,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("profile_drive_folder smoke ok"))
             return
 
-        folder = options.get("folder")
+        folder = options.get("folder") or load_folder_id_from_config(options.get("config"))
         if not folder:
-            raise CommandError("--folder is required unless --smoke is used")
+            raise CommandError("--folder or --config (with folder_id) is required unless --smoke is used")
         folder_id = extract_drive_folder_id(folder)
         scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
         drive_service = build_google_service("drive", "v3", scopes)

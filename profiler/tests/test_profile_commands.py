@@ -105,3 +105,91 @@ def test_profile_drive_folder_smoke():
     out = StringIO()
     call_command("profile_drive_folder", smoke=True, stdout=out)
     assert "smoke ok" in out.getvalue()
+
+
+def test_profile_preflight_reads_folder_id_from_config(tmp_path):
+    config_payload = {"folder_id": "drive-folder-123"}
+    config_path = tmp_path / "cohort_corpus.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    class FakeDriveGetCall:
+        def execute(self):
+            return {"id": "drive-folder-123", "name": "Farm Folder"}
+
+    class FakeDriveAboutCall:
+        def execute(self):
+            return {"user": {"displayName": "Profiler Bot"}}
+
+    class FakeDriveFiles:
+        def get(self, **kwargs):
+            assert kwargs["fileId"] == "drive-folder-123"
+            return FakeDriveGetCall()
+
+    class FakeDriveAbout:
+        def get(self, **kwargs):
+            assert kwargs["fields"] == "user"
+            return FakeDriveAboutCall()
+
+    class FakeDriveService:
+        def files(self):
+            return FakeDriveFiles()
+
+        def about(self):
+            return FakeDriveAbout()
+
+    class FakeSheetsService:
+        pass
+
+    stdout_buffer = StringIO()
+    with patch(
+        "profiler.management.commands.profile_preflight.build_google_service",
+        side_effect=[FakeDriveService(), FakeSheetsService()],
+    ):
+        call_command("profile_preflight", config=str(config_path), stdout=stdout_buffer)
+
+    rendered = stdout_buffer.getvalue()
+    assert "folder readable: Farm Folder (drive-folder-123)" in rendered
+    assert "profile_preflight ok" in rendered
+
+
+def test_profile_drive_folder_reads_folder_id_from_config(tmp_path):
+    config_payload = {"folder_id": "drive-folder-abc"}
+    config_path = tmp_path / "cohort_corpus.json"
+    config_path.write_text(json.dumps(config_payload), encoding="utf-8")
+
+    class FakeDriveGetCall:
+        def execute(self):
+            return {
+                "id": "drive-folder-abc",
+                "name": "Corpus Root",
+                "mimeType": "application/vnd.google-apps.folder",
+                "modifiedTime": "2026-05-07T00:00:00.000Z",
+            }
+
+    class FakeDriveFiles:
+        def get(self, **kwargs):
+            assert kwargs["fileId"] == "drive-folder-abc"
+            return FakeDriveGetCall()
+
+    class FakeDriveService:
+        def files(self):
+            return FakeDriveFiles()
+
+    class FakeSheetsService:
+        pass
+
+    with (
+        patch(
+            "profiler.management.commands.profile_drive_folder.build_google_service",
+            side_effect=[FakeDriveService(), FakeSheetsService()],
+        ),
+        patch(
+            "profiler.management.commands.profile_drive_folder.walk_folder",
+            return_value={"folders": [], "spreadsheets": [], "other_files": []},
+        ),
+    ):
+        stdout_buffer = StringIO()
+        call_command("profile_drive_folder", config=str(config_path), no_tabs=True, stdout=stdout_buffer)
+
+    rendered = stdout_buffer.getvalue()
+    assert "[folder] Corpus Root" in rendered

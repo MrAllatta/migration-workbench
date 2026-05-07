@@ -18,11 +18,19 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
 
 ## Recommended sequence
 
-1. **Smoke** — Validate credentials and folder read access:
+1. **Smoke** — Validate credentials and folder read access (prefer config-driven flow):
+  ```bash
+   python manage.py profile_preflight --config path/to/cohort_corpus.json
+  ```
+   Standalone fallback:
   ```bash
    python manage.py profile_preflight --folder <folder-id-or-url>
   ```
 2. **Tree** — Snapshot the folder tree (and optionally every spreadsheet’s tabs):
+  ```bash
+   python manage.py profile_drive_folder --config path/to/cohort_corpus.json --out build/drive_tree.json
+  ```
+   Standalone fallback:
   ```bash
    python manage.py profile_drive_folder --folder <folder-id-or-url> --out build/drive_tree.json
   ```
@@ -51,7 +59,7 @@ Dry-run sanity: grep your `profile_drive_folder` markdown output against the reg
 
 ## Native Google Sheets only
 
-The Drive walker treats `**application/vnd.google-apps.spreadsheet**` as spreadsheets. `**.xlsx` and other Office files** are listed under `other_files` and are **not** included in `profile_cohort_corpus`. Convert uploads to Google Sheets first if they must participate.
+The Drive walker treats `**application/vnd.google-apps.spreadsheet`** as spreadsheets. `**.xlsx` and other Office files** are listed under `other_files` and are **not** included in `profile_cohort_corpus`. Convert uploads to Google Sheets first if they must participate.
 
 ## Makefile shortcut (workbench repo)
 

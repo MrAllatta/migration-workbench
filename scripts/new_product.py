@@ -371,7 +371,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell chassis-gate profile-coda-corpus profile-cohort-corpus
+.PHONY: venv install install-dev-workbench migrate check shell chassis-gate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus
 
 venv:
 	python3 -m venv $(VENV)
@@ -401,6 +401,12 @@ chassis-gate:
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
 	$(MAKE) -C "$(WORKBENCH)" chassis-gate
 
+profile-preflight:
+	DB_ENGINE=sqlite $(MANAGE) profile_preflight --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}"
+
+profile-drive-folder:
+	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"
+
 profile-coda-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
 
@@ -420,6 +426,10 @@ SQLITE_PATH=db.sqlite3
 
 # Google Drive / Sheets profiling (ADC + SA impersonation — see migration-workbench docs/google-auth.md).
 # GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=mw-profiler@PROJECT.iam.gserviceaccount.com
+# Required for make profile-preflight / make profile-drive-folder.
+COHORT_CORPUS_CONFIG=config/cohort_corpus.local.json
+# Optional override for make profile-drive-folder output.
+DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json
 
 # Optional chassis development only: WORKBENCH=/absolute/path/to/migration-workbench
 """
@@ -447,6 +457,24 @@ make migrate && make check
 ```
 
 Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make install-dev-workbench` after `make install` to use that checkout instead of PyPI, or `make chassis-gate` to run the workbench repo gate.
+
+## Discovery profiling from `.env`
+
+Set these in `.env` before Drive folder discovery:
+
+```bash
+COHORT_CORPUS_CONFIG=config/cohort_corpus.local.json
+DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json  # optional (defaults to this path)
+```
+
+Then run:
+
+```bash
+make profile-preflight
+make profile-drive-folder
+```
+
+`COHORT_CORPUS_CONFIG` is the required folder-id discovery config consumed by both targets.
 
 ## Documentation
 
@@ -483,7 +511,7 @@ make check
 
 Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Drive / Sheets with ADC (see migration-workbench **`docs/google-auth.md`**). Store artifacts under **`data/profile_snapshots/`** (gitignore large outputs if needed).
 
-**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Convenience: `make profile-cohort-corpus` with `COHORT_CORPUS_CONFIG` and optional `COHORT_CORPUS_OUT_DIR`.
+**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). In `.env`, set required `COHORT_CORPUS_CONFIG` for `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus`; optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
 
 **Coda:** migration-workbench **`docs/coda.md`**; multi-doc: `make profile-coda-corpus` with `CODA_CORPUS_CONFIG`.
 
