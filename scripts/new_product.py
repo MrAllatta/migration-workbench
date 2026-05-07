@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scaffold a product repository that embeds migration-workbench (farm/vizcarra-style layout)."""
+"""Scaffold a product repository that embeds migration-workbench (farm/guitar-style layout)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,9 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+PROVIDER_GOOGLE_SHEETS = "google_sheets"
+PROVIDER_CODA = "coda"
 
 PYTHON_IMAGE_DIGEST = (
     "sha256:ee710afcfb733f4a750d9be683cf054b5cd247b6c5f5237a6849ea568b90ab15"
@@ -415,14 +418,29 @@ profile-cohort-corpus:
 """
 
 
-def render_env_example() -> str:
-    return """DJANGO_DEBUG=1
+def render_env_example(provider: str) -> str:
+    shared_env = """DJANGO_DEBUG=1
 DJANGO_SECRET_KEY=replace-me
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 # Production: set CSRF_TRUSTED_ORIGINS=https://your-app.fly.dev
 
 # SQLite: relative paths resolve under backend/; use absolute path in production (e.g. /data/db.sqlite3).
 SQLITE_PATH=db.sqlite3
+"""
+
+    if provider == PROVIDER_CODA:
+        provider_env = """
+# Coda profiling (see migration-workbench docs/coda.md).
+# Never commit real tokens.
+# CODA_API_TOKEN=
+CODA_CORPUS_CONFIG=config/coda_corpus.local.json
+# Optional override for make profile-coda-corpus output dir.
+CODA_CORPUS_OUT_DIR=build/coda_corpus
+# Optional pull_bundle config path for Coda-based bundles.
+CODA_LIVE_CONFIG=config/coda_live.local.json
+"""
+    else:
+        provider_env = """
 
 # Google Drive / Sheets profiling (ADC + SA impersonation — see migration-workbench docs/google-auth.md).
 # GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=mw-profiler@PROJECT.iam.gserviceaccount.com
@@ -430,9 +448,16 @@ SQLITE_PATH=db.sqlite3
 COHORT_CORPUS_CONFIG=config/cohort_corpus.local.json
 # Optional override for make profile-drive-folder output.
 DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json
+"""
+
+    return (
+        shared_env
+        + provider_env
+        + """
 
 # Optional chassis development only: WORKBENCH=/absolute/path/to/migration-workbench
 """
+    )
 
 
 def render_agents_md() -> str:
@@ -444,21 +469,26 @@ def render_agents_md() -> str:
 """
 
 
-def render_readme_md(project_name: str) -> str:
-    return f"""# {project_name}
+def render_readme_profile_section(provider: str) -> str:
+    if provider == PROVIDER_CODA:
+        return """## Discovery profiling from `.env`
 
-Django product repository built on **[migration-workbench](https://pypi.org/project/migration-workbench/)** — profiler, importer chassis, and workbook tooling for spreadsheet/Coda → app migrations.
-
-## Quickstart
+Set these in `.env` before Coda corpus profiling:
 
 ```bash
-make install          # editable product package; migration-workbench from PyPI
-make migrate && make check
+CODA_CORPUS_CONFIG=config/coda_corpus.local.json
+CODA_CORPUS_OUT_DIR=build/coda_corpus  # optional (defaults to this path)
 ```
 
-Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make install-dev-workbench` after `make install` to use that checkout instead of PyPI, or `make chassis-gate` to run the workbench repo gate.
+Then run:
 
-## Discovery profiling from `.env`
+```bash
+make profile-coda-corpus
+```
+
+`CODA_CORPUS_CONFIG` is the required corpus config consumed by this target.
+"""
+    return """## Discovery profiling from `.env`
 
 Set these in `.env` before Drive folder discovery:
 
@@ -475,6 +505,25 @@ make profile-drive-folder
 ```
 
 `COHORT_CORPUS_CONFIG` is the required folder-id discovery config consumed by both targets.
+"""
+
+
+def render_readme_md(project_name: str, provider: str) -> str:
+    profile_section = render_readme_profile_section(provider)
+    return f"""# {project_name}
+
+Django product repository built on **[migration-workbench](https://pypi.org/project/migration-workbench/)** — profiler, importer chassis, and workbook tooling for spreadsheet/Coda → app migrations.
+
+## Quickstart
+
+```bash
+make install          # editable product package; migration-workbench from PyPI
+make migrate && make check
+```
+
+Optional chassis development: set `WORKBENCH` in `.env` to a migration-workbench checkout, then `make install-dev-workbench` after `make install` to use that checkout instead of PyPI, or `make chassis-gate` to run the workbench repo gate.
+
+{profile_section}
 
 ## Documentation
 
@@ -554,6 +603,15 @@ Living document for entities, attributes, and sheet/tab mapping. Align with the 
 """
 
 
+def render_raw_notes_readme() -> str:
+    return """# Raw client notes
+
+Drop unedited exports, emails, scratch markdown, or other source material here.
+
+Files in this directory are **not tracked** (see root `.gitignore`). Copy distilled facts into `docs/schema-contract.md`, `docs/operator.md`, or corpus config as they are validated.
+"""
+
+
 def render_gitignore() -> str:
     return """.venv/
 __pycache__/
@@ -563,6 +621,10 @@ __pycache__/
 backend/db.sqlite3
 backend/staticfiles/
 .env
+config/*.json
+data/**
+!data/raw_notes/
+!data/raw_notes/README.md
 dist/
 *.egg-info/
 .pytest_cache/
@@ -644,7 +706,32 @@ CMD ["/app/scripts/entrypoint_product.sh"]
 """
 
 
-def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
+def scaffold_config_templates(
+    output_dir: Path, script_dir: Path, provider: str, *, force: bool
+) -> None:
+    if provider == PROVIDER_CODA:
+        copy_file(
+            script_dir.parent / "example_data" / "coda_corpus.example.json",
+            output_dir / "config" / "coda_corpus.local.json",
+            force=force,
+        )
+        copy_file(
+            script_dir.parent / "docs" / "examples" / "coda-live-config.example.json",
+            output_dir / "config" / "coda_live.local.json",
+            force=force,
+        )
+        return
+
+    copy_file(
+        script_dir.parent / "example_data" / "cohort_corpus.example.json",
+        output_dir / "config" / "cohort_corpus.local.json",
+        force=force,
+    )
+
+
+def scaffold(
+    product_kebab: str, output_dir: Path, provider: str, *, force: bool
+) -> None:
     _validate_kebab(product_kebab)
     py_name = python_pkg_name(product_kebab)
     prefix = model_class_prefix(product_kebab)
@@ -666,11 +753,12 @@ def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
         ("backend/apps/core/migrations/__init__.py", ""),
         ("pyproject.toml", render_pyproject_toml(product_kebab, py_name)),
         ("Makefile", render_makefile()),
-        (".env.example", render_env_example()),
+        (".env.example", render_env_example(provider)),
         ("AGENTS.md", render_agents_md()),
-        ("README.md", render_readme_md(product_kebab)),
+        ("README.md", render_readme_md(product_kebab, provider)),
         ("docs/operator.md", render_operator_md(product_kebab)),
         ("docs/schema-contract.md", render_schema_contract_md(product_kebab)),
+        ("data/raw_notes/README.md", render_raw_notes_readme()),
         (".gitignore", render_gitignore()),
         ("Dockerfile", render_dockerfile()),
     ]
@@ -681,6 +769,7 @@ def scaffold(product_kebab: str, output_dir: Path, *, force: bool) -> None:
     copy_file(
         entrypoint_src, output_dir / "scripts" / "entrypoint_product.sh", force=force
     )
+    scaffold_config_templates(output_dir, script_dir, provider, force=force)
 
     manage = output_dir / "backend" / "manage.py"
     if manage.exists():
@@ -706,7 +795,19 @@ def main(argv: list[str]) -> int:
         action="store_true",
         help="Overwrite existing files",
     )
+    provider_group = parser.add_mutually_exclusive_group()
+    provider_group.add_argument(
+        "--google-sheets",
+        action="store_true",
+        help="Scaffold Google Sheets profile config files and env defaults (default).",
+    )
+    provider_group.add_argument(
+        "--coda",
+        action="store_true",
+        help="Scaffold Coda profile config files and env defaults.",
+    )
     args = parser.parse_args(argv)
+    provider = PROVIDER_CODA if args.coda else PROVIDER_GOOGLE_SHEETS
 
     out = args.output_dir
     if out is None:
@@ -714,7 +815,7 @@ def main(argv: list[str]) -> int:
     else:
         out = args.output_dir.expanduser().resolve()
 
-    scaffold(args.product, out, force=args.force)
+    scaffold(args.product, out, provider, force=args.force)
     print(f"\nDone. Next: cd {out} && make install && make migrate && make check")
     return 0
 

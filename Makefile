@@ -101,7 +101,7 @@ chassis-gate:
 
 new-product:
 	@test -n "$(PRODUCT)" || (echo "Usage: make new-product PRODUCT=name"; exit 1)
-	$(PYTHON) scripts/new_product.py $(PRODUCT)
+	$(PYTHON) scripts/new_product.py $(PRODUCT) $(PROVIDER)
 
 publish:
 	$(PYTHON) -m build

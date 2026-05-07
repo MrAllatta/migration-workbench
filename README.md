@@ -20,9 +20,10 @@ From a sibling checkout of this repo:
 
 ```bash
 make new-product PRODUCT=my-product   # writes ../my-product; git init + initial commit
+make new-product PRODUCT=my-product PROVIDER=--coda
 ```
 
-Then `cd ../my-product && make install && make migrate && make check`. Local **`make install`** matches the **Dockerfile**: the product package is editable (`pip install -e .`) and **`migration-workbench` comes from PyPI** via `pyproject.toml`. The scaffold also includes `backend/`, `Makefile`, `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), and starter docs. Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
+Then `cd ../my-product && make install && make migrate && make check`. Local **`make install`** matches the **Dockerfile**: the product package is editable (`pip install -e .`) and **`migration-workbench` comes from PyPI** via `pyproject.toml`. The scaffold also includes `backend/`, `Makefile`, `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), starter docs, and provider-specific config skeletons under `config/` (Google Sheets by default; use `PROVIDER=--coda` for Coda). Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
 
 **3. Develop the chassis (this repo)**  
 Clone, editable install, run the full gate:
