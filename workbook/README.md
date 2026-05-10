@@ -270,7 +270,7 @@ the parser from the Django field class in the contract:
 | ``DateField`` / ``DateTimeField`` | ``self._parse_date()`` |
 | ``DecimalField`` / ``FloatField`` | ``self._dec()`` |
 | ``IntegerField`` / ``SmallIntegerField`` etc. | ``self._int()`` |
-| ``BooleanField`` | ``row.get(...).lower() in ("yes", "true", "1")`` |
+| ``BooleanField`` | ``self._bool()`` |
 | ``CharField`` / ``TextField`` / others | ``row.get(...).strip()`` |
 
 ### File safety

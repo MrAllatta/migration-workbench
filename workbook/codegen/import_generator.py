@@ -237,23 +237,23 @@ def _render_defaults_dict(
         if parser == "parse_date":
             raw_statements.append(f'{inner}raw_{fname} = row.get({fname!r}, "")')
             dict_entries.append(
-                f"{inner}{fname}: "
+                f"{inner}{fname!r}: "
                 f"self._parse_date(raw_{fname}) if raw_{fname}.strip() else None,"
             )
         elif parser in ("dec", "int"):
             default = _default_value(parser)
             dict_entries.append(
-                f"{inner}{fname}: "
+                f"{inner}{fname!r}: "
                 f'{_parser_method(parser)}(row.get({fname!r}, ""), {default}),'
             )
         elif parser == "bool":
             dict_entries.append(
-                f"{inner}{fname}: "
+                f"{inner}{fname!r}: "
                 f'{_parser_method(parser)}(row.get({fname!r}, "")),'
             )
         else:
             dict_entries.append(
-                f'{inner}{fname}: row.get({fname!r}, "").strip(),'
+                f'{inner}{fname!r}: row.get({fname!r}, "").strip(),'
             )
 
     parts: list[str] = []
@@ -320,6 +320,7 @@ def _render_import_method(
     model_name: str,
     contract_fields: list[dict[str, Any]],
     import_cfg: dict[str, Any],
+    indent: int = 4,
 ) -> str:
     """Render a single import tier method."""
     method_name = f"_import_{model_name.lower()}"
@@ -433,7 +434,11 @@ def _render_import_method(
         f'"created" if created else "updated"] += 1'
     )
 
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    if indent:
+        pad = " " * indent
+        result = pad + result.replace("\n", "\n" + pad)
+    return result
 
 
 def render_import_py(
@@ -506,7 +511,7 @@ def render_import_py(
     seen_tiers: set[int] = set()
     for tier, name, _ in candidates:
         if tier not in seen_tiers:
-            parts.append(f'        self.tier("TIER {tier}: {name}s", self._{name.lower()})')
+            parts.append(f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})')
             seen_tiers.add(tier)
         # If same tier as previous, add without tier heading.
     parts.append("")

@@ -34,7 +34,7 @@ from django.db import transaction
 from importer.bundle_reader import iter_bundle_tab_rows
 from importer.chassis import ImporterChassisMixin
 from importer.lookups import resolve_fk_by_text
-from importer.parsing import parse_iso_date, split_on, to_decimal, to_decimal_or_none, to_int, to_int_or_none
+from importer.parsing import parse_iso_date, split_on, to_bool, to_decimal, to_decimal_or_none, to_int, to_int_or_none
 from importer.sample_guard import live12_block_message_for_sample_into_dev_sqlite
 from importer.summary import build_escalation_summary, build_failure_signatures, normalized_outcomes, write_summary_json
 
@@ -285,6 +285,10 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
     def _dec_or_none(self, value):
         """Coerce *value* to a positive ``Decimal`` or ``None``.  See :func:`~importer.parsing.to_decimal_or_none`."""
         return to_decimal_or_none(value)
+
+    def _bool(self, value):
+        """Coerce *value* to a boolean.  See :func:`~importer.parsing.to_bool`."""
+        return to_bool(value)
 
     def _parse_date(self, date_str):
         """Parse an ISO 8601 date string.  See :func:`~importer.parsing.parse_iso_date`."""

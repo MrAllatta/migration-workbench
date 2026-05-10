@@ -97,6 +97,33 @@ def to_decimal_or_none(value):
         return None
 
 
+def to_bool(value, default=False):
+    """Coerce *value* to a boolean, returning *default* on failure.
+
+    Handles common spreadsheet boolean representations:
+
+    * ``True`` / ``False`` (Python bool) — passed through.
+    * ``"yes"`` / ``"no"``, ``"true"`` / ``"false"``, ``"1"`` / ``"0"``,
+      ``"y"`` / ``"n"``, ``"x"`` / ``""`` — case-insensitive.
+
+    Args:
+        value: Raw cell value to convert.
+        default: Fallback returned when *value* is empty or unrecognised.
+            Defaults to ``False``.
+
+    Returns:
+        bool: Parsed boolean, or *default*.
+    """
+    if isinstance(value, bool):
+        return value
+    s = str(value).strip().lower()
+    if s in ("yes", "true", "1", "y", "x"):
+        return True
+    if s in ("no", "false", "0", "n", ""):
+        return False
+    return default
+
+
 def parse_iso_date(date_str):
     """Parse an ISO 8601 date string (``YYYY-MM-DD``) to a :class:`datetime.date`.
 

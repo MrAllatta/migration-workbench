@@ -96,7 +96,8 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) generate_models --contract build/_out/schema-contract-smoke.yaml --out /dev/null --force
 	DB_ENGINE=sqlite $(MANAGE) scaffold_view_manifest --structure example_data/scaffold_view_manifest_structure.example.json --out build/_out/view-manifest-smoke.yaml --summary-json build/_out/view-manifest-smoke.json
 	DB_ENGINE=sqlite $(MANAGE) generate_admin --contract build/_out/schema-contract-smoke.yaml --manifest build/_out/view-manifest-smoke.yaml --out /dev/null --force
-	DB_ENGINE=sqlite $(MANAGE) generate_import --contract build/_out/schema-contract-smoke.yaml --out /dev/null --force
+	DB_ENGINE=sqlite $(MANAGE) generate_import --contract build/_out/schema-contract-smoke.yaml --out build/_out/import_data.py --force
+	$(PYTHON) -c "import sys; sys.path.insert(0, 'build/_out'); from import_data import Command; from importer.base import BaseImportCommand; assert issubclass(Command, BaseImportCommand)"
 	DB_ENGINE=sqlite $(MANAGE) generate_discovery_interview --manifest build/_out/view-manifest-smoke.yaml --out build/_out/discovery-interview-smoke.md
 	DB_ENGINE=sqlite $(MANAGE) merge_discovery_notes --manifest build/_out/view-manifest-smoke.yaml --interview example_data/discovery_interview.example.md --out build/_out/view-manifest-merged-smoke.yaml --summary-out build/_out/discovery-summary-smoke.md
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json
