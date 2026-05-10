@@ -22,8 +22,18 @@ class Command(BaseCommand):
             "--resume-from-tab-selection",
             action="store_true",
             help=(
-                "Skip tab selection generation and read tab_selection_<date>.json from --out-dir "
-                "to drive the deep-profile pass. Use after hand-editing the tab selection file."
+                "Read tab_selection_<date>.json and in_scope_workbook_index_<date>.json from "
+                "--out-dir from a prior full run, skipping Drive discovery and broad tab listing "
+                "before deep profiling. Use after hand-editing tab_selection_<date>.json."
+            ),
+        )
+        parser.add_argument(
+            "--skip-existing-deep",
+            action="store_true",
+            help=(
+                "Reuse existing per-tab payloads under deep/ when filenames match pending jobs "
+                "instead of refetching Sheets grid data—useful together with backoff after 429 "
+                "throttling or with JSON \"deep_skip_existing\": true."
             ),
         )
 
@@ -60,6 +70,7 @@ class Command(BaseCommand):
             out_dir=out_dir,
             date_stamp=date_stamp,
             resume_from_tab_selection=options.get("resume_from_tab_selection", False),
+            skip_existing_deep=options.get("skip_existing_deep", False),
         )
         self.stdout.write(self.style.SUCCESS("profile_cohort_corpus wrote artifacts:"))
         for key, path in outputs.items():

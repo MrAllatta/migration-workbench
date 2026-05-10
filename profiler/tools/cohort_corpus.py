@@ -13,7 +13,10 @@ and ``year_regex`` in the corpus config):
 4. **Scoring / shortlist** — rank tabs by heuristic score (row/col counts,
    name keyword patterns for operational vs. reference vs. support tabs).
 5. **Tab selection** — auto-select the top *N* per workbook code, then apply
-   manual overrides.
+   manual overrides (or reuse a hand-edited ``tab_selection_*.json`` with
+   :func:`run_cohort_corpus` ``resume_from_tab_selection``, which also skips
+   Drive discovery through tab shortlisting when ``in_scope_workbook_index_*.json``
+   is already present alongside that selection).
 6. **Deep profile** — call ``fetch_tab_grid`` + ``summarize_tab`` on each
    selected tab, writing per-tab JSON artifacts under ``out_dir/deep/``.
 7. **Column candidates** — score header columns for domain relevance and
@@ -28,6 +31,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -540,16 +544,21 @@ def run_cohort_corpus(
     out_dir: Path,
     date_stamp: str,
     resume_from_tab_selection: bool = False,
+    skip_existing_deep: bool = False,
 ) -> dict:
     """Execute the full cohort corpus profiling pipeline and write all artifacts.
 
     All intermediate JSON files are written to *out_dir* with *date_stamp*
     suffixes.  Deep-profile per-tab files go into ``out_dir/deep/``.
 
-    When *resume_from_tab_selection* is ``True``, the
-    ``tab_selection_<date_stamp>.json`` file must already exist in *out_dir*;
-    the pipeline skips discovery / broad profiling / scoring and goes directly
-    to deep profiling using that selection.
+    When *resume_from_tab_selection* is ``True``, *out_dir* must contain both
+    ``tab_selection_<date_stamp>.json`` and
+    ``in_scope_workbook_index_<date_stamp>.json`` from an earlier full run.
+    The pipeline skips Drive discovery through tab shortlisting,
+    preserves the hand-edited tab selection JSON, reloads workbook index rows from
+    disk, then runs deep profiling and downstream column artifacts using the
+    selected tab titles (one deep job per index row workbook code matched to
+    those titles).
 
     Args:
         drive_service: Authenticated Google Drive API service object.
@@ -559,11 +568,18 @@ def run_cohort_corpus(
             matching capturing group 1 of ``workbook_id_regex``).
             Optional keys include ``workbook_id_regex``, ``year_regex``,
             ``heuristics``, ``tab_auto_limit``, ``column_min_score``,
-            ``tab_selection_overrides``, ``discovery_no_tabs``, ``max_depth``.
+            ``tab_selection_overrides``, ``discovery_no_tabs``, ``max_depth``,
+            ``deep_read_delay_seconds``, ``deep_skip_existing``.
         out_dir: Directory where all artifact JSON files are written.
         date_stamp: Timestamp string appended to artifact filenames.
-        resume_from_tab_selection: Skip to deep profiling using an existing
-            tab selection file.  Defaults to ``False``.
+        resume_from_tab_selection: Load workbook index rows and ``approved_tabs``
+            from artifacts on disk, skipping Drive discovery and broad Sheets
+            tab listing unless a full rerun is executed. Defaults to ``False``.
+        skip_existing_deep: When combined with cached files under ``out_dir/deep/``,
+            reuse existing payloads for column scoring instead of refetching.
+            Intended for retrying quota-throttled corpus runs without repeating
+            successful tab pulls. Combines logically with JSON config
+            ``deep_skip_existing``. Defaults to ``False``.
 
     Returns:
         dict[str, str]: Mapping from artifact role to file path for every file
@@ -593,129 +609,160 @@ def run_cohort_corpus(
     tab_score_heuristics = heuristics_config.get("tab_score") or {}
     column_score_heuristics = heuristics_config.get("column_score") or {}
 
-    include_tabs = not bool(config.get("discovery_no_tabs"))
-    tree = walk_folder(
-        drive_service,
-        sheets_service,
-        folder_id,
-        include_tabs=include_tabs,
-        max_depth=config.get("max_depth"),
-    )
-    discovery_payload = {
-        "id": folder_id,
-        "name": config.get("folder_name") or folder_id,
-        **tree,
-    }
     discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
-    write_json(discovery_path, discovery_payload)
-
-    index_records = build_cohort_corpus_index(
-        discovery_payload,
-        in_scope_codes,
-        workbook_id_re=workbook_id_re,
-        year_re=year_re,
-    )
     index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"
-    write_json(
-        index_path,
-        {
-            "generated_from": discovery_path.name,
-            "record_count": len(index_records),
-            "records": index_records,
-        },
-    )
-
-    inventory_rows: list[dict] = []
-    broad_results: list[dict] = []
-    for record in index_records:
-        spreadsheet_id = record["spreadsheet_id"]
-        try:
-            tabs = list_tabs(sheets_service, spreadsheet_id)
-            broad_results.append(
-                {
-                    "year": record["year"],
-                    "workbook_code": record["workbook_code"],
-                    "spreadsheet_id": spreadsheet_id,
-                    "spreadsheet_name": record["spreadsheet_name"],
-                    "tab_count": len(tabs),
-                    "exit_code": 0,
-                    "error": None,
-                }
-            )
-            for tab in tabs:
-                inventory_rows.append(
-                    {
-                        "spreadsheet_id": spreadsheet_id,
-                        "sheet_id": tab["sheet_id"],
-                        "rows": tab["rows"] or 0,
-                        "cols": tab["cols"] or 0,
-                        "tab_title": tab["title"],
-                    }
-                )
-        except Exception as exc:  # noqa: BLE001
-            broad_results.append(
-                {
-                    "year": record["year"],
-                    "workbook_code": record["workbook_code"],
-                    "spreadsheet_id": spreadsheet_id,
-                    "spreadsheet_name": record["spreadsheet_name"],
-                    "tab_count": 0,
-                    "exit_code": 1,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-            )
-
     broad_path = out_dir / f"broad_profile_coverage_{date_stamp}.json"
-    write_json(
-        broad_path,
-        {
-            "generated_from": index_path.name,
-            "run_count": len(broad_results),
-            "success_count": sum(1 for row in broad_results if row["exit_code"] == 0),
-            "failure_count": sum(1 for row in broad_results if row["exit_code"] != 0),
-            "results": broad_results,
-        },
-    )
-
-    tab_shortlist = select_tabs_from_inventory(
-        index_records,
-        inventory_rows,
-        tab_score_heuristics=tab_score_heuristics,
-    )
     tab_shortlist_path = out_dir / f"tab_shortlist_{date_stamp}.json"
-    write_json(
-        tab_shortlist_path,
-        {
-            "generated_from": broad_path.name,
-            "candidate_count": len(
-                {(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}
-            ),
-            "selected_count": len(tab_shortlist),
-            "selected": tab_shortlist,
-        },
-    )
-
     tab_selection_path = out_dir / f"tab_selection_{date_stamp}.json"
+
     if resume_from_tab_selection:
         if not tab_selection_path.exists():
             raise CommandError(
                 f"--resume-from-tab-selection requires existing {tab_selection_path}; none found"
             )
+        if not index_path.exists():
+            raise CommandError(
+                f"--resume-from-tab-selection requires existing {index_path} from an earlier "
+                "full corpus run on the same --date-stamp/--out-dir. Run profile_cohort_corpus "
+                "without the flag once, hand-edit tab_selection_<date>.json, then rerun with "
+                "--resume-from-tab-selection."
+            )
         try:
-            existing = json.loads(tab_selection_path.read_text(encoding="utf-8"))
+            existing_selection_payload = json.loads(
+                tab_selection_path.read_text(encoding="utf-8")
+            )
         except json.JSONDecodeError as exc:
             raise CommandError(f"Could not parse {tab_selection_path}: {exc}") from exc
-        approved_tabs = existing.get("approved_tabs")
+        approved_tabs = existing_selection_payload.get("approved_tabs")
         if not isinstance(approved_tabs, dict) or not all(
-            isinstance(code, str)
-            and isinstance(tabs, list)
-            and all(isinstance(tab, str) for tab in tabs)
-            for code, tabs in approved_tabs.items()
+            isinstance(workbook_code, str)
+            and isinstance(selected_tab_titles, list)
+            and all(isinstance(tab_title_entry, str) for tab_title_entry in selected_tab_titles)
+            for workbook_code, selected_tab_titles in approved_tabs.items()
         ):
             raise CommandError(
                 f"{tab_selection_path} must contain 'approved_tabs' as dict[str, list[str]]"
             )
+        try:
+            workbook_index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"Could not parse {index_path}: {exc}") from exc
+        index_records = workbook_index_payload.get("records")
+        if not isinstance(index_records, list) or not index_records:
+            raise CommandError(f"{index_path} must contain a non-empty 'records' list")
+
+        required_index_keys = (
+            "spreadsheet_id",
+            "workbook_code",
+            "year",
+            "spreadsheet_name",
+        )
+        for row_index, index_row in enumerate(index_records):
+            if not isinstance(index_row, dict) or not all(
+                key in index_row for key in required_index_keys
+            ):
+                raise CommandError(
+                    f"{index_path} records[{row_index}] is missing one of {required_index_keys!r}"
+                )
     else:
+        include_tabs = not bool(config.get("discovery_no_tabs"))
+        tree = walk_folder(
+            drive_service,
+            sheets_service,
+            folder_id,
+            include_tabs=include_tabs,
+            max_depth=config.get("max_depth"),
+        )
+        discovery_payload = {
+            "id": folder_id,
+            "name": config.get("folder_name") or folder_id,
+            **tree,
+        }
+        write_json(discovery_path, discovery_payload)
+
+        index_records = build_cohort_corpus_index(
+            discovery_payload,
+            in_scope_codes,
+            workbook_id_re=workbook_id_re,
+            year_re=year_re,
+        )
+        write_json(
+            index_path,
+            {
+                "generated_from": discovery_path.name,
+                "record_count": len(index_records),
+                "records": index_records,
+            },
+        )
+
+        inventory_rows: list[dict] = []
+        broad_results: list[dict] = []
+        for record in index_records:
+            spreadsheet_id = record["spreadsheet_id"]
+            try:
+                tabs = list_tabs(sheets_service, spreadsheet_id)
+                broad_results.append(
+                    {
+                        "year": record["year"],
+                        "workbook_code": record["workbook_code"],
+                        "spreadsheet_id": spreadsheet_id,
+                        "spreadsheet_name": record["spreadsheet_name"],
+                        "tab_count": len(tabs),
+                        "exit_code": 0,
+                        "error": None,
+                    }
+                )
+                for tab in tabs:
+                    inventory_rows.append(
+                        {
+                            "spreadsheet_id": spreadsheet_id,
+                            "sheet_id": tab["sheet_id"],
+                            "rows": tab["rows"] or 0,
+                            "cols": tab["cols"] or 0,
+                            "tab_title": tab["title"],
+                        }
+                    )
+            except Exception as exc:  # noqa: BLE001
+                broad_results.append(
+                    {
+                        "year": record["year"],
+                        "workbook_code": record["workbook_code"],
+                        "spreadsheet_id": spreadsheet_id,
+                        "spreadsheet_name": record["spreadsheet_name"],
+                        "tab_count": 0,
+                        "exit_code": 1,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                )
+
+        write_json(
+            broad_path,
+            {
+                "generated_from": index_path.name,
+                "run_count": len(broad_results),
+                "success_count": sum(1 for row in broad_results if row["exit_code"] == 0),
+                "failure_count": sum(1 for row in broad_results if row["exit_code"] != 0),
+                "results": broad_results,
+            },
+        )
+
+        tab_shortlist = select_tabs_from_inventory(
+            index_records,
+            inventory_rows,
+            tab_score_heuristics=tab_score_heuristics,
+        )
+        write_json(
+            tab_shortlist_path,
+            {
+                "generated_from": broad_path.name,
+                "candidate_count": len(
+                    {(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}
+                ),
+                "selected_count": len(tab_shortlist),
+                "selected": tab_shortlist,
+            },
+        )
+
         heuristic_tabs = auto_select_tabs(
             tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3))
         )
@@ -733,30 +780,85 @@ def run_cohort_corpus(
             tab_selection_payload["overrides_applied"] = overrides
         write_json(tab_selection_path, tab_selection_payload)
 
+    reuse_cached_deep = bool(skip_existing_deep) or bool(config.get("deep_skip_existing"))
+    deep_read_delay_seconds = float(config.get("deep_read_delay_seconds") or 0.0)
+
     deep_results: list[dict] = []
     candidate_columns: list[dict] = []
     deep_dir = out_dir / "deep"
+    deep_dir.mkdir(parents=True, exist_ok=True)
+
+    payload_for_candidates: dict
+    summary_for_candidates: dict
+    resolved_out_json: str | None
+
     for record in index_records:
         for tab_title in approved_tabs.get(record["workbook_code"], []):
+            out_path = (
+                deep_dir
+                / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}.json"
+            )
+            if reuse_cached_deep and out_path.exists():
+                try:
+                    cached_deep_payload = json.loads(out_path.read_text(encoding="utf-8"))
+                    cached_grid_payload = cached_deep_payload.get("raw")
+                    cached_tab_summary = cached_deep_payload.get("summary")
+                except json.JSONDecodeError:
+                    cached_grid_payload = None
+                    cached_tab_summary = None
+                if cached_grid_payload is not None and cached_tab_summary is not None:
+                    payload_for_candidates = cached_grid_payload
+                    summary_for_candidates = cached_tab_summary
+                    resolved_out_json = str(out_path.relative_to(out_dir.parent))
+                    deep_results.append(
+                        {
+                            "year": record["year"],
+                            "workbook_code": record["workbook_code"],
+                            "spreadsheet_id": record["spreadsheet_id"],
+                            "tab_title": tab_title,
+                            "out_json": resolved_out_json,
+                            "exit_code": 0,
+                            "error": None,
+                            "reused_cached_deep": True,
+                        }
+                    )
+                    candidate_columns.extend(
+                        derive_column_candidates(
+                            workbook_code=record["workbook_code"],
+                            year=record["year"],
+                            spreadsheet_id=record["spreadsheet_id"],
+                            tab_title=tab_title,
+                            payload={
+                                "raw": payload_for_candidates,
+                                "summary": summary_for_candidates,
+                            },
+                            column_score_heuristics=column_score_heuristics,
+                        )
+                    )
+                    continue
+
             try:
-                payload = fetch_tab_grid(
+                if deep_read_delay_seconds > 0:
+                    time.sleep(deep_read_delay_seconds)
+                payload_for_candidates = fetch_tab_grid(
                     sheets_service, record["spreadsheet_id"], tab_title
                 )
-                summary = summarize_tab(payload)
-                out_path = (
-                    deep_dir
-                    / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}.json"
+                summary_for_candidates = summarize_tab(payload_for_candidates)
+                write_json(
+                    out_path,
+                    {"raw": payload_for_candidates, "summary": summary_for_candidates},
                 )
-                write_json(out_path, {"raw": payload, "summary": summary})
+                resolved_out_json = str(out_path.relative_to(out_dir.parent))
                 deep_results.append(
                     {
                         "year": record["year"],
                         "workbook_code": record["workbook_code"],
                         "spreadsheet_id": record["spreadsheet_id"],
                         "tab_title": tab_title,
-                        "out_json": str(out_path.relative_to(out_dir.parent)),
+                        "out_json": resolved_out_json,
                         "exit_code": 0,
                         "error": None,
+                        "reused_cached_deep": False,
                     }
                 )
                 candidate_columns.extend(
@@ -765,7 +867,10 @@ def run_cohort_corpus(
                         year=record["year"],
                         spreadsheet_id=record["spreadsheet_id"],
                         tab_title=tab_title,
-                        payload={"raw": payload, "summary": summary},
+                        payload={
+                            "raw": payload_for_candidates,
+                            "summary": summary_for_candidates,
+                        },
                         column_score_heuristics=column_score_heuristics,
                     )
                 )
@@ -779,6 +884,7 @@ def run_cohort_corpus(
                         "out_json": None,
                         "exit_code": 1,
                         "error": f"{type(exc).__name__}: {exc}",
+                        "reused_cached_deep": False,
                     }
                 )
 

@@ -1,6 +1,8 @@
 import json
 import re
 from io import StringIO
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.management import call_command
@@ -9,6 +11,7 @@ from django.core.management.base import CommandError
 from profiler.tools.cohort_corpus import (
     apply_tab_selection_overrides,
     build_cohort_corpus_index,
+    run_cohort_corpus,
     score_tab,
     select_tabs_from_inventory,
 )
@@ -234,3 +237,71 @@ def test_profile_cohort_corpus_smoke_accepts_resume_from_tab_selection_flag(tmp_
         stdout=out,
     )
     assert (tmp_path / "profile_cohort_corpus_smoke_2026-04-28.json").exists()
+
+
+def test_run_cohort_corpus_resume_requires_workbook_index_snapshot(tmp_path: Path):
+    """Hand-editing tab selection without a workbook index artifact should raise."""
+    corpus_out_dir = tmp_path / "corpus_run"
+    corpus_out_dir.mkdir(parents=True, exist_ok=True)
+    date_stamp = "2026-05-07"
+    selection_path = corpus_out_dir / f"tab_selection_{date_stamp}.json"
+    selection_path.write_text(
+        json.dumps({"approved_tabs": {"301": ["Sheet A"]}}, indent=2),
+        encoding="utf-8",
+    )
+    corpus_config = {"folder_id": "drive-folder-1", "in_scope_workbooks": ["301"]}
+    mock_drive = MagicMock()
+    mock_sheets = MagicMock()
+    with pytest.raises(CommandError, match=r"in_scope_workbook_index_"):
+        run_cohort_corpus(
+            drive_service=mock_drive,
+            sheets_service=mock_sheets,
+            config=corpus_config,
+            out_dir=corpus_out_dir,
+            date_stamp=date_stamp,
+            resume_from_tab_selection=True,
+        )
+
+
+def test_run_cohort_corpus_resume_skips_drive_walk(tmp_path: Path):
+    """Resume loads index rows from disk and must not crawl Drive anew."""
+    corpus_out_dir = tmp_path / "corpus_run"
+    corpus_out_dir.mkdir(parents=True, exist_ok=True)
+    date_stamp = "2026-05-07"
+    workbook_index_payload = {
+        "generated_from": f"drive_discovery_{date_stamp}.json",
+        "record_count": 1,
+        "records": [
+            {
+                "year": 2025,
+                "workbook_code": "301",
+                "spreadsheet_id": "spreadsheet-id-abcdef",
+                "spreadsheet_name": "301 Stub",
+                "folder_path": "Corpus",
+                "modified_time": None,
+                "tab_count": 0,
+            },
+        ],
+    }
+    index_path = corpus_out_dir / f"in_scope_workbook_index_{date_stamp}.json"
+    index_path.write_text(json.dumps(workbook_index_payload), encoding="utf-8")
+    selection_path = corpus_out_dir / f"tab_selection_{date_stamp}.json"
+    selection_path.write_text(
+        json.dumps({"approved_tabs": {"301": []}}, indent=2),
+        encoding="utf-8",
+    )
+    corpus_config = {"folder_id": "drive-folder-1", "in_scope_workbooks": ["301"]}
+    mock_drive = MagicMock()
+    mock_sheets = MagicMock()
+    with patch(
+        "profiler.management.commands.profile_drive_folder.walk_folder"
+    ) as mock_walk_drive_tree:
+        run_cohort_corpus(
+            drive_service=mock_drive,
+            sheets_service=mock_sheets,
+            config=corpus_config,
+            out_dir=corpus_out_dir,
+            date_stamp=date_stamp,
+            resume_from_tab_selection=True,
+        )
+    mock_walk_drive_tree.assert_not_called()

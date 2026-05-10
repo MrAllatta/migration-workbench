@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import random
 import re
+import time
 from collections import Counter
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
+from googleapiclient.errors import HttpError
 
 from connectors.google_sheets import (
     DRIVE_READONLY_SCOPE,
@@ -24,15 +27,40 @@ def _col_letter(idx0: int) -> str:
     return s
 
 
+def _execute_sheets_http_request(request, *, max_attempts: int = 10) -> dict:
+    """Run a prepared Sheets API request, retrying transient HTTP 429 responses.
+
+    Args:
+        request: Google API request object returned by ``.get(...)`` on a
+            ``spreadsheets()`` resource (must expose ``execute()``).
+        max_attempts: Upper bound on attempts including the first call.
+
+    Returns:
+        dict: Parsed JSON response from ``execute()``.
+
+    Raises:
+        HttpError: When a non-retryable error occurs or retries are exhausted.
+    """
+    base_delay_seconds = 2.0
+    for attempt_index in range(max_attempts):
+        try:
+            return request.execute()
+        except HttpError as exc:
+            status = getattr(exc.resp, "status", None)
+            if status == 429 and attempt_index < max_attempts - 1:
+                backoff = base_delay_seconds * (2**attempt_index)
+                jitter = random.uniform(0.0, 0.35 * backoff)
+                time.sleep(backoff + jitter)
+                continue
+            raise
+
+
 def list_tabs(sheets_service, spreadsheet_id: str) -> list[dict]:
-    response = (
-        sheets_service.spreadsheets()
-        .get(
-            spreadsheetId=spreadsheet_id,
-            fields="properties(title),sheets(properties(sheetId,title,index,gridProperties))",
-        )
-        .execute()
+    request = sheets_service.spreadsheets().get(
+        spreadsheetId=spreadsheet_id,
+        fields="properties(title),sheets(properties(sheetId,title,index,gridProperties))",
     )
+    response = _execute_sheets_http_request(request)
     return [
         {
             "title": s["properties"]["title"],
@@ -54,17 +82,13 @@ def fetch_tab_grid(sheets_service, spreadsheet_id: str, tab_title: str) -> dict:
         "))))"
     )
     range_ = f"'{tab_title.replace(chr(39), chr(39) * 2)}'"
-    response = (
-        sheets_service.spreadsheets()
-        .get(
-            spreadsheetId=spreadsheet_id,
-            ranges=[range_],
-            includeGridData=True,
-            fields=fields,
-        )
-        .execute()
+    request = sheets_service.spreadsheets().get(
+        spreadsheetId=spreadsheet_id,
+        ranges=[range_],
+        includeGridData=True,
+        fields=fields,
     )
-    return response
+    return _execute_sheets_http_request(request)
 
 
 def _user_entered_repr(ue: dict | None) -> tuple[str, str]:
