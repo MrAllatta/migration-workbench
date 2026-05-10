@@ -35,7 +35,7 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         raise ValueError("schema contract must be a YAML mapping")
 
     version = str(raw.get("version") or "1.0")
-    if version not in ("1.0", "1.1"):
+    if version not in ("1.0", "1.1", "1.2"):
         raise ValueError(f"unsupported schema contract version: {version}")
 
     raw.setdefault("source", {})
@@ -125,6 +125,63 @@ def _normalise_field_class(raw: str) -> str:
     if s.startswith("models."):
         return s
     return f"models.{s}"
+
+
+def get_enums(contract: dict[str, Any]) -> dict[str, list[tuple[str, str]]]:
+    """Return top-level enum definitions as ``{name: [(value, label), ...]}``.
+
+    The contract ``enums`` block is formatted as::
+
+        enums:
+          EventType:
+            - [seeded, "Seeded"]
+            - [harvested, "Harvested"]
+
+    Returns:
+        Empty dict when absent.
+    """
+    raw = contract.get("enums") or {}
+    result: dict[str, list[tuple[str, str]]] = {}
+    for name, pairs in raw.items():
+        result[name] = [(str(p[0]), str(p[1])) for p in pairs]
+    return result
+
+
+def get_admin_config(table: dict[str, Any]) -> dict[str, Any]:
+    """Return the ``admin`` configuration block for *table*, or ``{}``.
+
+    The admin block may contain ``list_display``, ``list_filter``,
+    ``search_fields``, ``readonly_fields``, ``inlines``, etc.
+    """
+    cfg = table.get("admin")
+    if cfg and isinstance(cfg, dict):
+        return cfg
+    return {}
+
+
+def get_model_base(table: dict[str, Any]) -> str:
+    """Return the model base class for *table*.
+
+    Defaults to ``"models.Model"``.  Override via ``model_base`` key::
+
+        model_base: "AbstractUser"
+    """
+    explicit = table.get("model_base")
+    if explicit:
+        return str(explicit)
+    return "models.Model"
+
+
+def get_extra_imports(table: dict[str, Any]) -> list[str]:
+    """Return extra import lines for *table*, or ``[]``.
+
+    Extra imports are needed when ``model_base`` is not ``models.Model``
+    (e.g. ``from django.contrib.auth.models import AbstractUser``).
+    """
+    imports = table.get("extra_imports")
+    if imports and isinstance(imports, list):
+        return [str(i) for i in imports]
+    return []
 
 
 def get_import_config(table: dict[str, Any]) -> dict[str, Any] | None:

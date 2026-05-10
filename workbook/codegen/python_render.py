@@ -6,11 +6,40 @@ import json
 from typing import Any
 
 
-def render_field_kwargs(kwargs: dict[str, Any]) -> str:
+def render_choices_class(name: str, pairs: list[tuple[str, str]]) -> str:
+    """Render a ``models.TextChoices`` class.
+
+    Args:
+        name: Enum class name (e.g. ``"EventType"``).
+        pairs: List of ``(value, label)`` tuples.
+
+    Returns:
+        Source block for the choices class.
+    """
+    lines = [
+        "",
+        f"class {name}(models.TextChoices):",
+    ]
+    for value, label in pairs:
+        key = value.upper().replace(" ", "_")
+        lines.append(f'    {key} = {value!r}, {label!r}')
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_field_kwargs(
+    kwargs: dict[str, Any],
+    enum_names: set[str] | None = None,
+    model_name: str | None = None,
+) -> str:
     """Render a Django field kwargs dict as a Python keyword-argument string.
 
     Args:
         kwargs: Keyword arguments for a Django model field constructor.
+        enum_names: Set of known enum type names; when ``choices`` matches one,
+            it is rendered as a model-qualified reference.
+        model_name: The Django model class name (needed when rendering choices
+            as ``<ModelName>.<EnumName>``).
 
     Returns:
         Comma-separated ``key=value`` string, e.g.
@@ -26,6 +55,8 @@ def render_field_kwargs(kwargs: dict[str, Any]) -> str:
         if k == "on_delete":
             raw = str(v).removeprefix("models.")
             parts.append(f"on_delete=models.{raw}")
+        elif k == "choices" and enum_names and model_name and isinstance(v, str) and v in enum_names:
+            parts.append(f"choices={model_name}.{v}")
         elif isinstance(v, bool):
             parts.append(f"{k}={v}")
         elif isinstance(v, int):
@@ -37,7 +68,15 @@ def render_field_kwargs(kwargs: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
-def render_field(name: str, field_class: str, kwargs: dict[str, Any], indent: int = 4) -> str:
+def render_field(
+    name: str,
+    field_class: str,
+    kwargs: dict[str, Any],
+    indent: int = 4,
+    enum_names: set[str] | None = None,
+    model_name: str | None = None,
+    rendered_model_names: set[str] | None = None,
+) -> str:
     """Render a single Django model field declaration.
 
     Args:
@@ -45,6 +84,10 @@ def render_field(name: str, field_class: str, kwargs: dict[str, Any], indent: in
         field_class: Fully-qualified Django field class (e.g. ``"models.ForeignKey"``).
         kwargs: Keyword arguments for the field constructor.
         indent: Spaces of indentation (default 4).
+        enum_names: Set of known enum type names (passed to *render_field_kwargs*).
+        model_name: The Django model class name (for enum references).
+        rendered_model_names: Set of already-rendered model names; used to
+            detect forward references that need quoting.
 
     Returns:
         Indented field declaration line::
@@ -56,14 +99,21 @@ def render_field(name: str, field_class: str, kwargs: dict[str, Any], indent: in
     if field_class == "models.ForeignKey":
         remaining = dict(kwargs)
         to_val = remaining.pop("to", None)
-        kw_str = render_field_kwargs(remaining)
+        kw_str = render_field_kwargs(remaining, enum_names, model_name)
         if to_val is not None:
-            to_str = to_val if isinstance(to_val, str) and to_val.isidentifier() else repr(to_val)
+            if isinstance(to_val, str) and to_val == "self":
+                to_str = '"self"'
+            elif isinstance(to_val, str) and to_val.isidentifier() and rendered_model_names is not None and to_val not in rendered_model_names:
+                to_str = repr(to_val)
+            elif isinstance(to_val, str) and to_val.isidentifier():
+                to_str = to_val
+            else:
+                to_str = repr(to_val)
             body = f"{to_str}, {kw_str}" if kw_str else to_str
         else:
             body = kw_str
     else:
-        body = render_field_kwargs(kwargs)
+        body = render_field_kwargs(kwargs, enum_names, model_name)
 
     if body:
         return f"{pad}{name} = {field_class}({body})"
@@ -116,11 +166,48 @@ def render_str_method(template: str | None, indent: int = 4) -> str:
     )
 
 
+def _render_meta_value(k: str, v: Any, inner: str) -> str:
+    """Render a single Meta option value."""
+    if k in ("indexes", "constraints"):
+        return ""  # handled separately below
+    if isinstance(v, str):
+        return f'{inner}{k} = "{v}"'
+    if isinstance(v, bool):
+        return f"{inner}{k} = {v}"
+    if isinstance(v, int):
+        return f"{inner}{k} = {v}"
+    if v is None:
+        return f"{inner}{k} = None"
+    if isinstance(v, list) and all(isinstance(item, str) for item in v):
+        items = ", ".join(json.dumps(item) for item in v)
+        return f"{inner}{k} = [{items}]"
+    return f"{inner}{k} = {v!r}"
+
+
+def _render_index(idx: dict[str, Any], inner: str) -> str:
+    """Render a ``models.Index(...)`` declaration."""
+    fields = idx.get("fields", [])
+    fields_str = ", ".join(repr(f) for f in fields)
+    name = idx.get("name")
+    if name:
+        return f"{inner}models.Index(fields=[{fields_str}], name={name!r}),"
+    return f"{inner}models.Index(fields=[{fields_str}]),"
+
+
+def _render_constraint(con: dict[str, Any], inner: str) -> str:
+    """Render a ``models.UniqueConstraint(...)`` declaration."""
+    fields = con.get("fields", [])
+    fields_str = ", ".join(repr(f) for f in fields)
+    name = con.get("name", "")
+    return f"{inner}models.UniqueConstraint(fields=[{fields_str}], name={name!r}),"
+
+
 def render_meta(model_meta: dict[str, Any], indent: int = 4) -> str:
     """Render ``class Meta`` block.
 
     Args:
         model_meta: Options dict (``verbose_name``, ``ordering``, etc.).
+            Supports ``indexes`` and ``constraints`` keys with lists of dicts.
         indent: Spaces of indentation (default 4).
 
     Returns:
@@ -132,16 +219,21 @@ def render_meta(model_meta: dict[str, Any], indent: int = 4) -> str:
     inner = " " * (indent * 2)
     lines = [f"{pad}class Meta:"]
     for k, v in model_meta.items():
-        if isinstance(v, str):
-            lines.append(f'{inner}{k} = "{v}"')
-        elif isinstance(v, list):
-            items = ", ".join(json.dumps(item) for item in v)
-            lines.append(f"{inner}{k} = [{items}]")
-        elif isinstance(v, bool):
-            lines.append(f"{inner}{k} = {v}")
-        elif v is None:
-            lines.append(f"{inner}{k} = None")
+        if k == "indexes" and isinstance(v, list):
+            if v:
+                lines.append(f"{inner}indexes = [")
+                for idx in v:
+                    lines.append(_render_index(idx, inner + "    "))
+                lines.append(f"{inner}]")
+        elif k == "constraints" and isinstance(v, list):
+            if v:
+                lines.append(f"{inner}constraints = [")
+                for con in v:
+                    lines.append(_render_constraint(con, inner + "    "))
+                lines.append(f"{inner}]")
         else:
-            lines.append(f"{inner}{k} = {v!r}")
+            line = _render_meta_value(k, v, inner)
+            if line:
+                lines.append(line)
     lines.append("")
     return "\n".join(lines)

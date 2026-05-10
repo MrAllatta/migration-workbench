@@ -166,7 +166,8 @@ def test_render_has_imports():
 
 def test_render_has_command_class():
     source = render_import_py(_contract_with_imports(), app_label="core")
-    assert "class Command(BaseImportCommand):" in source
+    assert "class GeneratedImportCore(BaseImportCommand):" in source
+    assert "class Command(GeneratedImportCore):" in source
 
 
 def test_render_has_run_import_pipeline():
@@ -281,7 +282,8 @@ def test_update_or_create_with_unique():
 def test_no_import_config_still_renders():
     """A contract with no import_config blocks still produces a valid command."""
     source = render_import_py(_contract_no_imports(), app_label="core")
-    assert "class Command(BaseImportCommand):" in source
+    assert "class GeneratedImportCore(BaseImportCommand):" in source
+    assert "class Command(GeneratedImportCore):" in source
     _check_compiles(source)
 
 
@@ -327,7 +329,8 @@ def test_command_output(tmp_path):
 
     assert out_path.exists()
     source = out_path.read_text(encoding="utf-8")
-    assert "class Command(BaseImportCommand):" in source
+    assert "class GeneratedImportCore(BaseImportCommand):" in source
+    assert "class Command(GeneratedImportCore):" in source
     assert "_import_crop" in source
     assert "_import_planting" in source
     _check_compiles(source)

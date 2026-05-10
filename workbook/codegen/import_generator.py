@@ -236,24 +236,25 @@ def _render_defaults_dict(
 
         if parser == "parse_date":
             raw_statements.append(f'{inner}raw_{fname} = row.get({fname!r}, "")')
+            val = f"self._parse_date(raw_{fname}) if raw_{fname}.strip() else None"
             dict_entries.append(
-                f"{inner}{fname!r}: "
-                f"self._parse_date(raw_{fname}) if raw_{fname}.strip() else None,"
+                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
             )
         elif parser in ("dec", "int"):
             default = _default_value(parser)
+            val = f'{_parser_method(parser)}(row.get({fname!r}, ""), {default})'
             dict_entries.append(
-                f"{inner}{fname!r}: "
-                f'{_parser_method(parser)}(row.get({fname!r}, ""), {default}),'
+                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
             )
         elif parser == "bool":
+            val = f'{_parser_method(parser)}(row.get({fname!r}, ""))'
             dict_entries.append(
-                f"{inner}{fname!r}: "
-                f'{_parser_method(parser)}(row.get({fname!r}, "")),'
+                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
             )
         else:
+            val = f'row.get({fname!r}, "").strip()'
             dict_entries.append(
-                f'{inner}{fname!r}: row.get({fname!r}, "").strip(),'
+                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
             )
 
     parts: list[str] = []
@@ -421,18 +422,23 @@ def _render_import_method(
     )
     lines.append("            continue")
 
+    # Override hook: _prepare_row.
+    lines.append("        data = self._prepare_row(defaults)")
+    lines.append("")
+
     # update_or_create call.
     unique_kwargs = ", ".join(
         f"{f}={f}" for f in unique_on
     )
     lines.append(
         f"        obj, created = {model_name}.objects.update_or_create("
-        f"{unique_kwargs}, defaults=defaults)"
+        f"{unique_kwargs}, defaults=data)"
     )
     lines.append(
         f'        self.stats[{model_name!r}]['
         f'"created" if created else "updated"] += 1'
     )
+    lines.append("        self._before_save(obj, data)")
 
     result = "\n".join(lines)
     if indent:
@@ -472,6 +478,8 @@ def render_import_py(
 
     candidates.sort(key=lambda x: (x[0], x[1]))
 
+    base_class_name = f"GeneratedImport{app_label.capitalize()}"
+
     if not candidates:
         # Render a valid (empty) command stub with no import methods.
         return (
@@ -479,14 +487,19 @@ def render_import_py(
             f"# App label: {app_label}\n"
             "# Last generated: see git history\n"
             "\n"
-            "from importer.base import BaseImportCommand\n"
+            "from typing import Any\n"
+        "from importer.base import BaseImportCommand\n"
             "\n"
             "\n"
-            "class Command(BaseImportCommand):\n"
+            f"class {base_class_name}(BaseImportCommand):\n"
             f'    help = "Import {app_label} data from normalized bundles."\n'
             "\n"
             "    def _run_import_pipeline(self):\n"
             "        pass\n"
+            "\n"
+            "\n"
+            f"class Command({base_class_name}):\n"
+            "    pass\n"
         )
 
     model_names = sorted({name for _, name, _ in candidates})
@@ -497,14 +510,41 @@ def render_import_py(
         f"# App label: {app_label}",
         "# Last generated: see git history",
         "",
+        "from typing import Any",
         "from importer.base import BaseImportCommand",
         f"from {app_label}.models import {', '.join(model_names)}",
         "",
         "",
-        "class Command(BaseImportCommand):",
+        f"class {base_class_name}(BaseImportCommand):",
         f'    help = "Import {app_label} data from normalized bundles."',
         "",
+        "    # -- Override hooks ---------------------------------------------------",
+        "",
+        "    def _prepare_row(self, data: dict) -> dict:",
+        '        """Hook: transform the defaults dict before update_or_create."""',
+        "        return data",
+        "",
+        "    def _before_save(self, obj, data: dict) -> None:",
+        '        """Hook: called after each update_or_create."""',
+        "        pass",
+        "",
     ]
+
+    # Add _prepare_<field> stubs for each model.
+    seen_prepare_stubs: set[str] = set()
+    for _, name, table in candidates:
+        for f in get_fields(table):
+            fname = f["name"]
+            if fname not in seen_prepare_stubs:
+                parts.append(
+                    f"    def _prepare_{fname}(self, raw_value, row) -> Any:"
+                )
+                parts.append(
+                    f'        """Hook: transform a single raw value before assignment."""'
+                )
+                parts.append("        return raw_value")
+                parts.append("")
+                seen_prepare_stubs.add(fname)
 
     # _run_import_pipeline with tier calls.
     parts.append("    def _run_import_pipeline(self):")
@@ -522,5 +562,10 @@ def render_import_py(
         cfg = get_import_config(table)
         parts.append(_render_import_method(name, fields, cfg))
 
+    parts.append("")
+    parts.append("")
+    parts.append(f"class Command({base_class_name}):")
+    parts.append(f'    """Concrete import command for {app_label}.  Hand-editable."""')
+    parts.append("    pass")
     parts.append("")
     return "\n".join(parts)

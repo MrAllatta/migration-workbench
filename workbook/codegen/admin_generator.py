@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from workbook.codegen.contract import (
+    get_admin_config,
     get_fields,
     get_model_meta,
     get_model_name,
@@ -81,17 +82,23 @@ def _build_fk_index(
 def _pick_display_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
+    admin_cfg: dict[str, Any] | None = None,
     max_count: int = 5,
 ) -> list[str]:
     """Pick ``list_display`` field names for a model.
 
     Preference order:
-    1. ``editable_fields`` from the view manifest (up to *max_count*).
-    2. First non-id field from the contract if no view match.
+    1. ``admin.list_display`` from the contract.
+    2. ``editable_fields`` from the view manifest (up to *max_count*).
+    3. First non-id field from the contract if no match.
     """
+    if admin_cfg:
+        raw = admin_cfg.get("list_display")
+        if raw and isinstance(raw, list):
+            valid = {f["name"] for f in contract_fields}
+            return [f for f in raw if f in valid][:max_count]
     if view:
         editable = view.get("editable_fields") or []
-        # Keep only fields that actually exist in the model.
         valid = {f["name"] for f in contract_fields}
         return [f for f in editable if f in valid][:max_count]
     if contract_fields:
@@ -102,8 +109,20 @@ def _pick_display_fields(
 def _pick_filter_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
+    admin_cfg: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Pick ``list_filter`` fields from ``filterable_by`` or date fields."""
+    """Pick ``list_filter`` fields.
+
+    Preference order:
+    1. ``admin.list_filter`` from the contract.
+    2. ``filterable_by`` from the view manifest.
+    3. Date fields from the contract.
+    """
+    if admin_cfg:
+        raw = admin_cfg.get("list_filter")
+        if raw and isinstance(raw, list):
+            valid = {f["name"] for f in contract_fields}
+            return [f for f in raw if f in valid]
     if view:
         fb = view.get("filterable_by") or []
         valid = {f["name"] for f in contract_fields}
@@ -114,8 +133,19 @@ def _pick_filter_fields(
 def _pick_search_fields(
     contract_fields: list[dict[str, Any]],
     fk_index_entry: list[dict[str, Any]] | None = None,
+    admin_cfg: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Pick ``search_fields`` from text-type fields and FK names."""
+    """Pick ``search_fields``.
+
+    Preference order:
+    1. ``admin.search_fields`` from the contract.
+    2. Text-type fields and FK names.
+    """
+    if admin_cfg:
+        raw = admin_cfg.get("search_fields")
+        if raw and isinstance(raw, list):
+            valid = {f["name"] for f in contract_fields}
+            return [f for f in raw if f in valid]
     fields: list[str] = []
     for f in contract_fields:
         if _is_text_field(f):
@@ -128,8 +158,19 @@ def _pick_search_fields(
 def _pick_readonly_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
+    admin_cfg: dict[str, Any] | None = None,
 ) -> list[str]:
-    """Pick ``readonly_fields`` from ``computed_fields`` (formula columns)."""
+    """Pick ``readonly_fields``.
+
+    Preference order:
+    1. ``admin.readonly_fields`` from the contract.
+    2. ``computed_fields`` from the view manifest.
+    """
+    if admin_cfg:
+        raw = admin_cfg.get("readonly_fields")
+        if raw and isinstance(raw, list):
+            valid = {f["name"] for f in contract_fields}
+            return [f for f in raw if f in valid]
     if not view:
         return []
     computed = view.get("computed_fields") or []
@@ -285,10 +326,11 @@ def render_admin_py(
             inline_names.append(f"{ref['source_name']}Inline")
 
         # Admin class for this model.
-        display = _pick_display_fields(view, contract_fields)
-        filters = _pick_filter_fields(view, contract_fields)
-        search = _pick_search_fields(contract_fields, rev_fks)
-        readonly = _pick_readonly_fields(view, contract_fields)
+        admin_cfg = get_admin_config(table)
+        display = _pick_display_fields(view, contract_fields, admin_cfg)
+        filters = _pick_filter_fields(view, contract_fields, admin_cfg)
+        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg)
+        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg)
 
         admin_class_parts.append(
             _render_admin_class(
