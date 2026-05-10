@@ -19,6 +19,7 @@ from typing import Any
 from workbook.codegen.contract import (
     get_admin_config,
     get_fields,
+    get_model_base,
     get_model_meta,
     get_model_name,
 )
@@ -57,6 +58,12 @@ def _is_date_field(field: dict[str, Any]) -> bool:
     return _field_class_short(field["class"]) in ("DateField", "DateTimeField")
 
 
+def _is_abstract_user_model(table: dict[str, Any]) -> bool:
+    """Return ``True`` if *table* extends ``AbstractUser``."""
+    base = str(get_model_base(table))
+    return base == "AbstractUser" or base.endswith(".AbstractUser")
+
+
 def _build_fk_index(
     tables: list[dict[str, Any]],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -84,6 +91,8 @@ def _pick_display_fields(
     contract_fields: list[dict[str, Any]],
     admin_cfg: dict[str, Any] | None = None,
     max_count: int = 5,
+    *,
+    authoritative: bool = False,
 ) -> list[str]:
     """Pick ``list_display`` field names for a model.
 
@@ -92,14 +101,15 @@ def _pick_display_fields(
     2. ``editable_fields`` from the view manifest (up to *max_count*).
     3. First non-id field from the contract if no match.
     """
+    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
         raw = admin_cfg.get("list_display")
         if raw and isinstance(raw, list):
-            valid = {f["name"] for f in contract_fields}
-            return [f for f in raw if f in valid][:max_count]
+            return raw[:max_count] if authoritative else [f for f in raw if f in valid][:max_count]
     if view:
         editable = view.get("editable_fields") or []
-        valid = {f["name"] for f in contract_fields}
+        if authoritative:
+            return editable[:max_count]
         return [f for f in editable if f in valid][:max_count]
     if contract_fields:
         return [contract_fields[0]["name"]]
@@ -110,6 +120,8 @@ def _pick_filter_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
     admin_cfg: dict[str, Any] | None = None,
+    *,
+    authoritative: bool = False,
 ) -> list[str]:
     """Pick ``list_filter`` fields.
 
@@ -118,14 +130,15 @@ def _pick_filter_fields(
     2. ``filterable_by`` from the view manifest.
     3. Date fields from the contract.
     """
+    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
         raw = admin_cfg.get("list_filter")
         if raw and isinstance(raw, list):
-            valid = {f["name"] for f in contract_fields}
-            return [f for f in raw if f in valid]
+            return raw if authoritative else [f for f in raw if f in valid]
     if view:
         fb = view.get("filterable_by") or []
-        valid = {f["name"] for f in contract_fields}
+        if authoritative:
+            return fb
         return [f for f in fb if f in valid]
     return [f["name"] for f in contract_fields if _is_date_field(f)]
 
@@ -134,6 +147,8 @@ def _pick_search_fields(
     contract_fields: list[dict[str, Any]],
     fk_index_entry: list[dict[str, Any]] | None = None,
     admin_cfg: dict[str, Any] | None = None,
+    *,
+    authoritative: bool = False,
 ) -> list[str]:
     """Pick ``search_fields``.
 
@@ -141,11 +156,11 @@ def _pick_search_fields(
     1. ``admin.search_fields`` from the contract.
     2. Text-type fields and FK names.
     """
+    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
         raw = admin_cfg.get("search_fields")
         if raw and isinstance(raw, list):
-            valid = {f["name"] for f in contract_fields}
-            return [f for f in raw if f in valid]
+            return raw if authoritative else [f for f in raw if f in valid]
     fields: list[str] = []
     for f in contract_fields:
         if _is_text_field(f):
@@ -159,6 +174,8 @@ def _pick_readonly_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
     admin_cfg: dict[str, Any] | None = None,
+    *,
+    authoritative: bool = False,
 ) -> list[str]:
     """Pick ``readonly_fields``.
 
@@ -166,15 +183,16 @@ def _pick_readonly_fields(
     1. ``admin.readonly_fields`` from the contract.
     2. ``computed_fields`` from the view manifest.
     """
+    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
         raw = admin_cfg.get("readonly_fields")
         if raw and isinstance(raw, list):
-            valid = {f["name"] for f in contract_fields}
-            return [f for f in raw if f in valid]
+            return raw if authoritative else [f for f in raw if f in valid]
     if not view:
         return []
     computed = view.get("computed_fields") or []
-    valid = {f["name"] for f in contract_fields}
+    if authoritative:
+        return computed
     return [f for f in computed if f in valid]
 
 
@@ -217,12 +235,13 @@ def _render_admin_class(
     readonly_fields: list[str],
     inline_classes: list[str],
     verbose_name: str | None,
+    admin_base_class: str = "admin.ModelAdmin",
 ) -> str:
     """Render a ``ModelAdmin`` class with ``@admin.register``."""
     lines = [
         "",
         f"@admin.register({model_name})",
-        f"class {model_name}Admin(admin.ModelAdmin):",
+        f"class {model_name}Admin({admin_base_class}):",
     ]
 
     if display_fields:
@@ -245,6 +264,12 @@ def _render_admin_class(
         items = ", ".join(inline_classes)
         lines.append(f"    inlines = [{items}]")
 
+    if all(
+        not x
+        for x in [display_fields, filter_fields, search_fields, readonly_fields, inline_classes]
+    ):
+        lines.append("    pass")
+
     lines.append("")
     return "\n".join(lines)
 
@@ -258,14 +283,15 @@ def _render_header(app_label: str) -> str:
     )
 
 
-def _render_imports(tables: list[dict[str, Any]]) -> str:
+def _render_imports(tables: list[dict[str, Any]], *, needs_user_admin: bool) -> str:
     """Render the ``import`` block."""
     model_names = sorted({get_model_name(t) for t in tables})
     imports = ", ".join(model_names)
-    return (
-        "from django.contrib import admin\n"
-        f"from .models import {imports}\n"
-    )
+    lines = ["from django.contrib import admin"]
+    if needs_user_admin:
+        lines.append("from django.contrib.auth.admin import UserAdmin as BaseUserAdmin")
+    lines.append(f"from .models import {imports}")
+    return "\n".join(lines) + "\n"
 
 
 def render_admin_py(
@@ -294,9 +320,11 @@ def render_admin_py(
     if not tables:
         return _render_header(app_label) + "from django.contrib import admin\n" + "\n"
 
+    needs_user_admin = any(_is_abstract_user_model(t) for t in tables)
+
     parts: list[str] = [
         _render_header(app_label),
-        _render_imports(tables),
+        _render_imports(tables, needs_user_admin=needs_user_admin),
     ]
 
     # Collect all inline classes (must be defined before admin classes).
@@ -326,11 +354,12 @@ def render_admin_py(
             inline_names.append(f"{ref['source_name']}Inline")
 
         # Admin class for this model.
+        is_user = _is_abstract_user_model(table)
         admin_cfg = get_admin_config(table)
-        display = _pick_display_fields(view, contract_fields, admin_cfg)
-        filters = _pick_filter_fields(view, contract_fields, admin_cfg)
-        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg)
-        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg)
+        display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_user)
+        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user)
+        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_user)
+        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_user)
 
         admin_class_parts.append(
             _render_admin_class(
@@ -341,6 +370,7 @@ def render_admin_py(
                 readonly_fields=readonly,
                 inline_classes=inline_names,
                 verbose_name=verbose_name,
+                admin_base_class="BaseUserAdmin" if is_user else "admin.ModelAdmin",
             )
         )
 

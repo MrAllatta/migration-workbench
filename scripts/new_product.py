@@ -377,7 +377,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell chassis-gate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus
+.PHONY: venv install install-dev-workbench migrate check shell chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus
 
 venv:
 	python3 -m venv $(VENV)
@@ -402,6 +402,20 @@ check:
 
 shell:
 	$(MANAGE) shell
+
+CONTRACT = config/contract.yaml
+CORE = backend/apps/core
+
+generate-models:
+	$(MANAGE) generate_models "$(CONTRACT)" --out "$(CORE)/models.py" --force
+
+generate-admin:
+	$(MANAGE) generate_admin "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force
+
+generate-import:
+	$(MANAGE) generate_import "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
+
+generate: generate-models generate-admin generate-import
 
 chassis-gate:
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)

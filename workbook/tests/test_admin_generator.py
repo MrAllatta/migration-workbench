@@ -381,3 +381,40 @@ def test_command_warns_on_existing_output(tmp_path):
             out=str(out_path),
             app_label="core",
         )
+
+
+# ---------------------------------------------------------------------------
+# AbstractUser / BaseUserAdmin support
+# ---------------------------------------------------------------------------
+
+
+def _contract_abstract_user_admin() -> dict:
+    """Return a contract with an AbstractUser model and an ``admin:`` block."""
+    return {
+        "version": "1.2",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "farm_user",
+                "model_base": "django.contrib.auth.models.AbstractUser",
+                "model_meta": {"verbose_name": "Farm User"},
+                "admin": {
+                    "list_display": ["username", "email", "is_active"],
+                    "list_filter": ["is_active"],
+                    "search_fields": ["username", "email"],
+                    "readonly_fields": ["date_joined"],
+                },
+            }
+        ],
+    }
+
+
+def test_user_model_admin_uses_useradmin_and_is_authoritative():
+    source = render_admin_py(_contract_abstract_user_admin(), manifest=None, app_label="core")
+    assert "from django.contrib.auth.admin import UserAdmin as BaseUserAdmin" in source
+    assert "class FarmUserAdmin(BaseUserAdmin):" in source
+    assert "list_display = ['username', 'email', 'is_active']" in source
+    assert "list_filter = ['is_active']" in source
+    assert "search_fields = ['username', 'email']" in source
+    assert "readonly_fields = ['date_joined']" in source
+    _check_compiles(source)
