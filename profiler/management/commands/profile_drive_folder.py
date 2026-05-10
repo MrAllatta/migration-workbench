@@ -136,27 +136,39 @@ def walk_folder(
     }
 
 
-def render_tree(node: dict, *, name: str, prefix: str = "") -> list[str]:
-    lines: list[str] = [f"{prefix}[folder] {name}"]
-    child_prefix = prefix + "  "
+def render_tree(node: dict, *, name: str, heading_level: int = 1) -> list[str]:
+    safe_heading_level = max(1, min(heading_level, 6))
+    heading_prefix = "#" * safe_heading_level
+    lines: list[str] = [f"{heading_prefix} Folder: {name}"]
+
     for sub in node.get("folders", []):
         if sub.get("truncated"):
-            lines.append(f"{child_prefix}[folder] {sub.get('name')}  (truncated, id={sub.get('id')})")
+            lines.append(f"- Folder: {sub.get('name')} (truncated, id={sub.get('id')})")
             continue
-        lines.extend(render_tree(sub, name=sub.get("name") or sub.get("id"), prefix=child_prefix))
+        lines.extend(
+            render_tree(
+                sub,
+                name=sub.get("name") or sub.get("id"),
+                heading_level=safe_heading_level + 1,
+            )
+        )
+
     for sheet in node.get("spreadsheets", []):
-        header = f"{child_prefix}[sheet]  {sheet.get('name')}  (id={sheet['id']})"
-        lines.append(header)
+        sheet_heading_prefix = "#" * min(safe_heading_level + 1, 6)
+        sheet_name = sheet.get("name") or sheet.get("id")
+        lines.append(f"{sheet_heading_prefix} Sheet: {sheet_name} (id={sheet['id']})")
         tabs = sheet.get("tabs")
         if sheet.get("error"):
-            lines.append(f"{child_prefix}  !! tabs unavailable: {sheet['error']}")
+            lines.append(f"- Tabs unavailable: {sheet['error']}")
         elif tabs is not None:
             for tab in tabs:
                 lines.append(
-                    f"{child_prefix}  - tab[{tab['index']:>2}] {tab['title']!r}  rows={tab['rows']}  cols={tab['cols']}"
+                    f"- tab[{tab['index']:>2}] {tab['title']!r} rows={tab['rows']} cols={tab['cols']}"
                 )
+
     for other in node.get("other_files", []):
-        lines.append(f"{child_prefix}[other]  {other.get('name')}  ({other.get('mimeType')})")
+        lines.append(f"- Other file: {other.get('name')} ({other.get('mimeType')})")
+
     return lines
 
 

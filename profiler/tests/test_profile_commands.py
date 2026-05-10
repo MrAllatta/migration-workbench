@@ -185,11 +185,26 @@ def test_profile_drive_folder_reads_folder_id_from_config(tmp_path):
         ),
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder",
-            return_value={"folders": [], "spreadsheets": [], "other_files": []},
+            return_value={
+                "folders": [{"id": "child-folder-1", "name": "Nested Folder", "truncated": True}],
+                "spreadsheets": [
+                    {
+                        "id": "sheet-123",
+                        "name": "Workbook A",
+                        "tabs": [{"index": 0, "title": "Tab A", "rows": 10, "cols": 5}],
+                        "error": None,
+                    }
+                ],
+                "other_files": [{"name": "Notes.txt", "mimeType": "text/plain"}],
+            },
         ),
     ):
         stdout_buffer = StringIO()
         call_command("profile_drive_folder", config=str(config_path), no_tabs=True, stdout=stdout_buffer)
 
     rendered = stdout_buffer.getvalue()
-    assert "[folder] Corpus Root" in rendered
+    assert "# Folder: Corpus Root" in rendered
+    assert "## Sheet: Workbook A (id=sheet-123)" in rendered
+    assert "- tab[ 0] 'Tab A' rows=10 cols=5" in rendered
+    assert "- Folder: Nested Folder (truncated, id=child-folder-1)" in rendered
+    assert "- Other file: Notes.txt (text/plain)" in rendered
