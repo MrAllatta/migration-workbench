@@ -86,6 +86,65 @@ Outputs:
 
 The same path may be used for `--manifest` and `--out` to overwrite in place; the manifest is fully read into memory before any write.
 
+## Codegen: generate_models
+
+``generate_models`` reads a **hardened** schema-contract YAML (v1.0 or v1.1) and
+writes a complete Django ``models.py`` with resolved foreign keys, ``class Meta``,
+``__str__`` methods, and optional hand-authored extra fields.
+
+```bash
+python manage.py generate_models \
+  --contract build/schema-contract.yaml \
+  --out backend/apps/core/models.py \
+  --app-label core
+```
+
+### Contract version 1.1 (hardened)
+
+A v1.1 contract extends the auto-generated v1.0 format with hand-edited blocks.
+Start from a v1.0 file produced by ``scaffold_workbook_schema``, then add:
+
+```yaml
+tables:
+  - suggested_model_name: crop
+    # --- v1.1 additions below ---
+    model_meta:
+      verbose_name: "Crop"
+      verbose_name_plural: "Crops"
+      ordering: ["name"]
+    str_template: "{self.name}"
+    # Resolve FK targets that were TODO_TargetModel
+    fk_resolutions:
+      crop: "Crop"
+    # Override auto-inferred field types / kwargs
+    field_overrides:
+      crop_type:
+        class: "CharField"
+        kwargs:
+          max_length: 100
+          blank: true
+          default: ""
+    # Hand-authored fields not from any source column
+    extra_fields:
+      slug:
+        class: "SlugField"
+        kwargs:
+          max_length: 200
+          unique: true
+          blank: true
+```
+
+The generator works with both v1.0 (auto-inferred only) and v1.1 (hardened)
+contracts. v1.0 output is equivalent to the old ``--models-stub-out`` flag —
+useful as a starting point but missing FK resolution and rich Meta.
+
+### File safety
+
+- Use ``--force`` to overwrite without prompting.
+- The output file is **hand-editable** after generation; the header comment
+  marks it as codegen-originated.  Re-running without ``--force`` on an
+  existing file exits with a warning to prevent accidental overwrites.
+
 ## Pointers
 
 - [README](../README.md)
