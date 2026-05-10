@@ -1,0 +1,308 @@
+"""Render Django ``admin.py`` source from a schema contract + view manifest.
+
+Usage::
+
+    from workbook.codegen.contract import load_contract
+    from workbook.codegen.manifest import load_manifest
+    from workbook.codegen.admin_generator import render_admin_py
+
+    contract = load_contract("build/schema-contract.yaml")
+    manifest = load_manifest("build/view-manifest.yaml")
+    source = render_admin_py(contract, manifest, app_label="core")
+    Path("backend/apps/core/admin.py").write_text(source)
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from workbook.codegen.contract import (
+    get_fields,
+    get_model_meta,
+    get_model_name,
+)
+from workbook.codegen.manifest import find_view_for_entity
+
+
+# -- helpers ----------------------------------------------------------------
+
+_MODEL_CLASSES_WITH_SEARCH = {
+    "CharField",
+    "TextField",
+    "SlugField",
+    "URLField",
+    "EmailField",
+}
+
+
+def _field_class_short(raw: str) -> str:
+    """Strip the ``models.`` prefix from a field class string."""
+    return raw.removeprefix("models.")
+
+
+def _is_text_field(field: dict[str, Any]) -> bool:
+    """Return ``True`` if *field* is a text-like searchable type."""
+    short = _field_class_short(field["class"])
+    return short in _MODEL_CLASSES_WITH_SEARCH
+
+
+def _is_fk_field(field: dict[str, Any]) -> bool:
+    """Return ``True`` if *field* is a ``ForeignKey``."""
+    return field["class"] == "models.ForeignKey"
+
+
+def _is_date_field(field: dict[str, Any]) -> bool:
+    """Return ``True`` if *field* is a date/time type."""
+    return _field_class_short(field["class"]) in ("DateField", "DateTimeField")
+
+
+def _build_fk_index(
+    tables: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Build ``{target_model_name: [{source_table, fk_field_name}, ...]}``.
+
+    Crawls all tables in the contract and indexes every ForeignKey field
+    by its target model, so the admin generator can emit ``TabularInline``
+    classes for reverse FK relationships.
+    """
+    index: dict[str, list[dict[str, Any]]] = {}
+    for table in tables:
+        source_name = get_model_name(table)
+        for field in get_fields(table):
+            if _is_fk_field(field):
+                target = field["kwargs"].get("to", "")
+                if target and isinstance(target, str) and target != "self":
+                    index.setdefault(target, []).append(
+                        {"source_name": source_name, "field_name": field["name"]}
+                    )
+    return index
+
+
+def _pick_display_fields(
+    view: dict[str, Any] | None,
+    contract_fields: list[dict[str, Any]],
+    max_count: int = 5,
+) -> list[str]:
+    """Pick ``list_display`` field names for a model.
+
+    Preference order:
+    1. ``editable_fields`` from the view manifest (up to *max_count*).
+    2. First non-id field from the contract if no view match.
+    """
+    if view:
+        editable = view.get("editable_fields") or []
+        # Keep only fields that actually exist in the model.
+        valid = {f["name"] for f in contract_fields}
+        return [f for f in editable if f in valid][:max_count]
+    if contract_fields:
+        return [contract_fields[0]["name"]]
+    return []
+
+
+def _pick_filter_fields(
+    view: dict[str, Any] | None,
+    contract_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Pick ``list_filter`` fields from ``filterable_by`` or date fields."""
+    if view:
+        fb = view.get("filterable_by") or []
+        valid = {f["name"] for f in contract_fields}
+        return [f for f in fb if f in valid]
+    return [f["name"] for f in contract_fields if _is_date_field(f)]
+
+
+def _pick_search_fields(
+    contract_fields: list[dict[str, Any]],
+    fk_index_entry: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    """Pick ``search_fields`` from text-type fields and FK names."""
+    fields: list[str] = []
+    for f in contract_fields:
+        if _is_text_field(f):
+            fields.append(f["name"])
+        elif _is_fk_field(f):
+            fields.append(f"{f['name']}__name")
+    return fields
+
+
+def _pick_readonly_fields(
+    view: dict[str, Any] | None,
+    contract_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Pick ``readonly_fields`` from ``computed_fields`` (formula columns)."""
+    if not view:
+        return []
+    computed = view.get("computed_fields") or []
+    valid = {f["name"] for f in contract_fields}
+    return [f for f in computed if f in valid]
+
+
+def _inline_field_names(
+    source_fields: list[dict[str, Any]],
+    fk_field_name: str,
+) -> list[str]:
+    """Return field names for an inline, excluding the FK itself."""
+    return [f["name"] for f in source_fields if f["name"] != fk_field_name]
+
+
+# -- rendering --------------------------------------------------------------
+
+
+def _render_inline_class(
+    source_name: str, source_fields: list[dict[str, Any]], fk_field_name: str
+) -> str:
+    """Render a ``TabularInline`` class for a reverse FK relationship."""
+    inline_name = f"{source_name}Inline"
+    display = _inline_field_names(source_fields, fk_field_name)
+    field_list = ", ".join(repr(f) for f in display[:6])
+
+    lines = [
+        "",
+        f"class {inline_name}(admin.TabularInline):",
+        f"    model = {source_name}",
+        "    extra = 0",
+    ]
+    if display:
+        lines.append(f"    fields = [{field_list}]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_admin_class(
+    model_name: str,
+    display_fields: list[str],
+    filter_fields: list[str],
+    search_fields: list[str],
+    readonly_fields: list[str],
+    inline_classes: list[str],
+    verbose_name: str | None,
+) -> str:
+    """Render a ``ModelAdmin`` class with ``@admin.register``."""
+    lines = [
+        "",
+        f"@admin.register({model_name})",
+        f"class {model_name}Admin(admin.ModelAdmin):",
+    ]
+
+    if display_fields:
+        items = ", ".join(repr(f) for f in display_fields)
+        lines.append(f"    list_display = [{items}]")
+
+    if filter_fields:
+        items = ", ".join(repr(f) for f in filter_fields)
+        lines.append(f"    list_filter = [{items}]")
+
+    if search_fields:
+        items = ", ".join(repr(f) for f in search_fields)
+        lines.append(f"    search_fields = [{items}]")
+
+    if readonly_fields:
+        items = ", ".join(repr(f) for f in readonly_fields)
+        lines.append(f"    readonly_fields = [{items}]")
+
+    if inline_classes:
+        items = ", ".join(inline_classes)
+        lines.append(f"    inlines = [{items}]")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _render_header(app_label: str) -> str:
+    """Render the file-level header comment."""
+    return (
+        "# Generated by migration-workbench codegen \u2014 hand-editable\n"
+        f"# App label: {app_label}\n"
+        "# Last generated: see git history\n"
+    )
+
+
+def _render_imports(tables: list[dict[str, Any]]) -> str:
+    """Render the ``import`` block."""
+    model_names = sorted({get_model_name(t) for t in tables})
+    imports = ", ".join(model_names)
+    return (
+        "from django.contrib import admin\n"
+        f"from .models import {imports}\n"
+    )
+
+
+def render_admin_py(
+    contract: dict[str, Any],
+    manifest: dict[str, Any] | None,
+    app_label: str = "core",
+) -> str:
+    """Render a complete ``admin.py`` file from a contract and optional manifest.
+
+    Args:
+        contract: Normalised schema-contract dict (v1.0 or v1.1).
+        manifest: Optional normalised view-manifest dict.  When ``None``,
+            admin classes are generated from contract data alone (no
+            ``list_display``, ``list_filter``, etc. inference from the
+            manifest).
+        app_label: Django app label for header comments.
+
+    Returns:
+        Complete ``admin.py`` source text.
+    """
+    tables = list(contract.get("tables") or [])
+
+    # Pass 1: build FK reverse index for inline detection.
+    fk_index = _build_fk_index(tables)
+
+    if not tables:
+        return _render_header(app_label) + "from django.contrib import admin\n" + "\n"
+
+    parts: list[str] = [
+        _render_header(app_label),
+        _render_imports(tables),
+    ]
+
+    # Collect all inline classes (must be defined before admin classes).
+    inline_class_defs: list[str] = []
+    admin_class_parts: list[str] = []
+
+    for table in tables:
+        model_name = get_model_name(table)
+        contract_fields = get_fields(table)
+        # View manifest entities are stored as suggested_model_name (lowercase).
+        raw_entity = str(table.get("suggested_model_name") or "").lower()
+        view = find_view_for_entity(manifest, raw_entity) if manifest else None
+        meta = get_model_meta(table)
+        verbose_name = meta.get("verbose_name")
+
+        # Inline classes for *this* model's reverse FK relationships.
+        rev_fks = fk_index.get(model_name) or []
+        inline_names: list[str] = []
+        for ref in rev_fks:
+            ref_table = next(
+                t for t in tables if get_model_name(t) == ref["source_name"]
+            )
+            source_fields = get_fields(ref_table)
+            inline_class_defs.append(
+                _render_inline_class(ref["source_name"], source_fields, ref["field_name"])
+            )
+            inline_names.append(f"{ref['source_name']}Inline")
+
+        # Admin class for this model.
+        display = _pick_display_fields(view, contract_fields)
+        filters = _pick_filter_fields(view, contract_fields)
+        search = _pick_search_fields(contract_fields, rev_fks)
+        readonly = _pick_readonly_fields(view, contract_fields)
+
+        admin_class_parts.append(
+            _render_admin_class(
+                model_name=model_name,
+                display_fields=display,
+                filter_fields=filters,
+                search_fields=search,
+                readonly_fields=readonly,
+                inline_classes=inline_names,
+                verbose_name=verbose_name,
+            )
+        )
+
+    parts.extend(inline_class_defs)
+    parts.extend(admin_class_parts)
+    parts.append("")
+    return "\n".join(parts)

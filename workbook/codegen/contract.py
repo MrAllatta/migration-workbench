@@ -127,6 +127,32 @@ def _normalise_field_class(raw: str) -> str:
     return f"models.{s}"
 
 
+def get_import_config(table: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the ``import_config`` block for *table*, or ``None``.
+
+    The import config is a v1.1 extension that tells the import generator
+    how to turn bundle CSV rows into model instances.  Expected keys::
+
+        tier               int   — import ordering (lower = first)
+        bundle_path        str   — CSV path relative to bundle root
+        required_headers   list  — column headers the CSV must contain
+        aliases            dict  — canonical → [alias, …] (optional)
+        column_map         dict  — field_name → source_header (optional)
+        default_values     dict  — field_name → fallback (optional)
+        unique_on          list  — field names for update_or_create
+        required_source_columns  list — must be non-empty (optional)
+        fk_lookup          dict  — field → {model, on} (optional)
+        field_parsers      dict  — field → parser_name (optional)
+
+    Returns ``None`` when the block is absent so generators can skip
+    models that are not importable from bundles.
+    """
+    cfg = table.get("import_config")
+    if cfg and isinstance(cfg, dict):
+        return cfg
+    return None
+
+
 def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
     """Return the resolved, overridden field list for *table*.
 

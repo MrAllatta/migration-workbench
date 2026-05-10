@@ -145,6 +145,141 @@ useful as a starting point but missing FK resolution and rich Meta.
   marks it as codegen-originated.  Re-running without ``--force`` on an
   existing file exits with a warning to prevent accidental overwrites.
 
+## Codegen: generate_admin
+
+``generate_admin`` reads a schema-contract YAML and an optional annotated
+view-manifest YAML, then writes a complete Django ``admin.py`` with
+``ModelAdmin`` registrations and ``TabularInline`` classes for reverse FK
+relationships.
+
+```bash
+python manage.py generate_admin \
+  --contract build/schema-contract.yaml \
+  --manifest build/view-manifest.yaml \
+  --out backend/apps/core/admin.py \
+  --app-label core
+```
+
+### What it produces
+
+- ``@admin.register`` for every model in the contract.
+- ``list_display`` from the manifest's ``editable_fields`` (up to 5).
+- ``list_filter`` from the manifest's ``filterable_by`` (dropdown-validated
+  columns).
+- ``search_fields`` from text-type fields (CharField, TextField, etc.) and
+  FK name fields.
+- ``readonly_fields`` from the manifest's ``computed_fields`` (formula
+  columns).
+- ``TabularInline`` classes for every reverse FK relationship discovered
+  in the contract.
+- Minimal ``ModelAdmin`` for every model even without a manifest — you
+  get a registered admin shell to fill in.
+
+### Discovery annotation
+
+Run the discovery interview workflow first to annotate the view manifest
+with operator context (role hints, status semantics, access notes).  The
+admin generator reads the **annotated** manifest, so those answers can
+inform the generated admin (e.g. which fields are editable in forms).
+
+---
+
+## Codegen: generate_import
+
+``generate_import`` reads a v1.1 schema-contract with ``import_config``
+blocks and writes a ``BaseImportCommand`` subclass that imports data from
+normalized bundle CSVs.
+
+```bash
+python manage.py generate_import \
+  --contract build/schema-contract.yaml \
+  --out backend/apps/core/management/commands/import_core_data.py \
+  --app-label core
+```
+
+### Contract extension: ``import_config``
+
+Add an ``import_config`` block to each table in your v1.1 contract that
+should be importable from a bundle CSV:
+
+```yaml
+tables:
+  - suggested_model_name: crop
+    columns: [ ... ]
+    import_config:
+      tier: 1                              # import order (lower = first)
+      bundle_path: "reference/crop_info.csv"
+      required_headers: [Crop, Type]
+      aliases:                              # optional
+        Type: [Crop Type, Variety]
+      column_map:                           # optional; field → source header
+        name: Crop
+        crop_type: Type
+      default_values:                       # optional
+        crop_type: ""
+      unique_on: [name]                     # fields for update_or_create
+      required_source_columns: [name]       # must be non-empty
+      fk_lookup:                            # FK resolution strategy
+        crop:
+          model: Crop                       # target model class
+          on: name                          # field on target to match
+      field_parsers:                        # optional override per field
+        plant_date: parse_date
+
+  - suggested_model_name: planting
+    columns: [ ... ]
+    import_config:
+      tier: 2
+      bundle_path: "year_2025/crop_planner.csv"
+      required_headers: [Crop, Plant Date, Beds Used]
+      column_map:
+        crop: Crop
+        plant_date: Plant Date
+        beds_used: Beds Used
+      unique_on: [crop, plant_date]
+      required_source_columns: [crop]
+      fk_lookup:
+        crop:
+          model: Crop
+          on: name
+```
+
+### What it produces
+
+A ``BaseImportCommand`` subclass with:
+
+- ``_run_import_pipeline`` calling ``self.tier()`` for each tier group.
+- One ``_import_<model>()`` method per table with ``import_config``.
+- ``read_bundle_tab`` calls with alias-aware header detection and column
+  mapping.
+- Required-source-column guards (``record_missing_required``).
+- FK resolution via ``_resolve_fk_by_text`` (``record_stale_fk`` on miss).
+- Type-coerced field assignments (dates via ``_parse_date``, decimals via
+  ``_dec``, ints via ``_int``, strings via ``.strip()``).
+- ``write_disabled`` guard for dry-run mode.
+- ``update_or_create`` with the configured ``unique_on`` fields.
+- Per-model stats tracking (``self.stats["Model"]["created"/"updated"]``).
+
+### Field parser inference
+
+If no explicit ``field_parsers`` override is given, the generator infers
+the parser from the Django field class in the contract:
+
+| Contract field class | Generated parser |
+|---|---|
+| ``DateField`` / ``DateTimeField`` | ``self._parse_date()`` |
+| ``DecimalField`` / ``FloatField`` | ``self._dec()`` |
+| ``IntegerField`` / ``SmallIntegerField`` etc. | ``self._int()`` |
+| ``BooleanField`` | ``row.get(...).lower() in ("yes", "true", "1")`` |
+| ``CharField`` / ``TextField`` / others | ``row.get(...).strip()`` |
+
+### File safety
+
+All three ``generate_*`` commands share the same safety protocol: output
+file exists and ``--force`` is not set → exit with a warning.  Generated
+files are marked with a header comment indicating they came from the
+codegen pipeline.
+
 ## Pointers
 
 - [README](../README.md)
