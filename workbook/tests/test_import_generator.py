@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from io import StringIO
 from pathlib import Path
 
 import yaml
 
+from importer.base import BaseImportCommand
 from workbook.codegen.contract import get_import_config, load_contract
 from workbook.codegen.import_generator import render_import_py
 
@@ -361,3 +365,272 @@ def test_command_warns_on_existing_output(tmp_path):
             app_label="core",
             force=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# Execution tests  (dynamically import and run the generated Command)
+# ---------------------------------------------------------------------------
+
+
+def _contract_examplecrop() -> dict:
+    """Contract matching the real ``ExampleCrop`` model from the examples app."""
+    return {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "example_crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
+                    {
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100},
+                    },
+                ],
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "crop_info.csv",
+                    "column_map": {"name": "Crop", "crop_type": "Type"},
+                    "unique_on": ["name"],
+                },
+            },
+        ],
+    }
+
+
+def _contract_exampleblock_with_fk() -> dict:
+    """Contract for ExampleBlock with FK lookup to ExampleCrop."""
+    return {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "example_crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
+                    {
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100},
+                    },
+                ],
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "crop_info.csv",
+                    "column_map": {"name": "Crop", "crop_type": "Type"},
+                    "unique_on": ["name"],
+                },
+            },
+            {
+                "suggested_model_name": "example_block",
+                "columns": [
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "ExampleCrop",
+                            "on_delete": "models.PROTECT",
+                        },
+                    },
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
+                    {
+                        "suggested_field_name": "block_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                ],
+                "import_config": {
+                    "tier": 2,
+                    "bundle_path": "blocks.csv",
+                    "column_map": {
+                        "crop": "Crop",
+                        "name": "Block",
+                        "block_type": "Block Type",
+                    },
+                    "unique_on": ["name"],
+                    "fk_lookup": {
+                        "crop": {"model": "ExampleCrop", "on": "name"},
+                    },
+                },
+            },
+        ],
+    }
+
+
+def _contract_examplecrop_required() -> dict:
+    """Contract for ExampleCrop with a required column check."""
+    return {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "example_crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
+                    {
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100},
+                    },
+                ],
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "crop_info.csv",
+                    "column_map": {"name": "Crop", "crop_type": "Type"},
+                    "unique_on": ["name"],
+                    "required_source_columns": ["name"],
+                },
+            },
+        ],
+    }
+
+
+def _generate_and_import_command(
+    contract: dict,
+    csv_files: dict[str, str],
+    tmp_path: Path,
+    app_label: str = "examples",
+) -> tuple[type[BaseImportCommand], str]:
+    """Write contract + CSVs, generate import, dynamically import Command class.
+
+    Returns:
+        ``(Command_class, data_dir_string)``.
+    """
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(yaml.dump(contract), encoding="utf-8")
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    for rel_path, content in csv_files.items():
+        path = data_dir / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    out_path = tmp_path / "import_data.py"
+    from django.core.management import call_command
+
+    call_command(
+        "generate_import",
+        contract=str(contract_path),
+        out=str(out_path),
+        app_label=app_label,
+        force=True,
+    )
+
+    assert out_path.exists()
+    source = out_path.read_text(encoding="utf-8")
+
+    # Check source compiles
+    _check_compiles(source)
+
+    # Dynamic import
+    mod_name = f"_test_import_{tmp_path.name}"
+    spec = importlib.util.spec_from_file_location(mod_name, str(out_path))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+
+    assert hasattr(mod, "Command")
+    assert issubclass(mod.Command, BaseImportCommand)
+
+    return mod.Command, str(data_dir)
+
+
+def test_generated_import_executes_validate_only(tmp_path, db):
+    """Generated command runs with --validate-only and reports processed counts."""
+    csv_files = {
+        "crop_info.csv": "Crop,Type\nKale,Greens\nTomato,Fruit\nCarrot,Root\n",
+    }
+    CommandCls, data_dir = _generate_and_import_command(
+        _contract_examplecrop(), csv_files, tmp_path
+    )
+
+    cmd = CommandCls()
+    cmd.stdout = StringIO()
+    cmd.stderr = StringIO()
+    cmd.handle(
+        data_dir=data_dir,
+        dry_run=False,
+        validate_only=True,
+        preflight=False,
+        non_atomic_apply=False,
+        summary_json=None,
+        verbose=False,
+    )
+
+    # validate-only: write_disabled=False, rows are actually created then rolled back.
+    # The stats track "created" (not "processed") in this mode.
+    assert cmd.stats["ExampleCrop"]["created"] > 0
+
+
+def test_generated_import_handles_fk_resolution(tmp_path, db):
+    """Generated command with FK resolution runs without error in dry-run mode."""
+    csv_files = {
+        "crop_info.csv": "Crop,Type\nKale,Greens\nTomato,Fruit\n",
+        "blocks.csv": "Block,Block Type,Crop\nField A,field,Kale\nField B,field,Tomato\n",
+    }
+    CommandCls, data_dir = _generate_and_import_command(
+        _contract_exampleblock_with_fk(), csv_files, tmp_path
+    )
+
+    cmd = CommandCls()
+    cmd.stdout = StringIO()
+    cmd.stderr = StringIO()
+    cmd.handle(
+        data_dir=data_dir,
+        dry_run=True,
+        validate_only=False,
+        preflight=False,
+        non_atomic_apply=False,
+        summary_json=None,
+        verbose=False,
+    )
+
+    # dry-run: write_disabled=True, rows are parsed but not written.
+    # The stats track "processed" in this mode.
+    assert cmd.stats["ExampleCrop"]["processed"] > 0
+    assert cmd.stats["ExampleBlock"]["processed"] > 0
+
+
+def test_generated_import_reports_missing_required(tmp_path, db):
+    """Generated command records errors when required columns are blank."""
+    csv_files = {
+        "crop_info.csv": "Crop,Type\nKale,Greens\n,Tomato\nCarrot,Root\n",
+    }
+    CommandCls, data_dir = _generate_and_import_command(
+        _contract_examplecrop_required(), csv_files, tmp_path
+    )
+
+    cmd = CommandCls()
+    cmd.stdout = StringIO()
+    cmd.stderr = StringIO()
+    cmd.handle(
+        data_dir=data_dir,
+        dry_run=True,
+        validate_only=False,
+        preflight=False,
+        non_atomic_apply=False,
+        summary_json=None,
+        verbose=False,
+    )
+
+    errors = [e for e in cmd.row_errors if e["code"] == "missing_required"]
+    assert len(errors) == 1
+    assert errors[0]["model"] == "ExampleCrop"
