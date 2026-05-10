@@ -33,7 +33,7 @@ See [docs/coda.md](../docs/coda.md).
 
 ## Artifacts
 
-Typically under `build/` (this repo) or product-owned `data/profile_snapshots/`. Coda corpus tooling lives in `profiler/tools/coda_corpus.py`; Sheets cohort tooling in `profiler/tools/cohort_corpus.py`. Shared Coda helpers: [`connectors/coda_source.py`](../connectors/coda_source.py).
+Typically under product-owned `data/profile_snapshots/` (including the default `make profile-cohort-corpus` path). Coda corpus tooling lives in `profiler/tools/coda_corpus.py`; Sheets cohort tooling in `profiler/tools/cohort_corpus.py`. Shared Coda helpers: [`connectors/coda_source.py`](../connectors/coda_source.py).
 
 ## Configuration / env
 

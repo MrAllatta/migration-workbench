@@ -23,7 +23,7 @@ make new-product PRODUCT=my-product   # writes ../my-product; git init + initial
 make new-product PRODUCT=my-product PROVIDER=--coda
 ```
 
-Then `cd ../my-product && make install && make migrate && make check`. Local **`make install`** matches the **Dockerfile**: the product package is editable (`pip install -e .`) and **`migration-workbench` comes from PyPI** via `pyproject.toml`. The scaffold also includes `backend/`, `Makefile`, `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), starter docs, and provider-specific config skeletons under `config/` (Google Sheets by default; use `PROVIDER=--coda` for Coda). Initial commit uses a local author identity when none is configured; `git` must be on `PATH`. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
+Then `cd ../my-product && make install && make migrate && make check`. Local **`make install`** matches the **Dockerfile**: the product package is editable (`pip install -e .`) and **`migration-workbench` comes from PyPI** via `pyproject.toml`. The scaffold also includes `backend/`, `Makefile`, `scripts/entrypoint_product.sh`, SQLite/Fly-aligned settings (`SQLITE_PATH`, `/healthz`, WAL pragmas), starter docs, and provider-specific config skeletons under `config/` (Google Sheets by default; use `PROVIDER=--coda` for Coda). If `git` is on `PATH`, the scaffold initializes a repo and writes one initial commit using a scaffold-local author identity. Use `--output-dir` / `--force` on `scripts/new_product.py` for non-default paths.
 
 **3. Develop the chassis (this repo)**  
 Clone, editable install, run the full gate:
@@ -88,7 +88,7 @@ More detail: [docs/architecture.md](docs/architecture.md).
 ## The pipeline
 
 1. **Intake** — Source config (Drive folder, sheet IDs, Coda doc URLs).
-2. **Profile** — Profiler commands emit JSON/Markdown under `build/` or product-owned `data/profile_snapshots/`.
+2. **Profile** — Profiler commands emit JSON/Markdown under product-owned `data/profile_snapshots/` by default.
 3. **Model** — `scaffold_workbook_schema` produces schema-contract YAML for review.
 4. **Harden** — Importer tiers validate then apply; summary artifacts record outcomes.
 5. **Deploy** — `wb manifest lint` validates [deploy/spaces.yml](deploy/spaces.yml); `wb deploy <space> --env <preview|production> --dry-run` plans releases (provider mutation deferred — see [docs/deployment.md](docs/deployment.md)).
@@ -107,7 +107,7 @@ Fly.io + SQLite on a persistent volume + Litestream replication to **Tigris or a
 | Publish PyPI | [.github/workflows/publish-pypi.yml](.github/workflows/publish-pypi.yml) | tag `v*`                             | Trusted Publishing to PyPI                                                                      |
 
 
-GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product repos inherit CI patterns via `make new-product` scaffolding.
+GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product repos can copy these CI patterns, but workflow files are maintained per repository.
 
 ## Status and roadmap
 

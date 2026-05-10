@@ -368,6 +368,9 @@ def render_makefile() -> str:
 # to replace the PyPI package with an editable install from your checkout (same venv as this project).
 # WORKBENCH is also required for `chassis-gate` (runs the workbench repo gate in that checkout).
 export WORKBENCH
+# Export profile config values loaded from `.env` so recipe shell checks can read them.
+export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT
+export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python
@@ -414,7 +417,7 @@ profile-coda-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
 
 profile-cohort-corpus:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-build/cohort_corpus}"
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"
 """
 
 
@@ -486,7 +489,7 @@ Then run:
 make profile-coda-corpus
 ```
 
-`CODA_CORPUS_CONFIG` is the required corpus config consumed by this target.
+`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` from `.env`.
 """
     return """## Discovery profiling from `.env`
 
@@ -504,7 +507,7 @@ make profile-preflight
 make profile-drive-folder
 ```
 
-`COHORT_CORPUS_CONFIG` is the required folder-id discovery config consumed by both targets.
+`make profile-preflight` and `make profile-drive-folder` read `COHORT_CORPUS_CONFIG` from `.env`.
 """
 
 
@@ -560,9 +563,9 @@ make check
 
 Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Drive / Sheets with ADC (see migration-workbench **`docs/google-auth.md`**). Store artifacts under **`data/profile_snapshots/`** (gitignore large outputs if needed).
 
-**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). In `.env`, set required `COHORT_CORPUS_CONFIG` for `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus`; optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
+**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Set `COHORT_CORPUS_CONFIG` in `.env`; `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus` read it from the environment exported by the generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
 
-**Coda:** migration-workbench **`docs/coda.md`**; multi-doc: `make profile-coda-corpus` with `CODA_CORPUS_CONFIG`.
+**Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` in `.env`, then run `make profile-coda-corpus`.
 
 ## Imports
 

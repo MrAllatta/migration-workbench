@@ -45,10 +45,18 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
    python manage.py profile_cohort_corpus --config path/to/cohort_corpus.json --out-dir data/profile_snapshots/cohort_run
   ```
    Or from the workbench repo root:
-5. **Tab selection loop** — Review `tab_selection_<date>.json`. Hand-edit `**approved_tabs`** as needed, then re-run:
+5. **Tab selection loop** — Review `tab_selection_<date>.json`. Hand-edit `**approved_tabs**` as needed, then re-run with the **same** `--out-dir` and `--date-stamp` as the full corpus run (`in_scope_workbook_index_<date>.json` must still sit beside tab selection):
+
   ```bash
-   python manage.py profile_cohort_corpus --config … --out-dir … --resume-from-tab-selection
+   python manage.py profile_cohort_corpus \
+     --config … \
+     --out-dir … \
+     --date-stamp 2026-05-07 \
+     --resume-from-tab-selection
   ```
+
+   Resume skips Drive discovery through tab shortlisting (no broad `list_tabs` sweep before deep profiling). After HTTP 429 throttling, add optional JSON keys **`deep_read_delay_seconds`** (float: sleep before each non-cached `fetch_tab_grid`) and **`deep_skip_existing`**, or pass CLI **`--skip-existing-deep`**, to reuse matching `deep/*.json` payloads instead of refetching.
+
 6. **Deeper tooling** — For single spreadsheets or formula surveys, see [profiler/README.md](../profiler/README.md) (`profile_tab`, `scan_formula_patterns`). Align outputs with the [schema design loop](schema-design-loop.md).
 
 ## Naming contract
@@ -67,7 +75,7 @@ The Drive walker treats `**application/vnd.google-apps.spreadsheet`** as spreads
 | Variable                | Required | Default               |
 | ----------------------- | -------- | --------------------- |
 | `COHORT_CORPUS_CONFIG`  | Yes      | —                     |
-| `COHORT_CORPUS_OUT_DIR` | No       | `build/cohort_corpus` |
+| `COHORT_CORPUS_OUT_DIR` | No       | `data/profile_snapshots/cohort_corpus` |
 
 
 ```bash

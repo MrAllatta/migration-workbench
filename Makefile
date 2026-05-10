@@ -70,7 +70,7 @@ profile-coda-corpus:
 profile-cohort-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus \
 		--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" \
-		--out-dir "$${COHORT_CORPUS_OUT_DIR:-build/cohort_corpus}"
+		--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"
 
 profile-coda-canvas:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke
