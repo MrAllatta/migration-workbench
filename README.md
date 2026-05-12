@@ -134,6 +134,15 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 - Provider interface extraction after a second space is stable on Fly.
 - Postgres mode where concurrent writes demand it.
 
+### v1.0 criteria
+
+The pipeline is exercised toward v1.0 via a **product test repo** (farm). v1.0 is reached when:
+
+1. **End-to-end pipeline** — All five stages (Connectors → Profiler → Importer → Workbook → Deployment) exercised on a real corpus via the product repo.
+2. **Schema design loop completed** — At least one source corpus has gone through Profile → Observe → Draft → Decide → Author config → Author importer → Gate → Drift check.
+3. **Production deployment live** — A scaffolded product is deployed to Fly.io with real imported data, health-check passing.
+4. **PyPI release cut** — All gaps identified during the test run are patched upstream, and a new PyPI release is published.
+
 Semantic versioning applies; `**0.x`** may ship breaking changes — pin ranges in product repos.
 
 ## Releases
@@ -158,6 +167,42 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 | [docs/coda.md](docs/coda.md)                                                                      | Coda profiling                                                |
 | Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
 
+
+## Changelog
+
+### 0.1.3 (unreleased)
+
+- Backport AbstractUser admin scaffold support from codegen pipeline.
+- Extend contract schema to v1.2: enums, admin config, `model_base`, richer `Meta`.
+- Initial codegen pipeline: `generate_models`, `generate_admin`, `generate_import` commands producing production Django files from hardened schema-contract YAML.
+- Import generator base class with override hooks.
+- `inject_project_local_config.sh` helper for per-checkout config injection.
+
+### 0.1.2
+
+- Default profile output directory: `data/profile_snapshots/`.
+- Drive folder tree rendered as Markdown artifact.
+- Cohort corpus resume support with workbook index and HTTP 429 retry.
+- Skeleton config files and raw_notes bucket included in `new-product` scaffold.
+- New product scaffold emits fixed Makefile referencing editable workbench path.
+- Bundle reader integration with YAML config files.
+
+### 0.1.1
+
+- View manifest draft YAML artifact from profiler structural pass.
+- `structure.json` artifact from `pull_bundle` command — tab- and column-level metadata.
+- New product scaffold defaults to PyPI `migration-workbench`.
+- `read_bundle_tab` wrapper for normalizing rows from bundle tab CSV.
+- Git init and initial commit after `new-product`.
+- Consolidated docs folder with cross-cutting operator notes.
+- Per-app READMEs at `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/`.
+
+### 0.1.0
+
+- Initial scaffold: profile, import, bundle commands.
+- Project bootstrap scripting (`new-product`).
+- Google Sheets / Drive and Coda adapters.
+- Deployment documentation for Fly.io + Litestream.
 
 ## Database modes
 
