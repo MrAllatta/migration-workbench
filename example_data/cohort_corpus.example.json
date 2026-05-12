@@ -1,5 +1,4 @@
 {
-  "folder_id": "REPLACE_ME",
   "folder_name": "Corpus Root Folder",
   "workbook_id_regex": "\\b(\\d{3})\\b",
   "year_regex": "\\b(20\\d{2})\\b",

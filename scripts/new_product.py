@@ -369,8 +369,8 @@ def render_makefile() -> str:
 # WORKBENCH is also required for `chassis-gate` (runs the workbench repo gate in that checkout).
 export WORKBENCH
 # Export profile config values loaded from `.env` so recipe shell checks can read them.
-export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT
-export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR
+export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID
+export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS
 export VIEW_MANIFEST
 
 VENV = .venv
@@ -442,16 +442,16 @@ chassis-gate:
 	$(MAKE) -C "$(WORKBENCH)" chassis-gate
 
 profile-preflight:
-	DB_ENGINE=sqlite $(MANAGE) profile_preflight --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}"
+	DB_ENGINE=sqlite $(MANAGE) profile_preflight --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG}"
 
 profile-drive-folder:
-	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"
+	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG}" --out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"
 
 profile-coda-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
 
 profile-cohort-corpus:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"
 """
 
 
@@ -470,7 +470,9 @@ SQLITE_PATH=db.sqlite3
 # Coda profiling (see migration-workbench docs/coda.md).
 # Never commit real tokens.
 # CODA_API_TOKEN=
-CODA_CORPUS_CONFIG=config/coda_corpus.local.json
+CODA_CORPUS_CONFIG=config/coda_corpus.json
+# Comma-separated Coda doc IDs, positional with the docs array in the corpus config.
+CODA_DOC_IDS=replace-me
 # Optional override for make profile-coda-corpus output dir.
 CODA_CORPUS_OUT_DIR=build/coda_corpus
 # Optional pull_bundle config path for Coda-based bundles.
@@ -482,7 +484,9 @@ CODA_LIVE_CONFIG=config/coda_live.local.json
 # Google Drive / Sheets profiling (ADC + SA impersonation — see migration-workbench docs/google-auth.md).
 # GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=mw-profiler@PROJECT.iam.gserviceaccount.com
 # Required for make profile-preflight / make profile-drive-folder.
-COHORT_CORPUS_CONFIG=config/cohort_corpus.local.json
+COHORT_CORPUS_CONFIG=config/cohort_corpus.json
+# Google Drive folder id for the corpus root folder.
+DRIVE_FOLDER_ID=replace-me
 # Optional override for make profile-drive-folder output.
 DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json
 """
@@ -503,8 +507,8 @@ def _render_agents_profile_section(provider: str) -> str:
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
 
-1. **Set `CODA_API_TOKEN`** in `.env` (see migration-workbench `docs/coda.md`).
-2. **Configure** `config/coda_corpus.local.json` with doc IDs and table selectors.
+1. **Set `CODA_API_TOKEN`** and **`CODA_DOC_IDS`** in `.env` (see migration-workbench `docs/coda.md`).
+2. **Configure heuristics** in `config/coda_corpus.json` with table score rules and column selectors.
 3. **Run corpus profile:**
    ```bash
    make profile-coda-corpus
@@ -517,8 +521,8 @@ Run after setting up `.env`. These commands inspect source data and produce arti
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
 
-1. **Set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` (see migration-workbench `docs/google-auth.md`).
-2. **Configure** `config/cohort_corpus.local.json` with Drive folder ID, workbook name patterns, and tab selectors.
+1. **Set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** and **`DRIVE_FOLDER_ID`** in `.env` (see migration-workbench `docs/google-auth.md`).
+2. **Configure heuristics** in `config/cohort_corpus.json` with workbook name patterns, tab score rules, and column selectors.
 3. **Run preflight** (validates config, checks Drive access):
    ```bash
    make profile-preflight
@@ -720,7 +724,7 @@ These are the decisions the agent **must not make autonomously**. When reaching 
 - Copy `.env.example` to `.env` and fill in real values.
 - **Google Sheets auth:** Application Default Credentials (ADC) with service account impersonation (`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`). See workbench `docs/google-auth.md`.
 - **Coda auth:** `CODA_API_TOKEN` in `.env`. See workbench `docs/coda.md`.
-- Profile config JSON files live in `config/` (*.local.json) and are gitignored.
+- Profile heuristic config files (`.json` in `config/`) are tracked. Secrets (`DRIVE_FOLDER_ID`, `CODA_DOC_IDS`) go in `.env`.
 
 ## Naming & style
 
@@ -762,7 +766,8 @@ def render_readme_profile_section(provider: str) -> str:
 Set these in `.env` before Coda corpus profiling:
 
 ```bash
-CODA_CORPUS_CONFIG=config/coda_corpus.local.json
+CODA_CORPUS_CONFIG=config/coda_corpus.json
+CODA_DOC_IDS=replace-with-comma-separated-doc-ids
 CODA_CORPUS_OUT_DIR=build/coda_corpus  # optional (defaults to this path)
 ```
 
@@ -772,14 +777,15 @@ Then run:
 make profile-coda-corpus
 ```
 
-`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` from `.env`.
+`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` from `.env`.
 """
     return """## Discovery profiling from `.env`
 
 Set these in `.env` before Drive folder discovery:
 
 ```bash
-COHORT_CORPUS_CONFIG=config/cohort_corpus.local.json
+COHORT_CORPUS_CONFIG=config/cohort_corpus.json
+DRIVE_FOLDER_ID=replace-with-drive-folder-id
 DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json  # optional (defaults to this path)
 ```
 
@@ -790,7 +796,7 @@ make profile-preflight
 make profile-drive-folder
 ```
 
-`make profile-preflight` and `make profile-drive-folder` read `COHORT_CORPUS_CONFIG` from `.env`.
+`make profile-preflight` and `make profile-drive-folder` read `COHORT_CORPUS_CONFIG` and `DRIVE_FOLDER_ID` from `.env`.
 """
 
 
@@ -846,9 +852,9 @@ make check
 
 Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Drive / Sheets with ADC (see migration-workbench **`docs/google-auth.md`**). Store artifacts under **`data/profile_snapshots/`** (gitignore large outputs if needed).
 
-**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Set `COHORT_CORPUS_CONFIG` in `.env`; `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus` read it from the environment exported by the generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
+**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Set `COHORT_CORPUS_CONFIG` and `DRIVE_FOLDER_ID` in `.env`; `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus` read them from the environment exported by the generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
 
-**Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` in `.env`, then run `make profile-coda-corpus`.
+**Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
 
 ## Imports
 
@@ -907,7 +913,7 @@ __pycache__/
 backend/db.sqlite3
 backend/staticfiles/
 .env
-config/*.json
+config/*.local.json
 data/**
 !data/raw_notes/
 !data/raw_notes/README.md
@@ -998,7 +1004,7 @@ def scaffold_config_templates(
     if provider == PROVIDER_CODA:
         copy_file(
             script_dir.parent / "example_data" / "coda_corpus.example.json",
-            output_dir / "config" / "coda_corpus.local.json",
+            output_dir / "config" / "coda_corpus.json",
             force=force,
         )
         copy_file(
@@ -1010,7 +1016,7 @@ def scaffold_config_templates(
 
     copy_file(
         script_dir.parent / "example_data" / "cohort_corpus.example.json",
-        output_dir / "config" / "cohort_corpus.local.json",
+        output_dir / "config" / "cohort_corpus.json",
         force=force,
     )
 

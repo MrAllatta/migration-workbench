@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,6 +16,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--config", required=True, help="JSON config path for cohort-corpus profiling")
+        parser.add_argument("--folder", help="Drive folder id or URL (default: DRIVE_FOLDER_ID env)")
         parser.add_argument("--out-dir", required=True, help="Output directory for profiling artifacts")
         parser.add_argument("--date-stamp", default=None, help="Optional date stamp override (YYYY-MM-DD)")
         parser.add_argument("--smoke", action="store_true", help="Run without Google API calls")
@@ -43,6 +45,14 @@ class Command(BaseCommand):
             raise CommandError(f"Config not found: {config_path}")
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
+        folder_id = options.get("folder") or os.environ.get("DRIVE_FOLDER_ID")
+        if not folder_id:
+            raise CommandError(
+                "A Drive folder id is required. Pass --folder or set DRIVE_FOLDER_ID in .env"
+            )
+        from connectors.google_sheets import extract_drive_folder_id
+        folder_id = extract_drive_folder_id(folder_id)
+
         out_dir = Path(options["out_dir"]).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         date_stamp = options.get("date_stamp") or datetime.now(UTC).date().isoformat()
@@ -53,6 +63,7 @@ class Command(BaseCommand):
                 "config": str(config_path),
                 "out_dir": str(out_dir),
                 "date_stamp": date_stamp,
+                "folder_id": folder_id,
                 "in_scope_count": len(config.get("in_scope_workbooks") or []),
             }
             out_path = out_dir / f"profile_cohort_corpus_smoke_{date_stamp}.json"
@@ -66,6 +77,7 @@ class Command(BaseCommand):
         outputs = run_cohort_corpus(
             drive_service=drive_service,
             sheets_service=sheets_service,
+            folder_id=folder_id,
             config=config,
             out_dir=out_dir,
             date_stamp=date_stamp,

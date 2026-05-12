@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from django.core.management.base import CommandError
 
 
 def load_folder_id_from_config(config_path_value: str | None) -> str | None:
-    """Return ``folder_id`` from a corpus config path.
+    """Return ``folder_id`` from env or a corpus config path.
+
+    Checks ``DRIVE_FOLDER_ID`` environment variable first, then falls back
+    to reading ``folder_id`` from the JSON config file at
+    *config_path_value*.
 
     Args:
         config_path_value: JSON config path passed via ``--config``.
@@ -18,6 +23,10 @@ def load_folder_id_from_config(config_path_value: str | None) -> str | None:
     Raises:
         CommandError: When the config path is invalid or JSON is malformed.
     """
+    env_value = os.environ.get("DRIVE_FOLDER_ID")
+    if env_value and env_value.strip():
+        return env_value.strip()
+
     if not config_path_value:
         return None
 
@@ -32,7 +41,7 @@ def load_folder_id_from_config(config_path_value: str | None) -> str | None:
 
     folder_id = config_payload.get("folder_id")
     if folder_id is None:
-        raise CommandError(f"Config {config_path} is missing required key 'folder_id'")
+        return None
     if not isinstance(folder_id, str) or not folder_id.strip():
         raise CommandError(f"Config {config_path} has invalid 'folder_id'; expected non-empty string")
 

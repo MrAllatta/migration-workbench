@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -8,6 +9,27 @@ from django.core.management.base import BaseCommand, CommandError
 
 from connectors.coda_source import build_coda_session
 from profiler.tools.coda_corpus import write_json
+
+
+def _merge_coda_doc_ids(config: dict) -> None:
+    """Inject ``doc_id`` into each ``docs`` entry from ``CODA_DOC_IDS`` env.
+
+    The env var is a comma-separated list of doc IDs applied positionally
+    to the ``docs`` array.  Entries that already have ``doc_id`` or
+    ``doc_url`` are left unchanged.
+    """
+    raw = os.environ.get("CODA_DOC_IDS", "")
+    if not raw:
+        return
+    ids = [x.strip() for x in raw.split(",") if x.strip()]
+    if not ids:
+        return
+    docs = config.get("docs") or []
+    for index, entry in enumerate(docs):
+        if index >= len(ids):
+            break
+        if not entry.get("doc_id") and not entry.get("doc_url"):
+            entry["doc_id"] = ids[index]
 
 
 class Command(BaseCommand):
@@ -42,6 +64,8 @@ class Command(BaseCommand):
         if not config_path.exists():
             raise CommandError(f"Config not found: {config_path}")
         config = json.loads(config_path.read_text(encoding="utf-8"))
+
+        _merge_coda_doc_ids(config)
 
         out_dir = Path(options["out_dir"]).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)

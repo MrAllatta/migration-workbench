@@ -540,6 +540,7 @@ def run_cohort_corpus(
     *,
     drive_service,
     sheets_service,
+    folder_id: str,
     config: dict,
     out_dir: Path,
     date_stamp: str,
@@ -563,11 +564,12 @@ def run_cohort_corpus(
     Args:
         drive_service: Authenticated Google Drive API service object.
         sheets_service: Authenticated Google Sheets API service object.
-        config: Parsed corpus config dict.  Required keys: ``folder_id``
-            (Drive folder), ``in_scope_workbooks`` (list of code strings
-            matching capturing group 1 of ``workbook_id_regex``).
-            Optional keys include ``workbook_id_regex``, ``year_regex``,
-            ``heuristics``, ``tab_auto_limit``, ``column_min_score``,
+        folder_id: Google Drive folder id that contains the workbook corpus.
+        config: Parsed corpus config dict.  Required keys:
+            ``in_scope_workbooks`` (list of code strings matching capturing
+            group 1 of ``workbook_id_regex``).  Optional keys include
+            ``workbook_id_regex``, ``year_regex``, ``heuristics``,
+            ``tab_auto_limit``, ``column_min_score``,
             ``tab_selection_overrides``, ``discovery_no_tabs``, ``max_depth``,
             ``deep_read_delay_seconds``, ``deep_skip_existing``.
         out_dir: Directory where all artifact JSON files are written.
@@ -593,9 +595,6 @@ def run_cohort_corpus(
     """
     from profiler.management.commands.profile_drive_folder import walk_folder
 
-    folder_id = config.get("folder_id")
-    if not folder_id:
-        raise CommandError("Config must include 'folder_id'")
     in_scope_codes = set(config.get("in_scope_workbooks") or [])
     if not in_scope_codes:
         raise CommandError("Config must include non-empty 'in_scope_workbooks'")

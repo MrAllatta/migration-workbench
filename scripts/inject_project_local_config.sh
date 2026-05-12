@@ -12,13 +12,13 @@ Usage:
     --google-impersonate-service-account "service-account@project.iam.gserviceaccount.com"
 
 Updates:
-  - config/cohort_corpus.local.json: folder_id, folder_name
-  - .env: WORKBENCH, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
+  - config/cohort_corpus.json: folder_name (non-secret heuristics)
+  - .env: WORKBENCH, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT, DRIVE_FOLDER_ID
 
 Notes:
   - Existing values are replaced in place.
   - If .env does not exist, the script copies .env.example first.
-  - If WORKBENCH or GOOGLE_IMPERSONATE_SERVICE_ACCOUNT are missing in .env, they are appended.
+  - If WORKBENCH, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT, or DRIVE_FOLDER_ID are missing in .env, they are appended.
 EOF
 }
 
@@ -69,7 +69,7 @@ if [[ -z "$project_dir" || -z "$drive_folder_id" || -z "$drive_folder_name" || -
 fi
 
 project_dir="${project_dir%/}"
-config_path="$project_dir/config/cohort_corpus.local.json"
+config_path="$project_dir/config/cohort_corpus.json"
 env_path="$project_dir/.env"
 env_example_path="$project_dir/.env.example"
 
@@ -89,23 +89,21 @@ if [[ ! -f "$env_path" ]]; then
   echo "Created $env_path from $env_example_path"
 fi
 
-python3 - "$config_path" "$drive_folder_id" "$drive_folder_name" <<'PYTHON'
+python3 - "$config_path" "$drive_folder_name" <<'PYTHON'
 import json
 import pathlib
 import sys
 
 config_path = pathlib.Path(sys.argv[1])
-drive_folder_id = sys.argv[2]
-drive_folder_name = sys.argv[3]
+drive_folder_name = sys.argv[2]
 
 config_payload = json.loads(config_path.read_text())
-config_payload["folder_id"] = drive_folder_id
 config_payload["folder_name"] = drive_folder_name
 
 config_path.write_text(json.dumps(config_payload, indent=2) + "\n")
 PYTHON
 
-python3 - "$env_path" "$workbench_path" "$google_impersonate_service_account" <<'PYTHON'
+python3 - "$env_path" "$workbench_path" "$google_impersonate_service_account" "$drive_folder_id" <<'PYTHON'
 import pathlib
 import re
 import sys
@@ -113,6 +111,7 @@ import sys
 env_path = pathlib.Path(sys.argv[1])
 workbench_path = sys.argv[2]
 google_impersonate_service_account = sys.argv[3]
+drive_folder_id = sys.argv[4]
 
 env_text = env_path.read_text()
 final_text = env_text
@@ -135,10 +134,11 @@ final_text = replace_or_append(
     "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT",
     google_impersonate_service_account,
 )
+final_text = replace_or_append(final_text, "DRIVE_FOLDER_ID", drive_folder_id)
 
 env_path.write_text(final_text)
 PYTHON
 
 echo "Updated:"
-echo "  - $config_path (folder_id, folder_name)"
-echo "  - $env_path (WORKBENCH, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT)"
+echo "  - $config_path (folder_name)"
+echo "  - $env_path (WORKBENCH, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT, DRIVE_FOLDER_ID)"

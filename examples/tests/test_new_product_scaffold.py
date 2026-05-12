@@ -27,21 +27,22 @@ def test_new_product_google_scaffold_exports_profile_env_vars(tmp_path):
         encoding="utf-8"
     )
 
-    assert "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT" in generated_makefile
-    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR" in generated_makefile
+    assert "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID" in generated_makefile
+    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS" in generated_makefile
     assert (
         '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"'
         in generated_makefile
     )
     assert (
         "`make profile-preflight` and `make profile-drive-folder` read "
-        "`COHORT_CORPUS_CONFIG` from `.env`."
+        "`COHORT_CORPUS_CONFIG` and `DRIVE_FOLDER_ID` from `.env`."
     ) in generated_readme
     assert (
         "generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and "
         "`COHORT_CORPUS_OUT_DIR`"
     ) in generated_operator_doc
-    assert (output_dir / "config" / "cohort_corpus.local.json").exists()
+    assert (output_dir / "config" / "cohort_corpus.json").exists()
+    assert not (output_dir / "config" / "cohort_corpus.local.json").exists()
 
 
 def test_new_product_coda_scaffold_writes_coda_config_and_docs(tmp_path):
@@ -52,12 +53,13 @@ def test_new_product_coda_scaffold_writes_coda_config_and_docs(tmp_path):
         encoding="utf-8"
     )
 
-    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR" in generated_makefile
+    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS" in generated_makefile
     assert (
-        "`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` from `.env`."
+        "`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` from `.env`."
     ) in generated_readme
     assert (
-        "set `CODA_CORPUS_CONFIG` in `.env`, then run `make profile-coda-corpus`."
+        "set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`."
     ) in generated_operator_doc
-    assert (output_dir / "config" / "coda_corpus.local.json").exists()
+    assert (output_dir / "config" / "coda_corpus.json").exists()
+    assert not (output_dir / "config" / "coda_corpus.local.json").exists()
     assert (output_dir / "config" / "coda_live.local.json").exists()

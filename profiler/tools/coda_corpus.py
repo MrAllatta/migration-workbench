@@ -578,9 +578,11 @@ def run_coda_corpus(
     Args:
         session: Authenticated :class:`requests.Session` for the Coda API.
         config: Parsed corpus config dict.  Required keys: ``docs`` (list of
-            ``{name, doc_url|doc_id}`` entries).  Optional keys include
-            ``heuristics``, ``table_auto_limit``, ``max_rows_deep``,
-            ``column_min_score``, ``table_selection_overrides``, ``canvas``.
+            ``{name}`` entries; doc ids are injected from ``CODA_DOC_IDS`` env
+            or from optional ``doc_id``/``doc_url`` fields on each entry).
+            Optional keys include ``heuristics``, ``table_auto_limit``,
+            ``max_rows_deep``, ``column_min_score``,
+            ``table_selection_overrides``, ``canvas``.
         out_dir: Directory where all artifact JSON files are written.
         date_stamp: Timestamp string appended to artifact filenames (e.g.
             ``"20240501T120000"``).

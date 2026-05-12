@@ -31,7 +31,7 @@ HTTP 429 is retried with backoff in `coda_source.py`. Huge docs: `profile_coda_d
 1. **Inventory** — `profile_coda_doc --doc … --out …` (add `--no-columns` if huge).
 2. **Per table** — `profile_coda_table --doc … --table "Name" --out …` (omit `--table` to list). Prefer base tables for ETL; views are diagnostic.
 3. **Formulas** — column-level `formulaText`; use `scan_coda_formula_columns` with config like `example_data/scan_coda_formula_columns.example.json`.
-4. **Corpus** (multi-doc) — `profile_coda_corpus --config example_data/coda_corpus.example.json --out-dir …`; edit `table_selection_<date>.json`, re-run with `--resume-from-table-selection`. Makefile: `profile-coda-corpus` needs `CODA_CORPUS_CONFIG`.
+4. **Corpus** (multi-doc) — Set `CODA_DOC_IDS` in `.env` (comma-separated doc IDs, positional with the `docs` array). Then `profile_coda_corpus --config config/coda_corpus.json --out-dir …`; edit `table_selection_<date>.json`, re-run with `--resume-from-table-selection`. Makefile: `profile-coda-corpus` needs `CODA_CORPUS_CONFIG`.
 5. **Canvas** — `profile_coda_canvas` (`--use-export` for markdown export). `make profile-coda-canvas` runs `--smoke` only.
 6. **Bundle** — `pull_bundle` with live config; see [`examples/coda-live-config.example.json`](examples/coda-live-config.example.json).
 
@@ -49,7 +49,7 @@ Optional env: **`CODA_DOC_VERSION_LATEST=1`** sends `X-Coda-Doc-Version: latest`
 
 ## Troubleshooting
 
-- **`ValueError: Coda API token required`** — set `CODA_API_TOKEN` or `api_token` in live JSON (prefer env).
+- **`ValueError: Coda API token required`** — set `CODA_API_TOKEN` in `.env`.
 - **Table not found** — names are case-sensitive; list with `profile_coda_table` without `--table`.
 - **Empty grid** — confirm rows exist and the token’s user can see them in the UI.
 

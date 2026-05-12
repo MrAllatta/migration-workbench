@@ -36,10 +36,10 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
   ```
    A `.md` sibling is written next to the JSON for quick review.
 3. **Corpus config** — Copy `[example_data/cohort_corpus.example.json](../example_data/cohort_corpus.example.json)`. Set:
-  - `folder_id` — Drive folder id (or keep id separate from URL in your notes).
   - `workbook_id_regex` — Must include a **capturing group**; group **1** is the workbook id compared to `in_scope_workbooks`.
   - `year_regex` — Optional override; default finds `20xx` years in folder or file names.
   - `in_scope_workbooks` — List of ids exactly as captured by group 1 of `workbook_id_regex`.
+  - Set `DRIVE_FOLDER_ID` in `.env` with the Drive folder id or URL (not in the JSON config).
 4. **Corpus run** — Outputs dated JSON under `--out-dir` (product repos often use `data/profile_snapshots/`):
   ```bash
    python manage.py profile_cohort_corpus --config path/to/cohort_corpus.json --out-dir data/profile_snapshots/cohort_run
@@ -82,7 +82,7 @@ The Drive walker treats `**application/vnd.google-apps.spreadsheet`** as spreads
 COHORT_CORPUS_CONFIG=example_data/cohort_corpus.example.json make profile-cohort-corpus
 ```
 
-(`example_data/cohort_corpus.example.json` uses placeholders — replace `folder_id` and `in_scope_workbooks` before a real run.)
+(`example_data/cohort_corpus.example.json` uses placeholders — replace `in_scope_workbooks` and set `DRIVE_FOLDER_ID` in `.env` before a real run.)
 
 ## Pointers
 

@@ -1,12 +1,10 @@
 {
   "docs": [
     {
-      "name": "Main data",
-      "doc_url": "https://coda.io/d/X_dReplaceMe"
+      "name": "Main data"
     },
     {
-      "name": "Reference",
-      "doc_url": "https://coda.io/d/Y_dReplaceMe"
+      "name": "Reference"
     }
   ],
   "exclude_views": false,
