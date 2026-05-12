@@ -14,17 +14,26 @@ This loop keeps spreadsheet-driven importer work in product-owned configuration 
    For each app area, choose `lift`, `modify`, or `rebuild` using contract evidence.
 5. **Author tab config**  
    Encode import mappings in `bundles/<tier>.yaml` (`required_headers`, `aliases`, `column_map`, `default_values`, `row_transforms`).
-6. **Author importer**  
+6. **Author view manifest**  
+   After pulling a bundle with `--include-structure` (produces `structure.json`),
+   run `scaffold_view_manifest` to generate a view-manifest YAML. This captures
+   UI/workflow metadata: editable vs computed fields, filterable columns, status
+   field inference, and tab sequence.
+7. **Discovery interview** (optional)  
+   Run `generate_discovery_interview` to produce a structured Markdown
+   questionnaire. Have the operator fill in role ownership, status semantics, and
+   weekly actions, then run `merge_discovery_notes` to patch the manifest.
+8. **Author importer**  
    Keep importer commands thin `BaseImportCommand` subclasses that delegate to configured tiers.
-7. **Gate**  
+9. **Gate**  
    Run validate-only before apply; keep chassis and product gates green.
-8. **Drift check**  
+10. **Drift check**  
    Re-profile periodically and diff against checked-in snapshots; treat column/formula changes as explicit contract updates.
 
 ## Are We Patching?
 
 Use this quick diagnostic when deciding where a change belongs.
 
-- Changes in loop steps 4-6 are expected design work.
+- Changes in loop steps 4-8 are expected design work.
 - Changes in `importer/*` command body logic are workbench-level changes and should be rare.
 - If an importer bug fix requires code edits outside bundle config and thin importer subclasses, treat it as a smell and revisit the schema contract/config first.

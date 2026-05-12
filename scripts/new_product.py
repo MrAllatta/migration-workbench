@@ -371,13 +371,14 @@ export WORKBENCH
 # Export profile config values loaded from `.env` so recipe shell checks can read them.
 export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT
 export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR
+export VIEW_MANIFEST
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus
+.PHONY: venv install install-dev-workbench migrate check shell chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
 
 venv:
 	python3 -m venv $(VENV)
@@ -405,17 +406,36 @@ shell:
 
 CONTRACT = config/contract.yaml
 CORE = backend/apps/core
+BUNDLE_OUT = build/bundle
+VIEW_MANIFEST = config/view-manifest.yaml
 
 generate-models:
-	$(MANAGE) generate_models "$(CONTRACT)" --out "$(CORE)/models.py" --force
+	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --force
 
 generate-admin:
-	$(MANAGE) generate_admin "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force
+	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
+	$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force
 
 generate-import:
-	$(MANAGE) generate_import "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
+	$(MANAGE) generate_import --contract "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
 
 generate: generate-models generate-admin generate-import
+
+pull-bundle:
+	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG required}" BUNDLE_OUTPUT_DIR="$(BUNDLE_OUT)" INCLUDE_STRUCTURE=true scripts/run_import.sh pull_bundle
+
+generate-view-manifest:
+	@test -f "$(BUNDLE_OUT)/structure.json" || (echo >&2 "structure.json not found at $(BUNDLE_OUT)/structure.json. Run make pull-bundle first."; exit 1)
+	$(MANAGE) scaffold_view_manifest --structure "$(BUNDLE_OUT)/structure.json" --schema-contract "$(CONTRACT)" --out "$(VIEW_MANIFEST)" --summary-json build/view-manifest-summary.json
+
+generate-discovery-interview:
+	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
+	$(MANAGE) generate_discovery_interview --manifest "$(VIEW_MANIFEST)" --out build/discovery-interview.md
+
+merge-discovery-notes:
+	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
+	@test -f build/discovery-interview.md || (echo >&2 "Discovery interview not found at build/discovery-interview.md. Run make generate-discovery-interview first."; exit 1)
+	$(MANAGE) merge_discovery_notes --manifest "$(VIEW_MANIFEST)" --interview build/discovery-interview.md --out "$(VIEW_MANIFEST)" --summary-out build/discovery-summary.md
 
 chassis-gate:
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
@@ -553,10 +573,10 @@ Migration-workbench separates the work into five stages:
 1. **Connectors** — provider adapters (Google Sheets / Coda) that authenticate and pull row data.
 2. **Profiler** — read-only commands that inspect sources and write structure artifacts.
 3. **Importer** — normalizes source rows into CSV bundles, then runs preflight/apply via `BaseImportCommand` subclasses.
-4. **Workbook** — codegen that transforms profiler output + bundle config into schema contract YAML and generates Django models/admin/import code.
+4. **Workbook** — codegen that transforms profiler output + bundle config into schema contract YAML, generates Django models/admin/import code, and produces a view-manifest from bundle structure metadata that feeds the admin scaffold for richer UI configuration. Optionally, a discovery interview captures role ownership and workflow semantics.
 5. **Deployment** — validates deployment manifests, records releases, deploys to Fly.io.
 
-The governing workflow is the **Schema Design Loop** (see migration-workbench `docs/schema-design-loop.md`): **Profile → Observe → Draft → Decide → Author config → Author importer → Gate → Drift check**.
+The governing workflow is the **Schema Design Loop** (see migration-workbench `docs/schema-design-loop.md`): **Profile → Observe → Draft → Decide → Author config → Author view manifest → Author importer → Gate → Drift check**.
 
 {_render_agents_profile_section(provider)}
 
@@ -595,6 +615,46 @@ make generate          # all three
 make migrate
 make check
 ```
+
+### Generate view manifest
+
+After the contract is hardened and a bundle has been pulled from the source:
+
+```bash
+make pull-bundle           # produces build/bundle/structure.json
+make generate-view-manifest  # config/view-manifest.yaml
+```
+
+The view-manifest YAML captures UI/workflow metadata per source tab:
+`editable_fields` (non-formula columns), `computed_fields` (formula columns),
+`filterable_by` (dropdown-validated columns), and an inferred `status_field`.
+It also records `workflow_hints.tab_sequence` from tab position.
+
+**Review the view manifest** before proceeding — verify entity binding, editable
+vs computed splits, and status field detection. The manifest can be hand-edited.
+
+Regenerate the admin to incorporate manifest hints:
+
+```bash
+make generate-admin   # now produces richer admin.py
+```
+
+### Discovery interview (optional)
+
+To capture role ownership, status semantics, and weekly actions from operators:
+
+```bash
+make generate-discovery-interview   # writes build/discovery-interview.md
+```
+
+Have the operator fill in the Markdown answers, then:
+
+```bash
+make merge-discovery-notes  # patches view-manifest.yaml, writes build/discovery-summary.md
+```
+
+The merged manifest feeds `make generate-admin` for richer admin configuration
+(role-appropriate `list_filter`, per-view notes in `readonly_fields`, etc.).
 
 ## Import pipeline
 
@@ -651,6 +711,8 @@ These are the decisions the agent **must not make autonomously**. When reaching 
 | 12 | UI/Admin | Which fields should appear in `list_display`, `list_filter`, `search_fields`? Which are readonly? Which are editable? |
 | 13 | Status/workflow | If there is a status field, what are the valid states and transitions? |
 | 14 | Deployment | Confirm Fly app name, secrets, and Litestream replica bucket before deploy. |
+| 15 | View manifest | Review entity binding, editable vs computed fields, status field detection, and tab sequence in the generated view manifest. |
+| 16 | Discovery | Review role hints, weekly actions, and per-view notes from the merged discovery interview. |
 
 ## Secrets & environment
 
@@ -685,6 +747,7 @@ Draw identifiers, docstring references, and comments from the project's establis
 | Field/model name suggestions for Django | `schema_contract`, `contract_table`, `suggested_model_name`, `suggested_field_name`, `field_slug` |
 | UI and workflow concerns for admin scaffolding | `view_manifest`, `view_entry`, `workflow_hints` |
 | Generated Django model skeleton | `model_scaffold`, `admin_scaffold` |
+| Discovery interview artefacts | `discovery_interview`, `discovery_summary`, `role_hints`, `weekly_actions`, `view_notes` |
 
 ### Code generation context
 

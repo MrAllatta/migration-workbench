@@ -36,6 +36,7 @@ Key env vars:
   SOURCE_CONFIG=/path/to/config.json  (required for pull_* and snapshot_bundle)
   IMPORT_SUMMARY_JSON=/path.json      (optional)
   IMPORT_COMMAND=import_reference_example (default demo importer command)
+  INCLUDE_STRUCTURE=true              (optional; appends --include-structure to pull_bundle)
 
 Cloud mode env vars:
   PROJECT_ID=<gcp-project-id>         (required in cloud mode)
@@ -85,7 +86,11 @@ run_local() {
                 echo "SOURCE_CONFIG is required for pull_bundle in local mode."
                 exit 1
             fi
-            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}"
+            STRUCT_FLAG=""
+            if [[ "${INCLUDE_STRUCTURE:-}" == "true" ]]; then
+                STRUCT_FLAG="--include-structure"
+            fi
+            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}" ${STRUCT_FLAG}
             ;;
         snapshot_bundle)
             if [[ -z "${SOURCE_CONFIG}" ]]; then
@@ -99,7 +104,11 @@ run_local() {
                 echo "SOURCE_CONFIG is required for pull_preflight in local mode."
                 exit 1
             fi
-            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}"
+            STRUCT_FLAG=""
+            if [[ "${INCLUDE_STRUCTURE:-}" == "true" ]]; then
+                STRUCT_FLAG="--include-structure"
+            fi
+            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}" ${STRUCT_FLAG}
             run_import_command "${BUNDLE_OUTPUT_DIR}" "--validate-only"
             ;;
         pull_apply)
@@ -107,7 +116,11 @@ run_local() {
                 echo "SOURCE_CONFIG is required for pull_apply in local mode."
                 exit 1
             fi
-            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}"
+            STRUCT_FLAG=""
+            if [[ "${INCLUDE_STRUCTURE:-}" == "true" ]]; then
+                STRUCT_FLAG="--include-structure"
+            fi
+            ${MANAGE_PY} pull_bundle --config "${SOURCE_CONFIG}" --output-dir "${BUNDLE_OUTPUT_DIR}" ${STRUCT_FLAG}
             run_import_command "${BUNDLE_OUTPUT_DIR}"
             ;;
         *)
