@@ -104,8 +104,8 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --summary-json build/_out/apply-example.json
 
 new-product:
-	@test -n "$(PRODUCT)" || (echo "Usage: make new-product PRODUCT=name"; exit 1)
-	$(PYTHON) scripts/new_product.py $(PRODUCT) $(PROVIDER)
+	@test -n "$(PRODUCT)" || (echo "Usage: make new-product PRODUCT=name [PROVIDER=coda|google_sheets] [FORCE=1]"; exit 1)
+	$(PYTHON) scripts/new_product.py $(PRODUCT) $(if $(PROVIDER),--$(subst _,-,$(PROVIDER))) $(if $(FORCE),--force)
 
 publish:
 	$(PYTHON) -m build

@@ -477,12 +477,218 @@ DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json
     )
 
 
-def render_agents_md() -> str:
-    return """# Agent notes
+def _render_agents_profile_section(provider: str) -> str:
+    if provider == PROVIDER_CODA:
+        return """### Profiling (read-only discovery)
 
-- **Workbench:** `migration-workbench` is installed from **PyPI** via `make install`. Setting `WORKBENCH` in `.env` does not change that. After `make install`, run `make install-dev-workbench` to replace PyPI with an editable install from that checkout in this project's venv. `WORKBENCH` is also required for `make chassis-gate` (runs the gate in that checkout).
-- **Runtime:** Prefer `make` from this repo root. Commands use **`.venv/bin/python backend/manage.py`** after `make install`.
-- **Secrets:** `.env` is gitignored; never commit tokens or paste them into tracked files.
+Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
+
+1. **Set `CODA_API_TOKEN`** in `.env` (see migration-workbench `docs/coda.md`).
+2. **Configure** `config/coda_corpus.local.json` with doc IDs and table selectors.
+3. **Run corpus profile:**
+   ```bash
+   make profile-coda-corpus
+   ```
+   Reads `CODA_CORPUS_CONFIG` from `.env`; outputs go to `CODA_CORPUS_OUT_DIR` (default: `build/coda_corpus`).
+
+**Review the output** — profiler artifacts (JSON profiles, structure snapshots, formula inventories) land under the output directory. Read them before moving to schema design.
+"""
+    return """### Profiling (read-only discovery)
+
+Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
+
+1. **Set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` (see migration-workbench `docs/google-auth.md`).
+2. **Configure** `config/cohort_corpus.local.json` with Drive folder ID, workbook name patterns, and tab selectors.
+3. **Run preflight** (validates config, checks Drive access):
+   ```bash
+   make profile-preflight
+   ```
+4. **Map the Drive folder** (enumerates workbooks):
+   ```bash
+   make profile-drive-folder
+   ```
+   Output: `DRIVE_FOLDER_OUT` (default: `data/profile_snapshots/drive_tree.json`).
+5. **Run full corpus profile** (extracts column profiles from every in-scope tab):
+   ```bash
+   make profile-cohort-corpus
+   ```
+   Outputs go to `COHORT_CORPUS_OUT_DIR` (default: `data/profile_snapshots/cohort_corpus`).
+
+**Review the output** — profiler artifacts include column types, formula patterns, header snapshots. Read them before moving to schema design.
+"""
+
+
+def render_agents_md(provider: str) -> str:
+    return f"""# Agent notes
+
+## Repo identity
+
+This is a **scaffolded product repository** built on [migration-workbench](https://pypi.org/project/migration-workbench/). It embeds the workbench as a PyPI dependency and provides its own Django project at `backend/` (`config.settings`, `manage.py`, `apps/core/`). The workbench apps (`connectors`, `profiler`, `importer`, `workbook`) are listed in `INSTALLED_APPS`.
+
+Generated code (models, admin, import commands) lives under `backend/apps/core/`. Configuration and schema contracts live in `config/` and `docs/`.
+
+## Setup & dev workflow
+
+```bash
+make install          # creates venv, installs product + migration-workbench from PyPI
+make migrate          # makemigrations + migrate
+make check            # Django system check
+```
+
+To use an editable workbench checkout instead of PyPI (for chassis co-development):
+```bash
+# Set WORKBENCH=/path/to/migration-workbench in .env, then:
+make install-dev-workbench
+```
+
+To run the full workbench CI gate against that checkout:
+```bash
+make chassis-gate
+```
+
+## Pipeline overview
+
+Migration-workbench separates the work into five stages:
+
+1. **Connectors** — provider adapters (Google Sheets / Coda) that authenticate and pull row data.
+2. **Profiler** — read-only commands that inspect sources and write structure artifacts.
+3. **Importer** — normalizes source rows into CSV bundles, then runs preflight/apply via `BaseImportCommand` subclasses.
+4. **Workbook** — codegen that transforms profiler output + bundle config into schema contract YAML and generates Django models/admin/import code.
+5. **Deployment** — validates deployment manifests, records releases, deploys to Fly.io.
+
+The governing workflow is the **Schema Design Loop** (see migration-workbench `docs/schema-design-loop.md`): **Profile → Observe → Draft → Decide → Author config → Author importer → Gate → Drift check**.
+
+{_render_agents_profile_section(provider)}
+
+## Schema design & code generation
+
+After profiling, the schema design loop requires human judgment at several points. The agent's job is to facilitate — never silently decide.
+
+### Draft schema contract
+
+Review profiler output, then build a schema contract YAML (`config/contract.yaml`) that maps source tabs to Django models and columns to fields. The workbench `scaffold_workbook_schema` command can produce a v1.0 draft from profile artifacts.
+
+**Decisions to bring to the human:**
+- Which source tabs become Django models? What names?
+- Which columns become fields? What Django field types?
+- Which columns reference other entities (FK relationships)?
+- Which columns are formula-derived (computed, not stored)?
+
+### Harden the contract
+
+After the human reviews and edits the v1.0 draft, create a v1.1 hardened contract with explicit FK targets, field overrides, and import configuration.
+
+### Generate Django code
+
+Once the contract is hardened:
+
+```bash
+make generate-models   # backend/apps/core/models.py
+make generate-admin    # backend/apps/core/admin.py
+make generate-import   # backend/apps/core/imports.py
+make generate          # all three
+```
+
+**After generation, ask the human to review the output** before migrating.
+
+```bash
+make migrate
+make check
+```
+
+## Import pipeline
+
+### Pull a bundle from source
+```bash
+# Set SOURCE_CONFIG in .env pointing to your provider config, then:
+make pull-bundle
+```
+
+### Validate before applying
+```bash
+make import-preflight   # validate-only mode (transaction rolled back)
+```
+
+### Apply
+```bash
+make import-apply
+```
+
+### Combined pull + import
+```bash
+make pull-preflight   # pull then validate
+make pull-apply       # pull then apply
+```
+
+Always **preflight before apply**. Keep bundle YAML and importer subclasses in this repo; avoid patching workbench internals.
+
+## Deployment
+
+See migration-workbench `docs/deployment.md` for the full runbook. In brief:
+
+- **Docker:** `docker build -t product .` (uses the repo `Dockerfile`)
+- **Fly.io:** Set Fly secrets (`DJANGO_SECRET_KEY`, `CODA_API_TOKEN` or Google SA, etc.), deploy via `flyctl deploy`
+- **Database:** SQLite replicated via Litestream to Tigris object storage
+- **Entrypoint:** `scripts/entrypoint_product.sh` handles migrations + Litestream + Gunicorn
+
+## Human judgment points
+
+These are the decisions the agent **must not make autonomously**. When reaching any of these points, pause and ask the human:
+
+| # | Stage | Decision needed |
+|---|-------|-----------------|
+| 1 | Post-profile | Review profiler output. Which tabs are in scope? Which are ignored? |
+| 2 | Schema draft | What should each Django model be named? (source tab → entity name) |
+| 3 | Schema draft | For each column: is it a stored field, a computed property, or irrelevant? |
+| 4 | Schema draft | What Django field type fits? (CharField vs TextField? IntegerField vs DecimalField? DateField vs DateTimeField?) |
+| 5 | Schema draft | Which columns are FK references to other entities? What is the target model + field? |
+| 6 | Schema draft | Which columns have a fixed set of values (choices)? What are the valid values? |
+| 7 | Schema draft | What should the import key be (natural key for idempotent re-import)? |
+| 8 | Contract hardening | Review the v1.0 draft. Approve, modify, or reject each suggested model and field. |
+| 9 | Post-codegen | Review generated `models.py`, `admin.py`, `imports.py` before committing. |
+| 10 | Pre-import | Confirm import config (default values, alias mappings, row filters, transform rules). |
+| 11 | Post-import | Review summary JSON output. Are row counts and error counts expected? |
+| 12 | UI/Admin | Which fields should appear in `list_display`, `list_filter`, `search_fields`? Which are readonly? Which are editable? |
+| 13 | Status/workflow | If there is a status field, what are the valid states and transitions? |
+| 14 | Deployment | Confirm Fly app name, secrets, and Litestream replica bucket before deploy. |
+
+## Secrets & environment
+
+- **`.env` is gitignored.** Never commit tokens, service account keys, or API keys to tracked files.
+- Copy `.env.example` to `.env` and fill in real values.
+- **Google Sheets auth:** Application Default Credentials (ADC) with service account impersonation (`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`). See workbench `docs/google-auth.md`.
+- **Coda auth:** `CODA_API_TOKEN` in `.env`. See workbench `docs/coda.md`.
+- Profile config JSON files live in `config/` (*.local.json) and are gitignored.
+
+## Naming & style
+
+### Core rule: no throwaway labels
+
+Never use single-letter names, alphabetic slice labels, or abstract positional placeholders in code, comments, or docstrings.
+
+| Banned | Use instead |
+|--------|-------------|
+| `A`, `B`, `C`, `D` (standalone labels) | `source_contract`, `target_manifest`, `bundle_config`, `schema_contract` |
+| `x`, `y`, `n`, `m`, `i` (loop/scratch) | `tab_row`, `column_entry`, `field_name`, `row_index`, `tab_count` |
+| `tmp`, `res`, `val`, `obj` | `parsed_date`, `contract_dict`, `field_slug`, `worksheet_tab` |
+| Type vars `T`, `K`, `V` | `RowT`, `ModelT`, `ConfigT`, `KeyT`, `ValueT` |
+
+### Domain vocabulary
+
+Draw identifiers, docstring references, and comments from the project's established vocabulary:
+
+| Concept | Preferred names |
+|---------|-----------------|
+| Raw worksheet data pulled from a source | `bundle`, `bundle_tab`, `tab_row`, `bundle_config` |
+| Profiler output characterising column types | `profile_doc`, `doc_profile`, `column_profile`, `profiler_output` |
+| Structural map of tabs and columns | `structure`, `structure_artifact`, `tab_entry`, `column_entry` |
+| Field/model name suggestions for Django | `schema_contract`, `contract_table`, `suggested_model_name`, `suggested_field_name`, `field_slug` |
+| UI and workflow concerns for admin scaffolding | `view_manifest`, `view_entry`, `workflow_hints` |
+| Generated Django model skeleton | `model_scaffold`, `admin_scaffold` |
+
+### Code generation context
+
+Most code in this repo is **generated** by workbench commands (`generate_models`, `generate_admin`, `generate_import`). When editing generated code, preserve its structural patterns and only make targeted changes. If a change requires modifying every generated file, revisit the schema contract instead.
 """
 
 
@@ -771,7 +977,7 @@ def scaffold(
         ("pyproject.toml", render_pyproject_toml(product_kebab, py_name)),
         ("Makefile", render_makefile()),
         (".env.example", render_env_example(provider)),
-        ("AGENTS.md", render_agents_md()),
+        ("AGENTS.md", render_agents_md(provider)),
         ("README.md", render_readme_md(product_kebab, provider)),
         ("docs/operator.md", render_operator_md(product_kebab)),
         ("docs/schema-contract.md", render_schema_contract_md(product_kebab)),
