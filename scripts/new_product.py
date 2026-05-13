@@ -363,6 +363,14 @@ DJANGO_SETTINGS_MODULE = "config.settings"
 
 def render_makefile() -> str:
     return r"""-include .env
+# ── Environment variable loading ──────────────────────────────────────────
+# .env is loaded by Make's `-include` above. Vars are available inside recipe
+# shells (after the `export` lines below), NOT in raw `bash`.
+#
+#   Agent:  make check-env → verify required vars are set
+#           make bash      → drop into a shell with .env loaded
+#           grep ^KEY .env → check a value (read-only, safe)
+# ────────────────────────────────────────────────────────────────────────────
 # migration-workbench is installed from PyPI via pyproject.toml when you run `make install`.
 # Setting WORKBENCH in .env does not change that — use `make install-dev-workbench` after `make install`
 # to replace the PyPI package with an editable install from your checkout (same venv as this project).
@@ -378,7 +386,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
+.PHONY: venv install install-dev-workbench migrate check shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
 
 venv:
 	python3 -m venv $(VENV)
@@ -403,6 +411,20 @@ check:
 
 shell:
 	$(MANAGE) shell
+
+bash:
+	@set -a; . ./.env; set +a; exec $$SHELL
+
+check-env:
+	@set -a; . ./.env; set +a; \
+	err=0; \
+	for var in WORKBENCH DRIVE_FOLDER_ID GOOGLE_IMPERSONATE_SERVICE_ACCOUNT; do \
+		if [ -z "$${!var:-}" ]; then \
+			echo >&2 "Missing $$var in .env"; \
+			err=1; \
+		fi; \
+	done; \
+	exit $$err
 
 CONTRACT = config/contract.yaml
 CORE = backend/apps/core
@@ -570,6 +592,23 @@ To run the full workbench CI gate against that checkout:
 make chassis-gate
 ```
 
+## Environment basics
+
+The Makefile loads `.env` via `-include .env` and exports select vars with `export VAR`. This has a practical consequence:
+
+- `make <target>` — vars are available inside recipe shell commands.
+- Raw `bash` — NOT available (.env is not sourced into the shell).
+
+**For the agent:**
+
+| Command | What it does |
+|---------|-------------|
+| `make check-env` | Verify critical `.env` vars are set (exit 1 if missing) |
+| `make bash` | Drop into a bash shell with `.env` loaded |
+| `grep ^KEY .env` | Check a value (read-only, safe) |
+
+Never read or edit `.env` with file/write tools — it is gitignored and may contain secrets.
+
 ## Pipeline overview
 
 Migration-workbench separates the work into five stages:
@@ -701,6 +740,7 @@ These are the decisions the agent **must not make autonomously**. When reaching 
 
 | # | Stage | Decision needed |
 |---|-------|-----------------|
+| 0 | Environment | Verify `.env` is configured. Run `make check-env`. Confirm DRIVE_FOLDER_ID, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT (or CODA_API_TOKEN), and WORKBENCH (if dev mode) are set. |
 | 1 | Post-profile | Review profiler output. Which tabs are in scope? Which are ignored? |
 | 2 | Schema draft | What should each Django model be named? (source tab → entity name) |
 | 3 | Schema draft | For each column: is it a stored field, a computed property, or irrelevant? |
@@ -718,12 +758,10 @@ These are the decisions the agent **must not make autonomously**. When reaching 
 | 15 | View manifest | Review entity binding, editable vs computed fields, status field detection, and tab sequence in the generated view manifest. |
 | 16 | Discovery | Review role hints, weekly actions, and per-view notes from the merged discovery interview. |
 
-## Secrets & environment
+## Provider authentication
 
-- **`.env` is gitignored.** Never commit tokens, service account keys, or API keys to tracked files.
-- Copy `.env.example` to `.env` and fill in real values.
-- **Google Sheets auth:** Application Default Credentials (ADC) with service account impersonation (`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`). See workbench `docs/google-auth.md`.
-- **Coda auth:** `CODA_API_TOKEN` in `.env`. See workbench `docs/coda.md`.
+- **Google Sheets:** Application Default Credentials (ADC) with service account impersonation (`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`). See workbench `docs/google-auth.md`.
+- **Coda:** `CODA_API_TOKEN` in `.env`. See workbench `docs/coda.md`.
 - Profile heuristic config files (`.json` in `config/`) are tracked. Secrets (`DRIVE_FOLDER_ID`, `CODA_DOC_IDS`) go in `.env`.
 
 ## Naming & style
