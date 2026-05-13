@@ -3,6 +3,7 @@
 The core public functions are:
 
 * :func:`canonicalize_header_row` — apply alias substitutions to a raw header.
+* :func:`guess_header_row` — heuristic header detection suitable for discovery/profiling.
 * :func:`detect_header_row` — locate the header row in a raw row list.
 * :func:`normalize_rows` — detect + project + transform a row list in one call.
 * :func:`normalize_csv_file` — read a CSV, normalize it, and write the output.
@@ -17,11 +18,14 @@ filesystem or network access.
    use the *following* row as the header (useful when a label row precedes the
    real header).
 2. Required-header set scan — walk rows until all required headers are present.
-3. ``anchor_token`` fallback — same sentinel strategy without the priority flag.
-4. ``header_row_index`` — use an explicit 0-based row index (last resort).
+3. ``guess_header_row`` — heuristic text-label scoring (tried when required-header
+   scan fails).
+4. ``anchor_token`` fallback — same sentinel strategy without the priority flag.
+5. ``header_row_index`` — use an explicit 0-based row index (last resort).
 """
 
 import csv
+import re
 from datetime import date
 from pathlib import Path
 
@@ -557,6 +561,85 @@ def _normalize_single_region(
     }
 
 
+def guess_header_row(rows, max_scan_rows=30, min_fill_ratio=0.4, min_cols=4):
+    """Find the row most likely to be a header row using structural heuristics.
+
+    Scans *max_scan_rows* rows looking for the row with the highest ratio of
+    non-empty cells where most values look like text labels (start with a
+    letter).  Unlike :func:`detect_header_row`, this function does **not**
+    require a set of known columns, making it suitable for profiling/discovery
+    where the schema is not yet known.
+
+    Args:
+        rows: Raw row data (list of lists of strings).
+        max_scan_rows: How many rows to examine.  Defaults to 30.
+        min_fill_ratio: Minimum fraction of non-empty cells required.
+            Defaults to 0.4 (40%).
+        min_cols: Minimum number of non-empty cells required.  Defaults to 4.
+
+    Returns:
+        int | None: 0-based index of the detected header row, or ``None``
+        if no suitable row was found.
+    """
+    best_index = None
+    best_fill = 0.0
+    for row_index in range(min(len(rows), max_scan_rows)):
+        row = rows[row_index] or []
+        if not row:
+            continue
+        non_empty = [cell for cell in row if cell.strip()]
+        if len(non_empty) < min_cols:
+            continue
+        fill_ratio = len(non_empty) / len(row)
+        text_count = sum(1 for cell in non_empty if re.match(r'^[A-Za-z]', cell))
+        if text_count < 3 or fill_ratio < min_fill_ratio:
+            continue
+        if fill_ratio > best_fill:
+            best_index = row_index
+            best_fill = fill_ratio
+    return best_index
+
+
+def raw_sheet_to_row_lists(raw: dict) -> list[list[str]]:
+    """Convert raw Sheets API grid data into list-of-lists for header detection.
+
+    Args:
+        raw: Grid payload from the Sheets API ``spreadsheets().get()`` call.
+
+    Returns:
+        list[list[str]]: Row lists extracted from data blocks starting at row 0.
+    """
+    rows: list[list[str]] = []
+    try:
+        sheet = raw["sheets"][0]
+        for block in sheet.get("data", []):
+            if block.get("startRow", 0) != 0:
+                continue
+            for row_entry in block.get("rowData", []):
+                cell_values = [value.get("formattedValue", "") for value in (row_entry.get("values") or [])]
+                rows.append(cell_values)
+    except (KeyError, IndexError, TypeError):
+        pass
+    return rows
+
+
+def column_index_to_letter(idx0: int) -> str:
+    """Convert a 0-based column index to an Excel-style column letter.
+
+    Args:
+        idx0: 0-based column index.
+
+    Returns:
+        str: Column letter(s), e.g. ``"A"``, ``"Z"``, ``"AA"``, ``"AZ"``.
+    """
+    n = idx0 + 1
+    result = ""
+    while n > 0:
+        n, remainder = divmod(n - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
 def detect_header_row(
     rows,
     required_headers,
@@ -573,8 +656,9 @@ def detect_header_row(
 
     1. Anchor-token priority (when *prefer_anchor_token* is ``True``).
     2. Required-header set scan.
-    3. Anchor-token fallback.
-    4. Explicit *header_row_index*.
+    3. ``guess_header_row`` heuristic (tried when required-header scan fails).
+    4. Anchor-token fallback.
+    5. Explicit *header_row_index*.
 
     Args:
         rows: Raw row list (list of lists) from a CSV or provider fetch.
@@ -594,7 +678,7 @@ def detect_header_row(
     Returns:
         tuple[int, list[str], str]: ``(header_row_index, canonical_header, strategy)``
         where *strategy* is one of ``"anchor_token"``,
-        ``"required_header_set_scan"``, or ``"header_row_index"``.
+        ``"required_header_set_scan"``, ``"guessed"``, or ``"header_row_index"``.
 
     Raises:
         ValueError: When no header row is found and *header_row_index* is not
@@ -617,6 +701,11 @@ def detect_header_row(
         canonical = canonicalize_header_row(rows[index], aliases=aliases)
         if normalized_required <= {_normalize_text(value) for value in canonical}:
             return index, canonical, "required_header_set_scan"
+
+    guess = guess_header_row(rows, max_scan_rows=scan_limit)
+    if guess is not None:
+        canonical = canonicalize_header_row(rows[guess], aliases=aliases)
+        return guess, canonical, "guessed"
 
     if anchor_token:
         normalized_anchor = _normalize_text(anchor_token)

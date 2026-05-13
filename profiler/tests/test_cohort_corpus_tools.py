@@ -183,17 +183,17 @@ def test_score_tab_substring_fallback():
 
 
 def test_score_tab_derived_vs_size_bonus():
-    """derived_weight -4 cancels large_grid + many_rows + wide_sheet (+4)."""
+    """derived_weight -4 partially cancels size bonuses (capped at +3)."""
     score, reasons, breakdown = score_tab(
         "Final Report",
         1507,
         301,
         tab_score_heuristics={"derived_tokens": ["final report"]},
     )
-    assert score == 0
+    assert score == -1
     assert "derived_tab" in reasons
-    assert "large_grid" in reasons
-    assert breakdown["subtotal"] == 0
+    assert any(r.startswith("large_grid") for r in reasons)
+    assert breakdown["subtotal"] == -1
 
 
 def test_select_tabs_from_inventory_breakdown():

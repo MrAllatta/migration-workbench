@@ -29,6 +29,7 @@ import json
 import os
 import re
 from collections import Counter
+from urllib.parse import quote
 from connectors.google_sheets import (
     DRIVE_READONLY_SCOPE,
     SHEETS_READONLY_SCOPE,
@@ -79,11 +80,12 @@ def fetch_tab_grid(sheets_service, spreadsheet_id: str, tab_title: str) -> dict:
         "))))"
     )
     range_ = f"'{tab_title.replace(chr(39), chr(39)*2)}'"
+    safe_range = quote(range_, safe="'")
     response = (
         sheets_service.spreadsheets()
         .get(
             spreadsheetId=spreadsheet_id,
-            ranges=[range_],
+            ranges=[safe_range],
             includeGridData=True,
             fields=fields,
         )

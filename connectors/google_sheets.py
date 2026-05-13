@@ -1,7 +1,7 @@
 import os
 from collections import deque
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly"
@@ -209,10 +209,11 @@ def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descenda
 
 def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service):
     range_name = worksheet_title.replace("'", "''")
+    safe_range = quote(f"'{range_name}'", safe="'")
     response = (
         sheets_service.spreadsheets()
         .values()
-        .get(spreadsheetId=spreadsheet_id, range=f"'{range_name}'")
+        .get(spreadsheetId=spreadsheet_id, range=safe_range)
         .execute()
     )
     return response.get("values", [])
@@ -241,6 +242,7 @@ def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
     # letting us detect formula-driven columns (rows past row 2 are typically
     # formulaic in the same way as row 2 in spreadsheet UX patterns).
     range_ = f"'{quoted_title}'!1:2"
+    safe_range = quote(range_, safe="'")
     fields = (
         "properties(title),"
         "namedRanges,"
@@ -256,7 +258,7 @@ def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
         sheets_service.spreadsheets()
         .get(
             spreadsheetId=spreadsheet_id,
-            ranges=[range_],
+            ranges=[safe_range],
             includeGridData=True,
             fields=fields,
         )

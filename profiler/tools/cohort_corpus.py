@@ -29,8 +29,11 @@ non-destructive.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import re
+import sys
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -39,6 +42,7 @@ from django.core.management.base import CommandError
 
 from googleapiclient.errors import HttpError
 
+from connectors.spreadsheet import column_index_to_letter, guess_header_row, raw_sheet_to_row_lists
 from profiler.management.commands.profile_tab import (
     fetch_tab_grid,
     list_tabs,
@@ -320,22 +324,30 @@ def score_tab(
                 break
 
     cells = rows * cols
+    total_size_bonus = 0
     if cells >= 50_000:
-        score += 2
-        reasons.append("large_grid")
-        size_bonuses["large_grid"] = 2
+        bonus = min(2, 1 + int(math.log10(cells / 100_000)))
+        score += bonus
+        reasons.append(f"large_grid(+{bonus})")
+        size_bonuses["large_grid"] = bonus
+        total_size_bonus += bonus
     elif cells >= 10_000:
         score += 1
         reasons.append("medium_grid")
         size_bonuses["medium_grid"] = 1
-    if rows >= 1000:
-        score += 1
+        total_size_bonus += 1
+    remaining_cap = max(0, 3 - total_size_bonus)
+    if rows >= 1000 and remaining_cap > 0:
+        add = min(1, remaining_cap)
+        score += add
         reasons.append("many_rows")
-        size_bonuses["many_rows"] = 1
-    if cols >= 20:
-        score += 1
+        size_bonuses["many_rows"] = add
+        remaining_cap -= add
+    if cols >= 20 and remaining_cap > 0:
+        add = min(1, remaining_cap)
+        score += add
         reasons.append("wide_sheet")
-        size_bonuses["wide_sheet"] = 1
+        size_bonuses["wide_sheet"] = add
 
     breakdown = {
         "token_matches": token_matches,
@@ -464,17 +476,18 @@ def select_tabs_from_inventory(
 
 
 def auto_select_tabs(
-    tab_shortlist: list[dict], *, per_workbook: int = 3
+    tab_shortlist: list[dict], *, per_workbook: int = 3, per_code_overrides: dict[str, int] | None = None
 ) -> dict[str, list[str]]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
     approved: dict[str, list[str]] = {}
     for workbook_code, rows in grouped.items():
+        limit = (per_code_overrides or {}).get(workbook_code, per_workbook)
         rows.sort(
             key=lambda row: (-row["final_score"], -row["occurrences"], row["tab_title"])
         )
-        approved[workbook_code] = [row["tab_title"] for row in rows[:per_workbook]]
+        approved[workbook_code] = [row["tab_title"] for row in rows[:limit]]
     return approved
 
 
@@ -574,6 +587,11 @@ def make_slug(text: str) -> str:
     return slug[:50] or "tab"
 
 
+def _raw_sheet_to_row_lists(raw: dict) -> list[list[str]]:
+    """Convert raw Sheets API grid data into list-of-lists for ``guess_header_row``."""
+    return raw_sheet_to_row_lists(raw)
+
+
 def derive_column_candidates(
     *,
     workbook_code: str,
@@ -590,25 +608,16 @@ def derive_column_candidates(
 
     headers: list[tuple[str, str]] = []
     try:
-        sheet = raw["sheets"][0]
-        for block in sheet.get("data", []):
-            if block.get("startRow", 0) != 0:
+        row_lists = _raw_sheet_to_row_lists(raw)
+        header_index = guess_header_row(row_lists)
+        if header_index is None:
+            return []
+        headers_raw = row_lists[header_index]
+        for col_index, header in enumerate(headers_raw):
+            if not header.strip():
                 continue
-            values = (block.get("rowData") or [{}])[0].get("values") or []
-            start_col = block.get("startColumn", 0)
-            for idx, value in enumerate(values):
-                header = (value.get("formattedValue") or "").strip()
-                if not header:
-                    continue
-                col_index = start_col + idx
-                n = col_index + 1
-                col_letter = ""
-                while n > 0:
-                    n, remainder = divmod(n - 1, 26)
-                    col_letter = chr(65 + remainder) + col_letter
-                headers.append((col_letter, header))
-            if headers:
-                break
+            col_letter = column_index_to_letter(col_index)
+            headers.append((col_letter, header.strip()))
     except (KeyError, IndexError, TypeError):
         return []
 
@@ -675,6 +684,56 @@ def parse_tab_inventory_output(text: str) -> list[dict]:
             }
         )
     return rows
+
+
+def _render_corpus_summary(
+    path: Path,
+    *,
+    deep_results: list[dict],
+    candidate_columns: list[dict],
+    selected_columns: list[dict],
+    approved_tabs: dict[str, list[str]],
+) -> None:
+    """Write a human-readable Markdown summary of the corpus run."""
+    lines: list[str] = [
+        "# Corpus Summary",
+        "",
+        f"- **Generated:** `{path.name}`",
+        f"- **Deep profile jobs:** {len(deep_results)}",
+        f"  - Success: {sum(1 for row in deep_results if row['exit_code'] == 0)}",
+        f"  - Failure: {sum(1 for row in deep_results if row['exit_code'] != 0)}",
+        "",
+        "## Column Candidates",
+        "",
+        f"- Total candidates: {len(candidate_columns)}",
+        f"- Selected: {len(selected_columns)}",
+        "",
+        "## Per-Workbook Tab Selection",
+        "",
+    ]
+    for workbook_code in sorted(approved_tabs):
+        tabs = approved_tabs[workbook_code]
+        lines.append(f"### Workbook {workbook_code}")
+        lines.append("")
+        for tab_title in tabs:
+            failures = sum(
+                1
+                for row in deep_results
+                if row["workbook_code"] == workbook_code
+                and row["tab_title"] == tab_title
+                and row["exit_code"] != 0
+            )
+            successes = sum(
+                1
+                for row in deep_results
+                if row["workbook_code"] == workbook_code
+                and row["tab_title"] == tab_title
+                and row["exit_code"] == 0
+            )
+            status = "OK" if successes > 0 and failures == 0 else "FAIL" if failures > 0 else "N/A"
+            lines.append(f"- **{tab_title}** — {status} ({successes} ok, {failures} fail)")
+        lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def run_cohort_corpus(
@@ -787,6 +846,11 @@ def run_cohort_corpus(
     tab_shortlist_path = out_dir / f"tab_shortlist_{date_stamp}.json"
     tab_selection_path = out_dir / f"tab_selection_{date_stamp}.json"
 
+    # Year-aware tab validation: known_tabs is populated from broad coverage
+    # inventory when available, so deep fetches can skip tabs that don't exist
+    # in a given year's workbook.
+    known_tabs: set[tuple[str, str]] = set()
+
     if resume_from_tab_selection:
         if not tab_selection_path.exists():
             raise CommandError(
@@ -837,6 +901,15 @@ def run_cohort_corpus(
                     f"{index_path} records[{row_index}] is missing one of {required_index_keys!r}"
                 )
 
+        # Load broad coverage inventory for year-aware tab validation
+        if broad_path.exists():
+            try:
+                broad_payload = json.loads(broad_path.read_text(encoding="utf-8"))
+                for inventory_row in broad_payload.get("inventory_rows", []):
+                    known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
+            except (json.JSONDecodeError, KeyError):
+                pass
+
     elif resume_from_broad:
         if not broad_path.exists():
             raise CommandError(
@@ -883,7 +956,9 @@ def run_cohort_corpus(
         )
 
         heuristic_tabs = auto_select_tabs(
-            tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3))
+            tab_shortlist,
+            per_workbook=int(config.get("tab_auto_limit", 3)),
+            per_code_overrides=config.get("tab_auto_limit_overrides"),
         )
         overrides = config.get("tab_selection_overrides")
         approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
@@ -1001,7 +1076,9 @@ def run_cohort_corpus(
         )
 
         heuristic_tabs = auto_select_tabs(
-            tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3))
+            tab_shortlist,
+            per_workbook=int(config.get("tab_auto_limit", 3)),
+            per_code_overrides=config.get("tab_auto_limit_overrides"),
         )
         overrides = config.get("tab_selection_overrides")
         approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
@@ -1049,9 +1126,12 @@ def run_cohort_corpus(
         if _429_abort:
             break
         for tab_title in approved_tabs.get(record["workbook_code"], []):
+            if known_tabs and (record["spreadsheet_id"], tab_title) not in known_tabs:
+                continue
+            tab_hash = hashlib.sha1(tab_title.encode()).hexdigest()[:8]
             out_path = (
                 deep_dir
-                / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}.json"
+                / f"{record['workbook_code']}_{record['year']}_{record['spreadsheet_id'][:8]}_{make_slug(tab_title)}_{tab_hash}.json"
             )
             if reuse_cached_deep and out_path.exists():
                 try:
@@ -1129,30 +1209,35 @@ def run_cohort_corpus(
                         column_score_heuristics=column_score_heuristics,
                     )
                 )
-                _last_was_429 = False
             except Exception as exc:  # noqa: BLE001
                 is_429 = isinstance(exc, HttpError) and getattr(exc.resp, "status", None) == 429
                 if is_429:
                     _429_cooldown_count += 1
-                    if _429_cooldown_count > _429_max_cooldowns:
-                        deep_results.append(
-                            {
-                                "year": record["year"],
-                                "workbook_code": record["workbook_code"],
-                                "spreadsheet_id": record["spreadsheet_id"],
-                                "tab_title": tab_title,
-                                "out_json": None,
-                                "exit_code": 1,
-                                "error": (
-                                    f"HttpError 429: exceeded {_429_max_cooldowns} "
-                                    f"global cooldowns; aborting deep profile"
-                                ),
-                                "reused_cached_deep": False,
-                            }
+                    if _429_cooldown_count <= _429_max_cooldowns:
+                        sys.stderr.write(
+                            f"429 received; cooling {_429_cooldown_seconds}s "
+                            f"({_429_cooldown_count}/{_429_max_cooldowns})\n"
                         )
-                        _429_abort = True
-                        break
-                    time.sleep(_429_cooldown_seconds)
+                        sys.stderr.flush()
+                        time.sleep(_429_cooldown_seconds)
+                        continue
+                    deep_results.append(
+                        {
+                            "year": record["year"],
+                            "workbook_code": record["workbook_code"],
+                            "spreadsheet_id": record["spreadsheet_id"],
+                            "tab_title": tab_title,
+                            "out_json": None,
+                            "exit_code": 1,
+                            "error": (
+                                f"HttpError 429: exceeded {_429_max_cooldowns} "
+                                f"global cooldowns; aborting deep profile"
+                            ),
+                            "reused_cached_deep": False,
+                        }
+                    )
+                    _429_abort = True
+                    break
                 deep_results.append(
                     {
                         "year": record["year"],
@@ -1187,11 +1272,14 @@ def run_cohort_corpus(
         previous = deduped.get(key)
         if previous is None or candidate["priority_score"] > previous["priority_score"]:
             deduped[key] = candidate
+    column_heuristics = _normalize_column_heuristics(column_score_heuristics)
+    default_min = 0 if not column_heuristics.get("domain_keyword_tokens") else 4
+    min_score = int(config.get("column_min_score", default_min))
     selected_columns = sorted(
         [
             row
             for row in deduped.values()
-            if row["priority_score"] >= int(config.get("column_min_score", 4))
+            if row["priority_score"] >= min_score
         ],
         key=lambda row: (
             -row["priority_score"],
@@ -1220,6 +1308,15 @@ def run_cohort_corpus(
         },
     )
 
+    summary_path = out_dir / f"corpus_summary_{date_stamp}.md"
+    _render_corpus_summary(
+        summary_path,
+        deep_results=deep_results,
+        candidate_columns=candidate_columns,
+        selected_columns=selected_columns,
+        approved_tabs=approved_tabs,
+    )
+
     return {
         "discovery": str(discovery_path),
         "index": str(index_path),
@@ -1229,4 +1326,5 @@ def run_cohort_corpus(
         "deep_coverage": str(deep_coverage_path),
         "column_shortlist": str(column_shortlist_path),
         "column_selection": str(column_selection_path),
+        "corpus_summary": str(summary_path),
     }
