@@ -756,6 +756,96 @@ Draw identifiers, docstring references, and comments from the project's establis
 ### Code generation context
 
 Most code in this repo is **generated** by workbench commands (`generate_models`, `generate_admin`, `generate_import`). When editing generated code, preserve its structural patterns and only make targeted changes. If a change requires modifying every generated file, revisit the schema contract instead.
+
+## Patching upstream (migration-workbench)
+
+When farm encounters a gap or bug in migration-workbench, fix it upstream rather than working around it in farm code.
+
+### Decision criteria
+
+| Situation | Where to fix |
+|-----------|-------------|
+| Bug in a workbench command, management command, template, or utility | Workbench |
+| Missing feature that another scaffolded product would also need | Workbench |
+| Column type inference misfires for a source format | Workbench |
+| Import transform pipeline needs a new hook point | Workbench |
+| Codegen output is malformed or incomplete | Workbench |
+| Farm-specific display logic (admin config, list display, custom views) | Farm |
+| Farm-specific data validation or business rules | Farm |
+| One-off import transform for a unique source quirk | Farm |
+| Schema contract or view manifest fields (the "what" not the "how") | Farm |
+
+General principle: if the fix lives in workbench's domain (connectors, profiler, importer, workbook, codegen), it belongs in workbench. If it's specific to how farm uses the output, keep it in farm.
+
+### Workflow
+
+**1. Pinpoint the gap.** Identify the workbench module or management command involved. Note the symptom and the expected behavior.
+
+**2. Switch to an editable checkout.**
+
+```bash
+# Add to .env (gitignored):
+WORKBENCH=/path/to/migration-workbench
+
+# Reinstall workbench from the checkout (editable):
+make install-dev-workbench
+```
+
+**3. Fix upstream.** Edit files under `$WORKBENCH`. Because pip installed it in editable mode, changes take effect immediately — rerun the farm workflow that exposed the gap.
+
+**4. Verify in farm.**
+
+```bash
+make check
+```
+Also rerun the specific farm command or workflow that triggered the discovery.
+
+**5. Run the workbench gate.**
+
+```bash
+make chassis-gate
+```
+This runs the workbench repo's own test suite (lint, typecheck, pytest). Gate must pass before upstream PR.
+
+**6. Commit and PR.**
+
+In the `$WORKBENCH` checkout:
+```
+git checkout -b fix/descriptive-branch-name
+git add <relevant-files>
+git commit -m "fix(area): concise description of the fix"
+```
+
+Open a PR at https://github.com/anomalyco/migration-workbench. Include:
+- What the gap was (describe the farm workflow that exposed it)
+- What the fix does
+- How it was verified (farm workflow + chassis gate)
+
+**7. Cut back to PyPI after release.** Once the fix ships to PyPI:
+
+```bash
+# Bump the lower bound in pyproject.toml:
+#   "migration-workbench>=<new-version>,<1"
+make install          # reverts to PyPI
+make check            # confirm nothing broke
+```
+
+### Version discipline
+
+| Phase | Workbench source | Mechanism |
+|-------|-----------------|-----------|
+| Normal development | PyPI (as declared in pyproject.toml) | `make install` |
+| Active patching | Local editable checkout | `make install-dev-workbench` + `WORKBENCH` in `.env` |
+| Post-release | PyPI at the new version | `make install` (after bumping pyproject.toml) |
+
+The editable checkout is **development-only**. CI and production always install from PyPI via the version pin in `pyproject.toml`.
+
+### Anti-patterns
+
+- **Don't vendor workbench code into farm.** No copying modules, no monkey-patching workbench internals. It creates a drift problem.
+- **Don't create a permanent fork.** Farm should always consume workbench as a dependency, not a submodule or fork.
+- **Don't pin to a git SHA in pyproject.toml.** That breaks standard pip installs and makes the package unfriendly. Use the editable checkout locally; wait for a release for CI/deployment.
+- **Don't skip the chassis gate.** A fix that passes farm but breaks workbench's own tests will be rejected upstream.
 """
 
 
