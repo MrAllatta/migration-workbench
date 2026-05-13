@@ -40,6 +40,27 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
   - `year_regex` — Optional override; default finds `20xx` years in folder or file names.
   - `in_scope_workbooks` — List of ids exactly as captured by group 1 of `workbook_id_regex`.
   - `tab_score` and `column_score` heuristics — Domain tokens that boost matching tabs and columns during scoring.
+
+    **Token categories** (all are lists of strings):
+    - `operational_tokens` — Primary data-entry tabs (default weight `+3`).
+    - `reference_tokens` — Lookup / reference tabs (default weight `+3`).
+    - `reference_combo_tokens` — Multi-token reference patterns; all tokens in a
+      sub-list must match (default weight `+3`, overridable via
+      `reference_combo_weight`).
+    - `support_tokens` — Index / helper tabs (default weight `-2`).
+    - `derived_tokens` — Tabs that are auto-generated copies, pivot tables, or
+      reports (default weight `-4`).
+
+    **Per-category weights** override the defaults above (all optional):
+    - `operational_weight`, `reference_weight`, `derived_weight`,
+      `support_weight`, `reference_combo_weight`
+
+    **Match mode** (`match_mode`, default `"substring"`):
+    - `"substring"` — token is found anywhere in the lowered title (backward
+      compatible).
+    - `"word"` — token must match on word boundaries (``\\b``), so `"crop plan"`
+      does not match `"crop planner"`.
+
   - Set `DRIVE_FOLDER_ID` in `.env` with the Drive folder id or URL (not in the JSON config).
 4. **Corpus run** — Outputs dated JSON under `--out-dir` (product repos often use `data/profile_snapshots/`):
   ```bash

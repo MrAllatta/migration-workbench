@@ -150,8 +150,36 @@ def build_cohort_corpus_index(
     return records
 
 
+def _token_match(token: str, text: str, mode: str) -> bool:
+    """Check if *token* appears in *text* according to *mode*.
+
+    Args:
+        token: The keyword to look for (already lowered).
+        text: The target string (already lowered).
+        mode: ``"substring"`` (default) or ``"word"``.
+
+    Returns:
+        bool: Whether a match was found.
+    """
+    if mode == "word":
+        return bool(re.search(rf"\b{re.escape(token)}\b", text))
+    return token in text
+
+
 def _normalize_tab_heuristics(config: dict | None) -> dict:
     config = config or {}
+
+    operational_weight = config.get("operational_weight", 3)
+    reference_weight = config.get("reference_weight", 3)
+    derived_weight = config.get("derived_weight", -4)
+    support_weight = config.get("support_weight", -2)
+    reference_combo_weight = config.get(
+        "reference_combo_weight", reference_weight
+    )
+    match_mode = config.get("match_mode", "substring")
+    if match_mode not in ("substring", "word"):
+        match_mode = "substring"
+
     combo_tokens: list[tuple[str, ...]] = []
     for entry in config.get("reference_combo_tokens") or []:
         if isinstance(entry, (list, tuple)) and all(
@@ -175,6 +203,17 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
             for token in (config.get("support_tokens") or [])
             if isinstance(token, str)
         ],
+        "derived_tokens": [
+            token.lower()
+            for token in (config.get("derived_tokens") or [])
+            if isinstance(token, str)
+        ],
+        "operational_weight": operational_weight,
+        "reference_weight": reference_weight,
+        "derived_weight": derived_weight,
+        "support_weight": support_weight,
+        "reference_combo_weight": reference_combo_weight,
+        "match_mode": match_mode,
     }
 
 
@@ -191,46 +230,120 @@ def _normalize_column_heuristics(config: dict | None) -> dict:
 
 def score_tab(
     title: str, rows: int, cols: int, *, tab_score_heuristics: dict | None = None
-) -> tuple[int, list[str]]:
+) -> tuple[int, list[str], dict]:
+    """Score a single tab by its title and dimensions.
+
+    Args:
+        title: Tab worksheet title.
+        rows: Number of data rows.
+        cols: Number of data columns.
+        tab_score_heuristics: Optional config dict (see
+            ``_normalize_tab_heuristics``).
+
+    Returns:
+        Tuple of (score, reason_labels, breakdown_dict).
+    """
     lowered = title.lower()
     score = 0
     reasons: list[str] = []
+    token_matches: list[dict] = []
+    size_bonuses: dict[str, int] = {}
 
     heuristics = _normalize_tab_heuristics(tab_score_heuristics)
-    operational_tokens = heuristics["operational_tokens"]
-    reference_tokens = heuristics["reference_tokens"]
-    reference_combo_tokens = heuristics["reference_combo_tokens"]
-    support_tokens = heuristics["support_tokens"]
+    match_mode = heuristics["match_mode"]
 
-    if operational_tokens and any(token in lowered for token in operational_tokens):
-        score += 3
-        reasons.append("operational_tab_name")
-    if reference_tokens and any(token in lowered for token in reference_tokens):
-        score += 3
-        reasons.append("reference_lookup_tab_name")
-    if reference_combo_tokens and any(
-        all(token in lowered for token in combo) for combo in reference_combo_tokens
-    ):
-        score += 3
-        reasons.append("reference_lookup_tab_name")
-    if support_tokens and any(token in lowered for token in support_tokens):
-        score -= 2
-        reasons.append("likely_support_tab")
+    categories: list[tuple[str, list[str], str, int, str]] = [
+        (
+            "operational_tokens",
+            heuristics["operational_tokens"],
+            "operational",
+            heuristics["operational_weight"],
+            "operational_tab_name",
+        ),
+        (
+            "reference_tokens",
+            heuristics["reference_tokens"],
+            "reference",
+            heuristics["reference_weight"],
+            "reference_lookup_tab_name",
+        ),
+        (
+            "support_tokens",
+            heuristics["support_tokens"],
+            "support",
+            heuristics["support_weight"],
+            "likely_support_tab",
+        ),
+        (
+            "derived_tokens",
+            heuristics["derived_tokens"],
+            "derived",
+            heuristics["derived_weight"],
+            "derived_tab",
+        ),
+    ]
+    for _key, tokens, category, weight, reason in categories:
+        if tokens:
+            matched = [
+                token
+                for token in tokens
+                if _token_match(token, lowered, match_mode)
+            ]
+            if matched:
+                score += weight
+                reasons.append(reason)
+                for token in matched:
+                    token_matches.append(
+                        {
+                            "token": token,
+                            "category": category,
+                            "weight": weight,
+                        }
+                    )
+
+    combo_tokens = heuristics["reference_combo_tokens"]
+    if combo_tokens:
+        combo_weight = heuristics["reference_combo_weight"]
+        for combo in combo_tokens:
+            if all(
+                _token_match(token, lowered, match_mode) for token in combo
+            ):
+                score += combo_weight
+                reasons.append("reference_lookup_tab_name")
+                token_matches.append(
+                    {
+                        "token": " + ".join(combo),
+                        "category": "reference_combo",
+                        "weight": combo_weight,
+                    }
+                )
+                break
 
     cells = rows * cols
     if cells >= 50_000:
         score += 2
         reasons.append("large_grid")
+        size_bonuses["large_grid"] = 2
     elif cells >= 10_000:
         score += 1
         reasons.append("medium_grid")
+        size_bonuses["medium_grid"] = 1
     if rows >= 1000:
         score += 1
         reasons.append("many_rows")
+        size_bonuses["many_rows"] = 1
     if cols >= 20:
         score += 1
         reasons.append("wide_sheet")
-    return score, reasons
+        size_bonuses["wide_sheet"] = 1
+
+    breakdown = {
+        "token_matches": token_matches,
+        "size_bonuses": size_bonuses,
+        "subtotal": score,
+    }
+
+    return score, reasons, breakdown
 
 
 def select_tabs_from_inventory(
@@ -246,7 +359,7 @@ def select_tabs_from_inventory(
         meta = by_sheet_id.get(row["spreadsheet_id"])
         if meta is None:
             continue
-        score, reasons = score_tab(
+        score, reasons, breakdown = score_tab(
             row["tab_title"],
             row["rows"],
             row["cols"],
@@ -264,6 +377,7 @@ def select_tabs_from_inventory(
                 "cols": row["cols"],
                 "score": score,
                 "reasons": reasons,
+                "breakdown": breakdown,
             }
         )
 
@@ -281,6 +395,7 @@ def select_tabs_from_inventory(
                 "rows_max": 0,
                 "cols_max": 0,
                 "examples": [],
+                "breakdowns": [],
             },
         )
         bucket["occurrences"] += 1
@@ -288,6 +403,7 @@ def select_tabs_from_inventory(
         bucket["scores"].append(entry["score"])
         bucket["rows_max"] = max(bucket["rows_max"], entry["rows"])
         bucket["cols_max"] = max(bucket["cols_max"], entry["cols"])
+        bucket["breakdowns"].append(entry.get("breakdown", {}))
         if len(bucket["examples"]) < 3:
             bucket["examples"].append(
                 {"year": entry["year"], "spreadsheet_id": entry["spreadsheet_id"]}
@@ -303,6 +419,28 @@ def select_tabs_from_inventory(
         )
         if final_score < min_final_score:
             continue
+
+        cat_counts: dict[str, int] = {}
+        total_size_bonus = 0
+        total_token_matches = 0
+        for bd in bucket["breakdowns"]:
+            for tm in bd.get("token_matches", []):
+                cat = tm.get("category", "unknown")
+                cat_counts[cat] = cat_counts.get(cat, 0) + 1
+                total_token_matches += 1
+            total_size_bonus += sum(
+                bd.get("size_bonuses", {}).values()
+            )
+        breakdown_summary = {
+            "total_token_matches": total_token_matches,
+            "category_counts": cat_counts,
+            "avg_size_bonus": round(
+                total_size_bonus / len(bucket["breakdowns"]), 2
+            )
+            if bucket["breakdowns"]
+            else 0,
+        }
+
         selected.append(
             {
                 "workbook_code": bucket["workbook_code"],
@@ -316,6 +454,7 @@ def select_tabs_from_inventory(
                 "rows_max": bucket["rows_max"],
                 "cols_max": bucket["cols_max"],
                 "examples": bucket["examples"],
+                "breakdown_summary": breakdown_summary,
             }
         )
     selected.sort(
@@ -762,6 +901,7 @@ def run_cohort_corpus(
 
     else:
         include_tabs = not bool(config.get("discovery_no_tabs"))
+        assert folder_id is not None
         tree = walk_folder(
             drive_service,
             sheets_service,

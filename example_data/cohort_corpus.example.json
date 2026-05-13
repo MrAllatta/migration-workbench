@@ -11,7 +11,14 @@
       "operational_tokens": [],
       "reference_tokens": [],
       "reference_combo_tokens": [],
-      "support_tokens": []
+      "support_tokens": [],
+      "derived_tokens": [],
+      "operational_weight": 3,
+      "reference_weight": 3,
+      "derived_weight": -4,
+      "support_weight": -2,
+      "reference_combo_weight": 3,
+      "match_mode": "substring"
     },
     "column_score": {
       "domain_keyword_tokens": []

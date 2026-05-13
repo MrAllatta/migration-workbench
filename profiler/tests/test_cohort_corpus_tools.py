@@ -109,7 +109,7 @@ def test_select_tabs_from_inventory_scores_operational_tabs():
 
 
 def test_score_tab_boosts_reference_combo_tokens():
-    score, reasons = score_tab(
+    score, reasons, breakdown = score_tab(
         "Define Shared Terms",
         52,
         17,
@@ -117,12 +117,116 @@ def test_score_tab_boosts_reference_combo_tokens():
     )
     assert score >= 3
     assert "reference_lookup_tab_name" in reasons
+    assert len(breakdown["token_matches"]) == 1
+    assert breakdown["token_matches"][0]["category"] == "reference_combo"
 
 
 def test_score_tab_without_heuristics_uses_grid_shape_only():
-    score, reasons = score_tab("Any Name", 1200, 30)
+    score, reasons, breakdown = score_tab("Any Name", 1200, 30)
     assert score == 3
     assert set(reasons) == {"medium_grid", "many_rows", "wide_sheet"}
+    assert breakdown["size_bonuses"] == {"medium_grid": 1, "many_rows": 1, "wide_sheet": 1}
+
+
+def test_score_tab_with_weights():
+    """Override default weights and verify score changes proportionally."""
+    score, reasons, _breakdown = score_tab(
+        "Plan Board",
+        100,
+        10,
+        tab_score_heuristics={
+            "operational_tokens": ["plan"],
+            "operational_weight": 5,
+        },
+    )
+    assert score == 5
+    assert "operational_tab_name" in reasons
+
+
+def test_score_tab_derived_tokens():
+    """derived_tokens match applies derived_weight (default -4)."""
+    score, reasons, breakdown = score_tab(
+        "Final Report",
+        100,
+        10,
+        tab_score_heuristics={"derived_tokens": ["final report"]},
+    )
+    assert score == -4
+    assert "derived_tab" in reasons
+    assert breakdown["token_matches"][0]["category"] == "derived"
+    assert breakdown["token_matches"][0]["weight"] == -4
+
+
+def test_score_tab_word_boundary():
+    """match_mode word prevents substring false matches."""
+    score, _reasons, _breakdown = score_tab(
+        "Crop Planner",
+        100,
+        10,
+        tab_score_heuristics={
+            "operational_tokens": ["crop plan"],
+            "match_mode": "word",
+        },
+    )
+    assert score == 0
+
+
+def test_score_tab_substring_fallback():
+    """Default match_mode substring preserves old overlap behavior."""
+    score, _reasons, _breakdown = score_tab(
+        "Crop Planner",
+        100,
+        10,
+        tab_score_heuristics={"operational_tokens": ["crop plan"]},
+    )
+    assert score == 3
+
+
+def test_score_tab_derived_vs_size_bonus():
+    """derived_weight -4 cancels large_grid + many_rows + wide_sheet (+4)."""
+    score, reasons, breakdown = score_tab(
+        "Final Report",
+        1507,
+        301,
+        tab_score_heuristics={"derived_tokens": ["final report"]},
+    )
+    assert score == 0
+    assert "derived_tab" in reasons
+    assert "large_grid" in reasons
+    assert breakdown["subtotal"] == 0
+
+
+def test_select_tabs_from_inventory_breakdown():
+    """Breakdown dict present in scored entries."""
+    index_records = [
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "sheet-402",
+            "spreadsheet_name": "402 Planning LSF 2026",
+        }
+    ]
+    inventory_rows = [
+        {
+            "spreadsheet_id": "sheet-402",
+            "sheet_id": 1,
+            "rows": 100,
+            "cols": 10,
+            "tab_title": "Plan Board",
+        }
+    ]
+    selected = select_tabs_from_inventory(
+        index_records,
+        inventory_rows,
+        tab_score_heuristics={
+            "operational_tokens": ["plan"],
+            "support_tokens": ["index"],
+        },
+    )
+    assert len(selected) == 1
+    summary = selected[0]["breakdown_summary"]
+    assert summary["total_token_matches"] >= 1
+    assert isinstance(summary["avg_size_bonus"], (int, float))
 
 
 def test_profile_cohort_corpus_smoke_writes_output(tmp_path):
