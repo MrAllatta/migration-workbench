@@ -376,6 +376,7 @@ def render_makefile() -> str:
 # to replace the PyPI package with an editable install from your checkout (same venv as this project).
 # WORKBENCH is also required for `chassis-gate` (runs the workbench repo gate in that checkout).
 export WORKBENCH
+export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
 # Export profile config values loaded from `.env` so recipe shell checks can read them.
 export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID
 export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS
@@ -386,7 +387,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
+.PHONY: venv install install-dev-workbench migrate check shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
 
 venv:
 	python3 -m venv $(VENV)
@@ -419,7 +420,7 @@ check-env:
 	@set -a; . ./.env; set +a; \
 	err=0; \
 	for var in WORKBENCH DRIVE_FOLDER_ID GOOGLE_IMPERSONATE_SERVICE_ACCOUNT; do \
-		if [ -z "$${!var:-}" ]; then \
+		if [ -z "$$(printenv "$$var" || true)" ]; then \
 			echo >&2 "Missing $$var in .env"; \
 			err=1; \
 		fi; \
@@ -430,6 +431,9 @@ CONTRACT = config/contract.yaml
 CORE = backend/apps/core
 BUNDLE_OUT = build/bundle
 VIEW_MANIFEST = config/view-manifest.yaml
+
+# Corpus profiling date stamp — set to the date of your Phase 1 run for resume phases.
+DATE_STAMP = $(shell date +%Y-%m-%d)
 
 generate-models:
 	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --force
@@ -473,7 +477,19 @@ profile-coda-corpus:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
 
 profile-cohort-corpus:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)"
+
+# Phase 1: discovery + tab selection only (no deep API calls). Inspect tab_selection_<date>.json, then configure heuristics.
+profile-cohort-corpus-phase1:
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --stop-before-deep
+
+# Phase 2: re-run heuristics from broad coverage (no API calls). Iterate on cohort_corpus.json, then re-run.
+profile-cohort-corpus-phase2:
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-broad --stop-before-deep
+
+# Phase 3: deep profile from hand-edited tab_selection_<date>.json. Run after heuristics are final.
+profile-cohort-corpus-phase3:
+	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-tab-selection
 """
 
 
@@ -504,7 +520,7 @@ CODA_LIVE_CONFIG=config/coda_live.local.json
         provider_env = """
 
 # Google Drive / Sheets profiling (ADC + SA impersonation — see migration-workbench docs/google-auth.md).
-# GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=mw-profiler@PROJECT.iam.gserviceaccount.com
+GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=replace-me
 # Required for make profile-preflight / make profile-drive-folder.
 COHORT_CORPUS_CONFIG=config/cohort_corpus.json
 # Google Drive folder id for the corpus root folder.
@@ -543,24 +559,48 @@ Run after setting up `.env`. These commands inspect source data and produce arti
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
 
+Profiling follows a **3-phase workflow** to avoid expensive API calls until heuristic tuning is complete:
+
+#### Phase 1 — Discovery + tab selection
+
 1. **Set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** and **`DRIVE_FOLDER_ID`** in `.env` (see migration-workbench `docs/google-auth.md`).
-2. **Configure heuristics** in `config/cohort_corpus.json` with workbook name patterns, tab score rules, and column selectors.
-3. **Run preflight** (validates config, checks Drive access):
+2. **Run preflight** (validates config, checks Drive access):
    ```bash
    make profile-preflight
    ```
-4. **Map the Drive folder** (enumerates workbooks):
+3. **Map the Drive folder** (enumerates workbooks):
    ```bash
    make profile-drive-folder
    ```
    Output: `DRIVE_FOLDER_OUT` (default: `data/profile_snapshots/drive_tree.json`).
-5. **Run full corpus profile** (extracts column profiles from every in-scope tab):
+4. **Inspect the drive tree, then configure heuristics** in `config/cohort_corpus.json` — review the tree output to set `workbook_id_regex`, `in_scope_workbooks`, tab score rules, and column selectors based on actual workbook names and structure.
+5. **Run Phase 1** (discovers workbooks, lists tabs, scores and selects, then stops before deep grid fetches):
    ```bash
-   make profile-cohort-corpus
+   make profile-cohort-corpus-phase1
    ```
-   Outputs go to `COHORT_CORPUS_OUT_DIR` (default: `data/profile_snapshots/cohort_corpus`).
+   Outputs go to `COHORT_CORPUS_OUT_DIR` (default: `data/profile_snapshots/cohort_corpus`). The key artifact is `tab_selection_<date>.json` — review which tabs were auto-selected.
 
-**Review the output** — profiler artifacts include column types, formula patterns, header snapshots. Read them before moving to schema design.
+#### Phase 2 — Heuristic refinement
+
+After reviewing Phase 1 output, tune `tab_score_heuristics` and `tab_selection_overrides` in `config/cohort_corpus.json`, then re-run scoring without any API calls:
+
+```bash
+make profile-cohort-corpus-phase2
+```
+
+This re-reads the broad coverage data from disk and re-applies scoring/selection with the updated heuristics. Iterate as needed — no Drive or Sheets API calls are made.
+
+#### Phase 3 — Deep profiling
+
+Once tab selection is final (hand-edit `tab_selection_<date>.json` if desired), run the deep grid fetches and column scoring:
+
+```bash
+make profile-cohort-corpus-phase3
+```
+
+This skips Drive discovery and tab listing, going straight to deep profiling of the selected tabs.
+
+**Review the full output** — profiler artifacts include column types, formula patterns, header snapshots. Read them before moving to schema design.
 """
 
 
@@ -980,7 +1020,12 @@ make check
 
 Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Drive / Sheets with ADC (see migration-workbench **`docs/google-auth.md`**). Store artifacts under **`data/profile_snapshots/`** (gitignore large outputs if needed).
 
-**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, then `profile_cohort_corpus` with a JSON config (`workbook_id_regex`, `in_scope_workbooks`, etc.). Set `COHORT_CORPUS_CONFIG` and `DRIVE_FOLDER_ID` in `.env`; `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus` read them from the environment exported by the generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
+**Google Sheets multi-workbook corpus:** follow migration-workbench **`docs/google-corpus.md`** — `profile_preflight`, `profile_drive_folder`, inspect tree output to configure `in_scope_workbooks` and `workbook_id_regex`, then `profile_cohort_corpus`. Set `COHORT_CORPUS_CONFIG` and `DRIVE_FOLDER_ID` in `.env`; `make profile-preflight`, `make profile-drive-folder`, and `make profile-cohort-corpus` read them from the environment exported by the generated Makefile. Optionally set `DRIVE_FOLDER_OUT` and `COHORT_CORPUS_OUT_DIR` to override output paths.
+
+Profiling uses a **3-phase workflow** to avoid expensive API calls during heuristic tuning:
+- **Phase 1** (`make profile-cohort-corpus-phase1`): discovery + tab selection only, stops before deep grid fetches. Review `tab_selection_<date>.json`.
+- **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json`, then re-run.
+- **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`.
 
 **Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
 

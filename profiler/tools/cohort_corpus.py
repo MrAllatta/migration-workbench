@@ -37,6 +37,8 @@ from pathlib import Path
 
 from django.core.management.base import CommandError
 
+from googleapiclient.errors import HttpError
+
 from profiler.management.commands.profile_tab import (
     fetch_tab_grid,
     list_tabs,
@@ -540,64 +542,96 @@ def run_cohort_corpus(
     *,
     drive_service,
     sheets_service,
-    folder_id: str,
     config: dict,
     out_dir: Path,
     date_stamp: str,
     resume_from_tab_selection: bool = False,
+    resume_from_broad: bool = False,
+    stop_before_deep: bool = False,
     skip_existing_deep: bool = False,
+    folder_id: str | None = None,
 ) -> dict:
-    """Execute the full cohort corpus profiling pipeline and write all artifacts.
+    """Execute the cohort corpus profiling pipeline and write all artifacts.
 
     All intermediate JSON files are written to *out_dir* with *date_stamp*
     suffixes.  Deep-profile per-tab files go into ``out_dir/deep/``.
 
-    When *resume_from_tab_selection* is ``True``, *out_dir* must contain both
-    ``tab_selection_<date_stamp>.json`` and
-    ``in_scope_workbook_index_<date_stamp>.json`` from an earlier full run.
-    The pipeline skips Drive discovery through tab shortlisting,
-    preserves the hand-edited tab selection JSON, reloads workbook index rows from
-    disk, then runs deep profiling and downstream column artifacts using the
-    selected tab titles (one deep job per index row workbook code matched to
-    those titles).
+    The pipeline can be run in phases to avoid expensive deep profiling until
+    tab selection is confirmed:
+
+    **Phase 1 — Discovery + tab selection** (``stop_before_deep=True``):
+    Runs Drive discovery, workbook indexing, tab listing, scoring, and tab
+    selection.  Returns after writing ``tab_selection_<date_stamp>.json``,
+    skipping deep grid fetches and column scoring.  Use to inspect the
+    auto-selected tabs before committing to deep profile API calls.
+
+    **Phase 2 — Heuristic refinement** (``resume_from_broad=True``):
+    Reads ``broad_profile_coverage_<date_stamp>.json`` and
+    ``in_scope_workbook_index_<date_stamp>.json`` from a prior Phase 1 run,
+    then re-runs tab scoring, shortlisting, and selection using the
+    **current** config heuristics.  No Drive or Sheets API calls are made,
+    so this is fast and can be iterated.  Combine with ``stop_before_deep``
+    to stop after selection, or omit it to continue into deep profiling.
+
+    **Phase 3 — Deep profiling** (``resume_from_tab_selection=True``):
+    Reads ``tab_selection_<date_stamp>.json`` and workbook index from an
+    earlier run, preserving hand-edited selections.  Skips Drive discovery
+    through tab shortlisting and goes straight to deep grid fetches and
+    column scoring.
 
     Args:
         drive_service: Authenticated Google Drive API service object.
         sheets_service: Authenticated Google Sheets API service object.
-        folder_id: Google Drive folder id that contains the workbook corpus.
         config: Parsed corpus config dict.  Required keys:
             ``in_scope_workbooks`` (list of code strings matching capturing
             group 1 of ``workbook_id_regex``).  Optional keys include
             ``workbook_id_regex``, ``year_regex``, ``heuristics``,
             ``tab_auto_limit``, ``column_min_score``,
             ``tab_selection_overrides``, ``discovery_no_tabs``, ``max_depth``,
-            ``deep_read_delay_seconds``, ``deep_skip_existing``.
+            ``deep_read_delay_seconds``, ``deep_skip_existing``,
+            ``deep_read_429_cooldown``, ``deep_read_429_max_cooldowns``.
         out_dir: Directory where all artifact JSON files are written.
         date_stamp: Timestamp string appended to artifact filenames.
-        resume_from_tab_selection: Load workbook index rows and ``approved_tabs``
-            from artifacts on disk, skipping Drive discovery and broad Sheets
-            tab listing unless a full rerun is executed. Defaults to ``False``.
+        resume_from_tab_selection: Phase 3 mode — load hand-edited tab selection
+            and workbook index from disk; skip Drive discovery through tab
+            shortlisting.  Defaults to ``False``.
+        resume_from_broad: Phase 2 mode — reload broad coverage and index from
+            disk; re-run scoring and selection with current config without
+            API calls.  Defaults to ``False``.
+        stop_before_deep: Stop after writing tab selection; skip deep grid
+            fetches and column scoring.  Defaults to ``False``.
         skip_existing_deep: When combined with cached files under ``out_dir/deep/``,
             reuse existing payloads for column scoring instead of refetching.
             Intended for retrying quota-throttled corpus runs without repeating
             successful tab pulls. Combines logically with JSON config
             ``deep_skip_existing``. Defaults to ``False``.
+        folder_id: Google Drive folder id that contains the workbook corpus.
+            Required when not in resume mode. Defaults to ``None``.
 
     Returns:
         dict[str, str]: Mapping from artifact role to file path for every file
         written (keys: ``"discovery"``, ``"index"``, ``"broad_coverage"``,
-        ``"tab_shortlist"``, ``"tab_selection"``, ``"deep_coverage"``,
-        ``"column_shortlist"``, ``"column_selection"``).
+        ``"tab_shortlist"``, ``"tab_selection"``).  When ``stop_before_deep`` is
+        ``False``, also includes ``"deep_coverage"``, ``"column_shortlist"``,
+        ``"column_selection"``.
 
     Raises:
-        CommandError: If required config keys are missing or resume mode is
-            requested but no selection file exists.
+        CommandError: If required config keys are missing or a resume mode is
+            requested but no corresponding artifact file exists.
     """
     from profiler.management.commands.profile_drive_folder import walk_folder
 
     in_scope_codes = set(config.get("in_scope_workbooks") or [])
     if not in_scope_codes:
         raise CommandError("Config must include non-empty 'in_scope_workbooks'")
+
+    if resume_from_tab_selection and resume_from_broad:
+        raise CommandError(
+            "Cannot combine --resume-from-tab-selection and --resume-from-broad; "
+            "they are mutually exclusive."
+        )
+    if not resume_from_tab_selection and not resume_from_broad and not folder_id:
+        raise CommandError("folder_id is required when not in a resume mode")
 
     workbook_id_re = _corpus_regex_from_config(
         config, "workbook_id_regex", DEFAULT_WORKBOOK_ID_PATTERN
@@ -663,6 +697,69 @@ def run_cohort_corpus(
                 raise CommandError(
                     f"{index_path} records[{row_index}] is missing one of {required_index_keys!r}"
                 )
+
+    elif resume_from_broad:
+        if not broad_path.exists():
+            raise CommandError(
+                f"--resume-from-broad requires existing {broad_path}; none found"
+            )
+        if not index_path.exists():
+            raise CommandError(
+                f"--resume-from-broad requires existing {index_path} from an earlier "
+                "discovery run. Run profile_cohort_corpus without resume flags first."
+            )
+        try:
+            broad_payload = json.loads(broad_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"Could not parse {broad_path}: {exc}") from exc
+        inventory_rows = broad_payload.get("inventory_rows")
+        if not isinstance(inventory_rows, list):
+            raise CommandError(
+                f"{broad_path} is missing 'inventory_rows' list. "
+                "Re-run discovery without resume flags to regenerate in the new format."
+            )
+        try:
+            workbook_index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"Could not parse {index_path}: {exc}") from exc
+        index_records = workbook_index_payload.get("records")
+        if not isinstance(index_records, list) or not index_records:
+            raise CommandError(f"{index_path} must contain a non-empty 'records' list")
+
+        tab_shortlist = select_tabs_from_inventory(
+            index_records,
+            inventory_rows,
+            tab_score_heuristics=tab_score_heuristics,
+        )
+        write_json(
+            tab_shortlist_path,
+            {
+                "generated_from": broad_path.name,
+                "candidate_count": len(
+                    {(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}
+                ),
+                "selected_count": len(tab_shortlist),
+                "selected": tab_shortlist,
+            },
+        )
+
+        heuristic_tabs = auto_select_tabs(
+            tab_shortlist, per_workbook=int(config.get("tab_auto_limit", 3))
+        )
+        overrides = config.get("tab_selection_overrides")
+        approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
+        tab_selection_payload = {
+            "policy": (
+                "heuristic tab selection (tab_selection_overrides applied)"
+                if overrides
+                else "heuristic tab selection"
+            ),
+            "approved_tabs": approved_tabs,
+        }
+        if overrides:
+            tab_selection_payload["overrides_applied"] = overrides
+        write_json(tab_selection_path, tab_selection_payload)
+
     else:
         include_tabs = not bool(config.get("discovery_no_tabs"))
         tree = walk_folder(
@@ -742,6 +839,7 @@ def run_cohort_corpus(
                 "success_count": sum(1 for row in broad_results if row["exit_code"] == 0),
                 "failure_count": sum(1 for row in broad_results if row["exit_code"] != 0),
                 "results": broad_results,
+                "inventory_rows": inventory_rows,
             },
         )
 
@@ -779,8 +877,19 @@ def run_cohort_corpus(
             tab_selection_payload["overrides_applied"] = overrides
         write_json(tab_selection_path, tab_selection_payload)
 
+    artifacts: dict[str, str] = {
+        "discovery": str(discovery_path),
+        "index": str(index_path),
+        "broad_coverage": str(broad_path),
+        "tab_shortlist": str(tab_shortlist_path),
+        "tab_selection": str(tab_selection_path),
+    }
+
+    if stop_before_deep:
+        return artifacts
+
     reuse_cached_deep = bool(skip_existing_deep) or bool(config.get("deep_skip_existing"))
-    deep_read_delay_seconds = float(config.get("deep_read_delay_seconds") or 0.0)
+    deep_read_delay_seconds = float(config.get("deep_read_delay_seconds") or 0.5)
 
     deep_results: list[dict] = []
     candidate_columns: list[dict] = []
@@ -791,7 +900,14 @@ def run_cohort_corpus(
     summary_for_candidates: dict
     resolved_out_json: str | None
 
+    _429_cooldown_seconds = float(config.get("deep_read_429_cooldown") or 60.0)
+    _429_max_cooldowns = int(config.get("deep_read_429_max_cooldowns") or 5)
+    _429_cooldown_count = 0
+    _429_abort = False
+
     for record in index_records:
+        if _429_abort:
+            break
         for tab_title in approved_tabs.get(record["workbook_code"], []):
             out_path = (
                 deep_dir
@@ -873,7 +989,30 @@ def run_cohort_corpus(
                         column_score_heuristics=column_score_heuristics,
                     )
                 )
+                _last_was_429 = False
             except Exception as exc:  # noqa: BLE001
+                is_429 = isinstance(exc, HttpError) and getattr(exc.resp, "status", None) == 429
+                if is_429:
+                    _429_cooldown_count += 1
+                    if _429_cooldown_count > _429_max_cooldowns:
+                        deep_results.append(
+                            {
+                                "year": record["year"],
+                                "workbook_code": record["workbook_code"],
+                                "spreadsheet_id": record["spreadsheet_id"],
+                                "tab_title": tab_title,
+                                "out_json": None,
+                                "exit_code": 1,
+                                "error": (
+                                    f"HttpError 429: exceeded {_429_max_cooldowns} "
+                                    f"global cooldowns; aborting deep profile"
+                                ),
+                                "reused_cached_deep": False,
+                            }
+                        )
+                        _429_abort = True
+                        break
+                    time.sleep(_429_cooldown_seconds)
                 deep_results.append(
                     {
                         "year": record["year"],

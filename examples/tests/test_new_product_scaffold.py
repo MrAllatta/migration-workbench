@@ -63,3 +63,44 @@ def test_new_product_coda_scaffold_writes_coda_config_and_docs(tmp_path):
     assert (output_dir / "config" / "coda_corpus.json").exists()
     assert not (output_dir / "config" / "coda_corpus.local.json").exists()
     assert (output_dir / "config" / "coda_live.local.json").exists()
+
+
+def test_check_env_regression_no_bashism(tmp_path):
+    """Generated Makefile must not contain bash-specific indirect expansion."""
+    output_dir = _run_new_product(tmp_path, "no-bashism")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    assert "${!var:-}" not in makefile, (
+        "check-env target uses bash-specific ${!var:-} syntax; "
+        "use POSIX-compatible printenv instead"
+    )
+
+
+def test_check_env_works_with_posix_sh(tmp_path):
+    """make check-env must pass/fail correctly under /bin/sh (dash)."""
+    output_dir = _run_new_product(tmp_path, "posix-check-env")
+    env_file = output_dir / ".env"
+    env_file.write_text(
+        "WORKBENCH=/tmp\n"
+        "DRIVE_FOLDER_ID=test-folder\n"
+        "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=test@test.com\n"
+    )
+
+    result = subprocess.run(
+        ["make", "-C", str(output_dir), "check-env"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, (
+        f"check-env failed with all vars set:\n{result.stderr}{result.stdout}"
+    )
+
+    env_file.write_text(
+        "WORKBENCH=/tmp\n"
+        "DRIVE_FOLDER_ID=\n"
+        "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=test@test.com\n"
+    )
+    result = subprocess.run(
+        ["make", "-C", str(output_dir), "check-env"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "DRIVE_FOLDER_ID" in result.stderr

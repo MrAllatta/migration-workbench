@@ -30,6 +30,26 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--stop-before-deep",
+            action="store_true",
+            help=(
+                "Stop after writing tab selection; skip deep grid fetches and "
+                "column scoring. Use for Phase 1 (discovery + tab selection) "
+                "before committing to expensive deep API calls."
+            ),
+        )
+        parser.add_argument(
+            "--resume-from-broad",
+            action="store_true",
+            help=(
+                "Phase 2 mode: re-read broad_profile_coverage_<date>.json and "
+                "in_scope_workbook_index_<date>.json from disk, then re-run tab "
+                "scoring and selection using current config heuristics. No Drive "
+                "or Sheets API calls. Combine with --stop-before-deep to stop after "
+                "selection, or omit it to continue into deep profiling."
+            ),
+        )
+        parser.add_argument(
             "--skip-existing-deep",
             action="store_true",
             help=(
@@ -45,14 +65,6 @@ class Command(BaseCommand):
             raise CommandError(f"Config not found: {config_path}")
         config = json.loads(config_path.read_text(encoding="utf-8"))
 
-        folder_id = options.get("folder") or os.environ.get("DRIVE_FOLDER_ID")
-        if not folder_id:
-            raise CommandError(
-                "A Drive folder id is required. Pass --folder or set DRIVE_FOLDER_ID in .env"
-            )
-        from connectors.google_sheets import extract_drive_folder_id
-        folder_id = extract_drive_folder_id(folder_id)
-
         out_dir = Path(options["out_dir"]).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         date_stamp = options.get("date_stamp") or datetime.now(UTC).date().isoformat()
@@ -63,13 +75,21 @@ class Command(BaseCommand):
                 "config": str(config_path),
                 "out_dir": str(out_dir),
                 "date_stamp": date_stamp,
-                "folder_id": folder_id,
+                "folder_id": config.get("folder_id"),
                 "in_scope_count": len(config.get("in_scope_workbooks") or []),
             }
             out_path = out_dir / f"profile_cohort_corpus_smoke_{date_stamp}.json"
             out_path.write_text(json.dumps(smoke_payload, indent=2), encoding="utf-8")
             self.stdout.write(self.style.SUCCESS(f"profile_cohort_corpus smoke wrote {out_path}"))
             return
+
+        folder_id = options.get("folder") or os.environ.get("DRIVE_FOLDER_ID")
+        if not folder_id:
+            raise CommandError(
+                "A Drive folder id is required. Pass --folder or set DRIVE_FOLDER_ID in .env"
+            )
+        from connectors.google_sheets import extract_drive_folder_id
+        folder_id = extract_drive_folder_id(folder_id)
 
         scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
         drive_service = build_google_service("drive", "v3", scopes)
@@ -82,6 +102,8 @@ class Command(BaseCommand):
             out_dir=out_dir,
             date_stamp=date_stamp,
             resume_from_tab_selection=options.get("resume_from_tab_selection", False),
+            resume_from_broad=options.get("resume_from_broad", False),
+            stop_before_deep=options.get("stop_before_deep", False),
             skip_existing_deep=options.get("skip_existing_deep", False),
         )
         self.stdout.write(self.style.SUCCESS("profile_cohort_corpus wrote artifacts:"))

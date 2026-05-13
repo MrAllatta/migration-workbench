@@ -35,10 +35,11 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
    python manage.py profile_drive_folder --folder <folder-id-or-url> --out build/drive_tree.json
   ```
    A `.md` sibling is written next to the JSON for quick review.
-3. **Corpus config** — Copy `[example_data/cohort_corpus.example.json](../example_data/cohort_corpus.example.json)`. Set:
-  - `workbook_id_regex` — Must include a **capturing group**; group **1** is the workbook id compared to `in_scope_workbooks`.
+3. **Inspect tree, then configure corpus config** — Review the drive tree output (JSON or Markdown) to understand workbook naming patterns, folder structure, and which spreadsheets exist. Then copy `[example_data/cohort_corpus.example.json](../example_data/cohort_corpus.example.json)` and set:
+  - `workbook_id_regex` — Must include a **capturing group**; group **1** is the workbook id compared to `in_scope_workbooks`. Test against the tree output first: ``grep -oP '\b(\d{3})\b' data/profile_snapshots/drive_tree.md | sort -u``
   - `year_regex` — Optional override; default finds `20xx` years in folder or file names.
   - `in_scope_workbooks` — List of ids exactly as captured by group 1 of `workbook_id_regex`.
+  - `tab_score` and `column_score` heuristics — Domain tokens that boost matching tabs and columns during scoring.
   - Set `DRIVE_FOLDER_ID` in `.env` with the Drive folder id or URL (not in the JSON config).
 4. **Corpus run** — Outputs dated JSON under `--out-dir` (product repos often use `data/profile_snapshots/`):
   ```bash
@@ -63,7 +64,11 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
 
 Every file name in corpus discovery must expose an id that `**workbook_id_regex`** extracts as **group 1**. Entries in `**in_scope_workbooks`** must match those strings exactly (e.g. if the regex captures `201`, include `"201"`, not a label like `"FarmPlan"` unless your regex captures that text).
 
-Dry-run sanity: grep your `profile_drive_folder` markdown output against the regex you intend to use before a long corpus run.
+Use the drive tree Markdown output to verify your regex before a long corpus run:
+```bash
+grep -oP '\b(\d{3})\b' data/profile_snapshots/drive_tree.md | sort -u
+```
+Replace the pattern with your actual `workbook_id_regex` to confirm it captures only the expected workbook codes — not fragments of year strings or other digits.
 
 ## Native Google Sheets only
 
