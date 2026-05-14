@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -66,6 +66,14 @@ check-generated:
 	$(PYTHON) -c "from $(or $(APP_LABEL),core).models import *; print('import OK')"
 	@echo "--- django check ---"
 	$(MANAGE) check
+
+SNAPSHOT_DIR ?= build/codegen-snapshots
+
+snapshot-codegen:
+	$(PYTHON) scripts/snapshot_codegen.py --snapshot "$(CONTRACT)" --out-dir "$(SNAPSHOT_DIR)" --app-label "$(or $(APP_LABEL),core)"
+
+check-snapshots:
+	$(PYTHON) scripts/snapshot_codegen.py --check "$(CONTRACT)" --out-dir "$(SNAPSHOT_DIR)" --app-label "$(or $(APP_LABEL),core)"
 
 pull-bundle:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG is required}" BUNDLE_OUTPUT_DIR="$${BUNDLE_OUTPUT_DIR:-bundle_out}" scripts/run_import.sh pull_bundle
