@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -40,6 +40,25 @@ health-smoke:
 
 format:
 	$(BLACK) .
+
+CONTRACT ?= build/schema-contract.yaml
+OUT ?= build/out.py
+
+validate-contract:
+	$(PYTHON) scripts/validate_contract.py "$(CONTRACT)"
+
+diff-generated:
+	@test -f $(OUT).bak || { echo "No backup at $(OUT).bak"; exit 1; }
+	@diff -u $(OUT).bak $(OUT) || true
+
+generate-admin-light:
+	$(MANAGE) generate_admin --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)
+
+generate-admin:
+	$(MANAGE) generate_admin --contract $(CONTRACT) --manifest $(MANIFEST) --out $(OUT) $(if $(FORCE),--force)
+
+post-generate:
+	@test -f scripts/post-generate.sh && bash scripts/post-generate.sh || echo "No scripts/post-generate.sh found"
 
 pull-bundle:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG is required}" BUNDLE_OUTPUT_DIR="$${BUNDLE_OUTPUT_DIR:-bundle_out}" scripts/run_import.sh pull_bundle

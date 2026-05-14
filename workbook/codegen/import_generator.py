@@ -468,11 +468,14 @@ def render_import_py(
 
     # Collect models with import config, sorted by tier then name.
     candidates: list[tuple[int, str, dict[str, Any]]] = []
+    skipped: list[str] = []
     for table in tables:
+        name = get_model_name(table)
         cfg = get_import_config(table)
         if cfg is None:
+            ws = table.get("bundle_worksheet_title") or "(no source tab)"
+            skipped.append(f"# Skipped {name}: no import_config (worksheet: {ws})")
             continue
-        name = get_model_name(table)
         tier = int(cfg.get("tier", 99))
         candidates.append((tier, name, table))
 
@@ -510,6 +513,11 @@ def render_import_py(
         f"# App label: {app_label}",
         "# Last generated: see git history",
         "",
+    ]
+    if skipped:
+        parts.extend(skipped)
+        parts.append("")
+    parts.extend([
         "from typing import Any",
         "from importer.base import BaseImportCommand",
         f"from {app_label}.models import {', '.join(model_names)}",
@@ -528,7 +536,7 @@ def render_import_py(
         '        """Hook: called after each update_or_create."""',
         "        pass",
         "",
-    ]
+    ])
 
     # Add _prepare_<field> stubs for each model.
     seen_prepare_stubs: set[str] = set()

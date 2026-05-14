@@ -15,10 +15,12 @@ from __future__ import annotations
 from typing import Any
 
 from workbook.codegen.contract import (
+    get_computed_fields,
     get_db_table_name,
     get_enums,
     get_extra_imports,
     get_fields,
+    get_is_abstract,
     get_model_base,
     get_model_meta,
     get_model_name,
@@ -26,6 +28,7 @@ from workbook.codegen.contract import (
 )
 from workbook.codegen.python_render import (
     render_choices_class,
+    render_computed_property,
     render_field,
     render_import_block,
     render_meta,
@@ -56,9 +59,14 @@ def render_model(
     fields = get_fields(table)
     meta_options = dict(get_model_meta(table))
     str_template = get_str_template(table)
+    is_abstract = get_is_abstract(table)
+    computed_fields = get_computed_fields(table)
 
-    # Always set db_table so every generated model has an explicit table name.
-    meta_options["db_table"] = get_db_table_name(table, app_label)
+    if is_abstract:
+        meta_options.pop("db_table", None)
+        meta_options["abstract"] = True
+    else:
+        meta_options["db_table"] = get_db_table_name(table, app_label)
 
     lines: list[str] = []
 
@@ -78,8 +86,18 @@ def render_model(
             )
         )
 
-    if not fields:
+    if not fields and not computed_fields:
         lines.append("    pass")
+
+    for cf in computed_fields:
+        lines.append(
+            render_computed_property(
+                name=cf["name"],
+                return_type=cf.get("return_type"),
+                expression=cf.get("expression"),
+                indent=4,
+            )
+        )
 
     rendered_meta = render_meta(meta_options, indent=4)
     if rendered_meta:

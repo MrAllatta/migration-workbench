@@ -148,6 +148,40 @@ def render_import_block(
     return "\n".join(lines)
 
 
+def render_computed_property(
+    name: str,
+    return_type: str | None = None,
+    expression: str | None = None,
+    indent: int = 4,
+) -> str:
+    """Render a ``@property`` method from a computed field definition.
+
+    Args:
+        name: Property name (e.g. ``"signed_quantity"``).
+        return_type: Optional return type annotation.
+        expression: Python source for the property body.  When ``None``,
+            renders a stub with ``...``.
+        indent: Spaces of indentation (default 4).
+
+    Returns:
+        Property method source block.
+    """
+    pad = " " * indent
+    lines: list[str] = []
+    lines.append(f"{pad}@property")
+    if return_type:
+        lines.append(f"{pad}def {name}(self) -> {return_type}:")
+    else:
+        lines.append(f"{pad}def {name}(self):")
+    if expression:
+        for line in expression.strip().split("\n"):
+            lines.append(f"{pad * 2}{line}")
+    else:
+        lines.append(f"{pad * 2}...")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_str_method(template: str | None, indent: int = 4) -> str:
     """Render ``def __str__`` method.
 

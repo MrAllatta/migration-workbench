@@ -15,7 +15,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from workbook.codegen.admin_generator import render_admin_py
-from workbook.codegen.contract import load_contract
+from workbook.codegen.contract import load_contract, validate_contract_tables
 from workbook.codegen.manifest import load_manifest
 
 
@@ -72,6 +72,10 @@ class Command(BaseCommand):
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
+
+        warnings = validate_contract_tables(contract)
+        for w in warnings:
+            self.stdout.write(self.style.WARNING(f"validation: {w}"))
 
         self.stdout.write(
             self.style.SUCCESS(

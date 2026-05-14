@@ -14,7 +14,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from workbook.codegen.contract import load_contract
+from workbook.codegen.contract import load_contract, validate_contract_tables
 from workbook.codegen.import_generator import render_import_py
 
 
@@ -59,6 +59,10 @@ class Command(BaseCommand):
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
+
+        warnings = validate_contract_tables(contract)
+        for w in warnings:
+            self.stdout.write(self.style.WARNING(f"validation: {w}"))
 
         tables_with_import = [
             t for t in (contract.get("tables") or [])
