@@ -6,6 +6,8 @@
   "tab_auto_limit": 3,
   "column_min_score": 4,
   "tab_selection_overrides": {},
+  "deep_read_delay_seconds": 1.0,
+  "deep_skip_existing": true,
   "heuristics": {
     "tab_score": {
       "operational_tokens": [],
@@ -18,7 +20,10 @@
       "derived_weight": -4,
       "support_weight": -2,
       "reference_combo_weight": 3,
-      "match_mode": "substring"
+      "match_mode": "substring",
+      "tab_exclude_patterns": [],
+      "expansion_formula_penalty": 0,
+      "expansion_formula_threshold": 0.5
     },
     "column_score": {
       "domain_keyword_tokens": []

@@ -61,6 +61,27 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
     - `"word"` — token must match on word boundaries (``\\b``), so `"crop plan"`
       does not match `"crop planner"`.
 
+    **Tab exclusion by pattern** (`tab_exclude_patterns`, optional):
+    A list of dicts `{pattern, penalty}`. Any tab whose title matches the
+    regex `pattern` receives the configured `penalty` (default `-5`) added
+    to its auto-selection score. Useful for blocking known noise patterns:
+    ```json
+    "tab_exclude_patterns": [
+      {"pattern": "^Sheet\\d+$"},
+      {"pattern": "blankslate|template", "penalty": -10}
+    ]
+    ```
+    Patterns are tested against the lowered tab title via `re.compile`.
+    Invalid regexes are logged and skipped.
+
+    **Expansion formula penalty** (`expansion_formula_penalty` / `expansion_formula_threshold`, optional):
+    Reduces auto-selection scores for tabs dominated by auto-expanding formulas
+    (pivot tables, dashboards, summary sheets). Applicable **after** deep
+    profiling when formula pattern data is available.
+    - `expansion_formula_penalty` (int, default `0`): penalty applied per-tab.
+    - `expansion_formula_threshold` (float, default `0.5`): minimum fraction of
+      columns classified as `expansion_formula` to trigger the penalty.
+
   - Set `DRIVE_FOLDER_ID` in `.env` with the Drive folder id or URL (not in the JSON config).
 4. **Corpus run** — Outputs dated JSON under `--out-dir` (product repos often use `data/profile_snapshots/`):
   ```bash

@@ -499,6 +499,8 @@ profile-cohort-corpus-phase2:
 	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-broad --stop-before-deep
 
 # Phase 3: deep profile from hand-edited tab_selection_<date>.json. Run after heuristics are final.
+# Available tab_score heuristics: tab_exclude_patterns (regex block list),
+# expansion_formula_penalty, expansion_formula_threshold, plus token lists.
 profile-cohort-corpus-phase3:
 	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-tab-selection
 """
@@ -584,7 +586,7 @@ Profiling follows a **3-phase workflow** to avoid expensive API calls until heur
    make profile-drive-folder
    ```
    Output: `DRIVE_FOLDER_OUT` (default: `data/profile_snapshots/drive_tree.json`).
-4. **Inspect the drive tree, then configure heuristics** in `config/cohort_corpus.json` — review the tree output to set `workbook_id_regex`, `in_scope_workbooks`, tab score rules, and column selectors based on actual workbook names and structure.
+4. **Inspect the drive tree, then configure heuristics** in `config/cohort_corpus.json` — review the tree output to set `workbook_id_regex`, `in_scope_workbooks`, tab score rules, and column selectors based on actual workbook names and structure. Available `tab_score` heuristics: `operational_tokens`, `reference_tokens`, `support_tokens`, `derived_tokens`, `tab_exclude_patterns` (regex-based tab blocking), `expansion_formula_penalty` and `expansion_formula_threshold` (formula-heavy tab downranking).
 5. **Run Phase 1** (discovers workbooks, lists tabs, scores and selects, then stops before deep grid fetches):
    ```bash
    make profile-cohort-corpus-phase1
@@ -611,7 +613,7 @@ make profile-cohort-corpus-phase3
 
 This skips Drive discovery and tab listing, going straight to deep profiling of the selected tabs.
 
-**Review the full output** — profiler artifacts include column types, formula patterns, header snapshots. Read them before moving to schema design.
+**Review the full output** — profiler artifacts include column types, formula pattern classification (`raw`, `row_formula`, `expansion_formula`, `hybrid`, `empty`), and header snapshots. Read them before moving to schema design.
 """
 
 
@@ -1035,8 +1037,8 @@ Set **`GOOGLE_IMPERSONATE_SERVICE_ACCOUNT`** in `.env` when profiling Google Dri
 
 Profiling uses a **3-phase workflow** to avoid expensive API calls during heuristic tuning:
 - **Phase 1** (`make profile-cohort-corpus-phase1`): discovery + tab selection only, stops before deep grid fetches. Review `tab_selection_<date>.json`.
-- **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json`, then re-run.
-- **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`.
+- **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json` (token lists, `tab_exclude_patterns`, `expansion_formula_penalty`), then re-run.
+- **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`. Output includes formula pattern classification per column.
 
 **Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
 

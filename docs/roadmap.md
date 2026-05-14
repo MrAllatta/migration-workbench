@@ -179,51 +179,62 @@ been pulled yet). Known gaps:
 - **Import tier ordering is manual** — the `tier` integer is set by hand.
   Auto-detect dependency order from `fk_lookup` chains.
 
-## Medium-term (0.5.x–0.6.x)
+## Shipped: 0.5.x–0.6.x
 
-### Schema design loop tooling
+### 0.5.0 — Migration safety & robustness
 
-The farm exercise followed the schema design loop (Profile → Observe →
-Draft → Decide → Author → Gate → Drift). Tooling for phases 3-5 (Draft
-through Author) is weakest.
+- **Migration safety checks:** `wb contract safety --old --new` detects
+  destructive schema changes before codegen (field removed, nullable→non-nullable →
+  DANGER; class change, max_length decreased, unique added → WARNING).
+- **Null-key robustness:** `_diff_fields()` normalises YAML `null:` mapping keys
+  to the string `"null"` to prevent `TypeError` in kwarg comparison.
 
-- **Contract diff tool** — compare two contract versions and emit the
-  model/field/add/remove/change delta. Essential for drift checking and
-  code review.
-- **Profile-to-contract bridge** — `scaffold_workbook_schema` already
-  does this for source-aligned models. Extend it to suggest designed
-  model structures from profile patterns (e.g., "these three tabs have
-  overlapping columns → possible designed model").
-- **Schema review checklist** — `wb contract review --contract contract.yaml`
-  that checks for common issues: missing `unique_together`, nullable
-  FKs without `on_delete`, implicit `blank=True` on CharFields, etc.
+### 0.6.0 — Profiler ingestion hardening & formula analysis
 
-### Generated code quality verification
+- **Reserved-character sanitization:** Tab names containing `|`, `:`, `\`, `/`,
+  `*`, `?`, `"`, `<`, `>`, `%` are automatically replaced with underscore at
+  ingestion, with a logged warning. Applied in both Google Sheets and Coda
+  shape-structure functions.
+- **Tab exclusion by pattern:** `tab_exclude_patterns` in `heuristics.tab_score`
+  — a list of `{pattern, penalty}` dicts. Any tab whose title matches a
+  regex pattern receives the configured penalty (default `-5`). Useful for
+  blocking tabs matching known noise patterns (e.g. `"^Sheet\d+$"`, `"blankslate"`).
+- **Formula structure analysis:** Profiler classifies every column into one of:
+  `raw` (no formulas), `row_formula` (calculated-row), `expansion_formula`
+  (auto-expanding), `hybrid` (mixed), or `empty` (all blanks). The taxonomy
+  flows into schema contracts and view manifests.
+- **Expansion formula penalty:** `expansion_formula_penalty` (default `0`) and
+  `expansion_formula_threshold` (default `0.5`) in `heuristics.tab_score`
+  reduce auto-selection scores for tabs dominated by auto-expanding formulas
+  (pivot tables, dashboards, summary sheets).
+- **Tab name pipes sanitized:** `|` characters in tab names are replaced with
+  `_` during tab listing, preventing encoding issues in downstream bundle paths.
 
-- **`make check-generated`** — runs `py_compile` on generated files,
-  then `python -c "from core.models import *"` to verify imports,
-  then `manage.py check` to catch Django-level issues.
-- **Migration safety checks** — detect if contract changes would
-  produce destructive migrations (nullable→non-nullable, removed fields).
-  Warn before generation.
-- **Snapshot testing** — store generated output in `build/codegen-snapshots/`
-  by contract version. CI compares snapshots to detect unexpected
-  output changes.
+## Medium-term (0.7.x–0.9.x, toward v1.0)
 
-### View manifest and discovery integration
+See the [release slicing design](docs/superpowers/specs/2026-05-14-0x-release-slicing-design.md)
+for the detailed plan. In brief:
 
-The view manifest and discovery interview pipeline was not exercised
-in the farm implementation (admin was generated without manifest).
-These need end-to-end testing:
+### 0.7 — Contract & codegen hardening
+- **Profile-to-contract bridge** — extends `scaffold_workbook_schema` to
+  suggest designed/aggregate models from overlapping column patterns
+  across tabs (shipped).
+- **Contract review checklist** — FK lookup target validation, admin inlines
+  target existence, computed_field snake_case naming (shipped).
+- **`make validate-contract` in CI** — wired into scaffolded product Makefile.
+- **Codegen hardening** — fix corpus papercuts as surfaced.
 
-- **Admin generation from view manifest** — verify that `editable_fields`,
-  `computed_fields`, `filterable_by` actually influence the generated
-  admin (list_display, readonly_fields, list_filter).
-- **Discovery interview merge** — the `make merge-discovery-notes`
-  pipeline patches the view manifest. This should feed into admin
-  regeneration cleanly.
-- **Status field detection** — the heuristic picks the first CharField
-  with choices. Allow manual override in the manifest.
+### 0.8 — Import pipeline end-to-end
+- Exercise import generator with real bundles.
+- Harden column transforms, error summaries, multi-model atomic tiers.
+
+### 0.9 — View manifest, discovery & deployment
+- Admin generation from view manifest (exercise `editable_fields`,
+  `computed_fields`, `filterable_by`).
+- Discovery interview pipeline (`generate_discovery_interview` →
+  `merge_discovery_notes`).
+- Production deployment on Fly.io with real data.
+- Drift check wiring (`wb contract diff` as periodic check).
 
 ## Longer-term (post-v1.0)
 
