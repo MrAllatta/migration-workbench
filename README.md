@@ -173,6 +173,13 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.7.0
+
+- **Profile-to-contract bridge — designed model detection:** `scaffold_workbook_schema` now clusters tabs by overlapping column sets (>50% Jaccard-like overlap) and suggests designed/aggregate models with `source_tab: null`. New module `workbook.codegen.designed_model_detection`.
+- **Contract review checklist round-out:** `wb contract review` now checks FK lookup target existence, admin inlines target models, and computed_field snake_case naming conventions.
+- **`validate-contract` Make target:** Wired into scaffolded product Makefile; aggregates `check validate-contract` for CI.
+- **`corpus-codegen-report` Make target:** Runs contract review and Django system check on generated files; corpus feedback tracker doc for capturing papercuts.
+
 ### 0.6.0
 
 - **Reserved-character sanitization:** Tab names containing `|`, `:`, `\`, `/`, `*`, `?`, `"`, `<`, `>`, `%` are automatically sanitized to underscore at ingestion, with a logged warning.

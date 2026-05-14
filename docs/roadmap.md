@@ -215,14 +215,13 @@ been pulled yet). Known gaps:
 See the [release slicing design](docs/superpowers/specs/2026-05-14-0x-release-slicing-design.md)
 for the detailed plan. In brief:
 
-### 0.7 — Contract & codegen hardening
-- **Profile-to-contract bridge** — extends `scaffold_workbook_schema` to
-  suggest designed/aggregate models from overlapping column patterns
-  across tabs (shipped).
+### 0.7 — Contract & codegen hardening (shipped 2026-05-14)
+- **Profile-to-contract bridge** — `scaffold_workbook_schema` suggests
+  designed/aggregate models from overlapping column patterns (shipped).
 - **Contract review checklist** — FK lookup target validation, admin inlines
   target existence, computed_field snake_case naming (shipped).
-- **`make validate-contract` in CI** — wired into scaffolded product Makefile.
-- **Codegen hardening** — fix corpus papercuts as surfaced.
+- **`make validate-contract` and `corpus-codegen-report`** in scaffolded CI.
+- **Corpus feedback tracker** — lightweight issue doc for codegen papercuts.
 
 ### 0.8 — Import pipeline end-to-end
 - Exercise import generator with real bundles.
