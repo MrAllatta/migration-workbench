@@ -733,6 +733,128 @@ def _diff_fields(
     return entry
 
 
+MIGRATION_SEVERITY_DANGER = "DANGER"
+MIGRATION_SEVERITY_WARNING = "WARNING"
+
+
+def migration_safety_checks(diffs: dict[str, Any]) -> list[dict[str, Any]]:
+    """Inspect ``diff_contracts()`` output for migration safety risks.
+
+    Checks for field removals, nullable→non-nullable changes, field type
+    changes, ``max_length`` reductions, ``unique=True`` additions, and
+    non-nullable fields added without defaults.
+
+    Args:
+        diffs: Output from :func:`diff_contracts`.
+
+    Returns:
+        List of risk items, each with ``severity`` (DANGER or WARNING),
+        ``model``, ``field``, ``message``, and optional ``detail``.
+        Empty list when no risks are found.
+    """
+    results: list[dict[str, Any]] = []
+
+    for model_name, model_diff in (diffs.get("model_diffs") or {}).items():
+        # Field removals.
+        for f in model_diff.get("fields_removed") or []:
+            results.append({
+                "severity": MIGRATION_SEVERITY_DANGER,
+                "model": model_name,
+                "field": f["name"],
+                "message": "Field removed — existing data in source will be lost",
+                "detail": {"old_class": f.get("class", "")},
+            })
+
+        # Field changes.
+        for fc in model_diff.get("fields_changed") or []:
+            fname = fc["name"]
+            kwargs_diff = fc.get("kwargs") or {}
+
+            # nullable → non-nullable
+            null_old = kwargs_diff.get("null", {}).get("old")
+            null_new = kwargs_diff.get("null", {}).get("new")
+            if null_old is True and null_new is not True:
+                results.append({
+                    "severity": MIGRATION_SEVERITY_DANGER,
+                    "model": model_name,
+                    "field": fname,
+                    "message": "Field changed from nullable to non-nullable — "
+                    "migration will fail if null rows exist",
+                    "detail": {"null": {"old": True, "new": null_new}},
+                })
+
+            # Field class changed
+            class_change = fc.get("class")
+            if class_change and class_change["old"] != class_change["new"]:
+                results.append({
+                    "severity": MIGRATION_SEVERITY_WARNING,
+                    "model": model_name,
+                    "field": fname,
+                    "message": (
+                        f"Field class changed: "
+                        f"{_field_class_short(class_change['old'])} -> "
+                        f"{_field_class_short(class_change['new'])}"
+                        " — existing data may not cast cleanly"
+                    ),
+                    "detail": {"old_class": class_change["old"],
+                               "new_class": class_change["new"]},
+                })
+
+            # max_length decreased
+            max_old = kwargs_diff.get("max_length", {}).get("old")
+            max_new = kwargs_diff.get("max_length", {}).get("new")
+            if (max_old is not None and max_new is not None
+                    and max_old > max_new):
+                results.append({
+                    "severity": MIGRATION_SEVERITY_WARNING,
+                    "model": model_name,
+                    "field": fname,
+                    "message": (
+                        f"max_length decreased: {max_old} -> {max_new}"
+                        " — existing data may be truncated"
+                    ),
+                    "detail": {"old_max_length": max_old,
+                               "new_max_length": max_new},
+                })
+
+            # unique=True added
+            unique_old = kwargs_diff.get("unique", {}).get("old")
+            unique_new = kwargs_diff.get("unique", {}).get("new")
+            if unique_new is True and unique_old is not True:
+                results.append({
+                    "severity": MIGRATION_SEVERITY_WARNING,
+                    "model": model_name,
+                    "field": fname,
+                    "message": (
+                        "unique=True added — "
+                        "migration will fail if duplicate values exist"
+                    ),
+                    "detail": {"unique": {"old": unique_old, "new": True}},
+                })
+
+        # Field additions — check non-nullable without default.
+        for f in model_diff.get("fields_added") or []:
+            kwargs = f.get("kwargs") or {}
+            null = kwargs.get("null")
+            has_default = (
+                "default" in kwargs
+                or null is True
+            )
+            if not has_default:
+                results.append({
+                    "severity": MIGRATION_SEVERITY_WARNING,
+                    "model": model_name,
+                    "field": f["name"],
+                    "message": (
+                        "Non-nullable field added without default — "
+                        "existing rows will need a backfill value"
+                    ),
+                    "detail": {"class": f.get("class", "")},
+                })
+
+    return results
+
+
 def _diff_meta(
     old_meta: dict[str, Any],
     new_meta: dict[str, Any],
