@@ -387,7 +387,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check validate-contract validate shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
+.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
 
 venv:
 	python3 -m venv $(VENV)
@@ -414,6 +414,12 @@ validate-contract:
 	$(MANAGE) wb contract review --contract "$(CONTRACT)"
 
 validate: check validate-contract
+
+corpus-codegen-report:
+	@echo "=== Model compilation ==="
+	$(MANAGE) wb contract review --contract "$(CONTRACT)"
+	@echo "=== Generated file check ==="
+	$(MANAGE) check
 
 shell:
 	$(MANAGE) shell
