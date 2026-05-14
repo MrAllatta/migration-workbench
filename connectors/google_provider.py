@@ -6,6 +6,7 @@ shaping helper used by ``pull_bundle --include-structure`` to turn the raw
 """
 
 from connectors.base import ProviderAdapter
+from connectors.tab_name_utils import sanitize_tab_name
 from connectors.google_sheets import (
     DRIVE_READONLY_SCOPE,
     SHEETS_READONLY_SCOPE,
@@ -123,6 +124,8 @@ def shape_sheet_structure(response: dict, worksheet_title: str) -> dict | None:
                 "range": fv.get("range"),
             }
         )
+
+    worksheet_title = sanitize_tab_name(worksheet_title)
 
     return {
         "worksheet_title": worksheet_title,
