@@ -637,3 +637,92 @@ def test_generated_import_reports_missing_required(tmp_path, db):
     errors = [e for e in cmd.row_errors if e["code"] == "missing_required"]
     assert len(errors) == 1
     assert errors[0]["model"] == "ExampleCrop"
+
+
+# ---------------------------------------------------------------------------
+# Multi-source column_map and field_transforms
+# ---------------------------------------------------------------------------
+
+
+def _contract_multi_source() -> dict:
+    """Return a v1.1 contract with a multi-source column_map entry."""
+    return {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "person",
+                "columns": [
+                    {
+                        "suggested_field_name": "full_name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "age",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"null": True, "blank": True},
+                    },
+                ],
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "people.csv",
+                    "column_map": {
+                        "full_name": ["First Name", "Last Name"],
+                        "age": "Age",
+                    },
+                    "field_transforms": {
+                        "full_name": "' '.join(p for p in parts if p)",
+                    },
+                    "unique_on": ["full_name"],
+                },
+            },
+        ],
+    }
+
+
+def test_multi_source_defaults_dict():
+    """Multi-source fields get parts collection + transform in defaults."""
+    from workbook.codegen.import_generator import render_import_py
+
+    source = render_import_py(_contract_multi_source(), app_label="core")
+    assert "full_name_parts" in source
+    assert "row.get('First Name'" in source
+    assert "row.get('Last Name'" in source
+    assert "lambda parts" in source
+    _check_compiles(source)
+
+
+def test_multi_source_default_join():
+    """Multi-source without explicit transform uses space join."""
+    contract = _contract_multi_source()
+    del contract["tables"][0]["import_config"]["field_transforms"]
+    from workbook.codegen.import_generator import render_import_py
+
+    source = render_import_py(contract, app_label="core")
+    assert "full_name_parts" in source
+    assert '" ".join' in source
+    _check_compiles(source)
+
+
+def test_multi_source_tab_config_excludes_list_entries():
+    """Multi-source entries are omitted from tab_config column_map."""
+    from workbook.codegen.import_generator import _render_tab_config
+
+    cfg = _contract_multi_source()["tables"][0]["import_config"]
+    rendered = _render_tab_config(cfg, indent=0)
+    assert "'full_name'" not in rendered
+    assert "'age'" in rendered
+
+
+def test_multi_source_unique_assignments():
+    """Unique multi-source fields get parts + transform in unique assignments."""
+    contract = _contract_multi_source()
+    from workbook.codegen.contract import get_fields, get_import_config
+    from workbook.codegen.import_generator import _render_unique_assignments
+
+    fields = get_fields(contract["tables"][0])
+    cfg = get_import_config(contract["tables"][0])
+    rendered = _render_unique_assignments(fields, cfg, indent=8)
+    assert "full_name_parts" in rendered
+    assert "full_name = (lambda parts" in rendered or 'full_name = " ".join' in rendered

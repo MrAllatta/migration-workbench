@@ -99,9 +99,14 @@ def _render_tab_config(import_cfg: dict[str, Any], indent: int = 8) -> str:
     if cmap:
         map_lines = []
         for field_name, source_header in sorted(cmap.items()):
+            # Multi-source entries (list of headers) are handled in field
+            # assignments, not passed to read_bundle_tab.
+            if isinstance(source_header, list):
+                continue
             map_lines.append(f"{inner}{inner}{field_name!r}: {source_header!r}")
-        map_body = ",\n".join(map_lines)
-        lines.append(f'{inner}"column_map": {{\n{map_body}\n{inner}}},')
+        if map_lines:
+            map_body = ",\n".join(map_lines)
+            lines.append(f'{inner}"column_map": {{\n{map_body}\n{inner}}},')
 
     defaults = import_cfg.get("default_values")
     if defaults:
@@ -207,6 +212,85 @@ def _render_field_assignment(
         return f'{pad}{field_name} = row.get({field_name!r}, "").strip()'
 
 
+def _render_value_expression(
+    field_name: str,
+    field: dict[str, Any],
+    import_cfg: dict[str, Any],
+    indent: int = 10,
+) -> tuple[str, str]:
+    """Render a field value expression and optional pre-statements.
+
+    For single-source fields the pre-statements string is empty and the
+    value expression is a ``row.get(...)`` call (optionally wrapped in a
+    parser like ``self._dec(...)``).
+
+    For multi-source fields (``column_map`` entry is a list) the
+    pre-statements assign ``parts_<field>`` and ``<field>`` variables
+    before the ``defaults`` dict; the value expression is just the
+    variable name.
+
+    Returns:
+        ``(pre_statements, value_expr)``. *pre_statements* is ``""``
+        when no preparatory statements are needed.
+    """
+    column_map = import_cfg.get("column_map") or {}
+    field_transforms = import_cfg.get("field_transforms") or {}
+    field_parsers = import_cfg.get("field_parsers") or {}
+    source_entry = column_map.get(field_name, field_name)
+
+    # Multi-source: column_map value is a list of source headers.
+    if isinstance(source_entry, list):
+        pad = " " * indent
+        parts_expr = ", ".join(
+            f'row.get({h!r}, "").strip()' for h in source_entry
+        )
+        parts_var = f"{field_name}_parts"
+        transform = field_transforms.get(field_name)
+        if transform:
+            code = (
+                f"{pad}{parts_var} = [{parts_expr}]\n"
+                f"{pad}{field_name} = "
+                f"(lambda parts: {transform})({parts_var})"
+            )
+        else:
+            code = (
+                f"{pad}{parts_var} = [{parts_expr}]\n"
+                f'{pad}{field_name} = '
+                f'" ".join(p for p in {parts_var} if p)'
+            )
+        return (code, field_name)
+
+    # Single source: read_bundle_tab remaps source headers to field names,
+    # so use field_name (not source_header) as the row key.
+    pad = " " * indent
+    parser = field_parsers.get(field_name) or _infer_parser(field)
+
+    if parser == "parse_date":
+        pre = (
+            f'{pad}raw_{field_name} = row.get({field_name!r}, "")\n'
+            f"{pad}{field_name} = "
+            f"self._parse_date(raw_{field_name}) "
+            f"if raw_{field_name}.strip() else None"
+        )
+        return (pre, field_name)
+    elif parser in ("dec", "int"):
+        default = _default_value(parser)
+        return (
+            "",
+            f'{_parser_method(parser)}(row.get({field_name!r}, ""), {default})',
+        )
+    elif parser == "bool":
+        return (
+            "",
+            f'{_parser_method(parser)}(row.get({field_name!r}, ""))',
+        )
+    else:
+        return (
+            "",
+            f'row.get({field_name!r}, "").strip()',
+        )
+
+
 def _render_defaults_dict(
     contract_fields: list[dict[str, Any]],
     import_cfg: dict[str, Any],
@@ -219,48 +303,31 @@ def _render_defaults_dict(
     and reference it inside.
     """
     fk_lookup = import_cfg.get("fk_lookup") or {}
-    field_parsers = import_cfg.get("field_parsers") or {}
     unique_on = set(import_cfg.get("unique_on") or [])
 
     pad = " " * indent
     inner = " " * (indent + 4)
 
-    raw_statements: list[str] = []
+    pre_statements: list[str] = []
     dict_entries: list[str] = []
 
     for field in contract_fields:
         fname = field["name"]
-        # Skip FK fields (resolved separately) and unique fields.
         if fname in fk_lookup or fname in unique_on:
             continue
-        parser = field_parsers.get(fname) or _infer_parser(field)
 
-        if parser == "parse_date":
-            raw_statements.append(f'{inner}raw_{fname} = row.get({fname!r}, "")')
-            val = f"self._parse_date(raw_{fname}) if raw_{fname}.strip() else None"
-            dict_entries.append(
-                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
-            )
-        elif parser in ("dec", "int"):
-            default = _default_value(parser)
-            val = f'{_parser_method(parser)}(row.get({fname!r}, ""), {default})'
-            dict_entries.append(
-                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
-            )
-        elif parser == "bool":
-            val = f'{_parser_method(parser)}(row.get({fname!r}, ""))'
-            dict_entries.append(
-                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
-            )
-        else:
-            val = f'row.get({fname!r}, "").strip()'
-            dict_entries.append(
-                f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
-            )
+        pre, val = _render_value_expression(
+            fname, field, import_cfg, indent=indent
+        )
+        if pre:
+            pre_statements.append(pre)
+        dict_entries.append(
+            f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
+        )
 
     parts: list[str] = []
-    if raw_statements:
-        parts.append("\n".join(raw_statements))
+    if pre_statements:
+        parts.append("\n".join(pre_statements))
     parts.append(f"{pad}defaults = {{")
     if dict_entries:
         parts.append("\n".join(dict_entries))
@@ -279,7 +346,6 @@ def _render_unique_assignments(
     exist for the ``update_or_create`` unique kwargs.
     """
     fk_lookup = import_cfg.get("fk_lookup") or {}
-    field_parsers = import_cfg.get("field_parsers") or {}
     unique_on = import_cfg.get("unique_on") or []
 
     pad = " " * indent
@@ -291,29 +357,14 @@ def _render_unique_assignments(
         field = next((f for f in contract_fields if f["name"] == fname), None)
         if not field:
             continue
-        parser = field_parsers.get(fname) or _infer_parser(field)
 
-        if parser == "parse_date":
-            parts.append(f'{pad}raw_{fname} = row.get({fname!r}, "")')
-            parts.append(
-                f"{pad}{fname} = "
-                f"self._parse_date(raw_{fname}) if raw_{fname}.strip() else None"
-            )
-        elif parser in ("dec", "int"):
-            default = _default_value(parser)
-            parts.append(
-                f"{pad}{fname} = "
-                f'{_parser_method(parser)}(row.get({fname!r}, ""), {default})'
-            )
-        elif parser == "bool":
-            parts.append(
-                f"{pad}{fname} = "
-                f'{_parser_method(parser)}(row.get({fname!r}, ""))'
-            )
+        pre, val = _render_value_expression(
+            fname, field, import_cfg, indent=indent
+        )
+        if pre:
+            parts.append(pre)
         else:
-            parts.append(
-                f'{pad}{fname} = row.get({fname!r}, "").strip()'
-            )
+            parts.append(f"{pad}{fname} = {val}")
 
     return "\n".join(parts)
 
