@@ -581,3 +581,174 @@ def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})
 
     return fields
+
+
+def diff_contracts(
+    old: dict[str, Any],
+    new: dict[str, Any],
+) -> dict[str, Any]:
+    """Compare two normalised schema contracts and return a structured diff.
+
+    Compares tables (matched by ``suggested_model_name``), resolved fields
+    per table, and ``model_meta`` options.  No fuzzy rename detection —
+    models present in only one contract are reported as added/removed.
+
+    Args:
+        old: First (older) normalised contract dict.
+        new: Second (newer) normalised contract dict.
+
+    Returns:
+        Dict keyed by diff category, or ``{}`` when contracts are identical.
+    """
+    old_tables = {get_model_name(t): t for t in (old.get("tables") or [])}
+    new_tables = {get_model_name(t): t for t in (new.get("tables") or [])}
+
+    old_names = set(old_tables)
+    new_names = set(new_tables)
+
+    added_models = sorted(new_names - old_names)
+    removed_models = sorted(old_names - new_names)
+    common_models = sorted(old_names & new_names)
+
+    if not added_models and not removed_models and not common_models:
+        return {}
+
+    result: dict[str, Any] = {}
+    if added_models:
+        result["models_added"] = added_models
+    if removed_models:
+        result["models_removed"] = removed_models
+
+    model_diffs: dict[str, Any] = {}
+    for name in common_models:
+        diff = _diff_tables(old_tables[name], new_tables[name])
+        if diff:
+            model_diffs[name] = diff
+
+    if model_diffs:
+        result["model_diffs"] = model_diffs
+
+    return result
+
+
+def _diff_tables(
+    old_table: dict[str, Any],
+    new_table: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Compare two tables with the same model name.
+
+    Returns a diff dict or ``None`` when no differences are found.
+    """
+    old_fields = _field_map(get_fields(old_table))
+    new_fields = _field_map(get_fields(new_table))
+
+    old_names = set(old_fields)
+    new_names = set(new_fields)
+
+    result: dict[str, Any] = {}
+
+    # Field additions / removals.
+    added = sorted(new_names - old_names)
+    if added:
+        result["fields_added"] = [
+            _field_summary(new_fields[f]) for f in added
+        ]
+
+    removed = sorted(old_names - new_names)
+    if removed:
+        result["fields_removed"] = [
+            _field_summary(old_fields[f]) for f in removed
+        ]
+
+    # Field changes.
+    changed: list[dict[str, Any]] = []
+    for fname in sorted(old_names & new_names):
+        of = old_fields[fname]
+        nf = new_fields[fname]
+        fc = _diff_fields(of, nf)
+        if fc:
+            changed.append(fc)
+    if changed:
+        result["fields_changed"] = changed
+
+    # Meta changes.
+    meta_diff = _diff_meta(
+        old_table.get("model_meta") or {},
+        new_table.get("model_meta") or {},
+    )
+    if meta_diff:
+        result["meta_changed"] = meta_diff
+
+    return result if result else None
+
+
+def _field_map(fields: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Index a field list by ``name``."""
+    return {f["name"]: f for f in fields}
+
+
+def _field_summary(field: dict[str, Any]) -> dict[str, Any]:
+    """Return a clean, comparable field dict."""
+    return {
+        "name": field["name"],
+        "class": field["class"],
+        "kwargs": dict(field.get("kwargs") or {}),
+    }
+
+
+def _diff_fields(
+    old: dict[str, Any],
+    new: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Compare two fields with the same name.
+
+    Returns a change dict or ``None`` when fields are identical.
+    """
+    cls_old = old.get("class", "")
+    cls_new = new.get("class", "")
+    kwargs_old = dict(old.get("kwargs") or {})
+    kwargs_new = dict(new.get("kwargs") or {})
+
+    class_changed = cls_old != cls_new
+
+    all_kwargs_keys = sorted(set(kwargs_old) | set(kwargs_new))
+    kwarg_diffs: dict[str, dict[str, Any]] = {}
+    for k in all_kwargs_keys:
+        v_old = kwargs_old.get(k)
+        v_new = kwargs_new.get(k)
+        if v_old != v_new:
+            kwarg_diffs[k] = {"old": v_old, "new": v_new}
+
+    if not class_changed and not kwarg_diffs:
+        return None
+
+    entry: dict[str, Any] = {
+        "name": old["name"],
+        "class": {"old": cls_old, "new": cls_new},
+    }
+
+    if kwarg_diffs:
+        entry["kwargs"] = kwarg_diffs
+
+    return entry
+
+
+def _diff_meta(
+    old_meta: dict[str, Any],
+    new_meta: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Compare two ``model_meta`` dicts.
+
+    Only keys present in ``DIFF_META_KEYS`` are compared.
+    """
+    DIFF_META_KEYS = {
+        "unique_together", "indexes", "constraints",
+        "ordering", "verbose_name", "db_table", "app_label",
+    }
+    result: dict[str, Any] = {}
+    for key in DIFF_META_KEYS:
+        v_old = old_meta.get(key)
+        v_new = new_meta.get(key)
+        if v_old != v_new:
+            result[key] = {"old": v_old, "new": v_new}
+    return result if result else None
