@@ -98,7 +98,11 @@ def _build_cohort_contract(
         out_json = result.get("out_json")
         if not out_json:
             continue
-        deep_path = (deep_dir / out_json).resolve() if not Path(out_json).is_absolute() else Path(out_json)
+        # out_json stores paths relative to the snapshots root
+        # (e.g. "cohort_corpus/deep/202_2023_...json"), but deep_dir
+        # points at the deep/ subdirectory already.  Use the filename
+        # portion only, since deep/ contains flat filename listings.
+        deep_path = (deep_dir / Path(out_json).name).resolve() if not Path(out_json).is_absolute() else Path(out_json)
         if not deep_path.exists():
             continue
         try:

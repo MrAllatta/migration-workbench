@@ -411,13 +411,13 @@ check:
 	$(MANAGE) check
 
 validate-contract:
-	$(MANAGE) wb contract review --contract "$(CONTRACT)"
+	wb contract review --contract "$(CONTRACT)"
 
 validate: check validate-contract
 
 corpus-codegen-report:
 	@echo "=== Model compilation ==="
-	$(MANAGE) wb contract review --contract "$(CONTRACT)"
+	wb contract review --contract "$(CONTRACT)"
 	@echo "=== Generated file check ==="
 	$(MANAGE) check
 
