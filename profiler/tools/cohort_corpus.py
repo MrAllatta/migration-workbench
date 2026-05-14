@@ -198,7 +198,7 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
         if isinstance(entry, dict) and "pattern" in entry:
             try:
                 compiled = re.compile(entry["pattern"])
-                penalty = float(entry.get("penalty", -5))
+                penalty = int(entry.get("penalty", -5))
                 exclude_patterns.append({"pattern": compiled, "penalty": penalty})
             except re.error:
                 logger.warning("Invalid tab_exclude_pattern regex: %r", entry["pattern"])
@@ -379,6 +379,7 @@ def score_tab(
         "token_matches": token_matches,
         "size_bonuses": size_bonuses,
         "exclude_penalties": exclude_penalties,
+        "exclude_matches": exclude_matches,
         "subtotal": score,
     }
 
