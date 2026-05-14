@@ -155,6 +155,120 @@ def _contract_review(args: argparse.Namespace) -> int:
     return 0 if not issues else 1
 
 
+def _contract_diff(args: argparse.Namespace) -> int:
+    _setup_django()
+    from workbook.codegen.contract import diff_contracts, load_contract
+
+    try:
+        old_contract = load_contract(args.old)
+        new_contract = load_contract(args.new)
+    except ValueError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+    diffs = diff_contracts(old_contract, new_contract)
+
+    if not diffs:
+        return _render_output(
+            {
+                "ok": True,
+                "error_code": None,
+                "message": "Contracts are identical.",
+            },
+            args.json,
+        )
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": True,
+                "error_code": None,
+                "message": "Differences found.",
+                "diffs": diffs,
+            },
+            args.json,
+        )
+
+    lines: list[str] = []
+
+    if diffs.get("models_added") or diffs.get("models_removed"):
+        lines.append("=== Models ===")
+        if diffs.get("models_added"):
+            lines.append(f"  Added:   {', '.join(diffs['models_added'])}")
+        if diffs.get("models_removed"):
+            lines.append(f"  Removed: {', '.join(diffs['models_removed'])}")
+        lines.append("")
+
+    for model_name in sorted(diffs.get("model_diffs") or {}):
+        md = diffs["model_diffs"][model_name]
+        lines.append(f"=== Model: {model_name} ===")
+
+        if md.get("fields_added"):
+            lines.append("  Fields added:")
+            for f in md["fields_added"]:
+                kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
+                lines.append(f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+
+        if md.get("fields_removed"):
+            lines.append("  Fields removed:")
+            for f in md["fields_removed"]:
+                kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
+                lines.append(f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+
+        if md.get("fields_changed"):
+            lines.append("  Fields changed:")
+            for fc in md["fields_changed"]:
+                parts = [f"~ {fc['name']}"]
+                if "class" in fc:
+                    old_cls = _short_class(fc["class"]["old"])
+                    new_cls = _short_class(fc["class"]["new"])
+                    parts.append(f"{old_cls} -> {new_cls}")
+                for kw, v in (fc.get("kwargs") or {}).items():
+                    old_v = _fmt_value(v["old"])
+                    new_v = _fmt_value(v["new"])
+                    parts.append(f"{kw}: {old_v} -> {new_v}")
+                lines.append("    " + ", ".join(parts))
+
+        if md.get("meta_changed"):
+            lines.append("  Meta changes:")
+            for key, v in md["meta_changed"].items():
+                old_v = _fmt_value(v["old"])
+                new_v = _fmt_value(v["new"])
+                lines.append(f"    ~ {key}: {old_v} -> {new_v}")
+
+        lines.append("")
+
+    print("\n".join(lines).rstrip())
+    return 0
+
+
+def _short_class(raw: str) -> str:
+    return raw.removeprefix("models.")
+
+
+def _fmt_kwargs(kwargs: dict) -> str:
+    if not kwargs:
+        return ""
+    pairs = ", ".join(f"{k}={v!r}" for k, v in sorted(kwargs.items()))
+    return f", {pairs}"
+
+
+def _fmt_value(val: Any) -> str:
+    if val is None:
+        return "None"
+    if isinstance(val, str):
+        return val
+    if isinstance(val, (list, dict)):
+        return str(val)
+    return repr(val)
+
+
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     try:
@@ -262,6 +376,13 @@ def build_parser() -> argparse.ArgumentParser:
     review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
     review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
     review_cmd.set_defaults(func=_contract_review)
+
+    diff_cmd = contract_sub.add_parser(
+        "diff", help="Compare two schema contracts and show differences"
+    )
+    diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
+    diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
+    diff_cmd.set_defaults(func=_contract_diff)
 
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")

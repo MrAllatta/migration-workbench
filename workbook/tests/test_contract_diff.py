@@ -139,3 +139,65 @@ def test_diff_field_class_change():
         "new": "models.CharField",
     }
     assert changed[0]["kwargs"]["max_length"] == {"old": None, "new": 500}
+
+
+# ---------------------------------------------------------------------------
+# CLI integration
+# ---------------------------------------------------------------------------
+
+
+def test_contract_diff_cli_text(tmp_path):
+    """CLI emits human-readable text with no args by default."""
+    from deployment.wb_cli import main
+    import sys
+
+    old_path = tmp_path / "old.yaml"
+    new_path = tmp_path / "new.yaml"
+    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+
+    sys.argv = ["wb", "contract", "diff",
+                "--old", str(old_path),
+                "--new", str(new_path)]
+    rc = main()
+    assert rc == 0
+
+
+def test_contract_diff_cli_renders_text(tmp_path, capsys):
+    """Direct test of _contract_diff handler text output."""
+    from deployment.wb_cli import _contract_diff
+    import argparse
+
+    old_path = tmp_path / "old.yaml"
+    new_path = tmp_path / "new.yaml"
+    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+
+    args = argparse.Namespace(
+        old=str(old_path), new=str(new_path), json=False
+    )
+    rc = _contract_diff(args)
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "identical" in captured.out.lower()
+
+
+def test_contract_diff_cli_json(tmp_path, capsys):
+    """Direct test of _contract_diff handler JSON output."""
+    from deployment.wb_cli import _contract_diff
+    import argparse
+    import json
+
+    old_path = tmp_path / "old.yaml"
+    new_path = tmp_path / "new.yaml"
+    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+
+    args = argparse.Namespace(
+        old=str(old_path), new=str(new_path), json=True
+    )
+    rc = _contract_diff(args)
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["ok"] is True
