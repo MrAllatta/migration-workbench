@@ -20,6 +20,7 @@ from workbook.codegen.contract import (
     get_enums,
     get_extra_imports,
     get_fields,
+    get_hooks,
     get_is_abstract,
     get_model_base,
     get_model_meta,
@@ -73,6 +74,13 @@ def render_model(
     lines.append("")
     lines.append(f"class {class_name}({base_class}):")
 
+    hooks = get_hooks(table)
+    after_model = hooks.get("after_model", "").strip()
+    if after_model:
+        for line in after_model.split("\n"):
+            lines.append(f"    {line}")
+        lines.append("")
+
     for f in fields:
         lines.append(
             render_field(
@@ -86,7 +94,7 @@ def render_model(
             )
         )
 
-    if not fields and not computed_fields:
+    if not fields and not computed_fields and not after_model:
         lines.append("    pass")
 
     for cf in computed_fields:
@@ -103,9 +111,21 @@ def render_model(
     if rendered_meta:
         lines.append(rendered_meta)
 
+    after_meta = hooks.get("after_meta", "").strip()
+    if after_meta:
+        for line in after_meta.split("\n"):
+            lines.append(f"    {line}")
+        lines.append("")
+
     rendered_str = render_str_method(str_template, indent=4)
     if rendered_str:
         lines.append(rendered_str)
+
+    extra = hooks.get("extra_methods", "").strip()
+    if extra:
+        for line in extra.split("\n"):
+            lines.append(f"    {line}")
+        lines.append("")
 
     return "\n".join(lines) + "\n"
 

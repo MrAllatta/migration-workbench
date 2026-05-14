@@ -208,11 +208,25 @@ def _inline_field_names(
 
 
 def _render_inline_class(
-    source_name: str, source_fields: list[dict[str, Any]], fk_field_name: str
+    source_name: str,
+    source_fields: list[dict[str, Any]],
+    fk_field_name: str,
+    override_fields: list[str] | None = None,
 ) -> str:
-    """Render a ``TabularInline`` class for a reverse FK relationship."""
+    """Render a ``TabularInline`` class for a reverse FK relationship.
+
+    Args:
+        source_name: Model name of the inline model.
+        source_fields: Fields of the inline model.
+        fk_field_name: FK field linking back to the parent model.
+        override_fields: Optional explicit field list from ``admin.inlines``
+            in the contract.  When set, use these instead of auto-picking.
+    """
     inline_name = f"{source_name}Inline"
-    display = _inline_field_names(source_fields, fk_field_name)
+    if override_fields:
+        display = override_fields
+    else:
+        display = _inline_field_names(source_fields, fk_field_name)
     field_list = ", ".join(repr(f) for f in display[:6])
 
     lines = [
@@ -233,6 +247,8 @@ def _render_admin_class(
     filter_fields: list[str],
     search_fields: list[str],
     readonly_fields: list[str],
+    list_editable_fields: list[str],
+    autocomplete_fields_list: list[str],
     inline_classes: list[str],
     verbose_name: str | None,
     admin_base_class: str = "admin.ModelAdmin",
@@ -256,9 +272,17 @@ def _render_admin_class(
         items = ", ".join(repr(f) for f in search_fields)
         lines.append(f"    search_fields = [{items}]")
 
+    if list_editable_fields:
+        items = ", ".join(repr(f) for f in list_editable_fields)
+        lines.append(f"    list_editable = [{items}]")
+
     if readonly_fields:
         items = ", ".join(repr(f) for f in readonly_fields)
         lines.append(f"    readonly_fields = [{items}]")
+
+    if autocomplete_fields_list:
+        items = ", ".join(repr(f) for f in autocomplete_fields_list)
+        lines.append(f"    autocomplete_fields = [{items}]")
 
     if inline_classes:
         items = ", ".join(inline_classes)
@@ -266,7 +290,7 @@ def _render_admin_class(
 
     if all(
         not x
-        for x in [display_fields, filter_fields, search_fields, readonly_fields, inline_classes]
+        for x in [display_fields, filter_fields, search_fields, readonly_fields, list_editable_fields, autocomplete_fields_list, inline_classes]
     ):
         lines.append("    pass")
 
@@ -339,8 +363,11 @@ def render_admin_py(
         view = find_view_for_entity(manifest, raw_entity) if manifest else None
         meta = get_model_meta(table)
         verbose_name = meta.get("verbose_name")
+        admin_cfg = get_admin_config(table)
 
         # Inline classes for *this* model's reverse FK relationships.
+        # admin.inlines can override default field lists per inline source.
+        inline_overrides = admin_cfg.get("inlines") or {}
         rev_fks = fk_index.get(model_name) or []
         inline_names: list[str] = []
         for ref in rev_fks:
@@ -348,18 +375,34 @@ def render_admin_py(
                 t for t in tables if get_model_name(t) == ref["source_name"]
             )
             source_fields = get_fields(ref_table)
+            ref_entity = str(ref_table.get("suggested_model_name") or "").lower()
+            override_fields = inline_overrides.get(ref_entity)
             inline_class_defs.append(
-                _render_inline_class(ref["source_name"], source_fields, ref["field_name"])
+                _render_inline_class(
+                    ref["source_name"],
+                    source_fields,
+                    ref["field_name"],
+                    override_fields=override_fields,
+                )
             )
             inline_names.append(f"{ref['source_name']}Inline")
 
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
-        admin_cfg = get_admin_config(table)
         display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_user)
         filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user)
         search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_user)
         readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_user)
+
+        list_editable = admin_cfg.get("list_editable") or []
+        if list_editable:
+            valid = {f["name"] for f in contract_fields}
+            list_editable = [f for f in list_editable if f in valid]
+
+        autocomplete = admin_cfg.get("autocomplete_fields") or []
+        if autocomplete:
+            valid = {f["name"] for f in contract_fields if _is_fk_field(f)}
+            autocomplete = [f for f in autocomplete if f in valid]
 
         admin_class_parts.append(
             _render_admin_class(
@@ -368,6 +411,8 @@ def render_admin_py(
                 filter_fields=filters,
                 search_fields=search,
                 readonly_fields=readonly,
+                list_editable_fields=list_editable,
+                autocomplete_fields_list=autocomplete,
                 inline_classes=inline_names,
                 verbose_name=verbose_name,
                 admin_base_class="BaseUserAdmin" if is_user else "admin.ModelAdmin",

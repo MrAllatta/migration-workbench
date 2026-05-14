@@ -56,14 +56,17 @@ def get_db_table_name(table: dict[str, Any], app_label: str) -> str:
     """Return the ``db_table`` value for *table*.
 
     Uses the v1.1 ``model_meta.db_table`` when available, otherwise falls
-    back to ``{app_label}_{suggested_model_name}``.
+    back to ``{table_app_label}_{suggested_model_name}``.  The *app_label*
+    parameter is used as the default; individual tables can override it via
+    ``model_meta.app_label``.
     """
     meta = table.get("model_meta") or {}
     explicit = meta.get("db_table")
     if explicit:
         return str(explicit)
+    table_app_label = meta.get("app_label") or app_label
     raw = str(table.get("suggested_model_name") or "model")
-    return f"{app_label}_{raw}"
+    return f"{table_app_label}_{raw}"
 
 
 def get_model_meta(table: dict[str, Any]) -> dict[str, Any]:
@@ -235,6 +238,28 @@ def has_source_tab(table: dict[str, Any]) -> bool:
     if ws is None or (isinstance(ws, str) and not ws.strip()):
         return False
     return True
+
+
+def get_hooks(table: dict[str, Any]) -> dict[str, str]:
+    """Return the ``hooks`` block for *table*, or ``{}``.
+
+    Hooks are Python source fragments injected at well-defined points in the
+    generated model class::
+
+        hooks:
+          after_model: |
+              # injected right after ``class <Name>(<Base>):``
+          after_meta: |
+              # injected after the ``class Meta`` block
+          before_return: |
+              # injected at the end of the class body, before closing
+
+    See ``docs/roadmap.md`` for the full specification.
+    """
+    raw = table.get("hooks")
+    if raw and isinstance(raw, dict):
+        return {k: str(v) for k, v in raw.items()}
+    return {}
 
 
 def get_import_config(table: dict[str, Any]) -> dict[str, Any] | None:
