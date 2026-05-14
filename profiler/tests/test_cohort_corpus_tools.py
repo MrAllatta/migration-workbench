@@ -1048,3 +1048,50 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(tmp_
             resume_from_tab_selection=True,
         )
     mock_walk_drive_tree.assert_not_called()
+
+
+def test_score_tab_exclude_pattern_penalizes_match():
+    score, reasons, breakdown = score_tab(
+        "Crop Info 201",
+        100,
+        10,
+        tab_score_heuristics={
+            "tab_exclude_patterns": [
+                {"pattern": "\\b\\d{3}\\b", "penalty": -5}
+            ]
+        },
+    )
+    assert score == -5
+    assert "tab_exclude_pattern" in reasons
+    assert breakdown["exclude_penalties"] == -5
+
+
+def test_score_tab_exclude_pattern_no_match():
+    score, reasons, breakdown = score_tab(
+        "Crop Planner",
+        100,
+        10,
+        tab_score_heuristics={
+            "tab_exclude_patterns": [
+                {"pattern": "\\b\\d{3}\\b", "penalty": -5}
+            ]
+        },
+    )
+    assert score == 0
+    assert "tab_exclude_pattern" not in reasons
+
+
+def test_score_tab_exclude_pattern_multiple_rules():
+    score, reasons, breakdown = score_tab(
+        "IGNORE Sheet 999",
+        100,
+        10,
+        tab_score_heuristics={
+            "tab_exclude_patterns": [
+                {"pattern": "^IGNORE", "penalty": -3},
+                {"pattern": "\\b\\d{3}\\b", "penalty": -5},
+            ]
+        },
+    )
+    assert score == -8
+    assert breakdown["exclude_penalties"] == -8

@@ -33,6 +33,7 @@ import hashlib
 import json
 import math
 import re
+import logging
 import sys
 import time
 from collections import defaultdict
@@ -48,6 +49,8 @@ from profiler.management.commands.profile_tab import (
     list_tabs,
     summarize_tab,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
 DEFAULT_WORKBOOK_ID_PATTERN = re.compile(r"\b(\d{3})\b")
@@ -190,6 +193,15 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
             isinstance(token, str) for token in entry
         ):
             combo_tokens.append(tuple(token.lower() for token in entry))
+    exclude_patterns: list[dict] = []
+    for entry in config.get("tab_exclude_patterns") or []:
+        if isinstance(entry, dict) and "pattern" in entry:
+            try:
+                compiled = re.compile(entry["pattern"])
+                penalty = float(entry.get("penalty", -5))
+                exclude_patterns.append({"pattern": compiled, "penalty": penalty})
+            except re.error:
+                logger.warning("Invalid tab_exclude_pattern regex: %r", entry["pattern"])
     return {
         "operational_tokens": [
             token.lower()
@@ -218,6 +230,7 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
         "support_weight": support_weight,
         "reference_combo_weight": reference_combo_weight,
         "match_mode": match_mode,
+        "exclude_patterns": exclude_patterns,
     }
 
 
@@ -349,9 +362,23 @@ def score_tab(
         reasons.append("wide_sheet")
         size_bonuses["wide_sheet"] = add
 
+    exclude_penalties = 0
+    exclude_matches: list[dict] = []
+    for entry in heuristics.get("exclude_patterns", []):
+        if entry["pattern"].search(title):
+            exclude_penalties += entry["penalty"]
+            exclude_matches.append({
+                "pattern": entry["pattern"].pattern,
+                "penalty": entry["penalty"],
+            })
+    if exclude_penalties:
+        score += exclude_penalties
+        reasons.append("tab_exclude_pattern")
+
     breakdown = {
         "token_matches": token_matches,
         "size_bonuses": size_bonuses,
+        "exclude_penalties": exclude_penalties,
         "subtotal": score,
     }
 
