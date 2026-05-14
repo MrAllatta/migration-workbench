@@ -1,4 +1,5 @@
 from connectors.base import ProviderAdapter
+from connectors.tab_name_utils import sanitize_tab_name
 from connectors.coda_source import (
     build_coda_session,
     column_has_formula,
@@ -52,7 +53,7 @@ def shape_coda_table_structure(
             }
         )
     return {
-        "worksheet_title": table_name,
+        "worksheet_title": sanitize_tab_name(table_name),
         "tab_position": table_position,
         "hidden": False,
         "frozen_rows": 0,
