@@ -231,6 +231,8 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
         "reference_combo_weight": reference_combo_weight,
         "match_mode": match_mode,
         "exclude_patterns": exclude_patterns,
+        "expansion_formula_penalty": int(config.get("expansion_formula_penalty", 0)),
+        "expansion_formula_threshold": float(config.get("expansion_formula_threshold", 0.5)),
     }
 
 
@@ -246,7 +248,9 @@ def _normalize_column_heuristics(config: dict | None) -> dict:
 
 
 def score_tab(
-    title: str, rows: int, cols: int, *, tab_score_heuristics: dict | None = None
+    title: str, rows: int, cols: int, *,
+    tab_score_heuristics: dict | None = None,
+    column_formula_patterns: dict[str, str] | None = None,
 ) -> tuple[int, list[str], dict]:
     """Score a single tab by its title and dimensions.
 
@@ -374,6 +378,19 @@ def score_tab(
     if exclude_penalties:
         score += exclude_penalties
         reasons.append("tab_exclude_pattern")
+
+    # Apply expansion_formula_ratio penalty
+    expansion_penalty = heuristics.get("expansion_formula_penalty", 0)
+    if expansion_penalty and column_formula_patterns:
+        expansion_threshold = heuristics.get("expansion_formula_threshold", 0.5)
+        total_cols = len(column_formula_patterns)
+        expansion_count = sum(
+            1 for pattern in column_formula_patterns.values()
+            if pattern == "expansion_formula"
+        )
+        if total_cols > 0 and (expansion_count / total_cols) >= expansion_threshold:
+            score += expansion_penalty
+            reasons.append("expansion_formula_ratio")
 
     breakdown = {
         "token_matches": token_matches,

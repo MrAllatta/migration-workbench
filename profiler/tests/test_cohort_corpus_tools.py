@@ -1081,6 +1081,60 @@ def test_score_tab_exclude_pattern_no_match():
     assert "tab_exclude_pattern" not in reasons
 
 
+def test_score_tab_expansion_formula_ratio_penalty():
+    score, reasons, breakdown = score_tab(
+        "Final Report",
+        1500,
+        200,
+        tab_score_heuristics={
+            "expansion_formula_penalty": -5,
+            "expansion_formula_threshold": 0.5,
+        },
+        column_formula_patterns={
+            "A": "raw", "B": "raw", "C": "expansion_formula",
+            "D": "expansion_formula", "E": "expansion_formula",
+        },
+    )
+    # 3 of 5 columns are expansion_formula = 0.6 ratio, exceeding 0.5 threshold
+    # Penalty -5 applied
+    # Size bonuses: 1500*200 = 300k cells → large_grid(+2), many_rows(+1), wide_sheet(+1) capped at +3
+    # Total: -5 + 3 = -2
+    assert score == -2
+    assert "expansion_formula_ratio" in reasons
+
+
+def test_score_tab_expansion_formula_ratio_below_threshold():
+    score, reasons, breakdown = score_tab(
+        "Crop Planner",
+        100,
+        10,
+        tab_score_heuristics={
+            "expansion_formula_penalty": -5,
+            "expansion_formula_threshold": 0.5,
+        },
+        column_formula_patterns={
+            "A": "raw", "B": "raw", "C": "expansion_formula",
+        },
+    )
+    # 1 of 3 columns = 0.33 ratio, below 0.5 threshold → no penalty
+    assert score == 0
+    assert "expansion_formula_ratio" not in reasons
+
+
+def test_score_tab_expansion_formula_ratio_no_patterns_provided():
+    score, reasons, breakdown = score_tab(
+        "Final Report",
+        100,
+        10,
+        tab_score_heuristics={
+            "expansion_formula_penalty": -5,
+        },
+    )
+    # No column_formula_patterns provided → no penalty
+    assert score == 0
+    assert "expansion_formula_ratio" not in reasons
+
+
 def test_score_tab_exclude_pattern_multiple_rules():
     score, reasons, breakdown = score_tab(
         "IGNORE Sheet 999",
