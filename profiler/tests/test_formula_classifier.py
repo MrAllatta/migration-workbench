@@ -58,6 +58,11 @@ def test_empty_column():
     assert result == "empty"
 
 
+def test_empty_cell_list_returns_empty():
+    result = classify_column_formula_pattern([])
+    assert result == "empty"
+
+
 def test_expansion_detection_querys():
     cells = [
         {"row": 1, "col": 0, "kind": "formula", "text": '=QUERY(A:B,"select *")'},

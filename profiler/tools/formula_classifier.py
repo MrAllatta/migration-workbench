@@ -6,7 +6,6 @@ columns from computed columns (row-level formulas, expansion formulas, hybrid).
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 _EXPANSION_FUNCTIONS: frozenset[str] = frozenset({
@@ -92,8 +91,5 @@ def classify_column_formula_pattern(cells: list[dict[str, Any]]) -> str:
 
     if formula_count > 0 and raw_count == 0:
         return "row_formula"
-
-    if raw_count > 0 and formula_count > 0:
-        return "hybrid"
 
     return "raw"
