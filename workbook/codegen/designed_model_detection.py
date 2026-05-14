@@ -58,14 +58,12 @@ def suggest_designed_model(
     cluster: dict[str, Any],
     *,
     suggested_name: str,
-    source_provider: str = "google_sheets",
 ) -> dict[str, Any]:
     """Emit a contract table skeleton for a designed/aggregate model.
 
     Args:
         cluster: Cluster dict from ``find_column_overlap_groups()``.
         suggested_name: Snake_case model name to use.
-        source_provider: Provider identifier for the source.
 
     Returns:
         dict: Schema-contract ``tables`` entry with ``source_tab: null``,
@@ -81,20 +79,13 @@ def suggest_designed_model(
         }
         for col in cluster["shared_columns"]
     ]
-    extra_fields: list[dict[str, Any]] = []
+    extra_fields: dict[str, dict[str, Any]] = {}
     seen_unique: set[str] = set()
     for tab_cols in cluster["unique_columns"].values():
         for col in tab_cols:
             if col not in seen_unique:
                 seen_unique.add(col)
-                extra_fields.append(
-                    {
-                        "source_column": col,
-                        "suggested_field_name": col,
-                        "class": "TextField",
-                        "kwargs": {"blank": True},
-                    }
-                )
+                extra_fields[col] = {"class": "TextField", "kwargs": {"blank": True}}
 
     return {
         "bundle_worksheet_title": None,

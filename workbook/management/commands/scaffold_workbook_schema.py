@@ -38,6 +38,40 @@ def _infer_format_type_from_samples(samples: list[str]) -> str | None:
     return "text"
 
 
+def _inject_designed_models(tables: list[dict]) -> list[dict]:
+    """Detect overlapping tab column sets and inject designed model entries.
+
+    Args:
+        tables: List of schema-contract table entries.
+
+    Returns:
+        list[dict]: Tables list with designed model entries appended.
+    """
+    tab_columns: dict[str, set[str]] = {}
+    for table in tables:
+        title = table.get("bundle_worksheet_title", "")
+        if title:
+            tab_columns[title] = {
+                col.get("suggested_field_name", col.get("source_column", ""))
+                for col in table.get("columns", [])
+            }
+
+    overlap_groups = find_column_overlap_groups(tab_columns, min_overlap_ratio=0.5)
+    if overlap_groups:
+        for cluster_entry in overlap_groups:
+            tab_names = cluster_entry["tab_names"]
+            parts = sorted(tab_names)
+            merged_name = suggested_field_name(" ".join(parts))
+            suggested = suggest_designed_model(
+                cluster_entry,
+                suggested_name=merged_name,
+            )
+            suggested["_meta"] = {"generated_by": "designed_model_detection"}
+            tables.append(suggested)
+
+    return tables
+
+
 def _build_cohort_contract(
     deep_dir: Path,
     coverage_payload: dict,
@@ -115,28 +149,7 @@ def _build_cohort_contract(
         }
         tables.append(table_entry)
 
-    # Collect tab columns for overlap detection
-    tab_columns: dict[str, set[str]] = {}
-    for table in tables:
-        title = table.get("bundle_worksheet_title", "")
-        if title:
-            tab_columns[title] = {
-                col.get("suggested_field_name", col.get("source_column", ""))
-                for col in table.get("columns", [])
-            }
-
-    overlap_groups = find_column_overlap_groups(tab_columns, min_overlap_ratio=0.5)
-    if overlap_groups:
-        for cluster_entry in overlap_groups:
-            tab_names = cluster_entry["tab_names"]
-            merged_name = "_".join(sorted(tab_names)).lower().replace(" ", "_")
-            suggested = suggest_designed_model(
-                cluster_entry,
-                suggested_name=merged_name,
-                source_provider="google_sheets",
-            )
-            suggested["_meta"] = {"generated_by": "designed_model_detection"}
-            tables.append(suggested)
+    _inject_designed_models(tables)
 
     contract = {
         "version": version,
@@ -324,30 +337,6 @@ class Command(BaseCommand):
                 "Either --bundle-config or --cohort-corpus-out-dir is required."
             )
 
-        # Inject designed model suggestions when tab columns overlap
-        tables = contract.get("tables", [])
-        tab_columns: dict[str, set[str]] = {}
-        for table in tables:
-            title = table.get("bundle_worksheet_title", "")
-            if title:
-                tab_columns[title] = {
-                    col.get("suggested_field_name", col.get("source_column", ""))
-                    for col in table.get("columns", [])
-                }
-        overlap_groups = find_column_overlap_groups(tab_columns, min_overlap_ratio=0.5)
-        if overlap_groups:
-            for cluster_entry in overlap_groups:
-                tab_names = cluster_entry["tab_names"]
-                merged_name = "_".join(sorted(tab_names)).lower().replace(" ", "_")
-                suggested = suggest_designed_model(
-                    cluster_entry,
-                    suggested_name=merged_name,
-                    source_provider="google_sheets",
-                )
-                suggested["_meta"] = {"generated_by": "designed_model_detection"}
-                tables.append(suggested)
-            contract["tables"] = tables
-
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
@@ -409,6 +398,8 @@ class Command(BaseCommand):
         contract["version"] = version
         if hardened:
             _harden_contract(contract)
+        tables = contract.get("tables", [])
+        _inject_designed_models(tables)
         return contract
 
     def _handle_cohort_corpus(
