@@ -170,6 +170,11 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.5.0
+
+- **Migration safety checks:** `wb contract safety --old contract-v1.yaml --new contract-v2.yaml` detects destructive changes (field removed, nullable→non-nullable → DANGER; class change, max_length decreased, unique=True added, non-nullable field without default → WARNING) with text and `--json` output.
+- **Null-key robustness:** `_diff_fields()` normalises YAML `null:` mapping keys to the string `"null"` to prevent `TypeError` during kwarg comparison.
+
 ### 0.4.0
 
 - **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions for combining columns (default: space join).
