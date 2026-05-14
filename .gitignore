@@ -17,3 +17,5 @@ AGENTS.md
 fly.preview.toml
 fly.toml
 .opencode
+.worktrees/
+docs/superpowers/*
