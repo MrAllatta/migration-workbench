@@ -709,6 +709,10 @@ def _diff_fields(
     kwargs_old = dict(old.get("kwargs") or {})
     kwargs_new = dict(new.get("kwargs") or {})
 
+    # YAML parses null: as a Python None key — normalise to "null".
+    kwargs_old = {("null" if k is None else k): v for k, v in kwargs_old.items()}
+    kwargs_new = {("null" if k is None else k): v for k, v in kwargs_new.items()}
+
     class_changed = cls_old != cls_new
 
     all_kwargs_keys = sorted(set(kwargs_old) | set(kwargs_new))
