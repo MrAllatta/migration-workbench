@@ -260,9 +260,18 @@ def score_tab(
         cols: Number of data columns.
         tab_score_heuristics: Optional config dict (see
             ``_normalize_tab_heuristics``).
+        column_formula_patterns: Optional mapping from column letter to
+            formula pattern (``"raw"``, ``"row_formula"``,
+            ``"expansion_formula"``, ``"hybrid"``, or ``"empty"``).
+            When provided together with a configured
+            ``expansion_formula_penalty``, tabs whose expansion-formula
+            ratio exceeds ``expansion_formula_threshold`` receive the
+            configured penalty.
 
     Returns:
-        Tuple of (score, reason_labels, breakdown_dict).
+        Tuple of (score, reason_labels, breakdown_dict).  Reason labels
+        include ``"expansion_formula_ratio"`` when the expansion-formula
+        penalty is applied.
     """
     lowered = title.lower()
     score = 0
