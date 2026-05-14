@@ -651,6 +651,7 @@ def derive_column_candidates(
 
     heuristics = _normalize_column_heuristics(column_score_heuristics)
     domain_keyword_tokens = heuristics["domain_keyword_tokens"]
+    formula_patterns = summary.get("column_formula_patterns", {})
     candidates: list[dict] = []
     for col_letter, header in headers[:40]:
         lowered = header.lower()
@@ -682,6 +683,7 @@ def derive_column_candidates(
                 "evidence": {
                     "formula_cell_count": formula_count,
                     "functions_used": functions,
+                    "formula_pattern": formula_patterns.get(col_letter, "raw"),
                 },
             }
         )

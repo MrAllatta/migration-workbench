@@ -132,6 +132,7 @@ def map_profiler_column_to_django_field(col: dict[str, Any]) -> dict[str, Any]:
         "django_field_class": field_class,
         "django_field_kwargs": field_kwargs,
         "notes": [],
+        "formula_pattern": col.get("formula_pattern", "raw"),
     }
     if null_rate == 0 and (not isinstance(sample_size, int) or sample_size < 100):
         out["notes"].append("nullability_not_hardened_low_sample")
