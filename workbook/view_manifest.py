@@ -117,19 +117,10 @@ def _build_view_entry(
         if not header:
             continue
         field = _resolve_field_name(header, field_by_source)
-        formula_pattern = col.get("formula_pattern")
-        if formula_pattern:
-            if formula_pattern in ("expansion_formula", "row_formula"):
-                computed_fields.append(field)
-            elif formula_pattern == "empty":
-                pass
-            else:
-                editable_fields.append(field)
+        if col.get("is_formula"):
+            computed_fields.append(field)
         else:
-            if col.get("is_formula"):
-                computed_fields.append(field)
-            else:
-                editable_fields.append(field)
+            editable_fields.append(field)
         if col.get("data_validation_type") is not None:
             filterable_by.append(field)
 

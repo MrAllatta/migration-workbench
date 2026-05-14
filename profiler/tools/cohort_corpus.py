@@ -651,7 +651,8 @@ def derive_column_candidates(
 
     heuristics = _normalize_column_heuristics(column_score_heuristics)
     domain_keyword_tokens = heuristics["domain_keyword_tokens"]
-    formula_patterns = summary.get("column_formula_patterns", {})
+    raw_patterns = summary.get("column_formula_patterns")
+    formula_patterns = raw_patterns if isinstance(raw_patterns, dict) else {}
     candidates: list[dict] = []
     for col_letter, header in headers[:40]:
         lowered = header.lower()
