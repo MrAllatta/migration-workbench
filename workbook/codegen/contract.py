@@ -346,6 +346,164 @@ def validate_contract_tables(
     return warnings
 
 
+def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
+    """Run a design-review checklist on a schema contract.
+
+    Checks intended for schema designers before codegen — catches common
+    pitfalls like nullable FKs without ``on_delete``, CharFields without
+    ``max_length``, and missing ``unique_together`` on multi-FK tables.
+
+    Returns:
+        List of ``{"table": ..., "field": ..., "message": ...}`` dicts,
+        one per issue found.
+    """
+    issues: list[dict[str, str]] = []
+    tables = list(contract.get("tables") or [])
+    table_names = {get_model_name(t) for t in tables}
+
+    for table in tables:
+        name = get_model_name(table)
+        fields = get_fields(table)
+        meta = table.get("model_meta") or {}
+
+        # Check: CharField without max_length.
+        for field in fields:
+            fclass = _field_class_short(field["class"])
+            kwargs = field["kwargs"]
+            if fclass == "CharField" and "max_length" not in kwargs:
+                issues.append(
+                    {
+                        "table": name,
+                        "field": field["name"],
+                        "message": "CharField without max_length — default will be used",
+                    }
+                )
+            # Check: nullable FK without explicit on_delete.
+            if fclass == "ForeignKey":
+                on_delete = kwargs.get("on_delete")
+                null_ok = kwargs.get("null", kwargs.get("blank", False))
+                if null_ok and not on_delete:
+                    issues.append(
+                        {
+                            "table": name,
+                            "field": field["name"],
+                            "message": "nullable FK without explicit on_delete — "
+                            "Django will warn at runtime",
+                        }
+                    )
+                elif null_ok and str(on_delete) == "PROTECT":
+                    issues.append(
+                        {
+                            "table": name,
+                            "field": field["name"],
+                            "message": "nullable FK with PROTECT — "
+                            "import failures leave orphaned rows",
+                        }
+                    )
+
+        # Check: multiple FK fields but no unique_together or constraints.
+        fk_fields = [f for f in fields if f["class"] == "models.ForeignKey"]
+        if len(fk_fields) >= 2:
+            has_unique = bool(
+                meta.get("unique_together")
+                or meta.get("constraints")
+            )
+            if not has_unique:
+                issues.append(
+                    {
+                        "table": name,
+                        "field": ", ".join(f["name"] for f in fk_fields),
+                        "message": "multiple FK fields but no unique_together "
+                        "or constraints — possible duplicate rows",
+                    }
+                )
+
+        # Check: model has no __str__ template for admin usability.
+        str_tmpl = table.get("str_template")
+        if not str_tmpl:
+            issues.append(
+                {
+                    "table": name,
+                    "field": "",
+                    "message": "no str_template — admin lists show unhelpful "
+                    "object labels",
+                }
+            )
+
+    return issues
+
+
+def _field_class_short(raw: str) -> str:
+    """Strip the ``models.`` prefix from a field class string."""
+    return raw.removeprefix("models.")
+
+
+def assign_import_tiers(
+    contract: dict[str, Any],
+) -> dict[str, int]:
+    """Auto-assign import tiers by topological sort of FK dependency chains.
+
+    Tables with no FK dependencies get tier 1.  Each subsequent tier adds
+    one.  If a table already has an explicit ``import_config.tier``, that
+    value is preserved.
+
+    Returns:
+        ``{model_name: tier}`` for every table with ``import_config``.
+    """
+    tables = list(contract.get("tables") or [])
+    table_names: dict[str, dict[str, Any]] = {}
+    for t in tables:
+        name = get_model_name(t)
+        if get_import_config(t) is not None:
+            table_names[name] = t
+
+    # Build adjacency: model → set of FK target model names.
+    deps: dict[str, set[str]] = {}
+    for name, t in table_names.items():
+        cfg = get_import_config(t)
+        fk_lookup = (cfg or {}).get("fk_lookup") or {}
+        targets: set[str] = set()
+        for fk_cfg in fk_lookup.values():
+            target = fk_cfg.get("model")
+            if target and target in table_names:
+                targets.add(target)
+        deps[name] = targets
+
+    # Topological sort via Kahn's algorithm.
+    in_degree: dict[str, int] = {n: 0 for n in table_names}
+    for name in table_names:
+        for dep in deps[name]:
+            in_degree[dep] = in_degree.get(dep, 0) + 1
+
+    queue: list[str] = [n for n, d in in_degree.items() if d == 0]
+    tier_map: dict[str, int] = {}
+    current_tier = 1
+
+    while queue:
+        next_queue: list[str] = []
+        for name in queue:
+            tier_map[name] = current_tier
+            for dep_name, dep_set in deps.items():
+                if name in dep_set:
+                    in_degree[dep_name] -= 1
+                    if in_degree[dep_name] == 0:
+                        next_queue.append(dep_name)
+        queue = next_queue
+        current_tier += 1
+
+    # Apply explicit tiers as overrides.
+    result: dict[str, int] = {}
+    for name, t in table_names.items():
+        cfg = get_import_config(t)
+        explicit = cfg.get("tier") if cfg else None
+        if explicit is not None:
+            result[name] = int(explicit)
+        else:
+            result[name] = tier_map.get(name, 99)
+
+    return result
+
+
 def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
     """Return the resolved, overridden field list for *table*.
 

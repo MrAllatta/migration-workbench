@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from workbook.codegen.contract import (
+    assign_import_tiers,
     get_fields,
     get_import_config,
     get_model_name,
@@ -467,6 +468,9 @@ def render_import_py(
     tables = list(contract.get("tables") or [])
 
     # Collect models with import config, sorted by tier then name.
+    # Tiers are auto-detected from FK dependency chains (explicit tiers
+    # in the contract override auto-detection).
+    tier_map = assign_import_tiers(contract)
     candidates: list[tuple[int, str, dict[str, Any]]] = []
     skipped: list[str] = []
     for table in tables:
@@ -476,7 +480,7 @@ def render_import_py(
             ws = table.get("bundle_worksheet_title") or "(no source tab)"
             skipped.append(f"# Skipped {name}: no import_config (worksheet: {ws})")
             continue
-        tier = int(cfg.get("tier", 99))
+        tier = tier_map.get(name, 99)
         candidates.append((tier, name, table))
 
     candidates.sort(key=lambda x: (x[0], x[1]))

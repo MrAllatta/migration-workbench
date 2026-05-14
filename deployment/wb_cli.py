@@ -110,6 +110,51 @@ def _manifest_lint(args: argparse.Namespace) -> int:
     )
 
 
+def _contract_review(args: argparse.Namespace) -> int:
+    _setup_django()
+    from workbook.codegen.contract import load_contract, review_contract
+
+    try:
+        contract = load_contract(args.contract)
+    except ValueError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+    issues = review_contract(contract)
+    if not issues:
+        return _render_output(
+            {
+                "ok": True,
+                "error_code": None,
+                "message": f"No issues found in {args.contract}.",
+            },
+            args.json,
+        )
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": None,
+                "message": f"{len(issues)} issue(s) found.",
+                "details": issues,
+            },
+            args.json,
+        )
+
+    print(f"Found {len(issues)} issue(s) in {args.contract}:")
+    for issue in issues:
+        location = f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
+        print(f"  - {location}: {issue['message']}")
+    return 0 if not issues else 1
+
+
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     try:
@@ -211,6 +256,12 @@ def build_parser() -> argparse.ArgumentParser:
     manifest_sub = manifest_cmd.add_subparsers(dest="manifest_command", required=True)
     lint_cmd = manifest_sub.add_parser("lint", help="Validate deployment manifest")
     lint_cmd.set_defaults(func=_manifest_lint)
+
+    contract_cmd = sub.add_parser("contract", help="Schema contract operations")
+    contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)
+    review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
+    review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
+    review_cmd.set_defaults(func=_contract_review)
 
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")
