@@ -121,6 +121,7 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 - Align default Git branch with Deploy workflow (`main` vs `master`).
 - Production Deploy workflow green end-to-end after secrets and Fly bootstrap.
+- Pipe-character and reserved-character sanitization in tab names at profiler ingestion (Issue [#2](https://github.com/MrAllatta/migration-workbench/issues/2)).
 
 **Next**
 
@@ -128,6 +129,8 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 - Backup/restore drill documented and exercised for the workbench space.
 - Google auth runbook evolution toward WIF ([docs/google-auth.md](docs/google-auth.md)).
 - Scaffold-delivered CI/CD templates for client product repos.
+- Cross-reference tab detection via workbook code patterns (`\b\d{3}\b`) in tab scoring heuristics, penalizing derived tabs from other workbooks (Issue [#1](https://github.com/MrAllatta/migration-workbench/issues/1)).
+- Column-level formula structure analysis in the profiler: classify columns as raw data, row-level formula, expansion formula, or hybrid — feeding tab selection scoring, schema contract field annotations, and view manifest `editable_fields`/`computed_fields` split (Issue [#3](https://github.com/MrAllatta/migration-workbench/issues/3)).
 
 **Later**
 
@@ -169,6 +172,12 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.6.0
+
+- **Reserved-character sanitization:** Tab names containing `|`, `:`, `\`, `/`, `*`, `?`, `"`, `<`, `>`, `%` are automatically sanitized to underscore at ingestion, with a logged warning.
+- **Tab exclusion by pattern:** Configurable `tab_exclude_patterns` in scoring heuristics — each entry specifies a regex pattern and penalty weight for matching tab titles.
+- **Column formula structure analysis:** Profiler classifies columns as `raw`, `row_formula`, `expansion_formula`, `hybrid`, or `empty`. Classification flows into tab scoring (`expansion_formula_ratio` penalty), schema contract field annotations, and column candidate shortlists.
 
 ### 0.5.0
 
