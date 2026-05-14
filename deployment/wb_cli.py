@@ -225,7 +225,7 @@ def _contract_diff(args: argparse.Namespace) -> int:
             lines.append("  Fields changed:")
             for fc in md["fields_changed"]:
                 parts = [f"~ {fc['name']}"]
-                if "class" in fc:
+                if fc.get("class") and fc["class"]["old"] != fc["class"]["new"]:
                     old_cls = _short_class(fc["class"]["old"])
                     new_cls = _short_class(fc["class"]["new"])
                     parts.append(f"{old_cls} -> {new_cls}")
