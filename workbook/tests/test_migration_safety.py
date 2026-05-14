@@ -146,3 +146,48 @@ def test_no_diffs_returns_empty():
     """Empty diff produces no safety warnings."""
     assert migration_safety_checks({}) == []
     assert migration_safety_checks({"model_diffs": {}}) == []
+
+
+# ---------------------------------------------------------------------------
+# CLI integration
+# ---------------------------------------------------------------------------
+
+
+def test_contract_safety_cli_text(tmp_path, capsys):
+    """CLI emits human-readable text by default."""
+    from deployment.wb_cli import _contract_safety
+    import argparse
+
+    old_path = tmp_path / "old.yaml"
+    new_path = tmp_path / "new.yaml"
+    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+
+    args = argparse.Namespace(
+        old=str(old_path), new=str(new_path), json=False
+    )
+    rc = _contract_safety(args)
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "safe" in captured.out.lower() or "no" in captured.out.lower()
+
+
+def test_contract_safety_cli_json(tmp_path, capsys):
+    """CLI emits JSON with --json flag."""
+    from deployment.wb_cli import _contract_safety
+    import argparse
+    import json
+
+    old_path = tmp_path / "old.yaml"
+    new_path = tmp_path / "new.yaml"
+    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+
+    args = argparse.Namespace(
+        old=str(old_path), new=str(new_path), json=True
+    )
+    rc = _contract_safety(args)
+    assert rc == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["ok"] is True

@@ -269,6 +269,66 @@ def _fmt_value(val: Any) -> str:
     return repr(val)
 
 
+def _contract_safety(args: argparse.Namespace) -> int:
+    _setup_django()
+    from workbook.codegen.contract import (
+        diff_contracts,
+        load_contract,
+        migration_safety_checks,
+    )
+
+    try:
+        old_contract = load_contract(args.old)
+        new_contract = load_contract(args.new)
+    except ValueError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+    diffs = diff_contracts(old_contract, new_contract)
+    issues = migration_safety_checks(diffs)
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": len(issues) == 0,
+                "error_code": None,
+                "message": (
+                    f"{len(issues)} migration risk(s) found."
+                    if issues else "No migration risks detected."
+                ),
+                "details": issues,
+            },
+            args.json,
+        )
+
+    if not issues:
+        print("No migration risks detected — contracts are safe.")
+        return 0
+
+    danger = [i for i in issues if i["severity"] == "DANGER"]
+    warning = [i for i in issues if i["severity"] == "WARNING"]
+
+    if danger:
+        print(f"=== DANGER ({len(danger)}) ===")
+        for i in danger:
+            loc = f"{i['model']}.{i['field']}" if i["field"] else i["model"]
+            print(f"  {loc}: {i['message']}")
+    if warning:
+        print(f"=== WARNING ({len(warning)}) ===")
+        for i in warning:
+            loc = f"{i['model']}.{i['field']}" if i["field"] else i["model"]
+            print(f"  {loc}: {i['message']}")
+
+    print(f"\n{len(issues)} total migration risk(s) found.")
+    return 0 if not danger else 1
+
+
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     try:
@@ -383,6 +443,13 @@ def build_parser() -> argparse.ArgumentParser:
     diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
     diff_cmd.set_defaults(func=_contract_diff)
+
+    safety_cmd = contract_sub.add_parser(
+        "safety", help="Check contract changes for migration safety risks"
+    )
+    safety_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
+    safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
+    safety_cmd.set_defaults(func=_contract_safety)
 
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")
