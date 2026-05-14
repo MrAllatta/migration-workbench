@@ -170,6 +170,16 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.4.0
+
+- **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions for combining columns (default: space join).
+- **Contract composition:** Custom `!include` YAML tag resolves relative to including file's directory with cyclic-include detection.
+- **Auto-detect import tier ordering:** `assign_import_tiers()` topological sorts FK dependency chains; explicit tiers override auto-detection.
+- **Contract diff tool:** `wb contract diff --old contract-v1.yaml --new contract-v2.yaml` compares models, fields, and meta with text and JSON (`--json`) output.
+- **Schema review checklist:** `wb contract review --contract <yaml>` checks CharField max_length, nullable FK on_delete, missing unique_together, and str_template.
+- **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` stores generated output per contract version for regression detection.
+- **`check-generated` Makefile target:** py_compile validation of generated Python files.
+
 ### 0.3.0
 
 - **Admin scaffold maturity:** `list_editable`, `autocomplete_fields`, `admin.inlines` field overrides, `--diff` flag for regeneration preview.
