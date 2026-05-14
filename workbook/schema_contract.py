@@ -203,6 +203,7 @@ def build_contract(
                     "suggested_field_name": suggested_field_name(src),
                     "profiler_format_type": col.get("format_type"),
                     "has_formula": col.get("has_formula"),
+                    "formula_pattern": col.get("formula_pattern"),
                     "django_field_class": hint["django_field_class"],
                     "django_field_kwargs": hint["django_field_kwargs"],
                     "notes": hint.get("notes") or [],

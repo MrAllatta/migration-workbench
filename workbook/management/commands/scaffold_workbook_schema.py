@@ -96,6 +96,7 @@ def _build_cohort_contract(
                     "suggested_field_name": suggested_field_name(header),
                     "profiler_format_type": fmt,
                     "has_formula": None,
+                    "formula_pattern": None,
                     "django_field_class": hint["django_field_class"],
                     "django_field_kwargs": hint["django_field_kwargs"],
                     "notes": hint.get("notes") or [],
