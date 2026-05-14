@@ -170,8 +170,18 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
-### 0.1.3 (unreleased)
+### 0.3.0
 
+- **Admin scaffold maturity:** `list_editable`, `autocomplete_fields`, `admin.inlines` field overrides, `--diff` flag for regeneration preview.
+- **Post-generation hook system:** `hooks.after_model`, `hooks.after_meta`, `hooks.extra_methods` in contract YAML inject Python source at well-defined points in generated model classes.
+- **`scaffold_designed_model` command:** Emit contract table skeletons for designed/aggregate models with no source tab.
+- **Admin `--diff` flag:** Preview changes before overwriting; forced regeneration shows diff of detected changes.
+
+### 0.2.0
+
+- **Contract schema v1.3:** `computed_fields` (rendered as `@property`), `is_abstract`, `source_tab: null` for designed models, `app_label` per table in `model_meta`.
+- **Makefile improvements:** `validate-contract`, `diff-generated`, `generate-admin-light`, `generate-admin`, `post-generate` targets.
+- **Codegen QoL:** `generate_models --diff`, contract validation warnings at codegen time, import generator skip notes.
 - Backport AbstractUser admin scaffold support from codegen pipeline.
 - Extend contract schema to v1.2: enums, admin config, `model_base`, richer `Meta`.
 - Initial codegen pipeline: `generate_models`, `generate_admin`, `generate_import` commands producing production Django files from hardened schema-contract YAML.
