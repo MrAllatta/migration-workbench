@@ -8,13 +8,54 @@ don't need to branch on the version.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
 
 
+def _make_contract_loader(base_path: str | Path) -> type:
+    """Return a ``SafeLoader`` subclass with an ``!include`` tag registered.
+
+    The ``!include <path>`` tag loads a YAML file relative to *base_path*
+    and inlines its content at the point of use.  Cyclic includes are
+    detected and rejected.
+    """
+    import yaml
+
+    base_dir = Path(base_path).resolve().parent
+
+    class ContractLoader(yaml.SafeLoader):
+        """YAML loader that supports ``!include`` for contract composition."""
+
+        _include_stack: list[Path] = []
+
+    def _include_constructor(
+        loader: ContractLoader, node: yaml.ScalarNode
+    ) -> Any:
+        path_str: str = str(loader.construct_scalar(node))
+        target = (base_dir / path_str).resolve()
+        if target in loader._include_stack:
+            cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
+            raise ValueError(f"cyclic include detected: {cycle}")
+        if not target.is_file():
+            raise ValueError(f"include file not found: {target}")
+        loader._include_stack.append(target)
+        try:
+            text = target.read_text(encoding="utf-8")
+            return yaml.load(text, Loader=type(loader))
+        finally:
+            loader._include_stack.pop()
+
+    ContractLoader.add_constructor("!include", _include_constructor)
+    return ContractLoader
+
+
 def load_contract(path: str | Path) -> dict[str, Any]:
     """Load a schema-contract YAML, validate, and return a normalised dict.
+
+    Supports the ``!include`` YAML tag for composing contracts from multiple
+    files (paths are resolved relative to the including file's directory).
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
@@ -25,12 +66,14 @@ def load_contract(path: str | Path) -> dict[str, Any]:
 
     Raises:
         CommandError (via caller) or ``ValueError`` if the file is missing,
-        unparseable, or has an unsupported version.
+        unparseable, has an unsupported version, or includes a cyclic
+        reference.
     """
     import yaml
 
     src = Path(path).read_text(encoding="utf-8")
-    raw: dict[str, Any] = yaml.safe_load(src)
+    loader_cls = _make_contract_loader(path)
+    raw: dict[str, Any] = yaml.load(src, Loader=loader_cls)
     if not isinstance(raw, dict):
         raise ValueError("schema contract must be a YAML mapping")
 
