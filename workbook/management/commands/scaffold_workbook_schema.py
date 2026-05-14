@@ -10,6 +10,10 @@ from typing import Any
 from django.core.management.base import BaseCommand, CommandError
 
 from connectors.spreadsheet import guess_header_row, raw_sheet_to_row_lists
+from workbook.codegen.designed_model_detection import (
+    find_column_overlap_groups,
+    suggest_designed_model,
+)
 from workbook.field_mapping import map_profiler_column_to_django_field, suggested_field_name
 from workbook.schema_contract import build_contract, load_json
 
@@ -110,6 +114,29 @@ def _build_cohort_contract(
             "columns": columns,
         }
         tables.append(table_entry)
+
+    # Collect tab columns for overlap detection
+    tab_columns: dict[str, set[str]] = {}
+    for table in tables:
+        title = table.get("bundle_worksheet_title", "")
+        if title:
+            tab_columns[title] = {
+                col.get("suggested_field_name", col.get("source_column", ""))
+                for col in table.get("columns", [])
+            }
+
+    overlap_groups = find_column_overlap_groups(tab_columns, min_overlap_ratio=0.5)
+    if overlap_groups:
+        for cluster_entry in overlap_groups:
+            tab_names = cluster_entry["tab_names"]
+            merged_name = "_".join(sorted(tab_names)).lower().replace(" ", "_")
+            suggested = suggest_designed_model(
+                cluster_entry,
+                suggested_name=merged_name,
+                source_provider="google_sheets",
+            )
+            suggested["_meta"] = {"generated_by": "designed_model_detection"}
+            tables.append(suggested)
 
     contract = {
         "version": version,
@@ -296,6 +323,30 @@ class Command(BaseCommand):
             raise CommandError(
                 "Either --bundle-config or --cohort-corpus-out-dir is required."
             )
+
+        # Inject designed model suggestions when tab columns overlap
+        tables = contract.get("tables", [])
+        tab_columns: dict[str, set[str]] = {}
+        for table in tables:
+            title = table.get("bundle_worksheet_title", "")
+            if title:
+                tab_columns[title] = {
+                    col.get("suggested_field_name", col.get("source_column", ""))
+                    for col in table.get("columns", [])
+                }
+        overlap_groups = find_column_overlap_groups(tab_columns, min_overlap_ratio=0.5)
+        if overlap_groups:
+            for cluster_entry in overlap_groups:
+                tab_names = cluster_entry["tab_names"]
+                merged_name = "_".join(sorted(tab_names)).lower().replace(" ", "_")
+                suggested = suggest_designed_model(
+                    cluster_entry,
+                    suggested_name=merged_name,
+                    source_provider="google_sheets",
+                )
+                suggested["_meta"] = {"generated_by": "designed_model_detection"}
+                tables.append(suggested)
+            contract["tables"] = tables
 
         try:
             import yaml  # type: ignore[import-untyped]
