@@ -473,6 +473,53 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
                 }
             )
 
+        # Check: fk_lookup targets a model not in the contract.
+        import_config = table.get("import_config") or {}
+        fk_lookup = import_config.get("fk_lookup") or {}
+        for field_name, lookup_def in fk_lookup.items():
+            target_model = lookup_def.get("model", "")
+            if target_model and target_model not in table_names:
+                issues.append(
+                    {
+                        "table": name,
+                        "field": field_name,
+                        "message": (
+                            f"fk_lookup references '{target_model}' "
+                            f"which is not a table in the contract"
+                        ),
+                    }
+                )
+
+        # Check: admin.inlines target a model not in the contract.
+        admin_config = table.get("admin") or {}
+        for inline_name in admin_config.get("inlines") or []:
+            if inline_name not in table_names:
+                issues.append(
+                    {
+                        "table": name,
+                        "field": inline_name,
+                        "message": (
+                            f"admin.inlines references '{inline_name}' "
+                            f"which is not a table in the contract"
+                        ),
+                    }
+                )
+
+        # Check: computed_fields use snake_case names.
+        computed = table.get("computed_fields") or {}
+        for cf_name in computed:
+            if not re.match(r"^[a-z][a-z0-9_]*$", cf_name):
+                issues.append(
+                    {
+                        "table": name,
+                        "field": cf_name,
+                        "message": (
+                            f"computed_field '{cf_name}' is not snake_case — "
+                            f"use lowercase_with_underscores"
+                        ),
+                    }
+                )
+
     return issues
 
 
