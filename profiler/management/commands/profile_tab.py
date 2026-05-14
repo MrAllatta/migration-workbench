@@ -4,7 +4,7 @@ import json
 import random
 import re
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -16,6 +16,7 @@ from connectors.google_sheets import (
     build_google_service,
     extract_spreadsheet_id,
 )
+from profiler.tools.formula_classifier import classify_column_formula_pattern
 
 
 def _col_letter(idx0: int) -> str:
@@ -157,6 +158,19 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
                     }
                 )
 
+    col_cells: dict[int, list[dict]] = defaultdict(list)
+    for cell in cells:
+        col_cells[cell["col"]].append(cell)
+    column_formula_patterns: dict[str, str] = {}
+    for col_index in sorted(col_cells):
+        col_letter = _col_letter(col_index)
+        column_formula_patterns[col_letter] = classify_column_formula_pattern(
+            [
+                {"kind": c["kind"], "text": c.get("user_entered", "")}
+                for c in col_cells[col_index]
+            ]
+        )
+
     formulas = [c for c in cells if c["kind"] == "formula"]
     skeleton_counts: Counter = Counter()
     func_counts: Counter = Counter()
@@ -214,6 +228,7 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
         "importranges": import_ranges,
         "data_validation_rules": dv_rules,
         "focus_column": focus,
+        "column_formula_patterns": column_formula_patterns,
     }
 
 
