@@ -488,11 +488,13 @@ def _deploy_live(args: argparse.Namespace) -> int:
         actor=actor,
         outcome="deploy_start",
         is_healthy=False,
+        metadata={"build_strategy": "local" if getattr(args, "local", False) else "remote"},
         durable_log_path=Path("build/deploy/release-events.jsonl"),
     )
 
+    build_flag = "--local-only" if getattr(args, "local", False) else "--remote-only"
     deploy_result = subprocess.run(
-        ["fly", "deploy", "--remote-only", "--app", app_name],
+        ["fly", "deploy", build_flag, "--app", app_name],
         check=False,
         capture_output=True,
         text=True,
@@ -507,7 +509,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
             actor=actor,
             outcome="deploy_failed",
             is_healthy=False,
-            metadata={"deploy_stderr": deploy_result.stderr[:2000]},
+            metadata={"deploy_stderr": deploy_result.stderr[:2000], "build_strategy": "local" if getattr(args, "local", False) else "remote"},
             durable_log_path=Path("build/deploy/release-events.jsonl"),
         )
         return _render_output(
@@ -530,6 +532,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
         actor=actor,
         outcome=outcome,
         is_healthy=healthy,
+        metadata={"build_strategy": "local" if getattr(args, "local", False) else "remote"},
         durable_log_path=Path("build/deploy/release-events.jsonl"),
     )
 
@@ -666,6 +669,11 @@ def build_parser() -> argparse.ArgumentParser:
     deploy_cmd.add_argument("--env", required=True, help="Environment name (preview or production).")
     deploy_cmd.add_argument("--dry-run", action="store_true", help="Only plan and record release metadata.")
     deploy_cmd.add_argument("--live", action="store_true", help="Perform a live deploy with health check.")
+    deploy_cmd.add_argument(
+        "--local",
+        action="store_true",
+        help="Build locally with Docker instead of using Fly remote builder.",
+    )
     deploy_cmd.set_defaults(func=_deploy_dry_run)
     return parser
 
