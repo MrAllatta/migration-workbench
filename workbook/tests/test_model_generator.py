@@ -178,6 +178,24 @@ def test_render_field_kwargs_none():
     assert "blank=True" in result
 
 
+def test_render_field_kwargs_choices_accepts_bare_enum_name():
+    """Bare enum class name renders as ``choices=EnumName.choices``."""
+    result = render_field_kwargs({"choices": "EventType"}, enum_names={"EventType"})
+    assert result == "choices=EventType.choices"
+
+
+def test_render_field_kwargs_choices_accepts_enum_dot_choices():
+    """``EventType.choices`` input is normalised to ``choices=EventType.choices``."""
+    result = render_field_kwargs({"choices": "EventType.choices"}, enum_names={"EventType"})
+    assert result == "choices=EventType.choices"
+
+
+def test_render_field_kwargs_choices_unknown_enum_falls_back():
+    """Unknown enum name is rendered as a quoted string, not a class reference."""
+    result = render_field_kwargs({"choices": "UnknownType"}, enum_names={"EventType"})
+    assert result == "choices='UnknownType'"
+
+
 # ---------------------------------------------------------------------------
 # render_field
 # ---------------------------------------------------------------------------

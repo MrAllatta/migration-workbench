@@ -57,8 +57,12 @@ def render_field_kwargs(
         elif k == "on_delete":
             raw = str(v).removeprefix("models.")
             parts.append(f"on_delete=models.{raw}")
-        elif k == "choices" and enum_names and isinstance(v, str) and v in enum_names:
-            parts.append(f"choices={v}.choices")
+        elif k == "choices" and enum_names and isinstance(v, str):
+            enum_name = v.removesuffix(".choices") if v.endswith(".choices") else v
+            if enum_name in enum_names:
+                parts.append(f"choices={enum_name}.choices")
+            else:
+                parts.append(f"{k}={v!r}")
         elif isinstance(v, bool):
             parts.append(f"{k}={v}")
         elif isinstance(v, int):
