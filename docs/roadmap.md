@@ -224,13 +224,12 @@ been pulled yet). Known gaps:
 
 ### 0.8.0 — Import pipeline end-to-end (shipped 2026-05-15)
 
-- **Import pipeline exercised on real bundles:** FK chain ordering, auto-tier
-  detection from `fk_lookup` dependencies, column transforms.
-- **Per-tier transaction savepoints:** `--tier-atomic` / `--no-tier-atomic`.
-- **Per-row error catching:** structured error summaries with type_mismatch,
-  unique_violation, row_exception error codes.
-- **Multi-model import contracts:** FK chains, column transforms, multi-source
-  column_map config exercised end-to-end.
+- **Per-tier transaction savepoints** — `--tier-atomic` wraps each tier in its own savepoint; preceding tiers persist on later-tier failure.
+- **Per-row exception catching** — generated import methods catch `IntegrityError` and other exceptions per row, recording structured errors.
+- **Error handling hardening** — new error codes (`type_mismatch`, `unique_violation`, `row_exception`), per-model `row_errors_count` in summary JSON.
+- **End-to-end import fixture** — new 3-model test data exercising FK chains, `column_map` multi-source, `field_transforms`, and `field_parsers`.
+- **Parsing edge-case coverage** — `None`, whitespace-only, and sentinel value handling in `to_int`, `to_decimal`, `to_bool`, `parse_iso_date`.
+- **Bundle reader multi-source fix** — list-valued `column_map` entries no longer raise `TypeError`.
 
 ### 0.9.0 — View manifest, discovery & deployment (shipped 2026-05-15)
 

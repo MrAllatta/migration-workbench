@@ -44,6 +44,7 @@ class ImporterChassisMixin:
         )
         # Shared FK resolution cache populated lazily by resolve_fk_by_text.
         self.normalized_lookup_indexes = {}
+        self.tier_errors = {}
 
     def record_row_error(self, model_name, row_number, code, field_path, message):
         """Append a structured row-level error to the run's error log.

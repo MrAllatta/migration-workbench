@@ -1,0 +1,164 @@
+version: "1.3"
+source:
+  provider: local
+  source_id: import_pipeline_e2e
+
+tables:
+  - suggested_model_name: ExampleFarm
+    bundle_worksheet_title: Farms
+    columns:
+      - source_column: "Farm Name"
+        suggested_field_name: name
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.CharField
+        django_field_kwargs:
+          max_length: 200
+          unique: true
+      - source_column: Region
+        suggested_field_name: region
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.CharField
+        django_field_kwargs:
+          max_length: 100
+          blank: true
+          default: ""
+      - source_column: Established
+        suggested_field_name: established_date
+        profiler_format_type: date
+        has_formula: false
+        django_field_class: models.DateField
+        django_field_kwargs:
+          null: true
+          blank: true
+    import_config:
+      tier: 1
+      bundle_path: reference/farms.csv
+      required_headers: ["Farm Name", "Region", "Established"]
+      column_map:
+        name: "Farm Name"
+        region: Region
+        established_date: Established
+      required_source_columns: ["name"]
+      field_parsers:
+        established_date: parse_date
+      unique_on: ["name"]
+      default_values:
+        region: "Unknown"
+
+  - suggested_model_name: ExampleField
+    bundle_worksheet_title: Fields
+    columns:
+      - source_column: "Field Name"
+        suggested_field_name: name
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.CharField
+        django_field_kwargs:
+          max_length: 200
+      - source_column: Farm
+        suggested_field_name: farm
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.ForeignKey
+        django_field_kwargs:
+          to: examples.ExampleFarm
+          on_delete: models.CASCADE
+          related_name: fields
+      - source_column: Acreage
+        suggested_field_name: acreage
+        profiler_format_type: number
+        has_formula: false
+        django_field_class: models.DecimalField
+        django_field_kwargs:
+          max_digits: 8
+          decimal_places: 2
+          default: 0
+      - source_column: Active
+        suggested_field_name: is_active
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.BooleanField
+        django_field_kwargs:
+          default: true
+    import_config:
+      tier: 2
+      bundle_path: reference/fields.csv
+      required_headers: ["Field Name", "Farm", "Acreage", "Active"]
+      column_map:
+        name: "Field Name"
+        acreage: Acreage
+        is_active: Active
+      required_source_columns: ["name"]
+      fk_lookup:
+        farm: { model: "examples.ExampleFarm", on: name }
+      unique_on: ["name"]
+
+  - suggested_model_name: ExampleVariety
+    bundle_worksheet_title: Varieties
+    columns:
+      - source_column: Variety
+        suggested_field_name: name
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.CharField
+        django_field_kwargs:
+          max_length: 200
+          unique: true
+      - source_column: Crop
+        suggested_field_name: crop
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.ForeignKey
+        django_field_kwargs:
+          to: examples.ExampleCrop
+          on_delete: models.CASCADE
+          related_name: varieties
+      - source_column: Farm
+        suggested_field_name: farm
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.ForeignKey
+        django_field_kwargs:
+          to: examples.ExampleFarm
+          on_delete: models.SET_NULL
+          null: true
+          blank: true
+          related_name: varieties
+      - source_column: "Seed Cost"
+        suggested_field_name: seed_cost
+        profiler_format_type: number
+        has_formula: false
+        django_field_class: models.DecimalField
+        django_field_kwargs:
+          max_digits: 8
+          decimal_places: 2
+          default: 0
+      - source_column: "Short Notes"
+        suggested_field_name: full_description
+        profiler_format_type: text
+        has_formula: false
+        django_field_class: models.TextField
+        django_field_kwargs:
+          blank: true
+          default: ""
+    import_config:
+      tier: 3
+      bundle_path: reference/varieties.csv
+      required_headers: ["Variety", "Crop", "Farm", "Seed Cost", "Short Notes", "Growing Season"]
+      column_map:
+        name: Variety
+        seed_cost: "Seed Cost"
+        full_description:
+          - "Short Notes"
+          - "Growing Season"
+      field_transforms:
+        full_description: "' — '.join(p for p in parts if p)"
+      required_source_columns: ["name"]
+      fk_lookup:
+        crop: { model: "examples.ExampleCrop", on: name }
+        farm: { model: "examples.ExampleFarm", on: name }
+      unique_on: ["name"]
+      default_values:
+        full_description: ""

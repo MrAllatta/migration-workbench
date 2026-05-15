@@ -75,6 +75,17 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
             action="store_true",
             help="Disable atomic transaction wrapping for apply mode",
         )
+        parser.add_argument(
+            "--tier-atomic",
+            action="store_true",
+            default=True,
+            help="Wrap each import tier in its own transaction savepoint (default)",
+        )
+        parser.add_argument(
+            "--no-tier-atomic",
+            action="store_true",
+            help="Disable per-tier transaction savepoints",
+        )
         parser.add_argument("--summary-json", type=str, help="Write summary artifact to this path")
         parser.add_argument("--verbose", action="store_true", help="Detailed output")
 
@@ -113,6 +124,7 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         requested_summary_path = options.get("summary_json")
         self.summary_json_path = self.resolve_summary_json_path(requested_summary_path)
         self.setup_runtime()
+        self.tier_atomic = self.atomic_apply and not options.get("no_tier_atomic", False)
 
         if not os.path.isdir(self.data_dir):
             raise ValueError(f"Data directory not found: {self.data_dir}")
@@ -164,9 +176,10 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
     def tier(self, title, callback):
         """Print a titled section separator then invoke *callback*.
 
-        Use this to visually group related import steps in the command output::
-
-            self.tier("Crops", self._import_crops)
+        When ``tier_atomic`` is ``True`` and writes are enabled, the callback
+        runs inside a ``transaction.atomic()`` savepoint.  If the callback
+        raises an exception, the savepoint rolls back that tier's rows and
+        the pipeline continues to the next tier.
 
         Args:
             title: Section heading printed between separator lines.
@@ -175,7 +188,17 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         self.stdout.write(self.style.SUCCESS("\n" + "=" * 70))
         self.stdout.write(f"{title}\n")
         self.stdout.write("=" * 70)
-        callback()
+        if self.tier_atomic and not self.write_disabled:
+            try:
+                with transaction.atomic():
+                    callback()
+            except Exception as exc:
+                self.tier_errors[title] = str(exc)
+                self.stderr.write(
+                    self.style.ERROR(f"  TIER FAILED: {title} — {exc}")
+                )
+        else:
+            callback()
 
     def print_summary(self):
         """Print per-model outcome counts and escalation buckets to stdout.

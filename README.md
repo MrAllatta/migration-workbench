@@ -121,7 +121,6 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 - Align default Git branch with Deploy workflow (`main` vs `master`).
 - Production Deploy workflow green end-to-end after secrets and Fly bootstrap.
-- Pipe-character and reserved-character sanitization in tab names at profiler ingestion (Issue [#2](https://github.com/MrAllatta/migration-workbench/issues/2)).
 
 **Next**
 
@@ -130,7 +129,6 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 - Google auth runbook evolution toward WIF ([docs/google-auth.md](docs/google-auth.md)).
 - Scaffold-delivered CI/CD templates for client product repos.
 - Cross-reference tab detection via workbook code patterns (`\b\d{3}\b`) in tab scoring heuristics, penalizing derived tabs from other workbooks (Issue [#1](https://github.com/MrAllatta/migration-workbench/issues/1)).
-- Column-level formula structure analysis in the profiler: classify columns as raw data, row-level formula, expansion formula, or hybrid — feeding tab selection scoring, schema contract field annotations, and view manifest `editable_fields`/`computed_fields` split (Issue [#3](https://github.com/MrAllatta/migration-workbench/issues/3)).
 
 **Later**
 
@@ -172,6 +170,17 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.8.0
+
+- **Per-tier transaction savepoints:** `--tier-atomic` (default on) wraps each import tier in its own `transaction.atomic()` savepoint. A failing tier rolls back only its own rows; preceding tiers persist. `--no-tier-atomic` restores single-transaction behaviour.
+- **Per-row exception catching in generated imports:** Generated `_import_<model>()` methods now catch `IntegrityError` and other exceptions per row, recording structured errors instead of aborting the entire tier.
+- **New error codes:** `type_mismatch`, `unique_violation`, and `row_exception` in `FAILURE_SIGNATURE_OWNERSHIP` for structured escalation routing.
+- **Per-model row error counts in summary JSON:** Each model's outcome dict now includes `row_errors_count` for quick per-model error tallying.
+- **Expanded parsing edge-case handling:** Tests for `None`, whitespace-only, and common sentinel values (`"N/A"`, `"-"`) across all parsers.
+- **End-to-end import pipeline fixture:** `ExampleFarm`, `ExampleField`, `ExampleVariety` models with FK chains, `column_map` multi-source, `field_transforms`, and `field_parsers` exercising the full `generate_import` → `BaseImportCommand` pipeline.
+- **Bundle reader multi-source fix:** `iter_bundle_tab_rows` now correctly skips list-valued `column_map` entries instead of raising `TypeError`.
+- **Import pipeline smoke test in chassis-gate:** `generate_import` exercised with multi-model contract in CI.
 
 ### 0.7.0
 
