@@ -400,14 +400,16 @@ def validate_contract_tables(
 
     for table in tables:
         name = get_model_name(table)
-        field_names = {f["name"] for f in get_fields(table)}
+        fields = get_fields(table)
+        field_names = {f["name"] for f in fields}
 
-        for col in table.get("columns") or []:
-            fname = col.get("suggested_field_name", "?")
-            fk_to = (col.get("django_field_kwargs") or {}).get("to")
+        for field in fields:
+            if field["class"] != "models.ForeignKey":
+                continue
+            fk_to = field["kwargs"].get("to")
             if fk_to and fk_to not in table_names and fk_to != "self":
                 warnings.append(
-                    f"{name}.{fname}: FK target \"{fk_to}\" "
+                    f"{name}.{field['name']}: FK target \"{fk_to}\" "
                     f"is not a table in the contract"
                 )
 
