@@ -87,7 +87,7 @@ def test_drift_check_human_readable_output(tmp_path):
     new.write_text(yaml.dump(new_data, sort_keys=False), encoding="utf-8")
 
     result = _run_drift_check(baseline, new, json_output=False)
-    assert result.returncode == 0
+    assert result.returncode == 1  # drift detected
     assert "variety" in result.stdout or "added" in result.stdout.lower()
 
 

@@ -11,6 +11,7 @@ from workbook.discovery import (
     render_interview,
     render_summary,
 )
+from workbook.codegen.admin_generator import render_admin_py
 
 
 def _orders_manifest() -> dict:
@@ -370,3 +371,57 @@ def test_parse_interview_with_extra_blank_lines():
     manifest = _orders_manifest()
     patch = parse_interview(interview, manifest)
     assert patch["role_hints"] == ["Orders: Finance."]
+
+
+def test_discovery_round_trip_generates_admin():
+    """Full round-trip: manifest -> interview -> fill -> parse -> merge -> admin generation."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "crop_type", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "roundtrip", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "crop_type"],
+                "computed_fields": [],
+                "filterable_by": ["crop_type"],
+                "status_field": "crop_type",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Crops"], "role_hints": [], "weekly_actions": []},
+    }
+    interview_md = render_interview(manifest)
+    assert "<!-- q: role tab=Crops -->" in interview_md
+    assert "<!-- q: status_override field=crop_type tab=Crops -->" in interview_md
+
+    filled = (
+        interview_md
+        .replace("> _Your answer:_", "> Weekly workflow check.", 1)
+        .replace("> _Your answer:_", "> Farm manager.", 1)
+        .replace("> _Your answer:_", "> active -> inactive", 1)
+        .replace("> _Your answer:_ (leave blank to keep **crop_type**)", "> priority", 1)
+    )
+    patch = parse_interview(filled, manifest)
+    assert "Farm manager" in patch["role_hints"][0]
+    assert patch["status_overrides"].get("Crops") == "priority"
+    merged = apply_discovery_patch(manifest, patch)
+    source = render_admin_py(contract, merged, app_label="core")
+    assert "@admin.register(Crop)" in source
+    assert "list_filter" in source
+

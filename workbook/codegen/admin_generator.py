@@ -116,9 +116,18 @@ def _pick_display_fields(
     return []
 
 
-def _promote_status(fields: list[str], status_field: str | None) -> list[str]:
-    """Promote *status_field* to the front of *fields*, adding it if absent."""
+def _promote_status(
+    fields: list[str], status_field: str | None, valid_fields: set[str] | None = None
+) -> list[str]:
+    """Promote *status_field* to the front of *fields*, adding it if absent.
+
+    When *valid_fields* is provided, *status_field* is only added or
+    promoted if it exists within that set, preventing non-existent
+    fields from being injected into generated admin code.
+    """
     if not status_field:
+        return fields
+    if valid_fields is not None and status_field not in valid_fields:
         return fields
     without = [f for f in fields if f != status_field]
     return [status_field] + without
@@ -148,16 +157,16 @@ def _pick_filter_fields(
         raw = admin_cfg.get("list_filter")
         if raw and isinstance(raw, list):
             result = raw if authoritative else [f for f in raw if f in valid]
-            return _promote_status(result, status_field)
+            return _promote_status(result, status_field, valid_fields=valid)
     if view:
         fb = view.get("filterable_by") or []
         if authoritative:
             result = fb
         else:
             result = [f for f in fb if f in valid]
-        return _promote_status(result, status_field)
+        return _promote_status(result, status_field, valid_fields=valid)
     result = [f["name"] for f in contract_fields if _is_date_field(f)]
-    return _promote_status(result, status_field)
+    return _promote_status(result, status_field, valid_fields=valid)
 
 
 def _pick_search_fields(

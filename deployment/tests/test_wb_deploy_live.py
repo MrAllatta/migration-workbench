@@ -85,7 +85,7 @@ def test_deploy_rejects_neither_dry_run_nor_live(tmp_path):
 
 
 def test_deploy_live_flag_accepted_but_fails_without_fly(tmp_path):
-    """Deploy --live is accepted but fails when fly CLI is unavailable."""
+    """Deploy --live is accepted by parser without triggering 'Specify --dry-run' error."""
     manifest_path = tmp_path / "spaces.yml"
     manifest_path.write_text(yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8")
 
@@ -95,6 +95,8 @@ def test_deploy_live_flag_accepted_but_fails_without_fly(tmp_path):
          "deploy", "test_space", "--env", "preview", "--live"],
         capture_output=True, text=True,
     )
-    # Either fly deploy fails, or the command fails for a database reason.
-    # The key assertion is that --live is not rejected at parse time.
-    assert result.returncode != 0 or result.returncode == 0
+    # Verify --live is routed differently from bare deploy (no dry-run/live error).
+    assert "Specify --dry-run" not in result.stdout
+    assert "Specify --dry-run" not in result.stderr
+    # It will fail since fly CLI isn't available, but that's expected.
+    assert result.returncode != 0

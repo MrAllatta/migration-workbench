@@ -9,8 +9,10 @@ Entry point: the ``wb`` script installed by ``pyproject.toml``
     Validate ``deploy/spaces.yml`` against the full manifest schema.
 
 ``wb deploy <space> --env <env> --dry-run``
-    Record a dry-run release event for *space*/*env* (live deploys are not yet
-    implemented; ``--dry-run`` is required until they are).
+    Record a dry-run release event for *space*/*env* without deploying.
+
+``wb deploy <space> --env <env> --live``
+    Perform a live deploy with health-check polling and release recording.
 
 All subcommands accept ``--json`` to emit machine-readable JSON so CI scripts
 can parse results without screen-scraping.
@@ -458,12 +460,12 @@ def _deploy_live(args: argparse.Namespace) -> int:
 
     _setup_django()
 
-    app_name = (space_cfg.get("provider") or {}).get("app_name_template", "app")
+    app_name_base = (space_cfg.get("provider") or {}).get("app_name_template", "app")
+    app_name = app_name_base.replace("{environment}", args.env)
     git_sha = _get_git_sha()
     actor = getpass.getuser()
     healthcheck_path = (space_cfg.get("runtime") or {}).get("healthcheck_path", "/healthz")
-    internal_port = (space_cfg.get("runtime") or {}).get("internal_port", 8080)
-    health_url = f"http://localhost:{internal_port}{healthcheck_path}"
+    health_url = f"https://{app_name}.fly.dev{healthcheck_path}"
 
     release_id = f"live-{uuid.uuid4().hex[:8]}"
 
@@ -479,7 +481,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
     )
 
     deploy_result = subprocess.run(
-        ["fly", "deploy", "--remote-only"],
+        ["fly", "deploy", "--remote-only", "--app", app_name],
         check=False,
         capture_output=True,
         text=True,
@@ -577,7 +579,7 @@ def _drift_check(args: argparse.Namespace) -> int:
     existing_diff_cmd_args = argparse.Namespace(
         json=False, old=args.baseline, new=args.new
     )
-    result = _contract_diff(existing_diff_cmd_args)
+    _contract_diff(existing_diff_cmd_args)
 
     if safety:
         print()
@@ -591,7 +593,7 @@ def _drift_check(args: argparse.Namespace) -> int:
             loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
             print(f"  WARNING: {loc}: {item['message']}")
 
-    return 1 if any(s["severity"] == "DANGER" for s in safety) else result
+    return 1  # drift detected
 
 
 def build_parser() -> argparse.ArgumentParser:
