@@ -242,3 +242,131 @@ def test_merge_notes_command_writes_updated_manifest(tmp_path):
     summary_text = summary_path.read_text(encoding="utf-8")
     assert "## Weekly workflow" in summary_text
     assert "Open Orders, chase anything still pending." in summary_text
+
+
+# ---------------------------------------------------------------------------
+# status_override question in interview
+# ---------------------------------------------------------------------------
+
+
+def test_render_interview_includes_status_override_question():
+    manifest = _orders_manifest()
+    md = render_interview(manifest)
+    assert "<!-- q: status_override field=status tab=Orders -->" in md
+
+
+def test_parse_interview_extracts_status_override():
+    interview = (
+        "<!-- discovery-interview-format: draft-1 -->\n"
+        "# Discovery Interview — demo\n\n"
+        "## Per-view questions\n\n"
+        "### Orders (source tab: Orders)\n\n"
+        "<!-- q: role tab=Orders -->\n"
+        "- Role?\n"
+        "  > Finance team.\n\n"
+        "<!-- q: status tab=Orders field=status -->\n"
+        "- Status meaning?\n"
+        "  > Open -> closed.\n\n"
+        "<!-- q: status_override tab=Orders field=status -->\n"
+        "- Override status field?\n"
+        "  > priority\n\n"
+        "## Workflow actions\n\n"
+        "<!-- q: weekly_actions -->\n"
+        "- Actions?\n"
+    )
+    manifest = _orders_manifest()
+    patch = parse_interview(interview, manifest)
+    assert "status_overrides" in patch
+    assert patch["status_overrides"]["Orders"] == "priority"
+
+
+def test_apply_discovery_patch_writes_status_field_override():
+    manifest = _orders_manifest()
+    patch = {
+        "role_hints": [],
+        "weekly_actions": [],
+        "view_notes": {},
+        "weekly_workflow": "",
+        "status_overrides": {"Orders": "priority"},
+    }
+    updated = apply_discovery_patch(manifest, patch)
+    orders_view = next(v for v in updated["views"] if v["source_tab"] == "Orders")
+    assert orders_view["status_field"] == "priority"
+
+
+def test_apply_discovery_patch_clears_status_field():
+    manifest = _orders_manifest()
+    patch = {
+        "role_hints": [],
+        "weekly_actions": [],
+        "view_notes": {},
+        "weekly_workflow": "",
+        "status_overrides": {"Orders": "none"},
+    }
+    updated = apply_discovery_patch(manifest, patch)
+    orders_view = next(v for v in updated["views"] if v["source_tab"] == "Orders")
+    assert orders_view["status_field"] is None
+
+
+def test_parse_interview_skips_blank_status_override():
+    interview = (
+        "<!-- discovery-interview-format: draft-1 -->\n"
+        "# Discovery Interview — demo\n\n"
+        "## Per-view questions\n\n"
+        "### Orders (source tab: Orders)\n\n"
+        "<!-- q: role tab=Orders -->\n"
+        "- Role?\n"
+        "  > Finance team.\n\n"
+        "<!-- q: status tab=Orders field=status -->\n"
+        "- Status meaning?\n"
+        "  > Open -> closed.\n\n"
+        "<!-- q: status_override tab=Orders field=status -->\n"
+        "- Override?\n"
+        "  > _Your answer:_ (leave blank to keep **status**)\n\n"
+        "## Workflow actions\n\n"
+        "<!-- q: weekly_actions -->\n"
+        "- Actions?\n"
+    )
+    manifest = _orders_manifest()
+    patch = parse_interview(interview, manifest)
+    assert "status_overrides" in patch
+    # Blank override should not be in the dict
+    assert "Orders" not in patch["status_overrides"]
+
+
+# ---------------------------------------------------------------------------
+# Edge cases and round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_parse_interview_with_reordered_sections():
+    interview = (
+        "<!-- discovery-interview-format: draft-1 -->\n"
+        "# Discovery Interview — demo\n\n"
+        "## Workflow actions\n\n"
+        "<!-- q: weekly_actions -->\n"
+        "- Actions?\n"
+        "  1. Reconcile orders.\n\n"
+        "## Per-view questions\n\n"
+        "<!-- q: role tab=Orders -->\n"
+        "- Role?\n"
+        "  > Finance.\n\n"
+    )
+    manifest = _orders_manifest()
+    patch = parse_interview(interview, manifest)
+    assert patch["role_hints"] == ["Orders: Finance."]
+    assert "Reconcile orders." in patch["weekly_actions"]
+
+
+def test_parse_interview_with_extra_blank_lines():
+    interview = (
+        "<!-- discovery-interview-format: draft-1 -->\n"
+        "# Discovery Interview — demo\n\n"
+        "## Per-view questions\n\n"
+        "<!-- q: role tab=Orders -->\n\n\n"
+        "- Role?\n"
+        "  > Finance.\n\n"
+    )
+    manifest = _orders_manifest()
+    patch = parse_interview(interview, manifest)
+    assert patch["role_hints"] == ["Orders: Finance."]
