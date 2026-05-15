@@ -126,6 +126,7 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) pull_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out build/_out/schema-contract-smoke.yaml
+	DB_ENGINE=sqlite $(MANAGE) generate_import --contract example_data/import_pipeline_contract.example.yaml --out build/_out/import-pipeline-smoke.py --force
 	DB_ENGINE=sqlite $(MANAGE) generate_models --contract build/_out/schema-contract-smoke.yaml --out /dev/null --force
 	DB_ENGINE=sqlite $(MANAGE) scaffold_view_manifest --structure example_data/scaffold_view_manifest_structure.example.json --out build/_out/view-manifest-smoke.yaml --summary-json build/_out/view-manifest-smoke.json
 	DB_ENGINE=sqlite $(MANAGE) generate_admin --contract build/_out/schema-contract-smoke.yaml --manifest build/_out/view-manifest-smoke.yaml --out /dev/null --force
