@@ -114,7 +114,7 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 **Stable on 0.x today**
 
 - Profiler (Google Sheets / Drive + Coda), importer chassis, workbook scaffolder.
-- `wb manifest lint`, `wb deploy --dry-run`, PyPI trusted publishing.
+- `wb manifest lint`, `wb deploy --dry-run` / `--live`, PyPI trusted publishing.
 - Self-hosted Fly path: Litestream + shared Tigris bucket, `fly.toml` / `fly.preview.toml`, entrypoint migrations.
 
 **In flight**
@@ -124,7 +124,7 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 **Next**
 
-- Real `wb deploy` (today: `flyctl deploy` + manifest lint is the operator path).
+- Full end-to-end Deploy workflow green (secrets and Fly bootstrap).
 - Backup/restore drill documented and exercised for the workbench space.
 - Google auth runbook evolution toward WIF ([docs/google-auth.md](docs/google-auth.md)).
 - Scaffold-delivered CI/CD templates for client product repos.
@@ -170,6 +170,19 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.9.0
+
+- **Live deploy with health gate:** `wb deploy <space> --env <env> --live` performs a real Fly deploy, polls `/healthz`, and records release events. Outcome taxonomy: `deploy_start`, `deploy_failed`, `deploy_succeeded_healthy`, `deploy_succeeded_unhealthy`.
+- **`--local` build flag:** `wb deploy --local` builds with local Docker instead of Fly remote builder.
+- **Release ID propagation:** After successful deploy, `RELEASE_ID` is set as a Fly secret for the health endpoint.
+- **Improved deploy diagnostics:** `--verbose` / `-v` streams fly deploy stderr/stdout; failed deploys include stderr tail and machine state capture.
+- **Product-aware settings detection:** `wb` auto-detects product repo settings at `backend/config/settings.py`; `--django-settings` flag for explicit override.
+- **Harden entrypoint:** Docker entrypoint now checks for `/data` volume before creating directories, with actionable error messages.
+- **Manifest validation relaxed:** Missing `preview` or `production` environment blocks no longer fail validation.
+- **Test reliability:** Subprocess calls in tests use `sys.executable` instead of hardcoded `"python"` for venv isolation.
+- **Scaffold improvements:** `deploy/spaces.yml` generated for new products; `deployment` app added to `INSTALLED_APPS`.
+- **Code review hardening:** `fly secrets set` always warns on failure; conflicting `--dry-run`/`--live` flags error out; missing `fly` CLI produces actionable install hint; machine state parsing handles non-array API responses.
 
 ### 0.8.0
 
