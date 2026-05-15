@@ -9,6 +9,8 @@ class DummyCommand:
     validate_only = False
     dry_run = False
     atomic_apply = True
+    tier_errors = {}
+    tier_atomic = True
     verbose = False
     run_started_at = datetime.now(timezone.utc)
     run_id = "run-1"
