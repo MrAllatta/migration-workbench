@@ -66,7 +66,7 @@ def _git_init_and_initial_commit(repo: Path) -> None:
     try:
         has_git = _run(("rev-parse", "--git-dir"), check=False).returncode == 0
         if has_git:
-            print(f"skip git init: {repo} is already a git repository")
+            print(f"skip git commit: {repo} is already a git repository — scaffolded files are uncommitted")
             return
 
         init = _run(("init", "-b", "main"))

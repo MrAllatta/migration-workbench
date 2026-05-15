@@ -1,3 +1,5 @@
+"""Tests for validate_contract_tables FK target validation in extra_fields."""
+
 from workbook.codegen.contract import validate_contract_tables
 
 

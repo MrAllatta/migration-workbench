@@ -126,7 +126,6 @@ def _contract_review(args: argparse.Namespace) -> int:
             args.json,
         )
 
-    exit_zero = getattr(args, "exit_zero", False)
     issues = review_contract(contract)
     if not issues:
         return _render_output(
@@ -139,11 +138,16 @@ def _contract_review(args: argparse.Namespace) -> int:
         )
 
     if args.json:
+        message = (
+            f"{len(issues)} issue(s) found (exit-zero)."
+            if args.exit_zero
+            else f"{len(issues)} issue(s) found."
+        )
         return _render_output(
             {
-                "ok": exit_zero,
+                "ok": args.exit_zero,
                 "error_code": None,
-                "message": f"{len(issues)} issue(s) found.",
+                "message": message,
                 "details": issues,
             },
             args.json,
@@ -153,7 +157,7 @@ def _contract_review(args: argparse.Namespace) -> int:
     for issue in issues:
         location = f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
         print(f"  - {location}: {issue['message']}")
-    return 0 if exit_zero else 1
+    return 0 if args.exit_zero else 1
 
 
 def _contract_diff(args: argparse.Namespace) -> int:

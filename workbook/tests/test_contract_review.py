@@ -117,6 +117,37 @@ class TestReviewContract:
         issues = review_contract(contract)
         assert len(issues) == 0
 
+    def test_all_issues_include_rule_id(self):
+        """Every issue produced by review_contract must have a rule_id key."""
+        contract = {
+            "version": "1.3",
+            "tables": [
+                {
+                    "suggested_model_name": "planting",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                        {
+                            "source_column": "Field",
+                            "suggested_field_name": "field",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Field"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                },
+            ],
+        }
+        issues = review_contract(contract)
+        assert len(issues) > 0, "Expected at least one issue from multi-FK contract"
+        assert all("rule_id" in issue for issue in issues), (
+            f"Missing rule_id in issues: {issues}"
+        )
+
     def test_suppress_review_warning_multiple_fk_without_unique(self):
         """Allow suppressing specific review warnings per table by rule_id."""
         contract = {

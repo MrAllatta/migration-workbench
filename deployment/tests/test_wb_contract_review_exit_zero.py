@@ -101,3 +101,6 @@ def test_contract_review_exit_zero_json_marks_ok_true():
     assert payload.get("details"), (
         f"Expected details to contain issues, got: {payload}"
     )
+    assert "(exit-zero)" in payload["message"], (
+        f"Expected '(exit-zero)' in message, got: {payload['message']}"
+    )
