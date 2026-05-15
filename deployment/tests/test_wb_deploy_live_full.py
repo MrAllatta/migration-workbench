@@ -78,7 +78,9 @@ def _manifest() -> dict:
 @pytest.mark.django_db
 @patch("deployment.wb_cli.subprocess.run")
 @patch("deployment.health.wait_for_healthy")
-def test_deploy_live_full_success(mock_health, mock_run, tmp_path):
+@patch("deployment.wb_cli.shutil.which")
+def test_deploy_live_full_success(mock_which, mock_health, mock_run, tmp_path):
+    mock_which.return_value = "/usr/local/bin/fly"
     """Happy path: fly succeeds, health check passes, release events written."""
     manifest_path = tmp_path / "spaces.yml"
     manifest_path.write_text(yaml.dump(_manifest(), sort_keys=False), encoding="utf-8")
@@ -105,7 +107,9 @@ def test_deploy_live_full_success(mock_health, mock_run, tmp_path):
 
 @pytest.mark.django_db
 @patch("deployment.wb_cli.subprocess.run")
-def test_deploy_live_fly_fails(mock_run, tmp_path):
+@patch("deployment.wb_cli.shutil.which")
+def test_deploy_live_fly_fails(mock_which, mock_run, tmp_path):
+    mock_which.return_value = "/usr/local/bin/fly"
     """fly deploy failure records deploy_failed event and exits non-zero."""
     manifest_path = tmp_path / "spaces.yml"
     manifest_path.write_text(yaml.dump(_manifest(), sort_keys=False), encoding="utf-8")
