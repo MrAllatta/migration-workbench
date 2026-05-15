@@ -263,7 +263,10 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
 
         environments = _require_mapping(s.get("environments"), f"{spath}.environments", issues)
         for env in ("preview", "production"):
-            env_cfg = _require_mapping(environments.get(env), f"{spath}.environments.{env}", issues)
+            env_cfg = environments.get(env)
+            if env_cfg is None:
+                continue  # missing env is allowed for production-only spaces
+            env_cfg = _require_mapping(env_cfg, f"{spath}.environments.{env}", issues)
             _require_string(env_cfg, "branch_pattern", f"{spath}.environments.{env}", issues)
 
     return issues
