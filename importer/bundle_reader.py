@@ -111,6 +111,8 @@ def iter_bundle_tab_rows(csv_path: str, tab_config: dict) -> Iterator[tuple[int,
 
         normalized_row: dict[str, str] = {}
         for output_key, source_header in column_map.items():
+            if isinstance(source_header, list):
+                continue
             normalized_row[output_key] = values_by_header.get(source_header, "")
 
         for key, value in default_values.items():
