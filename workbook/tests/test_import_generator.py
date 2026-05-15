@@ -726,3 +726,82 @@ def test_multi_source_unique_assignments():
     rendered = _render_unique_assignments(fields, cfg, indent=8)
     assert "full_name_parts" in rendered
     assert "full_name = (lambda parts" in rendered or 'full_name = " ".join' in rendered
+
+
+# ---------------------------------------------------------------------------
+# --diff flag tests
+# ---------------------------------------------------------------------------
+
+
+def test_import_generator_diff_shows_changes(tmp_path):
+    """--diff shows unified diff when output differs from current file."""
+    from workbook.management.commands.generate_import import Command
+    from io import StringIO
+
+    contract = _contract_with_imports()
+    contract_path = tmp_path / "contract.yaml"
+    with open(contract_path, "w") as f:
+        yaml.dump(contract, f, sort_keys=False)
+
+    out_path = tmp_path / "imports.py"
+    out_path.write_text("# old content\n", encoding="utf-8")
+
+    cmd = Command(stdout=StringIO())
+    cmd.handle(
+        contract=str(contract_path),
+        out=str(out_path),
+        app_label="core",
+        force=False,
+        diff=True,
+    )
+    output = cmd.stdout.getvalue()
+    assert "---" in output or "+++" in output, "Expected diff output with change markers"
+
+
+def test_import_generator_diff_no_changes(tmp_path):
+    """--diff returns 'no changes' when output matches current file."""
+    from workbook.management.commands.generate_import import Command
+    from workbook.codegen.import_generator import render_import_py
+    from io import StringIO
+
+    contract = _contract_with_imports()
+    contract_path = tmp_path / "contract.yaml"
+    with open(contract_path, "w") as f:
+        yaml.dump(contract, f, sort_keys=False)
+
+    out_path = tmp_path / "imports.py"
+    source = render_import_py(contract, app_label="core")
+    out_path.write_text(source, encoding="utf-8")
+
+    cmd = Command(stdout=StringIO())
+    cmd.handle(
+        contract=str(contract_path),
+        out=str(out_path),
+        app_label="core",
+        force=False,
+        diff=True,
+    )
+    assert "no changes" in cmd.stdout.getvalue()
+
+
+def test_import_generator_diff_no_existing(tmp_path):
+    """--diff prints warning when output file doesn't exist yet."""
+    from workbook.management.commands.generate_import import Command
+    from io import StringIO
+
+    contract = _contract_with_imports()
+    contract_path = tmp_path / "contract.yaml"
+    with open(contract_path, "w") as f:
+        yaml.dump(contract, f, sort_keys=False)
+
+    out_path = tmp_path / "nonexistent.py"
+
+    cmd = Command(stdout=StringIO())
+    cmd.handle(
+        contract=str(contract_path),
+        out=str(out_path),
+        app_label="core",
+        force=False,
+        diff=True,
+    )
+    assert "no existing file" in cmd.stdout.getvalue()
