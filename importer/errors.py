@@ -27,6 +27,27 @@ FAILURE_SIGNATURE_OWNERSHIP = {
         "escalation_path": "ops-oncall -> platform",
         "recovery": "review fatal_error and importer logs before retry",
     },
+    "type_mismatch": {
+        "owner_area": "data-contracts",
+        "owner_team": "import-pipeline",
+        "severity": "medium",
+        "escalation_path": "ops-oncall -> data-contracts",
+        "recovery": "correct source data types and rerun --validate-only",
+    },
+    "unique_violation": {
+        "owner_area": "data-contracts",
+        "owner_team": "import-pipeline",
+        "severity": "high",
+        "escalation_path": "ops-oncall -> data-contracts",
+        "recovery": "deduplicate source data or adjust unique_on fields and rerun --validate-only",
+    },
+    "row_exception": {
+        "owner_area": "import-runtime",
+        "owner_team": "platform",
+        "severity": "high",
+        "escalation_path": "ops-oncall -> platform",
+        "recovery": "review row-level errors in summary artifact before retry",
+    },
     "unknown": {
         "owner_area": "triage",
         "owner_team": "platform",
