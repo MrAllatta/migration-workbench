@@ -478,19 +478,37 @@ def _render_import_method(
     lines.append("        data = self._prepare_row(defaults)")
     lines.append("")
 
-    # update_or_create call.
+    # Per-row exception catching with IntegrityError discrimination.
     unique_kwargs = ", ".join(
         f"{f}={f}" for f in unique_on
     )
+    lines.append("        try:")
     lines.append(
-        f"        obj, created = {model_name}.objects.update_or_create("
+        f"            obj, created = {model_name}.objects.update_or_create("
         f"{unique_kwargs}, defaults=data)"
     )
     lines.append(
-        f'        self.stats[{model_name!r}]['
+        f'            self.stats[{model_name!r}]['
         f'"created" if created else "updated"] += 1'
     )
-    lines.append("        self._before_save(obj, data)")
+    lines.append("            self._before_save(obj, data)")
+    lines.append("        except IntegrityError:")
+    lines.append(
+        f'            self.stats[{model_name!r}]["error"] += 1'
+    )
+    lines.append(
+        f'            self.record_row_error({model_name!r}, row_number, '
+        f'"unique_violation", "", "IntegrityError: unique constraint violation")'
+    )
+    lines.append("            continue")
+    lines.append("        except Exception as exc:")
+    lines.append(
+        f'            self.stats[{model_name!r}]["error"] += 1'
+    )
+    lines.append(
+        f'            self.record_row_error({model_name!r}, row_number, '
+        f'"row_exception", "", str(exc))'
+    )
 
     result = "\n".join(lines)
     if indent:
@@ -545,8 +563,9 @@ def render_import_py(
             f"# App label: {app_label}\n"
             "# Last generated: see git history\n"
             "\n"
-            "from typing import Any\n"
-        "from importer.base import BaseImportCommand\n"
+"from typing import Any\n"
+            "from django.db import IntegrityError\n"
+            "from importer.base import BaseImportCommand\n"
             "\n"
             "\n"
             f"class {base_class_name}(BaseImportCommand):\n"
@@ -574,6 +593,7 @@ def render_import_py(
         parts.append("")
     parts.extend([
         "from typing import Any",
+        "from django.db import IntegrityError",
         "from importer.base import BaseImportCommand",
         f"from {app_label}.models import {', '.join(model_names)}",
         "",
