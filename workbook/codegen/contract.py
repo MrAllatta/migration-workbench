@@ -23,19 +23,24 @@ def _make_contract_loader(base_path: str | Path) -> type:
     """
     import yaml
 
-    base_dir = Path(base_path).resolve().parent
+    contract_root = Path(base_path).resolve()
 
     class ContractLoader(yaml.SafeLoader):
         """YAML loader that supports ``!include`` for contract composition."""
 
         _include_stack: list[Path] = []
+        _contract_root: Path = contract_root
 
-    def _include_constructor(
-        loader: ContractLoader, node: yaml.ScalarNode
-    ) -> Any:
-        path_str: str = str(loader.construct_scalar(node))
-        target = (base_dir / path_str).resolve()
-        if target in loader._include_stack:
+    def _resolve_include_target(loader: ContractLoader, path_str: str) -> Path:
+        including_file = (
+            loader._include_stack[-1]
+            if loader._include_stack
+            else loader._contract_root
+        )
+        return (including_file.parent / path_str).resolve()
+
+    def _load_included_yaml(loader: ContractLoader, target: Path) -> Any:
+        if target == loader._contract_root or target in loader._include_stack:
             cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
             raise ValueError(f"cyclic include detected: {cycle}")
         if not target.is_file():
@@ -47,7 +52,25 @@ def _make_contract_loader(base_path: str | Path) -> type:
         finally:
             loader._include_stack.pop()
 
+    def _include_constructor(
+        loader: ContractLoader, node: yaml.ScalarNode
+    ) -> Any:
+        path_str: str = str(loader.construct_scalar(node))
+        target = _resolve_include_target(loader, path_str)
+        return _load_included_yaml(loader, target)
+
+    def _include_list_constructor(
+        loader: ContractLoader, node: yaml.ScalarNode
+    ) -> Any:
+        path_str: str = str(loader.construct_scalar(node))
+        target = _resolve_include_target(loader, path_str)
+        included = _load_included_yaml(loader, target)
+        if not isinstance(included, list):
+            raise ValueError("include_list expects a YAML list")
+        return included
+
     ContractLoader.add_constructor("!include", _include_constructor)
+    ContractLoader.add_constructor("!include_list", _include_list_constructor)
     return ContractLoader
 
 
@@ -84,6 +107,23 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     raw.setdefault("source", {})
     raw.setdefault("tables", [])
     raw["version"] = version
+
+    tables = raw.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError("schema contract tables must be a YAML list")
+
+    def _walk_table_entries(table_entries: list[Any]) -> list[dict[str, Any]]:
+        flattened: list[dict[str, Any]] = []
+        for entry in table_entries:
+            if isinstance(entry, list):
+                flattened.extend(_walk_table_entries(entry))
+                continue
+            if not isinstance(entry, dict):
+                raise ValueError("schema contract tables entries must be mappings")
+            flattened.append(entry)
+        return flattened
+
+    raw["tables"] = _walk_table_entries(tables)
     return raw
 
 
