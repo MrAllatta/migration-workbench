@@ -1278,7 +1278,7 @@ spaces:
     runtime:
       internal_port: 8080
       processes:
-        web: gunicorn config.wsgi:application --bind 0.0.0.0:8080
+        web: /app/scripts/entrypoint_product.sh
         release: python manage.py migrate
       healthcheck_path: /healthz
       healthcheck_timeout_s: 60

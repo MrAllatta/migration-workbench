@@ -40,6 +40,7 @@ import getpass
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from typing import Any
@@ -479,6 +480,18 @@ def _deploy_live(args: argparse.Namespace) -> int:
     health_url = f"https://{app_name}.fly.dev{healthcheck_path}"
 
     release_id = f"live-{uuid.uuid4().hex[:8]}"
+    is_local = getattr(args, "local", False)
+    build_strategy: str = "local" if is_local else "remote"
+
+    if not shutil.which("fly"):
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": "fly CLI not found. Install from https://fly.io/docs/hands-on/install-flyctl/",
+            },
+            args.json,
+        )
 
     record_release_event(
         space=args.space,
@@ -488,11 +501,11 @@ def _deploy_live(args: argparse.Namespace) -> int:
         actor=actor,
         outcome="deploy_start",
         is_healthy=False,
-        metadata={"build_strategy": "local" if getattr(args, "local", False) else "remote"},
+        metadata={"build_strategy": build_strategy},
         durable_log_path=Path("build/deploy/release-events.jsonl"),
     )
 
-    build_flag = "--local-only" if getattr(args, "local", False) else "--remote-only"
+    build_flag = "--local-only" if is_local else "--remote-only"
     deploy_result = subprocess.run(
         ["fly", "deploy", build_flag, "--app", app_name],
         check=False, capture_output=True, text=True,
@@ -512,7 +525,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
             metadata={
                 "deploy_stderr": deploy_result.stderr[-2000:] if deploy_result.stderr else "",
                 "deploy_stdout": deploy_result.stdout[-2000:] if deploy_result.stdout else "",
-                "build_strategy": "local" if getattr(args, "local", False) else "remote",
+                "build_strategy": build_strategy,
             },
             durable_log_path=Path("build/deploy/release-events.jsonl"),
         )
@@ -525,7 +538,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
         ["fly", "secrets", "set", f"RELEASE_ID={release_id}", "--app", app_name],
         check=False, capture_output=True, text=True,
     )
-    if release_secret_result.returncode != 0 and getattr(args, "verbose", False):
+    if release_secret_result.returncode != 0:
         print(
             f"Warning: failed to set RELEASE_ID secret: {release_secret_result.stderr[:500]}",
             file=sys.stderr,
@@ -542,12 +555,13 @@ def _deploy_live(args: argparse.Namespace) -> int:
         if machine_list.returncode == 0 and machine_list.stdout:
             try:
                 machines = json.loads(machine_list.stdout)
-                machine_states = [{"id": m.get("id"), "state": m.get("state"), "region": m.get("region")} for m in machines]
-            except (json.JSONDecodeError, TypeError):
+                if isinstance(machines, list):
+                    machine_states = [{"id": m.get("id"), "state": m.get("state"), "region": m.get("region")} for m in machines]
+            except (json.JSONDecodeError, TypeError, AttributeError, KeyError):
                 pass
 
     outcome = "deploy_succeeded_healthy" if healthy else "deploy_succeeded_unhealthy"
-    metadata: dict[str, Any] = {"build_strategy": "local" if getattr(args, "local", False) else "remote"}
+    metadata: dict[str, Any] = {"build_strategy": build_strategy}
     if not healthy:
         metadata["machine_states"] = machine_states
 
@@ -655,11 +669,6 @@ def build_parser() -> argparse.ArgumentParser:
         default="deploy/spaces.yml",
         help="Path to deployment manifest (default: deploy/spaces.yml).",
     )
-    parser.add_argument(
-        "--django-settings",
-        default=None,
-        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
-    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     manifest_cmd = sub.add_parser("manifest", help="Manifest operations")
@@ -672,6 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
     review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
     review_cmd.add_argument("--exit-zero", action="store_true", help="Return exit code 0 even when issues are found.")
+    review_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     review_cmd.set_defaults(func=_contract_review)
 
     diff_cmd = contract_sub.add_parser(
@@ -679,6 +689,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
+    diff_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     diff_cmd.set_defaults(func=_contract_diff)
 
     safety_cmd = contract_sub.add_parser(
@@ -686,6 +697,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     safety_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
+    safety_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     safety_cmd.set_defaults(func=_contract_safety)
 
     drift_cmd = sub.add_parser("drift", help="Drift detection operations")
@@ -693,6 +705,7 @@ def build_parser() -> argparse.ArgumentParser:
     check_cmd = drift_sub.add_parser("check", help="Check for drift between two schema contracts")
     check_cmd.add_argument("--baseline", required=True, help="Path to baseline (old) contract YAML")
     check_cmd.add_argument("--new", required=True, help="Path to new contract YAML")
+    check_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     check_cmd.set_defaults(func=_drift_check)
 
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
@@ -710,6 +723,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stream fly deploy output and health check logs to stderr.",
     )
+    deploy_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     deploy_cmd.set_defaults(func=_deploy_dry_run)
     return parser
 
@@ -729,17 +743,27 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
-        if args.command == "deploy" and getattr(args, "live", False):
-            args.func = _deploy_live
-        if args.command == "deploy" and not args.dry_run and not getattr(args, "live", False):
-            return _render_output(
-                {
-                    "ok": False,
-                    "error_code": ERROR_CODES["unexpected"],
-                    "message": "Specify --dry-run for dry-run or --live for live deploy.",
-                },
-                args.json,
-            )
+        if args.command == "deploy":
+            if args.dry_run and getattr(args, "live", False):
+                return _render_output(
+                    {
+                        "ok": False,
+                        "error_code": ERROR_CODES["unexpected"],
+                        "message": "Cannot use --dry-run with --live. Choose one.",
+                    },
+                    args.json,
+                )
+            if getattr(args, "live", False):
+                args.func = _deploy_live
+            elif not args.dry_run:
+                return _render_output(
+                    {
+                        "ok": False,
+                        "error_code": ERROR_CODES["unexpected"],
+                        "message": "Specify --dry-run for dry-run or --live for live deploy.",
+                    },
+                    args.json,
+                )
         return args.func(args)
     except Exception as exc:  # pragma: no cover
         return _render_output(
