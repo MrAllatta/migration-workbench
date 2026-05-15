@@ -53,6 +53,12 @@ diff-generated:
 drift-check:
 	$(PYTHON) -m deployment.wb_cli drift check --baseline "$(CONTRACT)" --new "$(CONTRACT)"
 
+SPACE ?= demo
+ENV ?= preview
+
+deploy:
+	$(PYTHON) -m deployment.wb_cli --manifest deploy/spaces.yml deploy $(SPACE) --env $(ENV) --live
+
 generate-admin-light:
 	$(MANAGE) generate_admin --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)
 
