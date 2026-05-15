@@ -449,8 +449,8 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
     ``max_length``, and missing ``unique_together`` on multi-FK tables.
 
     Returns:
-        List of ``{"table": ..., "field": ..., "message": ...}`` dicts,
-        one per issue found.
+        List of issue dicts. Each issue includes stable ``rule_id`` plus
+        ``table``, ``field``, and ``message`` keys.
     """
     issues: list[dict[str, str]] = []
     tables = list(contract.get("tables") or [])
@@ -461,39 +461,45 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
         fields = get_fields(table)
         meta = table.get("model_meta") or {}
 
+        suppressed_rule_ids = set(table.get("suppress_review_warnings") or [])
+
+        def add_issue(rule_id: str, field: str, message: str) -> None:
+            if rule_id in suppressed_rule_ids:
+                return
+            issues.append(
+                {
+                    "rule_id": rule_id,
+                    "table": name,
+                    "field": field,
+                    "message": message,
+                }
+            )
+
         # Check: CharField without max_length.
         for field in fields:
             fclass = _field_class_short(field["class"])
             kwargs = field["kwargs"]
             if fclass == "CharField" and "max_length" not in kwargs:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": field["name"],
-                        "message": "CharField without max_length — default will be used",
-                    }
+                add_issue(
+                    "charfield_missing_max_length",
+                    field["name"],
+                    "CharField without max_length — default will be used",
                 )
             # Check: nullable FK without explicit on_delete.
             if fclass == "ForeignKey":
                 on_delete = kwargs.get("on_delete")
                 null_ok = kwargs.get("null", kwargs.get("blank", False))
                 if null_ok and not on_delete:
-                    issues.append(
-                        {
-                            "table": name,
-                            "field": field["name"],
-                            "message": "nullable FK without explicit on_delete — "
-                            "Django will warn at runtime",
-                        }
+                    add_issue(
+                        "nullable_fk_missing_on_delete",
+                        field["name"],
+                        "nullable FK without explicit on_delete — Django will warn at runtime",
                     )
                 elif null_ok and str(on_delete) == "PROTECT":
-                    issues.append(
-                        {
-                            "table": name,
-                            "field": field["name"],
-                            "message": "nullable FK with PROTECT — "
-                            "import failures leave orphaned rows",
-                        }
+                    add_issue(
+                        "nullable_fk_with_protect",
+                        field["name"],
+                        "nullable FK with PROTECT — import failures leave orphaned rows",
                     )
 
         # Check: multiple FK fields but no unique_together or constraints.
@@ -504,25 +510,19 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
                 or meta.get("constraints")
             )
             if not has_unique:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": ", ".join(f["name"] for f in fk_fields),
-                        "message": "multiple FK fields but no unique_together "
-                        "or constraints — possible duplicate rows",
-                    }
+                add_issue(
+                    "multiple_fk_without_unique",
+                    ", ".join(f["name"] for f in fk_fields),
+                    "multiple FK fields but no unique_together or constraints — possible duplicate rows",
                 )
 
         # Check: model has no __str__ template for admin usability.
         str_tmpl = table.get("str_template")
         if not str_tmpl:
-            issues.append(
-                {
-                    "table": name,
-                    "field": "",
-                    "message": "no str_template — admin lists show unhelpful "
-                    "object labels",
-                }
+            add_issue(
+                "missing_str_template",
+                "",
+                "no str_template — admin lists show unhelpful object labels",
             )
 
         # Check: fk_lookup targets a model not in the contract.
@@ -531,45 +531,30 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
         for field_name, lookup_def in fk_lookup.items():
             target_model = lookup_def.get("model", "")
             if target_model and target_model not in table_names:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": field_name,
-                        "message": (
-                            f"fk_lookup references '{target_model}' "
-                            f"which is not a table in the contract"
-                        ),
-                    }
+                add_issue(
+                    "fk_lookup_missing_target_model",
+                    field_name,
+                    f"fk_lookup references '{target_model}' which is not a table in the contract",
                 )
 
         # Check: admin.inlines target a model not in the contract.
         admin_config = table.get("admin") or {}
         for inline_name in admin_config.get("inlines") or []:
             if inline_name not in table_names:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": inline_name,
-                        "message": (
-                            f"admin.inlines references '{inline_name}' "
-                            f"which is not a table in the contract"
-                        ),
-                    }
+                add_issue(
+                    "admin_inline_missing_target_model",
+                    inline_name,
+                    f"admin.inlines references '{inline_name}' which is not a table in the contract",
                 )
 
         # Check: computed_fields use snake_case names.
         computed = table.get("computed_fields") or {}
         for cf_name in computed:
             if not re.match(r"^[a-z][a-z0-9_]*$", cf_name):
-                issues.append(
-                    {
-                        "table": name,
-                        "field": cf_name,
-                        "message": (
-                            f"computed_field '{cf_name}' is not snake_case — "
-                            f"use lowercase_with_underscores"
-                        ),
-                    }
+                add_issue(
+                    "computed_field_not_snake_case",
+                    cf_name,
+                    f"computed_field '{cf_name}' is not snake_case — use lowercase_with_underscores",
                 )
 
     return issues
