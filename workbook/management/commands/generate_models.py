@@ -100,8 +100,6 @@ class Command(BaseCommand):
             sys.exit(1)
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        if out_path.exists() and str(out_path) != "/dev/null":
-            out_path.rename(str(out_path) + ".bak")
         out_path.write_text(source, encoding="utf-8")
 
         model_count = len(contract.get("tables") or [])

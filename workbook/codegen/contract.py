@@ -15,27 +15,34 @@ from typing import Any
 
 
 def _make_contract_loader(base_path: str | Path) -> type:
-    """Return a ``SafeLoader`` subclass with an ``!include`` tag registered.
+    """Return a ``SafeLoader`` subclass supporting ``!include`` and ``!include_list``.
 
-    The ``!include <path>`` tag loads a YAML file relative to *base_path*
-    and inlines its content at the point of use.  Cyclic includes are
-    detected and rejected.
+    Both tags load YAML from another file and inline it at the point of use.
+    Include paths are resolved relative to the directory of the including
+    file, not the root contract file.
+
+    Cyclic includes are detected and rejected.
     """
     import yaml
 
-    base_dir = Path(base_path).resolve().parent
+    contract_path = Path(base_path).resolve()
 
     class ContractLoader(yaml.SafeLoader):
         """YAML loader that supports ``!include`` for contract composition."""
 
         _include_stack: list[Path] = []
+        _contract_path: Path = contract_path
 
-    def _include_constructor(
-        loader: ContractLoader, node: yaml.ScalarNode
-    ) -> Any:
-        path_str: str = str(loader.construct_scalar(node))
-        target = (base_dir / path_str).resolve()
-        if target in loader._include_stack:
+    def _resolve_include_target(loader: ContractLoader, path_str: str) -> Path:
+        including_file = (
+            loader._include_stack[-1]
+            if loader._include_stack
+            else loader._contract_path
+        )
+        return (including_file.parent / path_str).resolve()
+
+    def _load_included_yaml(loader: ContractLoader, target: Path) -> Any:
+        if target == loader._contract_path or target in loader._include_stack:
             cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
             raise ValueError(f"cyclic include detected: {cycle}")
         if not target.is_file():
@@ -47,15 +54,37 @@ def _make_contract_loader(base_path: str | Path) -> type:
         finally:
             loader._include_stack.pop()
 
+    def _include_constructor(
+        loader: ContractLoader, node: yaml.ScalarNode
+    ) -> Any:
+        path_str: str = str(loader.construct_scalar(node))
+        target = _resolve_include_target(loader, path_str)
+        return _load_included_yaml(loader, target)
+
+    def _include_list_constructor(
+        loader: ContractLoader, node: yaml.ScalarNode
+    ) -> Any:
+        path_str: str = str(loader.construct_scalar(node))
+        target = _resolve_include_target(loader, path_str)
+        included = _load_included_yaml(loader, target)
+        if not isinstance(included, list):
+            included_type_name = type(included).__name__
+            raise ValueError(
+                f"include_list expects a YAML list (got {included_type_name}) in {target}"
+            )
+        return included
+
     ContractLoader.add_constructor("!include", _include_constructor)
+    ContractLoader.add_constructor("!include_list", _include_list_constructor)
     return ContractLoader
 
 
 def load_contract(path: str | Path) -> dict[str, Any]:
     """Load a schema-contract YAML, validate, and return a normalised dict.
 
-    Supports the ``!include`` YAML tag for composing contracts from multiple
-    files (paths are resolved relative to the including file's directory).
+    Supports the ``!include`` and ``!include_list`` YAML tags for composing
+    contracts from multiple files (paths are resolved relative to the
+    including file's directory).
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
@@ -84,6 +113,27 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     raw.setdefault("source", {})
     raw.setdefault("tables", [])
     raw["version"] = version
+
+    tables = raw.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError("schema contract tables must be a YAML list")
+
+    def _walk_table_entries(table_entries: list[Any]) -> list[dict[str, Any]]:
+        flattened: list[dict[str, Any]] = []
+        for entry in table_entries:
+            if isinstance(entry, list):
+                flattened.extend(_walk_table_entries(entry))
+                continue
+            if not isinstance(entry, dict):
+                entry_type_name = type(entry).__name__
+                raise ValueError(
+                    "schema contract tables entries must be mappings "
+                    f"(got {entry_type_name})"
+                )
+            flattened.append(entry)
+        return flattened
+
+    raw["tables"] = _walk_table_entries(tables)
     return raw
 
 
@@ -350,14 +400,16 @@ def validate_contract_tables(
 
     for table in tables:
         name = get_model_name(table)
-        field_names = {f["name"] for f in get_fields(table)}
+        fields = get_fields(table)
+        field_names = {f["name"] for f in fields}
 
-        for col in table.get("columns") or []:
-            fname = col.get("suggested_field_name", "?")
-            fk_to = (col.get("django_field_kwargs") or {}).get("to")
+        for field in fields:
+            if field["class"] != "models.ForeignKey":
+                continue
+            fk_to = field["kwargs"].get("to")
             if fk_to and fk_to not in table_names and fk_to != "self":
                 warnings.append(
-                    f"{name}.{fname}: FK target \"{fk_to}\" "
+                    f"{name}.{field['name']}: FK target \"{fk_to}\" "
                     f"is not a table in the contract"
                 )
 
@@ -397,8 +449,8 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
     ``max_length``, and missing ``unique_together`` on multi-FK tables.
 
     Returns:
-        List of ``{"table": ..., "field": ..., "message": ...}`` dicts,
-        one per issue found.
+        List of issue dicts. Each issue includes stable ``rule_id`` plus
+        ``table``, ``field``, and ``message`` keys.
     """
     issues: list[dict[str, str]] = []
     tables = list(contract.get("tables") or [])
@@ -409,39 +461,45 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
         fields = get_fields(table)
         meta = table.get("model_meta") or {}
 
+        suppressed_rule_ids = set(table.get("suppress_review_warnings") or [])
+
+        def add_issue(rule_id: str, field: str, message: str) -> None:
+            if rule_id in suppressed_rule_ids:
+                return
+            issues.append(
+                {
+                    "rule_id": rule_id,
+                    "table": name,
+                    "field": field,
+                    "message": message,
+                }
+            )
+
         # Check: CharField without max_length.
         for field in fields:
             fclass = _field_class_short(field["class"])
             kwargs = field["kwargs"]
             if fclass == "CharField" and "max_length" not in kwargs:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": field["name"],
-                        "message": "CharField without max_length — default will be used",
-                    }
+                add_issue(
+                    "charfield_missing_max_length",
+                    field["name"],
+                    "CharField without max_length — default will be used",
                 )
             # Check: nullable FK without explicit on_delete.
             if fclass == "ForeignKey":
                 on_delete = kwargs.get("on_delete")
                 null_ok = kwargs.get("null", kwargs.get("blank", False))
                 if null_ok and not on_delete:
-                    issues.append(
-                        {
-                            "table": name,
-                            "field": field["name"],
-                            "message": "nullable FK without explicit on_delete — "
-                            "Django will warn at runtime",
-                        }
+                    add_issue(
+                        "nullable_fk_missing_on_delete",
+                        field["name"],
+                        "nullable FK without explicit on_delete — Django will warn at runtime",
                     )
                 elif null_ok and str(on_delete) == "PROTECT":
-                    issues.append(
-                        {
-                            "table": name,
-                            "field": field["name"],
-                            "message": "nullable FK with PROTECT — "
-                            "import failures leave orphaned rows",
-                        }
+                    add_issue(
+                        "nullable_fk_with_protect",
+                        field["name"],
+                        "nullable FK with PROTECT — import failures leave orphaned rows",
                     )
 
         # Check: multiple FK fields but no unique_together or constraints.
@@ -452,25 +510,19 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
                 or meta.get("constraints")
             )
             if not has_unique:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": ", ".join(f["name"] for f in fk_fields),
-                        "message": "multiple FK fields but no unique_together "
-                        "or constraints — possible duplicate rows",
-                    }
+                add_issue(
+                    "multiple_fk_without_unique",
+                    ", ".join(f["name"] for f in fk_fields),
+                    "multiple FK fields but no unique_together or constraints — possible duplicate rows",
                 )
 
         # Check: model has no __str__ template for admin usability.
         str_tmpl = table.get("str_template")
         if not str_tmpl:
-            issues.append(
-                {
-                    "table": name,
-                    "field": "",
-                    "message": "no str_template — admin lists show unhelpful "
-                    "object labels",
-                }
+            add_issue(
+                "missing_str_template",
+                "",
+                "no str_template — admin lists show unhelpful object labels",
             )
 
         # Check: fk_lookup targets a model not in the contract.
@@ -479,45 +531,30 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
         for field_name, lookup_def in fk_lookup.items():
             target_model = lookup_def.get("model", "")
             if target_model and target_model not in table_names:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": field_name,
-                        "message": (
-                            f"fk_lookup references '{target_model}' "
-                            f"which is not a table in the contract"
-                        ),
-                    }
+                add_issue(
+                    "fk_lookup_missing_target_model",
+                    field_name,
+                    f"fk_lookup references '{target_model}' which is not a table in the contract",
                 )
 
         # Check: admin.inlines target a model not in the contract.
         admin_config = table.get("admin") or {}
         for inline_name in admin_config.get("inlines") or []:
             if inline_name not in table_names:
-                issues.append(
-                    {
-                        "table": name,
-                        "field": inline_name,
-                        "message": (
-                            f"admin.inlines references '{inline_name}' "
-                            f"which is not a table in the contract"
-                        ),
-                    }
+                add_issue(
+                    "admin_inline_missing_target_model",
+                    inline_name,
+                    f"admin.inlines references '{inline_name}' which is not a table in the contract",
                 )
 
         # Check: computed_fields use snake_case names.
         computed = table.get("computed_fields") or {}
         for cf_name in computed:
             if not re.match(r"^[a-z][a-z0-9_]*$", cf_name):
-                issues.append(
-                    {
-                        "table": name,
-                        "field": cf_name,
-                        "message": (
-                            f"computed_field '{cf_name}' is not snake_case — "
-                            f"use lowercase_with_underscores"
-                        ),
-                    }
+                add_issue(
+                    "computed_field_not_snake_case",
+                    cf_name,
+                    f"computed_field '{cf_name}' is not snake_case — use lowercase_with_underscores",
                 )
 
     return issues
@@ -622,7 +659,7 @@ def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
 
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})
 
-    for fname, spec in sorted(extra.items()):
+    for fname, spec in extra.items():
         fclass = _normalise_field_class(str(spec.get("class") or "models.TextField"))
         fkwargs = dict(spec.get("kwargs") or {})
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})

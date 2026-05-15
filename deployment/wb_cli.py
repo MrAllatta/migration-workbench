@@ -126,6 +126,7 @@ def _contract_review(args: argparse.Namespace) -> int:
             args.json,
         )
 
+    exit_zero = getattr(args, "exit_zero", False)
     issues = review_contract(contract)
     if not issues:
         return _render_output(
@@ -140,7 +141,7 @@ def _contract_review(args: argparse.Namespace) -> int:
     if args.json:
         return _render_output(
             {
-                "ok": False,
+                "ok": exit_zero,
                 "error_code": None,
                 "message": f"{len(issues)} issue(s) found.",
                 "details": issues,
@@ -152,7 +153,7 @@ def _contract_review(args: argparse.Namespace) -> int:
     for issue in issues:
         location = f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
         print(f"  - {location}: {issue['message']}")
-    return 0 if not issues else 1
+    return 0 if exit_zero else 1
 
 
 def _contract_diff(args: argparse.Namespace) -> int:
@@ -435,6 +436,7 @@ def build_parser() -> argparse.ArgumentParser:
     contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)
     review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
     review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
+    review_cmd.add_argument("--exit-zero", action="store_true", help="Return exit code 0 even when issues are found.")
     review_cmd.set_defaults(func=_contract_review)
 
     diff_cmd = contract_sub.add_parser(

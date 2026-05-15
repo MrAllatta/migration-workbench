@@ -48,8 +48,7 @@ validate-contract:
 	$(PYTHON) scripts/validate_contract.py "$(CONTRACT)"
 
 diff-generated:
-	@test -f $(OUT).bak || { echo "No backup at $(OUT).bak"; exit 1; }
-	@diff -u $(OUT).bak $(OUT) || true
+	$(MANAGE) generate_models --contract $(CONTRACT) --out $(OUT) --diff
 
 generate-admin-light:
 	$(MANAGE) generate_admin --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)

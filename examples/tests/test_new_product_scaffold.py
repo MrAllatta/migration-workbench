@@ -65,6 +65,52 @@ def test_new_product_coda_scaffold_writes_coda_config_and_docs(tmp_path):
     assert (output_dir / "config" / "coda_live.local.json").exists()
 
 
+def test_new_product_does_not_commit_into_existing_repo(tmp_path):
+    """Scaffolding into an existing git repo must not auto-commit."""
+    product_name = "existing-repo"
+    output_dir = tmp_path / product_name
+    output_dir.mkdir()
+
+    subprocess.run(
+        ["git", "init", "-b", "main"],
+        cwd=str(output_dir),
+        check=True,
+        capture_output=True,
+    )
+    baseline_file = output_dir / "baseline.txt"
+    baseline_file.write_text("baseline content\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "baseline.txt"],
+        cwd=str(output_dir),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C", str(output_dir),
+            "-c", "user.name=test",
+            "-c", "user.email=test@test.com",
+            "commit", "-m", "baseline",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    _run_new_product(tmp_path, product_name)
+
+    result = subprocess.run(
+        ["git", "log", "--oneline", "-1"],
+        cwd=str(output_dir),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "baseline" in result.stdout, (
+        f"Expected 'baseline' commit to remain latest, got: {result.stdout}"
+    )
+
+
 def test_check_env_regression_no_bashism(tmp_path):
     """Generated Makefile must not contain bash-specific indirect expansion."""
     output_dir = _run_new_product(tmp_path, "no-bashism")

@@ -28,6 +28,8 @@ Inputs are pull-bundle-style JSON (`tabs[]`, `required_headers`) plus optional `
 
 **Relations:** relation-like columns may emit `ForeignKey` with `django_field_kwargs.to: TODO_TargetModel` until product repos choose real targets.
 
+**Choices kwargs:** the `choices` field in `django_field_kwargs` accepts either a bare enum class name (e.g. `EventType`) or a dotted reference (e.g. `EventType.choices`). Codegen normalises both to `choices=EventType.choices` when the enum name is known.
+
 ## View manifest
 
 `scaffold_view_manifest` is a sibling artifact builder — it produces a **first-draft** UI/workflow contract from the profiler `structure.json` (emitted by `pull_bundle --include-structure`) and an optional schema-contract YAML.

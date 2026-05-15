@@ -140,8 +140,6 @@ class Command(BaseCommand):
                         )
                     )
                     self.stdout.write(diff_text)
-            if str(out_path) != "/dev/null":
-                out_path.rename(str(out_path) + ".bak")
         out_path.write_text(source, encoding="utf-8")
 
         line_count = source.count("\n")

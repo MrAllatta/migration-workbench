@@ -178,6 +178,24 @@ def test_render_field_kwargs_none():
     assert "blank=True" in result
 
 
+def test_render_field_kwargs_choices_accepts_bare_enum_name():
+    """Bare enum class name renders as ``choices=EnumName.choices``."""
+    result = render_field_kwargs({"choices": "EventType"}, enum_names={"EventType"})
+    assert result == "choices=EventType.choices"
+
+
+def test_render_field_kwargs_choices_accepts_enum_dot_choices():
+    """``EventType.choices`` input is normalised to ``choices=EventType.choices``."""
+    result = render_field_kwargs({"choices": "EventType.choices"}, enum_names={"EventType"})
+    assert result == "choices=EventType.choices"
+
+
+def test_render_field_kwargs_choices_unknown_enum_falls_back():
+    """Unknown enum name is rendered as a quoted string, not a class reference."""
+    result = render_field_kwargs({"choices": "UnknownType"}, enum_names={"EventType"})
+    assert result == "choices='UnknownType'"
+
+
 # ---------------------------------------------------------------------------
 # render_field
 # ---------------------------------------------------------------------------
@@ -355,6 +373,42 @@ def test_get_fields_extra_fields():
     fields = get_fields(t)
     names = [f["name"] for f in fields]
     assert "slug" in names
+
+
+def test_get_fields_preserves_extra_fields_order():
+    table = {
+        "suggested_model_name": "crop",
+        "columns": [
+            {
+                "suggested_field_name": "name",
+                "django_field_class": "models.CharField",
+                "django_field_kwargs": {"max_length": 200},
+            }
+        ],
+        "extra_fields": {
+            "season_label": {
+                "class": "models.CharField",
+                "kwargs": {"max_length": 50, "blank": True, "default": ""},
+            },
+            "farm_notes": {
+                "class": "models.TextField",
+                "kwargs": {"blank": True, "default": ""},
+            },
+            "audit_hash": {
+                "class": "models.CharField",
+                "kwargs": {"max_length": 64, "blank": True, "default": ""},
+            },
+        },
+    }
+
+    fields = get_fields(table)
+    field_names = [field["name"] for field in fields]
+    assert field_names == [
+        "name",
+        "season_label",
+        "farm_notes",
+        "audit_hash",
+    ]
 
 
 def test_get_fields_override_class():

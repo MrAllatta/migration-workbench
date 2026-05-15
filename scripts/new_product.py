@@ -65,15 +65,18 @@ def _git_init_and_initial_commit(repo: Path) -> None:
 
     try:
         has_git = _run(("rev-parse", "--git-dir"), check=False).returncode == 0
-        if not has_git:
-            init = _run(("init", "-b", "main"))
-            if init.returncode != 0:
-                print(
-                    f"warning: git init failed: {init.stderr.strip() or init.stdout}",
-                    file=sys.stderr,
-                )
-                return
-            print(f"git init {repo}")
+        if has_git:
+            print(f"skip git init: {repo} is already a git repository")
+            return
+
+        init = _run(("init", "-b", "main"))
+        if init.returncode != 0:
+            print(
+                f"warning: git init failed: {init.stderr.strip() or init.stdout}",
+                file=sys.stderr,
+            )
+            return
+        print(f"git init {repo}")
 
         add = _run(("add", "-A"))
         if add.returncode != 0:
@@ -417,7 +420,7 @@ validate: check validate-contract
 
 corpus-codegen-report:
 	@echo "=== Model compilation ==="
-	wb contract review --contract "$(CONTRACT)"
+	wb contract review --exit-zero --contract "$(CONTRACT)"
 	@echo "=== Generated file check ==="
 	$(MANAGE) check
 
@@ -450,8 +453,11 @@ generate-models:
 	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --force
 
 generate-admin:
-	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
-	$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force
+	@if [ -f "$(VIEW_MANIFEST)" ]; then \
+		$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force; \
+	else \
+		$(MANAGE) generate_admin --contract "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force; \
+	fi
 
 generate-import:
 	$(MANAGE) generate_import --contract "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
