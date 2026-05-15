@@ -124,3 +124,56 @@ def test_validate_manifest_rejects_storage_volume_override():
 
     issues = validate_manifest(payload)
     assert any(issue.path == "spaces.demo.storage.volume_gb" for issue in issues)
+
+
+def _minimal_valid_manifest() -> dict:
+    return {
+        "version": 1,
+        "profiles": {"tiny": {"cpu": {"cores": 1, "type": "shared"}, "memory_mb": 256, "volume_gb": 5}},
+        "replication_defaults": {
+            "provider": "s3",
+            "bucket_env": "LITESTREAM_BUCKET",
+            "snapshot_interval_minutes": 15,
+            "retention_days": 14,
+        },
+        "spaces": {
+            "test": {
+                "owner": "platform",
+                "project": "test",
+                "profile": "tiny",
+                "provider": {
+                    "type": "fly",
+                    "primary_region": "ewr",
+                    "regions": ["ewr"],
+                    "app_name_template": "test-{env}",
+                },
+                "build": {"dockerfile": "Dockerfile", "context": ".", "image": None},
+                "runtime": {
+                    "internal_port": 8080,
+                    "processes": {"web": "gunicorn app.wsgi:application", "release": "python manage.py migrate"},
+                    "healthcheck_path": "/healthz",
+                    "healthcheck_timeout_s": 60,
+                },
+                "storage": {"sqlite_path": "/data/db.sqlite3", "media_path": "/data/media"},
+                "replication": {"litestream_enabled": True, "replica_path_template": "test/{env}"},
+                "backup": {
+                    "predeploy_checkpoint": {"required": True, "method": "litestream_snapshot"},
+                    "retention_days": 7,
+                },
+                "environment": {"required": ["SQLITE_PATH"]},
+                "secrets": {"required": ["DJANGO_SECRET_KEY"]},
+                "environments": {
+                    "preview": {"branch_pattern": "preview/*"},
+                    "production": {"branch_pattern": "main"},
+                },
+            }
+        },
+    }
+
+
+def test_production_only_environment_is_valid():
+    manifest = _minimal_valid_manifest()
+    manifest["spaces"]["test"]["environments"].pop("preview", None)
+    issues = validate_manifest(manifest)
+    env_issues = [i for i in issues if "environments" in i.path]
+    assert not env_issues, f"Unexpected env issues: {env_issues}"

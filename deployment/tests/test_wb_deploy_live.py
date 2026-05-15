@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -75,7 +76,7 @@ def test_deploy_rejects_neither_dry_run_nor_live(tmp_path):
     manifest_path.write_text(yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8")
 
     result = subprocess.run(
-        ["python", "-m", "deployment.wb_cli", "--json",
+        [sys.executable, "-m", "deployment.wb_cli", "--json",
          "--manifest", str(manifest_path),
          "deploy", "test_space", "--env", "preview"],
         capture_output=True, text=True,
@@ -90,7 +91,7 @@ def test_deploy_live_flag_accepted_but_fails_without_fly(tmp_path):
     manifest_path.write_text(yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8")
 
     result = subprocess.run(
-        ["python", "-m", "deployment.wb_cli", "--json",
+        [sys.executable, "-m", "deployment.wb_cli", "--json",
          "--manifest", str(manifest_path),
          "deploy", "test_space", "--env", "preview", "--live"],
         capture_output=True, text=True,

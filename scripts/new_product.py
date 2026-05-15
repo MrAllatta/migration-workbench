@@ -183,6 +183,7 @@ INSTALLED_APPS = [
     "profiler",
     "importer",
     "workbook",
+    "deployment",
     "core",
 ]
 
@@ -1199,6 +1200,8 @@ COPY --from=builder /app /app
 
 RUN groupadd --gid "${{APP_GID}}" app \\
     && useradd --uid "${{APP_UID}}" --gid app --no-create-home --shell /usr/sbin/nologin app \\
+    && mkdir -p /data /data/media \\
+    && chown -R app:app /data \\
     && chown -R app:app /app \\
     && chmod +x /app/scripts/entrypoint_product.sh
 
@@ -1240,6 +1243,69 @@ def scaffold_config_templates(
     )
 
 
+def render_deploy_manifest(product_kebab: str) -> str:
+    """Render a minimal deploy/spaces.yml for the scaffolded product."""
+    return f"""version: 1
+
+profiles:
+  default:
+    cpu:
+      cores: 1
+      type: shared
+    memory_mb: 256
+    volume_gb: 1
+
+replication_defaults:
+  provider: tigris
+  bucket_env: LITESTREAM_BUCKET
+  snapshot_interval_minutes: 60
+  retention_days: 14
+
+spaces:
+  {product_kebab}:
+    owner: your-org
+    project: {product_kebab}
+    profile: default
+    provider:
+      type: fly
+      primary_region: ewr
+      regions:
+        - ewr
+      app_name_template: "{product_kebab}-{{environment}}"
+    build:
+      dockerfile: Dockerfile
+      context: .
+    runtime:
+      internal_port: 8080
+      processes:
+        web: /app/scripts/entrypoint_product.sh
+        release: python manage.py migrate
+      healthcheck_path: /healthz
+      healthcheck_timeout_s: 60
+    storage:
+      sqlite_path: /data/db.sqlite3
+      media_path: /data/media
+    replication:
+      litestream_enabled: true
+      replica_path_template: "{product_kebab}/{{environment}}"
+    backup:
+      predeploy_checkpoint:
+        required: true
+        method: litestream
+      retention_days: 14
+    secrets:
+      required:
+        - DJANGO_SECRET_KEY
+        - DJANGO_ALLOWED_HOSTS
+    environment:
+      required:
+        - SQLITE_PATH
+    environments:
+      production:
+        branch_pattern: main
+"""
+
+
 def scaffold(
     product_kebab: str, output_dir: Path, provider: str, *, force: bool
 ) -> None:
@@ -1272,6 +1338,7 @@ def scaffold(
         ("data/raw_notes/README.md", render_raw_notes_readme()),
         (".gitignore", render_gitignore()),
         ("Dockerfile", render_dockerfile()),
+        ("deploy/spaces.yml", render_deploy_manifest(product_kebab)),
     ]
 
     for rel, content in files:
