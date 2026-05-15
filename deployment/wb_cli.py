@@ -495,29 +495,29 @@ def _deploy_live(args: argparse.Namespace) -> int:
     build_flag = "--local-only" if getattr(args, "local", False) else "--remote-only"
     deploy_result = subprocess.run(
         ["fly", "deploy", build_flag, "--app", app_name],
-        check=False,
-        capture_output=True,
-        text=True,
+        check=False, capture_output=True, text=True,
     )
+    if getattr(args, "verbose", False):
+        if deploy_result.stdout:
+            print(deploy_result.stdout, file=sys.stderr, flush=True)
+        if deploy_result.stderr:
+            print(deploy_result.stderr, file=sys.stderr, flush=True)
 
     if deploy_result.returncode != 0:
+        stderr_tail = deploy_result.stderr[-1000:] if deploy_result.stderr else ""
+        message = f"fly deploy failed (exit {deploy_result.returncode}):\n{stderr_tail}"
         record_release_event(
-            space=args.space,
-            environment=args.env,
-            release_id=release_id,
-            git_sha=git_sha,
-            actor=actor,
-            outcome="deploy_failed",
-            is_healthy=False,
-            metadata={"deploy_stderr": deploy_result.stderr[:2000], "build_strategy": "local" if getattr(args, "local", False) else "remote"},
+            space=args.space, environment=args.env, release_id=release_id,
+            git_sha=git_sha, actor=actor, outcome="deploy_failed", is_healthy=False,
+            metadata={
+                "deploy_stderr": deploy_result.stderr[-2000:] if deploy_result.stderr else "",
+                "deploy_stdout": deploy_result.stdout[-2000:] if deploy_result.stdout else "",
+                "build_strategy": "local" if getattr(args, "local", False) else "remote",
+            },
             durable_log_path=Path("build/deploy/release-events.jsonl"),
         )
         return _render_output(
-            {
-                "ok": False,
-                "error_code": ERROR_CODES["unexpected"],
-                "message": f"fly deploy failed: {deploy_result.stderr[:500]}",
-            },
+            {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": message},
             args.json,
         )
 
@@ -533,7 +533,24 @@ def _deploy_live(args: argparse.Namespace) -> int:
 
     healthy = wait_for_healthy(health_url, timeout=120, interval=5)
 
-    outcome = "success" if healthy else "unhealthy"
+    machine_states: list[dict] = []
+    if not healthy:
+        machine_list = subprocess.run(
+            ["fly", "machine", "list", "--app", app_name, "--json"],
+            check=False, capture_output=True, text=True,
+        )
+        if machine_list.returncode == 0 and machine_list.stdout:
+            try:
+                machines = json.loads(machine_list.stdout)
+                machine_states = [{"id": m.get("id"), "state": m.get("state"), "region": m.get("region")} for m in machines]
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    outcome = "deploy_succeeded_healthy" if healthy else "deploy_succeeded_unhealthy"
+    metadata: dict[str, Any] = {"build_strategy": "local" if getattr(args, "local", False) else "remote"}
+    if not healthy:
+        metadata["machine_states"] = machine_states
+
     record_release_event(
         space=args.space,
         environment=args.env,
@@ -542,15 +559,19 @@ def _deploy_live(args: argparse.Namespace) -> int:
         actor=actor,
         outcome=outcome,
         is_healthy=healthy,
-        metadata={"build_strategy": "local" if getattr(args, "local", False) else "remote"},
+        metadata=metadata,
         durable_log_path=Path("build/deploy/release-events.jsonl"),
     )
+
+    message = f"Deploy {release_id}: {'healthy' if healthy else 'unhealthy'}"
+    if not healthy and machine_states:
+        message += f" | machine states: {machine_states}"
 
     return _render_output(
         {
             "ok": healthy,
             "error_code": None,
-            "message": f"Deploy {release_id}: {'healthy' if healthy else 'unhealthy'}",
+            "message": message,
             "release_id": release_id,
         },
         args.json,
@@ -683,6 +704,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--local",
         action="store_true",
         help="Build locally with Docker instead of using Fly remote builder.",
+    )
+    deploy_cmd.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Stream fly deploy output and health check logs to stderr.",
     )
     deploy_cmd.set_defaults(func=_deploy_dry_run)
     return parser
