@@ -65,15 +65,18 @@ def _git_init_and_initial_commit(repo: Path) -> None:
 
     try:
         has_git = _run(("rev-parse", "--git-dir"), check=False).returncode == 0
-        if not has_git:
-            init = _run(("init", "-b", "main"))
-            if init.returncode != 0:
-                print(
-                    f"warning: git init failed: {init.stderr.strip() or init.stdout}",
-                    file=sys.stderr,
-                )
-                return
-            print(f"git init {repo}")
+        if has_git:
+            print(f"skip git init: {repo} is already a git repository")
+            return
+
+        init = _run(("init", "-b", "main"))
+        if init.returncode != 0:
+            print(
+                f"warning: git init failed: {init.stderr.strip() or init.stdout}",
+                file=sys.stderr,
+            )
+            return
+        print(f"git init {repo}")
 
         add = _run(("add", "-A"))
         if add.returncode != 0:
