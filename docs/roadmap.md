@@ -178,7 +178,7 @@ been pulled yet). Known gaps:
 - **Import tier ordering is manual** — the `tier` integer is set by hand.
   Auto-detect dependency order from `fk_lookup` chains.
 
-## Shipped: 0.5.x–0.6.x
+## Shipped: 0.5.x–0.9.x
 
 ### 0.5.0 — Migration safety & robustness
 
@@ -209,30 +209,47 @@ been pulled yet). Known gaps:
 - **Tab name pipes sanitized:** `|` characters in tab names are replaced with
   `_` during tab listing, preventing encoding issues in downstream bundle paths.
 
-## Medium-term (0.7.x–0.9.x, toward v1.0)
+### 0.7.0 — Contract & codegen hardening (shipped 2026-05-14)
 
-See the [release slicing design](docs/superpowers/specs/2026-05-14-0x-release-slicing-design.md)
-for the detailed plan. In brief:
-
-### 0.7 — Contract & codegen hardening (shipped 2026-05-14)
-- **Profile-to-contract bridge** — `scaffold_workbook_schema` suggests
-  designed/aggregate models from overlapping column patterns (shipped).
-- **Contract review checklist** — FK lookup target validation, admin inlines
-  target existence, computed_field snake_case naming (shipped).
+- **Profile-to-contract bridge:** `scaffold_workbook_schema` suggests
+  designed/aggregate models from overlapping column patterns.
+- **Contract review checklist:** FK lookup target validation, admin inlines
+  target existence, computed_field snake_case naming, `--exit-zero` flag.
+- **Contract composition:** `!include_list` YAML tag for splitting tables across
+  files, cyclic include detection.
+- **Per-table warning suppression:** `suppress_review_warnings` key in contract.
+- **Codegen fixes:** preserve `extra_fields` order, no `.bak` backups,
+  FK validation for `extra_fields`, `wb contract review --exit-zero`.
 - **`make validate-contract` and `corpus-codegen-report`** in scaffolded CI.
-- **Corpus feedback tracker** — lightweight issue doc for codegen papercuts.
 
-### 0.8 — Import pipeline end-to-end
-- Exercise import generator with real bundles.
-- Harden column transforms, error summaries, multi-model atomic tiers.
+### 0.8.0 — Import pipeline end-to-end (shipped 2026-05-15)
 
-### 0.9 — View manifest, discovery & deployment
-- Admin generation from view manifest (exercise `editable_fields`,
-  `computed_fields`, `filterable_by`).
-- Discovery interview pipeline (`generate_discovery_interview` →
-  `merge_discovery_notes`).
-- Production deployment on Fly.io with real data.
-- Drift check wiring (`wb contract diff` as periodic check).
+- **Import pipeline exercised on real bundles:** FK chain ordering, auto-tier
+  detection from `fk_lookup` dependencies, column transforms.
+- **Per-tier transaction savepoints:** `--tier-atomic` / `--no-tier-atomic`.
+- **Per-row error catching:** structured error summaries with type_mismatch,
+  unique_violation, row_exception error codes.
+- **Multi-model import contracts:** FK chains, column transforms, multi-source
+  column_map config exercised end-to-end.
+
+### 0.9.0 — View manifest, discovery & deployment (shipped 2026-05-15)
+
+- **View manifest integration:** status_field promotion in `list_filter`, admin
+  class comment, end-to-end integration tests. `status_field` override via
+  manifest YAML and discovery interview.
+- **Discovery interview pipeline hardening:** `status_override` question in
+  interview, round-trip tests (parse → merge → admin generation), edge-case
+  resilience for reordered sections and blank lines.
+- **Drift check wiring:** `wb drift check` CLI command, `migration_safety_checks`
+  integration, Makefile target for periodic CI use.
+- **Production deployment:** `wb deploy --live` with health gate polling
+  (`wait_for_healthy`), release event recording, full-path deploy smoke test.
+- **Product scaffold maturity:** `diff-generated`, `generate-admin-light`,
+  `post-generate`, `check-generated`, `snapshot-codegen`, `check-snapshots`,
+  `drift-check` Makefile targets in `new_product.py` scaffold.
+- **Codegen parity:** `--diff` flag added to `generate_import` command.
+- **Deploy smoke test:** full-path integration tests for `_deploy_live()` with
+  mocked fly CLI and real HTTP health endpoint.
 
 ## Longer-term (post-v1.0)
 
@@ -299,8 +316,17 @@ or wished for during the farm implementation:
 | Couldn't tell what codegen changed across runs | `--diff` flag, `git diff` workflow |
 | Upstream renderer bugs found mid-pipeline | Fixes committed, add to test suite |
 | Import generator untested (no bundles pulled yet) | Import pipeline foundation section |
-| View manifest / discovery pipeline not exercised | Medium-term integration testing |
+| View manifest / discovery pipeline not exercised | 0.9.x end-to-end testing, deploy smoke test |
 | 114 test suite passed but no snapshot tests | Snapshot testing for generated output |
+
+## v1.0 Criteria Status
+
+| Criteria | Status |
+|---|---|
+| 1. End-to-end pipeline exercised on real corpus | ✅ Met (farm exercise) |
+| 2. Schema design loop completed | ✅ Met (phases 1–10 exercised in 0.8.x–0.9.x) |
+| 3. Production deployment live on Fly.io with real data | ⚠️ Code ready (0.9.x), live deploy pending |
+| 4. PyPI release with all gaps patched | ❌ Not started |
 
 ## Tracking
 
