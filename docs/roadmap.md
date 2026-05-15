@@ -222,9 +222,13 @@ for the detailed plan. In brief:
 - **`make validate-contract` and `corpus-codegen-report`** in scaffolded CI.
 - **Corpus feedback tracker** — lightweight issue doc for codegen papercuts.
 
-### 0.8 — Import pipeline end-to-end
-- Exercise import generator with real bundles.
-- Harden column transforms, error summaries, multi-model atomic tiers.
+### 0.8 — Import pipeline end-to-end (shipped 2026-05-15)
+- **Per-tier transaction savepoints** — `--tier-atomic` wraps each tier in its own savepoint; preceding tiers persist on later-tier failure.
+- **Per-row exception catching** — generated import methods catch `IntegrityError` and other exceptions per row, recording structured errors.
+- **Error handling hardening** — new error codes (`type_mismatch`, `unique_violation`, `row_exception`), per-model `row_errors_count` in summary JSON.
+- **End-to-end import fixture** — new 3-model test data exercising FK chains, `column_map` multi-source, `field_transforms`, and `field_parsers`.
+- **Parsing edge-case coverage** — `None`, whitespace-only, and sentinel value handling in `to_int`, `to_decimal`, `to_bool`, `parse_iso_date`.
+- **Bundle reader multi-source fix** — list-valued `column_map` entries no longer raise `TypeError`.
 
 ### 0.9 — View manifest, discovery & deployment
 - Admin generation from view manifest (exercise `editable_fields`,
