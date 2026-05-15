@@ -415,6 +415,69 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
     )
 
 
+def _drift_check(args: argparse.Namespace) -> int:
+    """Compare a baseline contract against a new contract and report drift.
+
+    Delegates to ``diff_contracts`` and ``migration_safety_checks`` to detect
+    structural changes and migration risks between the two contracts.
+    """
+    _setup_django()
+    from workbook.codegen.contract import diff_contracts, load_contract, migration_safety_checks
+
+    try:
+        old_contract = load_contract(args.baseline)
+    except ValueError as exc:
+        return _render_output(
+            {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
+            args.json,
+        )
+    try:
+        new_contract = load_contract(args.new)
+    except ValueError as exc:
+        return _render_output(
+            {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
+            args.json,
+        )
+
+    diffs = diff_contracts(old_contract, new_contract)
+    safety = migration_safety_checks(diffs) if diffs else []
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": not diffs,
+                "error_code": None,
+                "message": "No drift detected." if not diffs else "Drift detected.",
+                "diffs": diffs or {},
+                "safety": safety,
+            },
+            args.json,
+        )
+
+    if not diffs:
+        print("No drift detected — contracts are identical.")
+        return 0
+
+    existing_diff_cmd_args = argparse.Namespace(
+        json=False, old=args.baseline, new=args.new
+    )
+    result = _contract_diff(existing_diff_cmd_args)
+
+    if safety:
+        print()
+        print("=== Migration safety risks ===")
+        danger = [s for s in safety if s["severity"] == "DANGER"]
+        warning = [s for s in safety if s["severity"] == "WARNING"]
+        for item in danger:
+            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            print(f"  DANGER: {loc}: {item['message']}")
+        for item in warning:
+            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            print(f"  WARNING: {loc}: {item['message']}")
+
+    return 1 if any(s["severity"] == "DANGER" for s in safety) else result
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct and return the ``wb`` argument parser.
 
@@ -457,6 +520,13 @@ def build_parser() -> argparse.ArgumentParser:
     safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
     safety_cmd.set_defaults(func=_contract_safety)
 
+    drift_cmd = sub.add_parser("drift", help="Drift detection operations")
+    drift_sub = drift_cmd.add_subparsers(dest="drift_command", required=True)
+    check_cmd = drift_sub.add_parser("check", help="Check for drift between two schema contracts")
+    check_cmd.add_argument("--baseline", required=True, help="Path to baseline (old) contract YAML")
+    check_cmd.add_argument("--new", required=True, help="Path to new contract YAML")
+    check_cmd.set_defaults(func=_drift_check)
+
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")
     deploy_cmd.add_argument("--env", required=True, help="Environment name (preview or production).")
@@ -480,12 +550,12 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
-        if args.command == "deploy" and not args.dry_run:
+        if args.command == "deploy" and not args.dry_run and not getattr(args, "live", False):
             return _render_output(
                 {
                     "ok": False,
                     "error_code": ERROR_CODES["unexpected"],
-                    "message": "Only --dry-run is implemented in this release.",
+                    "message": "Only --dry-run is implemented in this release. Use --live to deploy.",
                 },
                 args.json,
             )
