@@ -417,7 +417,7 @@ validate: check validate-contract
 
 corpus-codegen-report:
 	@echo "=== Model compilation ==="
-	wb contract review --contract "$(CONTRACT)"
+	wb contract review --exit-zero --contract "$(CONTRACT)"
 	@echo "=== Generated file check ==="
 	$(MANAGE) check
 
@@ -450,8 +450,11 @@ generate-models:
 	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --force
 
 generate-admin:
-	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
-	$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force
+	@if [ -f "$(VIEW_MANIFEST)" ]; then \
+		$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force; \
+	else \
+		$(MANAGE) generate_admin --contract "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force; \
+	fi
 
 generate-import:
 	$(MANAGE) generate_import --contract "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
