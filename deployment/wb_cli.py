@@ -521,6 +521,16 @@ def _deploy_live(args: argparse.Namespace) -> int:
             args.json,
         )
 
+    release_secret_result = subprocess.run(
+        ["fly", "secrets", "set", f"RELEASE_ID={release_id}", "--app", app_name],
+        check=False, capture_output=True, text=True,
+    )
+    if release_secret_result.returncode != 0 and getattr(args, "verbose", False):
+        print(
+            f"Warning: failed to set RELEASE_ID secret: {release_secret_result.stderr[:500]}",
+            file=sys.stderr,
+        )
+
     healthy = wait_for_healthy(health_url, timeout=120, interval=5)
 
     outcome = "success" if healthy else "unhealthy"
