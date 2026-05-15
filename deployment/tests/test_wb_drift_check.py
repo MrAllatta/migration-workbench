@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -29,7 +30,7 @@ def _contract_with_model(model_name: str = "crop") -> dict:
 
 
 def _run_drift_check(baseline: Path, new: Path, json_output: bool = False) -> subprocess.CompletedProcess:
-    cmd = ["python", "-m", "deployment.wb_cli"]
+    cmd = [sys.executable, "-m", "deployment.wb_cli"]
     if json_output:
         cmd.append("--json")
     cmd.extend(["drift", "check", "--baseline", str(baseline), "--new", str(new)])
