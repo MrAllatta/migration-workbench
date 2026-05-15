@@ -672,7 +672,7 @@ def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
 
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})
 
-    for fname, spec in sorted(extra.items()):
+    for fname, spec in extra.items():
         fclass = _normalise_field_class(str(spec.get("class") or "models.TextField"))
         fkwargs = dict(spec.get("kwargs") or {})
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})

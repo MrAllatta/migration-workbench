@@ -357,6 +357,42 @@ def test_get_fields_extra_fields():
     assert "slug" in names
 
 
+def test_get_fields_preserves_extra_fields_order():
+    table = {
+        "suggested_model_name": "crop",
+        "columns": [
+            {
+                "suggested_field_name": "name",
+                "django_field_class": "models.CharField",
+                "django_field_kwargs": {"max_length": 200},
+            }
+        ],
+        "extra_fields": {
+            "season_label": {
+                "class": "models.CharField",
+                "kwargs": {"max_length": 50, "blank": True, "default": ""},
+            },
+            "farm_notes": {
+                "class": "models.TextField",
+                "kwargs": {"blank": True, "default": ""},
+            },
+            "audit_hash": {
+                "class": "models.CharField",
+                "kwargs": {"max_length": 64, "blank": True, "default": ""},
+            },
+        },
+    }
+
+    fields = get_fields(table)
+    field_names = [field["name"] for field in fields]
+    assert field_names == [
+        "name",
+        "season_label",
+        "farm_notes",
+        "audit_hash",
+    ]
+
+
 def test_get_fields_override_class():
     """Field overrides replace the auto-inferred class."""
     t = _contract_v1_1()["tables"][1]
