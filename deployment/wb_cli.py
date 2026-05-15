@@ -41,6 +41,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from typing import Any
 import uuid
 
@@ -55,8 +56,18 @@ ERROR_CODES = {
 }
 
 
-def _setup_django() -> None:
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "migration_workbench.settings")
+def _setup_django(settings_module: str | None = None) -> None:
+    if settings_module:
+        os.environ["DJANGO_SETTINGS_MODULE"] = settings_module
+    elif "DJANGO_SETTINGS_MODULE" not in os.environ:
+        backend_config = Path("backend/config/settings.py")
+        if backend_config.is_file():
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+            backend_dir = str(backend_config.parent.parent.resolve())
+            if backend_dir not in sys.path:
+                sys.path.insert(0, backend_dir)
+        else:
+            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "migration_workbench.settings")
     import django
 
     django.setup()
@@ -113,7 +124,7 @@ def _manifest_lint(args: argparse.Namespace) -> int:
 
 
 def _contract_review(args: argparse.Namespace) -> int:
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import load_contract, review_contract
 
     try:
@@ -163,7 +174,7 @@ def _contract_review(args: argparse.Namespace) -> int:
 
 
 def _contract_diff(args: argparse.Namespace) -> int:
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import diff_contracts, load_contract
 
     try:
@@ -277,7 +288,7 @@ def _fmt_value(val: Any) -> str:
 
 
 def _contract_safety(args: argparse.Namespace) -> int:
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import (
         diff_contracts,
         load_contract,
@@ -373,7 +384,7 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
             args.json,
         )
 
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
     from deployment.release_store import record_release_event
 
     release_id = f"dryrun-{uuid.uuid4().hex[:8]}"
@@ -458,7 +469,7 @@ def _deploy_live(args: argparse.Namespace) -> int:
             args.json,
         )
 
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
 
     app_name_base = (space_cfg.get("provider") or {}).get("app_name_template", "app")
     app_name = app_name_base.replace("{environment}", args.env)
@@ -539,7 +550,7 @@ def _drift_check(args: argparse.Namespace) -> int:
     Delegates to ``diff_contracts`` and ``migration_safety_checks`` to detect
     structural changes and migration risks between the two contracts.
     """
-    _setup_django()
+    _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import diff_contracts, load_contract, migration_safety_checks
 
     try:
@@ -609,6 +620,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--manifest",
         default="deploy/spaces.yml",
         help="Path to deployment manifest (default: deploy/spaces.yml).",
+    )
+    parser.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
