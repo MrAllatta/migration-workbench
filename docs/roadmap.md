@@ -68,9 +68,8 @@ The product repo Makefile had several papercuts:
   Add `make generate-admin-light` that runs without manifest, and
   `make generate-admin` for the full pipeline.
 
-- **`make generate-models` overwrites models.py without warning.**
-  Already has `--force` flag. Add `make diff-generated` target that
-  shows what changed between codegen runs: `diff -u models.py.bak models.py`.
+- **`make generate-models` overwrites models.py with `--force`.** Use
+  `--diff` or `git diff` to review what changed between codegen runs.
 
 - **`make validate-contract`** — runs `yaml.safe_load` + checks every
   FK target exists as a table name + verifies field references resolve.
@@ -297,7 +296,7 @@ or wished for during the farm implementation:
 | Properties/methods required hand-edit after generation | `contract.hooks` block |
 | Designed models (FieldEvent, InventoryEntry) have no scaffolding | `source_tab: null`, designed model scaffold command |
 | No way to validate contract before codegen | `make validate-contract`, codegen-time contract validation |
-| Couldn't tell what codegen changed across runs | `make diff-generated`, `--diff` flag |
+| Couldn't tell what codegen changed across runs | `--diff` flag, `git diff` workflow |
 | Upstream renderer bugs found mid-pipeline | Fixes committed, add to test suite |
 | Import generator untested (no bundles pulled yet) | Import pipeline foundation section |
 | View manifest / discovery pipeline not exercised | Medium-term integration testing |
