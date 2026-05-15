@@ -172,7 +172,10 @@ def build_summary_payload(command, status="ok", fatal_error=None):
         normalized = normalized_outcomes(
             command.stats[model_name], write_disabled=(command.validate_only or command.dry_run)
         )
-        per_model[model_name] = normalized
+        model_error_count = sum(
+            1 for err in command.row_errors if err.get("model") == model_name
+        )
+        per_model[model_name] = {**normalized, "row_errors_count": model_error_count}
         for key in totals:
             totals[key] += normalized[key]
 
