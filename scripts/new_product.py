@@ -1200,6 +1200,8 @@ COPY --from=builder /app /app
 
 RUN groupadd --gid "${{APP_GID}}" app \\
     && useradd --uid "${{APP_UID}}" --gid app --no-create-home --shell /usr/sbin/nologin app \\
+    && mkdir -p /data /data/media \\
+    && chown -R app:app /data \\
     && chown -R app:app /app \\
     && chmod +x /app/scripts/entrypoint_product.sh
 

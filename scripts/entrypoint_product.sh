@@ -95,7 +95,13 @@ under_data_volume_path() {
   esac
 }
 
-mkdir -p "$(dirname "$DB_PATH")"
+DATA_DIR="$(dirname "$DB_PATH")"
+if ! [ -d "$DATA_DIR" ] && ! mkdir -p "$DATA_DIR" 2>/dev/null; then
+  echo "entrypoint_product: cannot create ${DATA_DIR} — is the /data volume attached?" >&2
+  echo "entrypoint_product: Create a Fly volume: fly volumes create data --app <app> --size 1" >&2
+  echo "entrypoint_product: Then re-deploy. See docs/deployment.md for details." >&2
+  exit 1
+fi
 
 if [ -f "$DB_PATH" ]; then
   :
