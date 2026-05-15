@@ -116,3 +116,45 @@ class TestReviewContract:
         }
         issues = review_contract(contract)
         assert len(issues) == 0
+
+    def test_suppress_review_warning_multiple_fk_without_unique(self):
+        """Allow suppressing specific review warnings per table by rule_id."""
+        contract = {
+            "version": "1.3",
+            "tables": [
+                {
+                    "suggested_model_name": "planting",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                        {
+                            "source_column": "Field",
+                            "suggested_field_name": "field",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Field"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                },
+            ],
+        }
+        issues = review_contract(contract)
+        assert any(i.get("rule_id") == "multiple_fk_without_unique" for i in issues)
+
+        suppressed_contract = {
+            **contract,
+            "tables": [
+                {
+                    **contract["tables"][0],
+                    "suppress_review_warnings": ["multiple_fk_without_unique"],
+                },
+            ],
+        }
+        suppressed_issues = review_contract(suppressed_contract)
+        assert not any(
+            i.get("rule_id") == "multiple_fk_without_unique" for i in suppressed_issues
+        )
