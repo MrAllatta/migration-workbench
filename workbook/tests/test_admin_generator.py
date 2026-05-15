@@ -418,3 +418,217 @@ def test_user_model_admin_uses_useradmin_and_is_authoritative():
     assert "search_fields = ['username', 'email']" in source
     assert "readonly_fields = ['date_joined']" in source
     _check_compiles(source)
+
+
+# ---------------------------------------------------------------------------
+# status_field promotion and comment
+# ---------------------------------------------------------------------------
+
+
+def test_status_field_promoted_in_list_filter():
+    """When manifest has status_field already in filterable_by, it appears first."""
+    contract = _contract()
+    manifest = _manifest()
+    manifest["views"][0]["filterable_by"] = ["crop_type"]
+    manifest["views"][0]["status_field"] = "crop_type"
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "list_filter = ['crop_type']" in source
+
+
+def test_status_field_added_to_list_filter_when_not_in_filterable():
+    """When manifest has status_field not in filterable_by, it is added and promoted first."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "order",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "order",
+                "entity": "order",
+                "source_tab": "Orders",
+                "type": "list",
+                "editable_fields": ["status", "total"],
+                "computed_fields": [],
+                "filterable_by": ["total"],
+                "status_field": "status",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "list_filter = ['status', 'total']" in source
+
+
+def test_admin_class_includes_status_field_comment():
+    """When status_field is set, a comment appears above the admin class."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "order",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "order",
+                "entity": "order",
+                "source_tab": "Orders",
+                "type": "list",
+                "editable_fields": ["status", "total"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "# status_field: status" in source
+
+
+def test_no_status_field_comment_when_absent():
+    """When status_field is not set, no comment appears."""
+    source = render_admin_py(_contract(), _manifest(), app_label="core")
+    assert "status_field" not in source
+
+
+def test_manifest_round_trip_in_end_to_end_admin_generation():
+    """Verify manifest fields flow through to generated admin output end-to-end."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "order",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"suggested_field_name": "customer", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                    {"suggested_field_name": "created_at", "django_field_class": "models.DateTimeField", "django_field_kwargs": {"null": True}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "order",
+                "entity": "order",
+                "source_tab": "Orders",
+                "type": "list",
+                "editable_fields": ["status", "customer"],
+                "computed_fields": ["total"],
+                "filterable_by": ["status", "created_at"],
+                "status_field": "status",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "list_display" in source
+    assert "'status'" in source
+    assert "'customer'" in source
+    assert "readonly_fields = ['total']" in source
+    assert "list_filter = ['status', 'created_at']" in source
+    assert "# status_field: status" in source
+    _check_compiles(source)
+
+
+def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
+    """Manifest status_field referencing a non-existent field is not added to list_filter."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "order",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "order",
+                "entity": "order",
+                "source_tab": "Orders",
+                "type": "list",
+                "editable_fields": ["status"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": "nonexistent_field_name",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "nonexistent_field_name" not in source.splitlines()
+    _check_compiles(source)
+
+
+def test_status_field_comment_emitted_even_when_not_in_contract():
+    """The status_field comment is emitted as informational even for non-existent fields."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "order",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "order",
+                "entity": "order",
+                "source_tab": "Orders",
+                "type": "list",
+                "editable_fields": ["status"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": "nonexistent_field_name",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "# status_field: nonexistent_field_name" in source
+    _check_compiles(source)

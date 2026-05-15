@@ -89,6 +89,14 @@ def _render_view_block(view: dict[str, Any]) -> list[str]:
         )
         lines.append(f"  > {_PLACEHOLDER}")
         lines.append("")
+        lines.append(_question_marker("status_override", tab=title, field=str(status_field)))
+        lines.append(
+            f"- Should the status field for **{title}** be different from **{status_field}**?"
+        )
+        lines.append(
+            f"  > {_PLACEHOLDER} (leave blank to keep **{status_field}**)"
+        )
+        lines.append("")
     return lines
 
 
@@ -269,6 +277,7 @@ def parse_interview(interview_text: str, manifest: dict[str, Any]) -> dict[str, 
     weekly_actions: list[str] = []
     view_notes: dict[str, list[str]] = {}
     weekly_workflow = ""
+    status_overrides: dict[str, str] = {}
 
     for idx, line in enumerate(lines):
         match = _QUESTION_MARKER_RE.search(line)
@@ -300,12 +309,18 @@ def parse_interview(interview_text: str, manifest: dict[str, Any]) -> dict[str, 
             answer = _next_blockquote_answer(lines, idx + 1)
             if tab and answer:
                 view_notes.setdefault(tab, []).append(f"access: {answer}")
+        elif kind == "status_override":
+            tab = attrs.get("tab") or ""
+            answer = _next_blockquote_answer(lines, idx + 1)
+            if tab and answer:
+                status_overrides[tab] = answer
 
     return {
         "role_hints": role_hints,
         "weekly_actions": weekly_actions,
         "view_notes": {tab: " | ".join(parts) for tab, parts in view_notes.items()},
         "weekly_workflow": weekly_workflow,
+        "status_overrides": status_overrides,
     }
 
 
@@ -353,6 +368,17 @@ def apply_discovery_patch(
                 view["notes"] = f"{existing} | {new_note}"
             else:
                 view["notes"] = new_note
+
+    status_overrides = patch.get("status_overrides") or {}
+    for view in out.get("views") or []:
+        tab = str(view.get("source_tab") or "")
+        if tab in status_overrides:
+            override = status_overrides[tab]
+            suppressed = override.lower() in ("", "none", "null", "clear")
+            if suppressed:
+                view["status_field"] = None
+            else:
+                view["status_field"] = override
 
     return out
 

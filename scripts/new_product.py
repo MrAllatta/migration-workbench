@@ -390,7 +390,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes
+.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
 
 venv:
 	python3 -m venv $(VENV)
@@ -463,6 +463,33 @@ generate-import:
 	$(MANAGE) generate_import --contract "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
 
 generate: generate-models generate-admin generate-import
+
+diff-generated:
+	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --diff
+
+generate-admin-light:
+	$(MANAGE) generate_admin --contract "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force
+
+post-generate:
+	@test -f scripts/post-generate.sh && bash scripts/post-generate.sh || echo "No scripts/post-generate.sh found"
+
+check-generated:
+	$(PYTHON) -c "from backend.apps.core.models import *; print('import OK')"
+	$(MANAGE) check
+
+snapshot-codegen:
+	$(MANAGE) generate_models --contract "$(CONTRACT)" --out build/snapshots/models.py --force
+	$(MANAGE) generate_admin --contract "$(CONTRACT)" --out build/snapshots/admin.py --force
+	$(MANAGE) generate_import --contract "$(CONTRACT)" --out build/snapshots/imports.py --force
+
+check-snapshots:
+	@echo "=== Model import ==="
+	$(PYTHON) -c "from backend.apps.core.models import *; print('OK')"
+	@echo "=== Django check ==="
+	$(MANAGE) check
+
+drift-check:
+	$(PYTHON) -m deployment.wb_cli drift check --baseline "$(CONTRACT)" --new "$(CONTRACT)"
 
 pull-bundle:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG required}" BUNDLE_OUTPUT_DIR="$(BUNDLE_OUT)" INCLUDE_STRUCTURE=true scripts/run_import.sh pull_bundle

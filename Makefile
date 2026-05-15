@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -49,6 +49,15 @@ validate-contract:
 
 diff-generated:
 	$(MANAGE) generate_models --contract $(CONTRACT) --out $(OUT) --diff
+
+drift-check:
+	$(PYTHON) -m deployment.wb_cli drift check --baseline "$(CONTRACT)" --new "$(CONTRACT)"
+
+SPACE ?= demo
+ENV ?= preview
+
+deploy:
+	$(PYTHON) -m deployment.wb_cli --manifest deploy/spaces.yml deploy $(SPACE) --env $(ENV) --live
 
 generate-admin-light:
 	$(MANAGE) generate_admin --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)

@@ -116,12 +116,30 @@ def _pick_display_fields(
     return []
 
 
+def _promote_status(
+    fields: list[str], status_field: str | None, valid_fields: set[str] | None = None
+) -> list[str]:
+    """Promote *status_field* to the front of *fields*, adding it if absent.
+
+    When *valid_fields* is provided, *status_field* is only added or
+    promoted if it exists within that set, preventing non-existent
+    fields from being injected into generated admin code.
+    """
+    if not status_field:
+        return fields
+    if valid_fields is not None and status_field not in valid_fields:
+        return fields
+    without = [f for f in fields if f != status_field]
+    return [status_field] + without
+
+
 def _pick_filter_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
     admin_cfg: dict[str, Any] | None = None,
     *,
     authoritative: bool = False,
+    status_field: str | None = None,
 ) -> list[str]:
     """Pick ``list_filter`` fields.
 
@@ -129,18 +147,26 @@ def _pick_filter_fields(
     1. ``admin.list_filter`` from the contract.
     2. ``filterable_by`` from the view manifest.
     3. Date fields from the contract.
+
+    When *status_field* is set and present in the result, it is promoted
+    to the front of the list so status-based filtering is immediately
+    accessible in the admin changelist.
     """
     valid = {f["name"] for f in contract_fields}
     if admin_cfg:
         raw = admin_cfg.get("list_filter")
         if raw and isinstance(raw, list):
-            return raw if authoritative else [f for f in raw if f in valid]
+            result = raw if authoritative else [f for f in raw if f in valid]
+            return _promote_status(result, status_field, valid_fields=valid)
     if view:
         fb = view.get("filterable_by") or []
         if authoritative:
-            return fb
-        return [f for f in fb if f in valid]
-    return [f["name"] for f in contract_fields if _is_date_field(f)]
+            result = fb
+        else:
+            result = [f for f in fb if f in valid]
+        return _promote_status(result, status_field, valid_fields=valid)
+    result = [f["name"] for f in contract_fields if _is_date_field(f)]
+    return _promote_status(result, status_field, valid_fields=valid)
 
 
 def _pick_search_fields(
@@ -252,13 +278,19 @@ def _render_admin_class(
     inline_classes: list[str],
     verbose_name: str | None,
     admin_base_class: str = "admin.ModelAdmin",
+    status_field: str | None = None,
 ) -> str:
     """Render a ``ModelAdmin`` class with ``@admin.register``."""
-    lines = [
+    lines: list[str] = []
+
+    if status_field:
+        lines.append(f"# status_field: {status_field}")
+
+    lines.extend([
         "",
         f"@admin.register({model_name})",
         f"class {model_name}Admin({admin_base_class}):",
-    ]
+    ])
 
     if display_fields:
         items = ", ".join(repr(f) for f in display_fields)
@@ -389,8 +421,9 @@ def render_admin_py(
 
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
+        status_field = (view.get("status_field") or None) if view else None
         display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_user)
-        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user)
+        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user, status_field=status_field)
         search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_user)
         readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_user)
 
@@ -416,6 +449,7 @@ def render_admin_py(
                 inline_classes=inline_names,
                 verbose_name=verbose_name,
                 admin_base_class="BaseUserAdmin" if is_user else "admin.ModelAdmin",
+                status_field=status_field,
             )
         )
 

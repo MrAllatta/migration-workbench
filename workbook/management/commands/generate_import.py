@@ -9,6 +9,7 @@ foreign keys, and tracks statistics.
 
 from __future__ import annotations
 
+import difflib
 import sys
 from pathlib import Path
 
@@ -16,6 +17,27 @@ from django.core.management.base import BaseCommand, CommandError
 
 from workbook.codegen.contract import load_contract, validate_contract_tables
 from workbook.codegen.import_generator import render_import_py
+
+
+def _render_diff(source: str, current_path: Path) -> tuple[str, bool]:
+    """Compute a unified diff between *source* and the file at *current_path*.
+
+    Returns:
+        Tuple of ``(diff_text, has_changes)``. ``diff_text`` is the unified
+        diff string (empty string when files are identical or *current_path*
+        does not exist). ``has_changes`` is ``True`` when the diff is non-empty.
+    """
+    if not current_path.exists():
+        return ("", False)
+    current = current_path.read_text(encoding="utf-8")
+    diff = difflib.unified_diff(
+        current.splitlines(keepends=True),
+        source.splitlines(keepends=True),
+        fromfile=str(current_path),
+        tofile="<generated>",
+    )
+    diff_text = "".join(diff)
+    return (diff_text, bool(diff_text))
 
 
 class Command(BaseCommand):
@@ -45,6 +67,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Overwrite output file without prompting",
         )
+        parser.add_argument(
+            "--diff",
+            action="store_true",
+            help="Show diff against current output instead of overwriting (ignores --force)",
+        )
 
     def handle(self, *args, **options):
         contract_path = Path(options["contract"]).resolve()
@@ -54,6 +81,7 @@ class Command(BaseCommand):
         out_path = Path(options["out"]).resolve()
         app_label = options["app_label"]
         force = options["force"]
+        show_diff = options["diff"]
 
         try:
             contract = load_contract(str(contract_path))
@@ -77,12 +105,31 @@ class Command(BaseCommand):
 
         source = render_import_py(contract, app_label=app_label)
 
+        if show_diff:
+            diff_text, has_changes = _render_diff(source, out_path)
+            if has_changes:
+                self.stdout.write(diff_text)
+            elif out_path.exists():
+                self.stdout.write(self.style.SUCCESS("no changes"))
+            else:
+                self.stdout.write(self.style.WARNING(f"no existing file: {out_path}"))
+            return
+
         if out_path.exists() and not force:
             self.stdout.write(self.style.WARNING(f"output exists: {out_path}"))
             self.stdout.write("use --force to overwrite")
             sys.exit(1)
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        if force and out_path.exists():
+            diff_text, has_changes = _render_diff(source, out_path)
+            if has_changes:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"regenerating {out_path} — changes detected:"
+                    )
+                )
+                self.stdout.write(diff_text)
         out_path.write_text(source, encoding="utf-8")
 
         line_count = source.count("\n")

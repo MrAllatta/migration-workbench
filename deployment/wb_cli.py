@@ -9,8 +9,10 @@ Entry point: the ``wb`` script installed by ``pyproject.toml``
     Validate ``deploy/spaces.yml`` against the full manifest schema.
 
 ``wb deploy <space> --env <env> --dry-run``
-    Record a dry-run release event for *space*/*env* (live deploys are not yet
-    implemented; ``--dry-run`` is required until they are).
+    Record a dry-run release event for *space*/*env* without deploying.
+
+``wb deploy <space> --env <env> --live``
+    Perform a live deploy with health-check polling and release recording.
 
 All subcommands accept ``--json`` to emit machine-readable JSON so CI scripts
 can parse results without screen-scraping.
@@ -415,6 +417,185 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
     )
 
 
+def _deploy_live(args: argparse.Namespace) -> int:
+    """Perform a live deploy: validate manifest, deploy, health-check, record."""
+    from deployment.health import wait_for_healthy
+    from deployment.release_store import record_release_event
+
+    manifest_path = Path(args.manifest)
+    try:
+        payload = load_manifest(manifest_path)
+        ensure_manifest_valid(payload)
+    except ManifestValidationError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["manifest_invalid"],
+                "message": "Manifest validation failed.",
+                "details": str(exc).splitlines()[1:],
+            },
+            args.json,
+        )
+
+    space_cfg = (payload.get("spaces") or {}).get(args.space)
+    if not space_cfg:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["space_not_found"],
+                "message": f"Space '{args.space}' not found in manifest.",
+            },
+            args.json,
+        )
+    env_cfg = (space_cfg.get("environments") or {}).get(args.env)
+    if not env_cfg:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["environment_not_found"],
+                "message": f"Environment '{args.env}' not found for '{args.space}'.",
+            },
+            args.json,
+        )
+
+    _setup_django()
+
+    app_name_base = (space_cfg.get("provider") or {}).get("app_name_template", "app")
+    app_name = app_name_base.replace("{environment}", args.env)
+    git_sha = _get_git_sha()
+    actor = getpass.getuser()
+    healthcheck_path = (space_cfg.get("runtime") or {}).get("healthcheck_path", "/healthz")
+    health_url = f"https://{app_name}.fly.dev{healthcheck_path}"
+
+    release_id = f"live-{uuid.uuid4().hex[:8]}"
+
+    record_release_event(
+        space=args.space,
+        environment=args.env,
+        release_id=release_id,
+        git_sha=git_sha,
+        actor=actor,
+        outcome="deploy_start",
+        is_healthy=False,
+        durable_log_path=Path("build/deploy/release-events.jsonl"),
+    )
+
+    deploy_result = subprocess.run(
+        ["fly", "deploy", "--remote-only", "--app", app_name],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    if deploy_result.returncode != 0:
+        record_release_event(
+            space=args.space,
+            environment=args.env,
+            release_id=release_id,
+            git_sha=git_sha,
+            actor=actor,
+            outcome="deploy_failed",
+            is_healthy=False,
+            metadata={"deploy_stderr": deploy_result.stderr[:2000]},
+            durable_log_path=Path("build/deploy/release-events.jsonl"),
+        )
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": f"fly deploy failed: {deploy_result.stderr[:500]}",
+            },
+            args.json,
+        )
+
+    healthy = wait_for_healthy(health_url, timeout=120, interval=5)
+
+    outcome = "success" if healthy else "unhealthy"
+    record_release_event(
+        space=args.space,
+        environment=args.env,
+        release_id=release_id,
+        git_sha=git_sha,
+        actor=actor,
+        outcome=outcome,
+        is_healthy=healthy,
+        durable_log_path=Path("build/deploy/release-events.jsonl"),
+    )
+
+    return _render_output(
+        {
+            "ok": healthy,
+            "error_code": None,
+            "message": f"Deploy {release_id}: {'healthy' if healthy else 'unhealthy'}",
+            "release_id": release_id,
+        },
+        args.json,
+    )
+
+
+def _drift_check(args: argparse.Namespace) -> int:
+    """Compare a baseline contract against a new contract and report drift.
+
+    Delegates to ``diff_contracts`` and ``migration_safety_checks`` to detect
+    structural changes and migration risks between the two contracts.
+    """
+    _setup_django()
+    from workbook.codegen.contract import diff_contracts, load_contract, migration_safety_checks
+
+    try:
+        old_contract = load_contract(args.baseline)
+    except ValueError as exc:
+        return _render_output(
+            {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
+            args.json,
+        )
+    try:
+        new_contract = load_contract(args.new)
+    except ValueError as exc:
+        return _render_output(
+            {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
+            args.json,
+        )
+
+    diffs = diff_contracts(old_contract, new_contract)
+    safety = migration_safety_checks(diffs) if diffs else []
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": not diffs,
+                "error_code": None,
+                "message": "No drift detected." if not diffs else "Drift detected.",
+                "diffs": diffs or {},
+                "safety": safety,
+            },
+            args.json,
+        )
+
+    if not diffs:
+        print("No drift detected — contracts are identical.")
+        return 0
+
+    existing_diff_cmd_args = argparse.Namespace(
+        json=False, old=args.baseline, new=args.new
+    )
+    _contract_diff(existing_diff_cmd_args)
+
+    if safety:
+        print()
+        print("=== Migration safety risks ===")
+        danger = [s for s in safety if s["severity"] == "DANGER"]
+        warning = [s for s in safety if s["severity"] == "WARNING"]
+        for item in danger:
+            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            print(f"  DANGER: {loc}: {item['message']}")
+        for item in warning:
+            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            print(f"  WARNING: {loc}: {item['message']}")
+
+    return 1  # drift detected
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct and return the ``wb`` argument parser.
 
@@ -457,10 +638,18 @@ def build_parser() -> argparse.ArgumentParser:
     safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
     safety_cmd.set_defaults(func=_contract_safety)
 
+    drift_cmd = sub.add_parser("drift", help="Drift detection operations")
+    drift_sub = drift_cmd.add_subparsers(dest="drift_command", required=True)
+    check_cmd = drift_sub.add_parser("check", help="Check for drift between two schema contracts")
+    check_cmd.add_argument("--baseline", required=True, help="Path to baseline (old) contract YAML")
+    check_cmd.add_argument("--new", required=True, help="Path to new contract YAML")
+    check_cmd.set_defaults(func=_drift_check)
+
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")
     deploy_cmd.add_argument("--env", required=True, help="Environment name (preview or production).")
     deploy_cmd.add_argument("--dry-run", action="store_true", help="Only plan and record release metadata.")
+    deploy_cmd.add_argument("--live", action="store_true", help="Perform a live deploy with health check.")
     deploy_cmd.set_defaults(func=_deploy_dry_run)
     return parser
 
@@ -480,12 +669,14 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
-        if args.command == "deploy" and not args.dry_run:
+        if args.command == "deploy" and getattr(args, "live", False):
+            args.func = _deploy_live
+        if args.command == "deploy" and not args.dry_run and not getattr(args, "live", False):
             return _render_output(
                 {
                     "ok": False,
                     "error_code": ERROR_CODES["unexpected"],
-                    "message": "Only --dry-run is implemented in this release.",
+                    "message": "Specify --dry-run for dry-run or --live for live deploy.",
                 },
                 args.json,
             )
