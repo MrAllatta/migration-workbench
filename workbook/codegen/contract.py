@@ -15,32 +15,34 @@ from typing import Any
 
 
 def _make_contract_loader(base_path: str | Path) -> type:
-    """Return a ``SafeLoader`` subclass with an ``!include`` tag registered.
+    """Return a ``SafeLoader`` subclass supporting ``!include`` and ``!include_list``.
 
-    The ``!include <path>`` tag loads a YAML file relative to *base_path*
-    and inlines its content at the point of use.  Cyclic includes are
-    detected and rejected.
+    Both tags load YAML from another file and inline it at the point of use.
+    Include paths are resolved relative to the directory of the including
+    file, not the root contract file.
+
+    Cyclic includes are detected and rejected.
     """
     import yaml
 
-    contract_root = Path(base_path).resolve()
+    contract_path = Path(base_path).resolve()
 
     class ContractLoader(yaml.SafeLoader):
         """YAML loader that supports ``!include`` for contract composition."""
 
         _include_stack: list[Path] = []
-        _contract_root: Path = contract_root
+        _contract_path: Path = contract_path
 
     def _resolve_include_target(loader: ContractLoader, path_str: str) -> Path:
         including_file = (
             loader._include_stack[-1]
             if loader._include_stack
-            else loader._contract_root
+            else loader._contract_path
         )
         return (including_file.parent / path_str).resolve()
 
     def _load_included_yaml(loader: ContractLoader, target: Path) -> Any:
-        if target == loader._contract_root or target in loader._include_stack:
+        if target == loader._contract_path or target in loader._include_stack:
             cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
             raise ValueError(f"cyclic include detected: {cycle}")
         if not target.is_file():
@@ -66,7 +68,10 @@ def _make_contract_loader(base_path: str | Path) -> type:
         target = _resolve_include_target(loader, path_str)
         included = _load_included_yaml(loader, target)
         if not isinstance(included, list):
-            raise ValueError("include_list expects a YAML list")
+            included_type_name = type(included).__name__
+            raise ValueError(
+                f"include_list expects a YAML list (got {included_type_name}) in {target}"
+            )
         return included
 
     ContractLoader.add_constructor("!include", _include_constructor)
@@ -77,8 +82,9 @@ def _make_contract_loader(base_path: str | Path) -> type:
 def load_contract(path: str | Path) -> dict[str, Any]:
     """Load a schema-contract YAML, validate, and return a normalised dict.
 
-    Supports the ``!include`` YAML tag for composing contracts from multiple
-    files (paths are resolved relative to the including file's directory).
+    Supports the ``!include`` and ``!include_list`` YAML tags for composing
+    contracts from multiple files (paths are resolved relative to the
+    including file's directory).
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
@@ -119,7 +125,11 @@ def load_contract(path: str | Path) -> dict[str, Any]:
                 flattened.extend(_walk_table_entries(entry))
                 continue
             if not isinstance(entry, dict):
-                raise ValueError("schema contract tables entries must be mappings")
+                entry_type_name = type(entry).__name__
+                raise ValueError(
+                    "schema contract tables entries must be mappings "
+                    f"(got {entry_type_name})"
+                )
             flattened.append(entry)
         return flattened
 

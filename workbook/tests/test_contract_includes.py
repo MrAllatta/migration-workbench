@@ -52,8 +52,85 @@ tables:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"include_list expects a YAML list"):
+    with pytest.raises(ValueError, match=r"include_list expects a YAML list") as excinfo:
         load_contract(contract_path)
+
+    message = str(excinfo.value)
+    assert str(included_path) in message
+    assert "dict" in message
+
+
+def test_nested_includes_resolve_relative_to_including_file(tmp_path):
+    includes_dir = tmp_path / "includes"
+    includes_dir.mkdir()
+
+    nested_tables_path = includes_dir / "nested_tables.yaml"
+    nested_tables_path.write_text(
+        """
+- suggested_model_name: shipment
+  columns: []
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    tables_path = includes_dir / "tables.yaml"
+    tables_path.write_text(
+        """
+- suggested_model_name: harvest
+  columns: []
+- !include_list nested_tables.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        """
+version: "1.3"
+tables:
+  - !include_list includes/tables.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    contract = load_contract(contract_path)
+    model_names = [t["suggested_model_name"] for t in contract["tables"]]
+    assert model_names == ["harvest", "shipment"]
+
+
+def test_multi_hop_include_cycle_reports_cyclic_and_file_names(tmp_path):
+    first_path = tmp_path / "cycle_first.yaml"
+    second_path = tmp_path / "cycle_second.yaml"
+
+    first_path.write_text(
+        """
+- !include_list cycle_second.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+    second_path.write_text(
+        """
+- !include_list cycle_first.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        """
+version: "1.3"
+tables:
+  - !include_list cycle_first.yaml
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"cyclic include detected") as excinfo:
+        load_contract(contract_path)
+
+    message = str(excinfo.value)
+    assert first_path.name in message
+    assert second_path.name in message
 
 
 def test_tables_flattening_is_recursive(tmp_path):
@@ -62,11 +139,11 @@ def test_tables_flattening_is_recursive(tmp_path):
         """
 version: "1.3"
 tables:
-  - - - suggested_model_name: alpha
+  - - - suggested_model_name: planting
         columns: []
-    - - suggested_model_name: beta
+    - - suggested_model_name: harvest
         columns: []
-  - suggested_model_name: gamma
+  - suggested_model_name: shipment
     columns: []
 """.lstrip(),
         encoding="utf-8",
@@ -74,4 +151,25 @@ tables:
 
     contract = load_contract(contract_path)
     model_names = [t["suggested_model_name"] for t in contract["tables"]]
-    assert model_names == ["alpha", "beta", "gamma"]
+    assert model_names == ["planting", "harvest", "shipment"]
+
+
+def test_tables_entries_must_be_mappings_includes_type_name(tmp_path):
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        """
+version: "1.3"
+tables:
+  - suggested_model_name: crop
+    columns: []
+  - not a mapping
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError, match=r"schema contract tables entries must be mappings"
+    ) as excinfo:
+        load_contract(contract_path)
+
+    assert "str" in str(excinfo.value)
