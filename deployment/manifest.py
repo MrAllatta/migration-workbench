@@ -72,10 +72,12 @@ def load_manifest(path: Path) -> dict[str, Any]:
         dict: Parsed manifest payload.
 
     Raises:
-        ManifestValidationError: If the YAML root is not a mapping.
-        yaml.YAMLError: On YAML parse failure.
+        ManifestValidationError: If the YAML root is not a mapping, or on YAML parse failure.
     """
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ManifestValidationError(f"YAML parse failure: {exc}") from exc
     if not isinstance(payload, dict):
         raise ManifestValidationError("Manifest root must be a mapping.")
     return payload
