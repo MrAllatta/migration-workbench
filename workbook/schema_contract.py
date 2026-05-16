@@ -53,6 +53,65 @@ def _filter_section_headers(columns: list[dict]) -> list[dict]:
     return filtered
 
 
+def _compute_fk_resolutions(tables: list[dict]) -> list[dict]:
+    """Suggest FK resolutions from column overlap and cross-sheet refs."""
+    fk_candidates = []
+    for i, table in enumerate(tables):
+        source_cols = {}
+        for c in table.get("columns", []):
+            key = c.get("source_column") or c.get("suggested_field_name") or ""
+            if key:
+                source_cols[key] = c
+        for j, other_table in enumerate(tables):
+            if i == j:
+                continue
+            other_cols = {}
+            for c in other_table.get("columns", []):
+                key = c.get("source_column") or c.get("suggested_field_name") or ""
+                if key:
+                    other_cols[key] = c
+            other_model = other_table.get("suggested_model_name", "")
+            for col_name, col_def in source_cols.items():
+                if col_name in other_cols:
+                    other_col = other_cols[col_name]
+                    unique_count = other_col.get("unique_count") or other_col.get("non_empty_cells") or 0
+                    total = other_col.get("total_count") or other_col.get("non_empty_cells") or 0
+                    if total > 0 and unique_count / total >= 0.8:
+                        field_name = col_def.get("suggested_field_name") or col_name.lower().replace(" ", "_")
+                        target_field = other_col.get("suggested_field_name") or col_name.lower().replace(" ", "_")
+                        fk_candidates.append({
+                            "field": field_name,
+                            "target_model": other_model,
+                            "target_field": target_field,
+                            "confidence": "high" if unique_count == total else "medium",
+                            "source": "column_overlap",
+                        })
+    for table in tables:
+        for col in table.get("columns", []):
+            for ref in col.get("cross_sheet_refs") or []:
+                ref_name = ref[0] if isinstance(ref, list) else ref.get("sheet_name", "")
+                for other_table in tables:
+                    other_model_slug = other_table.get("suggested_model_name", "").lower().replace(" ", "")
+                    ref_slug = ref_name.lower().replace(" ", "")
+                    if other_model_slug == ref_slug:
+                        field_name = col.get("suggested_field_name") or (col.get("source_column") or "").lower().replace(" ", "_")
+                        fk_candidates.append({
+                            "field": field_name,
+                            "target_model": other_table["suggested_model_name"],
+                            "target_field": field_name,
+                            "confidence": "medium",
+                            "source": "cross_sheet_formula",
+                        })
+    seen = set()
+    unique_fks = []
+    for fk in fk_candidates:
+        key = (fk["field"], fk["target_model"])
+        if key not in seen:
+            seen.add(key)
+            unique_fks.append(fk)
+    return unique_fks
+
+
 def load_json(path: Path) -> Any:
     """Read and parse a UTF-8 JSON file.
 

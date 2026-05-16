@@ -15,7 +15,7 @@ from workbook.codegen.designed_model_detection import (
     suggest_designed_model,
 )
 from workbook.field_mapping import map_profiler_column_to_django_field, suggested_field_name
-from workbook.schema_contract import build_contract, load_json
+from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, load_json
 
 
 def _infer_format_type_from_samples(samples: list[str]) -> str | None:
@@ -260,6 +260,10 @@ def _harden_contract(contract: dict[str, Any]) -> None:
         table["admin"] = {
             "list_display": editable[:6],
         }
+
+    fk_resolutions = _compute_fk_resolutions(contract.get("tables", []))
+    if fk_resolutions:
+        contract.setdefault("fk_resolutions", []).extend(fk_resolutions)
 
 
 class Command(BaseCommand):

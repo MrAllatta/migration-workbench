@@ -1,4 +1,4 @@
-from workbook.schema_contract import build_contract, _filter_section_headers
+from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions
 from workbook.field_mapping import map_profiler_column_to_django_field
 
 
@@ -144,3 +144,21 @@ def test_filter_section_headers_keeps_normal_columns():
     ]
     result = _filter_section_headers(columns)
     assert len(result) == 2
+
+
+def test_compute_fk_resolutions_from_column_overlap():
+    tables = [
+        {"suggested_model_name": "CropPlanner", "columns": [
+            {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField", "unique_count": 15, "total_count": 50},
+            {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
+        ]},
+        {"suggested_model_name": "FieldBlock", "columns": [
+            {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField", "unique_count": 15, "total_count": 15},
+            {"suggested_field_name": "description", "source_column": "Description", "django_field_class": "models.TextField"},
+        ]},
+    ]
+    fks = _compute_fk_resolutions(tables)
+    block_fk = [f for f in fks if f["field"] == "block"]
+    assert len(block_fk) >= 1
+    assert block_fk[0]["target_model"] == "FieldBlock"
+    assert block_fk[0]["source"] == "column_overlap"
