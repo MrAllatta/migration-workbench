@@ -391,7 +391,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
+.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
 
 venv:
 	python3 -m venv $(VENV)
@@ -410,6 +410,11 @@ install-dev-workbench: venv
 migrate:
 	$(MANAGE) makemigrations
 	$(MANAGE) migrate
+
+reset-migrations:
+	rm -f $(CORE)/migrations/*.py
+	rm -rf $(CORE)/migrations/__pycache__
+	$(MANAGE) makemigrations $(or $(APP_LABEL),core)
 
 check:
 	$(MANAGE) check
@@ -1382,6 +1387,11 @@ def scaffold(
         copy_file(run_import_src, output_dir / "scripts" / "run_import.sh", force=force)
 
     scaffold_config_templates(output_dir, script_dir, provider, force=force)
+
+    migrations_dir = output_dir / "backend" / "apps" / py_name / "migrations"
+    initial_migration = migrations_dir / "0001_initial.py"
+    if initial_migration.exists():
+        initial_migration.unlink()
 
     manage = output_dir / "backend" / "manage.py"
     if manage.exists():

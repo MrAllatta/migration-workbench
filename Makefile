@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+.PHONY: install migrate reset-migrations run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -16,6 +16,11 @@ install:
 migrate:
 	$(MANAGE) makemigrations
 	$(MANAGE) migrate
+
+reset-migrations:
+	rm -f $(CORE)/migrations/*.py
+	rm -rf $(CORE)/migrations/__pycache__
+	$(MANAGE) makemigrations $(or $(APP_LABEL),core)
 
 run:
 	$(MANAGE) runserver
