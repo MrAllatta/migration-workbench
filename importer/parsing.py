@@ -125,18 +125,26 @@ def to_bool(value, default=False):
 
 
 def parse_iso_date(date_str):
-    """Parse an ISO 8601 date string (``YYYY-MM-DD``) to a :class:`datetime.date`.
+    """Parse a date string to a :class:`datetime.date`.
+
+    Supports ``YYYY-MM-DD``, ``M/D/YYYY``, and ``M/D/YY`` formats.
 
     Args:
-        date_str: String in ``YYYY-MM-DD`` format.
+        date_str: String in a supported date format.
 
     Returns:
         datetime.date: Parsed date.
 
     Raises:
-        ValueError: If *date_str* does not match ``YYYY-MM-DD``.
+        ValueError: If *date_str* does not match any supported format.
     """
-    return datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+    cleaned = str(date_str).strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"time data {cleaned!r} does not match any supported format")
 
 
 def split_on(value, delimiter="//"):
