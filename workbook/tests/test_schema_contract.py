@@ -1,4 +1,4 @@
-from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions
+from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year
 from workbook.field_mapping import map_profiler_column_to_django_field
 
 
@@ -162,3 +162,31 @@ def test_compute_fk_resolutions_from_column_overlap():
     assert len(block_fk) >= 1
     assert block_fk[0]["target_model"] == "FieldBlock"
     assert block_fk[0]["source"] == "column_overlap"
+
+
+def test_suggest_import_keys_prefers_unique_name_columns():
+    columns = [
+        {"suggested_field_name": "crop", "source_column": "Crop", "unique_count": 20, "total_count": 50},
+        {"suggested_field_name": "block", "source_column": "Block", "unique_count": 15, "total_count": 50},
+        {"suggested_field_name": "product_sku", "source_column": "Product SKU", "unique_count": 50, "total_count": 50},
+    ]
+    result = _suggest_import_keys(columns)
+    assert "fields" in result
+    assert "product_sku" in result["fields"]
+
+
+def test_add_source_bundle_year():
+    tables = [
+        {"suggested_model_name": "Crop", "columns": [
+            {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
+        ], "import_config": {}},
+    ]
+    result = _add_source_bundle_year(tables, year=2024)
+    assert result[0]["columns"][-1]["suggested_field_name"] == "source_bundle_year"
+    assert result[0]["import_config"]["defaults"]["source_bundle_year"] == 2024
+
+
+def test_add_source_bundle_year_no_year():
+    tables = [{"columns": [], "import_config": {}}]
+    result = _add_source_bundle_year(tables, year=None)
+    assert result == tables

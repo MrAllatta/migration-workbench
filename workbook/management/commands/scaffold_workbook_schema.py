@@ -15,7 +15,7 @@ from workbook.codegen.designed_model_detection import (
     suggest_designed_model,
 )
 from workbook.field_mapping import map_profiler_column_to_django_field, suggested_field_name
-from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, load_json
+from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year, load_json
 
 
 def _infer_format_type_from_samples(samples: list[str]) -> str | None:
@@ -236,6 +236,12 @@ def _harden_contract(contract: dict[str, Any]) -> None:
             "import_key": first_field,
             "unique_on": [first_field],
         }
+        ik = _suggest_import_keys(table.get("columns", []))
+        if ik:
+            table.setdefault("import_key", {})
+            table["import_key"].setdefault("fields", ik["fields"])
+            table["import_key"].setdefault("confidence", ik["confidence"])
+            table["import_key"].setdefault("note", ik["note"])
         fk_resolutions: dict[str, str] = {}
         for col in columns:
             if col.get("django_field_class") == "models.ForeignKey":
