@@ -1,6 +1,9 @@
 import time
 from unittest.mock import MagicMock
 
+import pytest
+from googleapiclient.errors import HttpError
+
 from connectors.google_sheets import SheetsThrottle, fetch_tab_rows, fetch_sheet_structure_data, _fill_merged_cell_headers
 
 
@@ -111,3 +114,44 @@ class TestFetchWithThrottle:
             assert result == mock_response
         finally:
             default_throttle._min_interval = original
+
+
+class TestRetryOn429:
+    def _make_429_error(self):
+        resp = MagicMock()
+        resp.status = 429
+        resp.reason = "Rate limit exceeded"
+        return HttpError(resp, b'{"error": {"message": "Quota exceeded"}}')
+
+    def test_fetch_tab_rows_retries_on_429(self):
+        mock_service = MagicMock()
+        error = self._make_429_error()
+        mock_service.spreadsheets().values().get().execute.side_effect = [
+            error,
+            {"values": [["A", "B"]]}
+        ]
+        throttle = SheetsThrottle(min_interval=0.001)
+        rows = fetch_tab_rows("sid", "Sheet1", mock_service, throttle=throttle)
+        assert rows == [["A", "B"]]
+        assert mock_service.spreadsheets().values().get().execute.call_count == 2
+
+    def test_fetch_tab_rows_raises_after_max_retries(self):
+        mock_service = MagicMock()
+        error = self._make_429_error()
+        mock_service.spreadsheets().values().get().execute.side_effect = error
+        throttle = SheetsThrottle(min_interval=0.001)
+        with pytest.raises(HttpError):
+            fetch_tab_rows("sid", "Sheet1", mock_service, throttle=throttle)
+        assert mock_service.spreadsheets().values().get().execute.call_count == 4
+
+    def test_fetch_sheet_structure_retries_on_429(self):
+        mock_service = MagicMock()
+        error = self._make_429_error()
+        mock_response = {"sheets": [], "namedRanges": [], "properties": {}}
+        mock_service.spreadsheets().get().execute.side_effect = [
+            error,
+            mock_response
+        ]
+        throttle = SheetsThrottle(min_interval=0.001)
+        result = fetch_sheet_structure_data(mock_service, "sid", "Sheet1", throttle=throttle)
+        assert result == mock_response

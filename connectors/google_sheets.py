@@ -1,8 +1,11 @@
+import logging
 import os
 import time
 from collections import deque
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+logger = logging.getLogger(__name__)
 
 
 def _fill_merged_cell_headers(headers: list[str]) -> list[str]:
@@ -258,18 +261,42 @@ class SheetsThrottle:
 
 default_throttle = SheetsThrottle()
 
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0
+
+
+def _execute_with_retry(execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_BASE_DELAY):
+    from googleapiclient.errors import HttpError
+
+    for attempt in range(max_retries + 1):
+        try:
+            return execute_fn()
+        except HttpError as exc:
+            if exc.resp.status != 429 or attempt >= max_retries:
+                raise
+            delay = base_delay * (2 ** attempt)
+            logger.warning(
+                "429 rate limit hit, retrying in %.1fs (attempt %d/%d)",
+                delay, attempt + 1, max_retries,
+            )
+            time.sleep(delay)
+
 
 def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service, *, throttle=None):
     if throttle is None:
         throttle = default_throttle
     throttle.wait()
     escaped_title = worksheet_title.replace("'", "''")
-    response = (
-        sheets_service.spreadsheets()
-        .values()
-        .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
-        .execute()
-    )
+
+    def _execute():
+        return (
+            sheets_service.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
+            .execute()
+        )
+
+    response = _execute_with_retry(_execute)
     values = response.get("values", [])
     if values:
         values[0] = _fill_merged_cell_headers(values[0])
@@ -309,13 +336,16 @@ def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title, 
         ")))"
         ")"
     )
-    return (
-        sheets_service.spreadsheets()
-        .get(
-            spreadsheetId=spreadsheet_id,
-            ranges=[range_],
-            includeGridData=True,
-            fields=fields,
+    def _execute():
+        return (
+            sheets_service.spreadsheets()
+            .get(
+                spreadsheetId=spreadsheet_id,
+                ranges=[range_],
+                includeGridData=True,
+                fields=fields,
+            )
+            .execute()
         )
-        .execute()
-    )
+
+    return _execute_with_retry(_execute)
