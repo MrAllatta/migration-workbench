@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -153,3 +153,27 @@ new-product:
 publish:
 	$(PYTHON) -m build
 	$(PYTHON) -m twine upload dist/*
+
+# ---------------------------------------------------------------------------
+# Docker / Fly.io deployment
+# ---------------------------------------------------------------------------
+
+DOCKER_IMAGE ?= product
+FLY_APP ?= product-production
+
+docker-build:
+	docker build -t $(DOCKER_IMAGE) .
+
+fly-launch:
+	flyctl launch --name $(FLY_APP) --region ewr --no-deploy --copy-config || true
+
+fly-volume:
+	flyctl volumes create data --app $(FLY_APP) --region ewr --size 1 --yes
+
+fly-secrets:
+	flyctl secrets set DJANGO_SECRET_KEY=$$(python3 -c "import secrets; print(secrets.token_urlsafe(50))") DJANGO_ALLOWED_HOSTS=$(FLY_APP).fly.dev DJANGO_DEBUG=0
+
+fly-deploy: docker-build
+	flyctl deploy --app $(FLY_APP)
+
+deploy: fly-launch fly-volume fly-secrets fly-deploy
