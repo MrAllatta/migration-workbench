@@ -111,7 +111,9 @@ fi
 
 /opt/venv/bin/python manage.py migrate --noinput
 
-GUNICORN_EXEC="$(printf '%s migration_workbench.wsgi:application --bind 0.0.0.0:8080 --workers %s --threads %s --worker-class gthread' \
+chown 1000:1000 "$DB_PATH" 2>/dev/null || true
+
+GUNICORN_EXEC="$(printf '%s migration_workbench.wsgi:application --bind 0.0.0.0:8080 --workers %s --threads %s --worker-class gthread --access-logfile - --error-logfile - --capture-output' \
   "$GUNICORN_BIN" "$GUNICORN_WORKERS" "$GUNICORN_THREADS")"
 
 if [ -n "${LITESTREAM_BUCKET:-}" ]; then
@@ -123,5 +125,6 @@ if [ -n "${LITESTREAM_BUCKET:-}" ]; then
   exec litestream replicate -config "$LITESTREAM_CONFIG" -exec "$GUNICORN_EXEC"
 else
   exec "$GUNICORN_BIN" migration_workbench.wsgi:application --bind 0.0.0.0:8080 \
-    --workers "$GUNICORN_WORKERS" --threads "$GUNICORN_THREADS" --worker-class gthread
+    --workers "$GUNICORN_WORKERS" --threads "$GUNICORN_THREADS" --worker-class gthread \
+    --access-logfile - --error-logfile - --capture-output
 fi
