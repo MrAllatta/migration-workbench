@@ -59,8 +59,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--app-label",
-            default="core",
-            help="Django app label for model imports (default: core)",
+            default=None,
+            help="Django app label for model imports (default: read from contract, fallback 'core')",
         )
         parser.add_argument(
             "--force",
@@ -87,6 +87,15 @@ class Command(BaseCommand):
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
+
+        if app_label is None:
+            for table in contract.get("tables", []):
+                meta = table.get("model_meta") or {}
+                if meta.get("app_label"):
+                    app_label = meta["app_label"]
+                    break
+        if app_label is None:
+            app_label = "core"
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
