@@ -210,14 +210,26 @@ def build_contract(
                 }
             )
 
-        contract_tables.append(
-            {
-                "bundle_worksheet_title": title,
-                "suggested_model_name": model_name_from_output_path(output_path),
-                "bundle_output_path": output_path,
-                "columns": django_columns,
+        entry: dict[str, Any] = {
+            "bundle_worksheet_title": title,
+            "suggested_model_name": model_name_from_output_path(output_path),
+            "bundle_output_path": output_path,
+            "columns": django_columns,
+        }
+
+        # Seed import_config for bundle-backed tables.
+        if required:
+            field_names = [c["suggested_field_name"] for c in django_columns if c.get("suggested_field_name")]
+            cmap = {c["suggested_field_name"]: c["source_column"] for c in django_columns if c.get("suggested_field_name")}
+            first_col = field_names[0] if field_names else None
+            entry["import_config"] = {
+                "bundle_path": output_path,
+                "required_headers": list(required),
+                "unique_on": [first_col] if first_col else [],
+                "column_map": cmap,
             }
-        )
+
+        contract_tables.append(entry)
 
     return {
         "version": "1.0",

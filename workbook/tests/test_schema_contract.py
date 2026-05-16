@@ -103,3 +103,23 @@ def test_text_type_defaults_to_textfield():
     )
     assert mapped["django_field_class"] == "models.TextField"
     assert "max_length" not in mapped["django_field_kwargs"]
+
+
+def test_contract_scaffold_auto_generates_import_config():
+    """build_contract should seed import_config for each table."""
+    bundle = {
+        "provider": "google_sheets",
+        "tabs": [
+            {
+                "worksheet_title": "Crop Info",
+                "output_path": "reference/crop_info.csv",
+                "required_headers": ["Crop", "Type"],
+            },
+        ],
+    }
+    contract = build_contract(bundle)
+    table = contract["tables"][0]
+    assert "import_config" in table
+    assert table["import_config"]["bundle_path"] == "reference/crop_info.csv"
+    assert "Crop" in table["import_config"]["required_headers"]
+    assert table["import_config"]["unique_on"] is not None
