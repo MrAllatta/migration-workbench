@@ -10,7 +10,9 @@ from connectors.tab_name_utils import sanitize_tab_name
 from connectors.google_sheets import (
     DRIVE_READONLY_SCOPE,
     SHEETS_READONLY_SCOPE,
+    SheetsThrottle,
     build_google_service,
+    default_throttle,
     extract_drive_folder_id,
     fetch_sheet_structure_data,
     fetch_tab_rows,
@@ -142,7 +144,8 @@ def shape_sheet_structure(response: dict, worksheet_title: str) -> dict | None:
 
 
 class GoogleSheetsAdapter(ProviderAdapter):
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, throttle: SheetsThrottle | None = None):
+        self.throttle = throttle or default_throttle
         self.folder_id = extract_drive_folder_id(
             config.get("drive_folder_id") or config.get("drive_folder_url")
         )
@@ -162,6 +165,7 @@ class GoogleSheetsAdapter(ProviderAdapter):
             spreadsheet_id=resolved["spreadsheet_id"],
             worksheet_title=worksheet_title,
             sheets_service=self.sheets_service,
+            throttle=self.throttle,
         )
         return {
             "rows": rows,
@@ -192,5 +196,6 @@ class GoogleSheetsAdapter(ProviderAdapter):
             sheets_service=self.sheets_service,
             spreadsheet_id=resolved["spreadsheet_id"],
             worksheet_title=worksheet_title,
+            throttle=self.throttle,
         )
         return shape_sheet_structure(response, worksheet_title)
