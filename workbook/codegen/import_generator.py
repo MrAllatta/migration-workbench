@@ -390,7 +390,13 @@ def _render_import_method(
 ) -> str:
     """Render a single import tier method."""
     method_name = f"_import_{model_name.lower()}"
-    bundle_path = import_cfg.get("bundle_path", "TODO_bundle_path.csv")
+    bundle_path = import_cfg.get("bundle_path")
+    if not bundle_path:
+        raise ValueError(
+            f"import_config.bundle_path is missing for table '{model_name}'. "
+            f"Run scaffold_workbook_schema --hardened to auto-generate it, "
+            f"or add bundle_path to each table's import_config."
+        )
     unique_on = import_cfg.get("unique_on") or []
     required = import_cfg.get("required_source_columns") or []
     fk_lookup = import_cfg.get("fk_lookup") or {}

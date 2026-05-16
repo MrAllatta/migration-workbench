@@ -1,4 +1,4 @@
-from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year
+from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year, _compute_bundle_paths
 from workbook.field_mapping import map_profiler_column_to_django_field
 
 
@@ -190,3 +190,19 @@ def test_add_source_bundle_year_no_year():
     tables = [{"columns": [], "import_config": {}}]
     result = _add_source_bundle_year(tables, year=None)
     assert result == tables
+
+
+def test_compute_bundle_paths_with_year():
+    tables = [
+        {"suggested_model_name": "Crop", "bundle_worksheet_title": "Crop Info", "import_config": {}},
+    ]
+    result = _compute_bundle_paths(tables, year=2024)
+    assert result[0]["import_config"]["bundle_path"] == "2024/crop_info.csv"
+
+
+def test_compute_bundle_paths_without_year():
+    tables = [
+        {"suggested_model_name": "Crop", "bundle_worksheet_title": "Crop Info", "import_config": {}},
+    ]
+    result = _compute_bundle_paths(tables, year=None)
+    assert result[0]["import_config"]["bundle_path"] == "crop_info.csv"

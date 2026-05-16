@@ -7,6 +7,7 @@ import sys
 from io import StringIO
 from pathlib import Path
 
+import pytest
 import yaml
 
 from importer.base import BaseImportCommand
@@ -902,3 +903,14 @@ def test_import_generator_diff_no_existing(tmp_path):
         diff=True,
     )
     assert "no existing file" in cmd.stdout.getvalue()
+
+
+def test_missing_bundle_path_raises_error():
+    """generate_import should raise ValueError when bundle_path is missing."""
+    contract = _contract_with_imports()
+    for table in contract["tables"]:
+        ic = table.get("import_config", {})
+        if ic:
+            ic.pop("bundle_path", None)
+    with pytest.raises(ValueError, match="bundle_path is missing"):
+        render_import_py(contract, app_label="core")
