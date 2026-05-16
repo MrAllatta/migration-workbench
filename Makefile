@@ -136,11 +136,16 @@ chassis-gate:
 	DB_ENGINE=sqlite $(MANAGE) snapshot_bundle --help >/dev/null
 	DB_ENGINE=sqlite $(MANAGE) scaffold_workbook_schema --bundle-config example_data/scaffold_workbook_bundle.example.json --table-profile example_data/scaffold_workbook_table_profile.example.json --out build/_out/schema-contract-smoke.yaml
 	DB_ENGINE=sqlite $(MANAGE) generate_import --contract example_data/import_pipeline_contract.example.yaml --out build/_out/import-pipeline-smoke.py --force
-	DB_ENGINE=sqlite $(MANAGE) generate_models --contract build/_out/schema-contract-smoke.yaml --out /dev/null --force
+	# Build temp domain app from scaffolded contract so import validation can run
+	mkdir -p build/_out/domain
+	touch build/_out/domain/__init__.py
+	printf 'import os, sys\nsys.path.insert(0, os.path.dirname(__file__))\nfrom migration_workbench.settings import *\nINSTALLED_APPS = list(INSTALLED_APPS) + ["domain"]\n' > build/_out/chassis_gate_settings.py
+	DB_ENGINE=sqlite DJANGO_SETTINGS_MODULE=chassis_gate_settings PYTHONPATH=build/_out:$$PYTHONPATH $(MANAGE) generate_models --contract build/_out/schema-contract-smoke.yaml --out build/_out/domain/models.py --force
+	DB_ENGINE=sqlite DJANGO_SETTINGS_MODULE=chassis_gate_settings PYTHONPATH=build/_out:$$PYTHONPATH $(MANAGE) migrate domain --run-syncdb
 	DB_ENGINE=sqlite $(MANAGE) scaffold_view_manifest --structure example_data/scaffold_view_manifest_structure.example.json --out build/_out/view-manifest-smoke.yaml --summary-json build/_out/view-manifest-smoke.json
 	DB_ENGINE=sqlite $(MANAGE) generate_admin --contract build/_out/schema-contract-smoke.yaml --manifest build/_out/view-manifest-smoke.yaml --out /dev/null --force
 	DB_ENGINE=sqlite $(MANAGE) generate_import --contract build/_out/schema-contract-smoke.yaml --out build/_out/import_data.py --force
-	$(PYTHON) -c "import sys; sys.path.insert(0, 'build/_out'); from import_data import Command; from importer.base import BaseImportCommand; assert issubclass(Command, BaseImportCommand)"
+	DB_ENGINE=sqlite DJANGO_SETTINGS_MODULE=chassis_gate_settings PYTHONPATH=build/_out:$$PYTHONPATH $(MANAGE) shell -c "from import_data import Command; from importer.base import BaseImportCommand; assert issubclass(Command, BaseImportCommand); print('import validation: OK')"
 	DB_ENGINE=sqlite $(MANAGE) generate_discovery_interview --manifest build/_out/view-manifest-smoke.yaml --out build/_out/discovery-interview-smoke.md
 	DB_ENGINE=sqlite $(MANAGE) merge_discovery_notes --manifest build/_out/view-manifest-smoke.yaml --interview example_data/discovery_interview.example.md --out build/_out/view-manifest-merged-smoke.yaml --summary-out build/_out/discovery-summary-smoke.md
 	DB_ENGINE=sqlite $(MANAGE) import_reference_example example_data --validate-only --summary-json build/_out/validate-example.json
