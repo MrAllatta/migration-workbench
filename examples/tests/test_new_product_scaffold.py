@@ -111,6 +111,12 @@ def test_new_product_does_not_commit_into_existing_repo(tmp_path):
     )
 
 
+def test_scaffold_copies_run_import_sh(tmp_path):
+    output_dir = _run_new_product(tmp_path, "run-import-test")
+    run_import = output_dir / "scripts" / "run_import.sh"
+    assert run_import.exists(), f"Expected {run_import} to exist after scaffold"
+
+
 def test_check_env_regression_no_bashism(tmp_path):
     """Generated Makefile must not contain bash-specific indirect expansion."""
     output_dir = _run_new_product(tmp_path, "no-bashism")

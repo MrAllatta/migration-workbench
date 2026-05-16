@@ -1371,6 +1371,10 @@ def scaffold(
     copy_file(
         entrypoint_src, output_dir / "scripts" / "entrypoint_product.sh", force=force
     )
+    run_import_src = script_dir / "run_import.sh"
+    if run_import_src.exists():
+        copy_file(run_import_src, output_dir / "scripts" / "run_import.sh", force=force)
+
     scaffold_config_templates(output_dir, script_dir, provider, force=force)
 
     manage = output_dir / "backend" / "manage.py"
