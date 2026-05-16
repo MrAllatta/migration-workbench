@@ -365,7 +365,7 @@ DJANGO_SETTINGS_MODULE = "config.settings"
 """
 
 
-def render_makefile() -> str:
+def render_makefile(product_kebab: str) -> str:
     return r"""-include .env
 # ── Environment variable loading ──────────────────────────────────────────
 # .env is loaded by Make's `-include` above. Vars are available inside recipe
@@ -537,7 +537,31 @@ profile-cohort-corpus-phase2:
 # expansion_formula_penalty, expansion_formula_threshold, plus token lists.
 profile-cohort-corpus-phase3:
 	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-tab-selection
-"""
+
+# ---------------------------------------------------------------------------
+# Docker / Fly.io deployment
+# ---------------------------------------------------------------------------
+
+DOCKER_IMAGE ?= product
+FLY_APP ?= {product_kebab}-production
+
+docker-build:
+	docker build -t $(DOCKER_IMAGE) .
+
+fly-launch:
+	flyctl launch --name $(FLY_APP) --region ewr --no-deploy --copy-config || true
+
+fly-volume:
+	flyctl volumes create data --app $(FLY_APP) --region ewr --size 1 --yes
+
+fly-secrets:
+	flyctl secrets set DJANGO_SECRET_KEY=$$(python3 -c "import secrets; print(secrets.token_urlsafe(50))") DJANGO_ALLOWED_HOSTS=$(FLY_APP).fly.dev DJANGO_DEBUG=0
+
+fly-deploy: docker-build
+	flyctl deploy --app $(FLY_APP)
+
+deploy: fly-launch fly-volume fly-secrets fly-deploy
+""".replace("{product_kebab}", product_kebab)
 
 
 def render_env_example(provider: str) -> str:
@@ -1329,7 +1353,7 @@ def scaffold(
         ("backend/apps/core/models.py", render_models_py(prefix, user_model_name)),
         ("backend/apps/core/migrations/__init__.py", ""),
         ("pyproject.toml", render_pyproject_toml(product_kebab, py_name)),
-        ("Makefile", render_makefile()),
+        ("Makefile", render_makefile(product_kebab)),
         (".env.example", render_env_example(provider)),
         ("AGENTS.md", render_agents_md(provider)),
         ("README.md", render_readme_md(product_kebab, provider)),
