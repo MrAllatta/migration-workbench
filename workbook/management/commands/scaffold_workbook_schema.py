@@ -341,6 +341,11 @@ class Command(BaseCommand):
                 "Either --bundle-config or --cohort-corpus-out-dir is required."
             )
 
+        app_label = options["models_app_label"]
+        for table in contract.get("tables", []):
+            meta = table.setdefault("model_meta", {})
+            meta.setdefault("app_label", app_label)
+
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
