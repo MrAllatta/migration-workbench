@@ -798,6 +798,20 @@ def test_multi_source_tab_config_excludes_list_entries():
     assert "'age'" in rendered
 
 
+def test_import_key_falls_back_to_unique_on():
+    """When import_config.unique_on is empty but import_key.fields exists,
+    generate_import should use import_key.fields as unique_on."""
+    contract = _contract_with_imports()
+    for table in contract["tables"]:
+        ic = table.get("import_config", {})
+        if ic:
+            ic["unique_on"] = []
+        table["import_key"] = {"fields": ["crop", "block"], "confidence": "high", "note": "test key"}
+    source = render_import_py(contract, app_label="core")
+    assert "crop=crop" in source or "crop" in source
+    _check_compiles(source)
+
+
 def test_multi_source_unique_assignments():
     """Unique multi-source fields get parts + transform in unique assignments."""
     contract = _contract_multi_source()

@@ -563,6 +563,11 @@ def render_import_py(
             skipped.append(f"# Skipped {name}: no import_config (worksheet: {ws})")
             continue
         cfg.setdefault("column_map", _derive_column_map(table))
+        if not cfg.get("unique_on"):
+            import_key = table.get("import_key") or {}
+            key_fields = import_key.get("fields") or []
+            if key_fields:
+                cfg["unique_on"] = key_fields
         if not cfg.get("required_headers"):
             cmap = cfg.get("column_map") or {}
             unique_on = cfg.get("unique_on") or []
