@@ -1,7 +1,8 @@
 import os
+import time
 from collections import deque
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, urlparse
 
 
 def _fill_merged_cell_headers(headers: list[str]) -> list[str]:
@@ -225,13 +226,48 @@ def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descenda
     }
 
 
-def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service):
-    range_name = worksheet_title.replace("'", "''")
-    safe_range = quote(f"'{range_name}'", safe="'")
+class SheetsThrottle:
+    """Rate limiter for Google Sheets API calls.
+
+    Enforces a minimum interval between consecutive API calls to stay
+    under the Sheets API quota (default 60 requests/min per user).
+
+    The interval is configurable via the ``GOOGLE_SHEETS_THROTTLE_INTERVAL``
+    environment variable (parsed as a float in seconds).
+    """
+
+    def __init__(self, min_interval: float | None = None):
+        if min_interval is None:
+            env_val = os.environ.get("GOOGLE_SHEETS_THROTTLE_INTERVAL")
+            if env_val is not None:
+                try:
+                    min_interval = float(env_val)
+                except (ValueError, TypeError):
+                    min_interval = 1.0
+            else:
+                min_interval = 1.0
+        self._min_interval = min_interval
+        self._last = 0.0
+
+    def wait(self):
+        elapsed = time.monotonic() - self._last
+        if elapsed < self._min_interval:
+            time.sleep(self._min_interval - elapsed)
+        self._last = time.monotonic()
+
+
+default_throttle = SheetsThrottle()
+
+
+def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service, *, throttle=None):
+    if throttle is None:
+        throttle = default_throttle
+    throttle.wait()
+    escaped_title = worksheet_title.replace("'", "''")
     response = (
         sheets_service.spreadsheets()
         .values()
-        .get(spreadsheetId=spreadsheet_id, range=safe_range)
+        .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
         .execute()
     )
     values = response.get("values", [])
@@ -240,30 +276,28 @@ def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service):
     return values
 
 
-def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
+def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title, *, throttle=None):
     """Fetch raw structural metadata for one worksheet tab.
 
     Issues a single ``spreadsheets().get()`` call scoped to rows 1-2 of the
     target tab so we recover header labels, a sample data row (used to flag
     formula columns), tab properties, filter views, and named ranges in one
-    round trip. Shaping into the bundle ``structure.json`` envelope is the
-    caller's responsibility (see :func:`connectors.google_provider.shape_sheet_structure`).
+    round trip.
 
     Args:
         sheets_service: An authenticated Google Sheets v4 service client.
-        spreadsheet_id: Resolved spreadsheet id (already extracted from any URL).
+        spreadsheet_id: Resolved spreadsheet id.
         worksheet_title: Tab title to scope the grid data fetch to.
+        throttle: Optional SheetsThrottle instance.
 
     Returns:
-        dict: Raw Sheets API response with ``sheets``, ``namedRanges``, and
-        ``properties`` keys populated.
+        dict: Raw Sheets API response.
     """
+    if throttle is None:
+        throttle = default_throttle
+    throttle.wait()
     quoted_title = worksheet_title.replace("'", "''")
-    # Header row plus one sample data row keeps payload tiny while still
-    # letting us detect formula-driven columns (rows past row 2 are typically
-    # formulaic in the same way as row 2 in spreadsheet UX patterns).
     range_ = f"'{quoted_title}'!1:2"
-    safe_range = quote(range_, safe="'")
     fields = (
         "properties(title),"
         "namedRanges,"
@@ -279,7 +313,7 @@ def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
         sheets_service.spreadsheets()
         .get(
             spreadsheetId=spreadsheet_id,
-            ranges=[safe_range],
+            ranges=[range_],
             includeGridData=True,
             fields=fields,
         )
