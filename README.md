@@ -4,6 +4,27 @@ Reusable Django chassis for **tabular workbook → app migrations**: connectors 
 
 **PyPI:** [migration-workbench](https://pypi.org/project/migration-workbench/) — `pip install migration-workbench` (import package `migration_workbench` uses underscores).
 
+## Prerequisites
+
+### Docker
+
+This project uses Docker for building and deploying. Your system user must be in the
+`docker` group to run Docker commands without `sudo`:
+
+```bash
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Apply the group change in the current shell session
+sg docker -c "docker ps"
+```
+
+After running these commands, **log out and back in** (or use `sg docker -c "your command"`)
+for the group change to take effect permanently.
+
+> **Troubleshooting:** If you see `permission denied while trying to connect to the Docker
+> API at unix:///var/run/docker.sock`, you have not completed the steps above.
+
 ## Who it is for
 
 - **Product teams** moving messy spreadsheet truth into a maintainable Django app.
