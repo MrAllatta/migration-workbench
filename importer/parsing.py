@@ -127,7 +127,9 @@ def to_bool(value, default=False):
 def parse_iso_date(date_str):
     """Parse a date string to a :class:`datetime.date`.
 
-    Supports ``YYYY-MM-DD``, ``M/D/YYYY``, and ``M/D/YY`` formats.
+    Supports ``YYYY-MM-DD``, ``M/D/YYYY``, ``M/D/YY``, ``M/D``,
+    ``M-D-YY``, and ``M-D-YYYY`` formats.  For ``M/D`` (no year),
+    the current year is used.
 
     Args:
         date_str: String in a supported date format.
@@ -139,11 +141,17 @@ def parse_iso_date(date_str):
         ValueError: If *date_str* does not match any supported format.
     """
     cleaned = str(date_str).strip()
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y"):
         try:
             return datetime.strptime(cleaned, fmt).date()
         except ValueError:
             continue
+    # Month/day without year: default to current year
+    try:
+        parsed = datetime.strptime(cleaned, "%m/%d").date()
+        return parsed.replace(year=datetime.now().year)
+    except ValueError:
+        pass
     raise ValueError(f"time data {cleaned!r} does not match any supported format")
 
 
