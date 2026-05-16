@@ -1,3 +1,4 @@
+import copy
 import csv
 import json
 from pathlib import Path
@@ -10,6 +11,52 @@ from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
 
 STRUCTURE_SCHEMA_VERSION = "structure-draft-1"
+
+
+def resolve_tab_title_for_year(tab: dict, year: int | None) -> str:
+    title_by_year = tab.get("worksheet_title_by_year") or {}
+    if year is not None:
+        year_key = str(year)
+        if year_key in title_by_year:
+            return title_by_year[year_key]
+    return tab.get("worksheet_title", "")
+
+
+def expand_years_config(config: dict) -> dict:
+    years = config.get("years")
+    if not years:
+        return config
+
+    result = copy.deepcopy(config)
+    result.pop("years", None)
+    expanded_tabs = []
+
+    for year_key, year_info in years.items():
+        year = int(year_key) if isinstance(year_key, str) else year_key
+        spreadsheet_id = year_info.get("spreadsheet_id", config.get("doc_id", ""))
+        source_bundle_year = year_info.get("source_bundle_year", year)
+
+        for tab in config.get("tabs", []):
+            tab_copy = copy.deepcopy(tab)
+            tab_copy["spreadsheet_id"] = spreadsheet_id
+            tab_copy["source_bundle_year"] = source_bundle_year
+
+            title = resolve_tab_title_for_year(tab_copy, year)
+            tab_copy["worksheet_title"] = title
+            tab_copy.pop("worksheet_title_by_year", None)
+
+            original_path = tab_copy.get("output_path", "")
+            base = original_path.rsplit(".", 1)[0] if "." in original_path else original_path
+            ext = original_path.rsplit(".", 1)[1] if "." in original_path else "csv"
+            tab_copy["output_path"] = f"{year}/{base}.{ext}"
+
+            defaults = tab_copy.setdefault("default_values", {})
+            defaults["source_bundle_year"] = source_bundle_year
+
+            expanded_tabs.append(tab_copy)
+
+    result["tabs"] = expanded_tabs
+    return result
 
 
 class Command(BaseCommand):
@@ -35,6 +82,7 @@ class Command(BaseCommand):
             raise CommandError(f"Config not found: {config_path}")
 
         config = json.loads(config_path.read_text(encoding="utf-8"))
+        config = expand_years_config(config)
         tabs = config.get("tabs", [])
         if not tabs:
             raise CommandError("Config must include at least one tab entry")
@@ -57,7 +105,7 @@ class Command(BaseCommand):
         default_scan_rows = LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"]["max_scan_rows"]
 
         for tab in tabs:
-            worksheet_title = tab.get("worksheet_title")
+            worksheet_title = resolve_tab_title_for_year(tab, tab.get("source_bundle_year"))
             if not worksheet_title:
                 raise CommandError("Each tab entry must include worksheet_title")
 
