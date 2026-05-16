@@ -34,8 +34,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--app-label",
-            default="core",
-            help="Django app label for Meta.db_table and import messages (default: core)",
+            default=None,
+            help="Django app label for Meta.db_table and import messages (default: read from contract, fallback 'core')",
         )
         parser.add_argument(
             "--force",
@@ -62,6 +62,20 @@ class Command(BaseCommand):
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
+
+        if app_label is None:
+            for table in contract.get("tables", []):
+                meta = table.get("model_meta") or {}
+                if meta.get("app_label"):
+                    app_label = meta["app_label"]
+                    break
+        if app_label is None:
+            app_label = "core"
+        if options["app_label"] is not None:
+            for table in contract.get("tables", []):
+                if "model_meta" not in table:
+                    table["model_meta"] = {}
+                table["model_meta"]["app_label"] = app_label
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
