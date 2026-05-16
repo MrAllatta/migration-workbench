@@ -3,6 +3,24 @@ from collections import deque
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
+
+def _fill_merged_cell_headers(headers: list[str]) -> list[str]:
+    result = list(headers)
+    last = None
+    for i, h in enumerate(result):
+        if h.strip():
+            last = h
+        elif last is not None:
+            result[i] = last
+    next_non_empty = None
+    for i in range(len(result) - 1, -1, -1):
+        if headers[i].strip():
+            next_non_empty = headers[i]
+        elif next_non_empty is None:
+            result[i] = headers[i]
+    return result
+
+
 DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly"
 SPREADSHEET_MIME_TYPE = "application/vnd.google-apps.spreadsheet"
@@ -216,7 +234,10 @@ def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service):
         .get(spreadsheetId=spreadsheet_id, range=safe_range)
         .execute()
     )
-    return response.get("values", [])
+    values = response.get("values", [])
+    if values:
+        values[0] = _fill_merged_cell_headers(values[0])
+    return values
 
 
 def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title):
