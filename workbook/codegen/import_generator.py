@@ -24,6 +24,19 @@ from workbook.codegen.contract import (
 
 # -- helpers ----------------------------------------------------------------
 
+def _derive_column_map(table: dict[str, Any]) -> dict[str, str]:
+    """Derive a column_map from ``columns[].source_column`` -> ``suggested_field_name``."""
+    cmap: dict[str, str] = {}
+    for col in table.get("columns") or []:
+        src = col.get("source_column")
+        fname = col.get("suggested_field_name")
+        if src and fname:
+            cmap[fname] = src
+    return cmap
+
+
+
+
 def _field_class_short(raw: str) -> str:
     """Strip ``models.`` prefix from a field class string."""
     return raw.removeprefix("models.")
@@ -549,6 +562,7 @@ def render_import_py(
             ws = table.get("bundle_worksheet_title") or "(no source tab)"
             skipped.append(f"# Skipped {name}: no import_config (worksheet: {ws})")
             continue
+        cfg.setdefault("column_map", _derive_column_map(table))
         tier = tier_map.get(name, 99)
         candidates.append((tier, name, table))
 

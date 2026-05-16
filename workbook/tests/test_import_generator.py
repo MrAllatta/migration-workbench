@@ -106,6 +106,40 @@ def _contract_with_imports() -> dict:
     }
 
 
+def _contract_no_column_map() -> dict:
+    """Contract with import_config but no column_map (to test auto-derivation)."""
+    return {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "bundle_worksheet_title": "Crop Info",
+                "suggested_model_name": "crop",
+                "bundle_output_path": "reference/crop_info.csv",
+                "columns": [
+                    {
+                        "source_column": "Crop",
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
+                    {
+                        "source_column": "Type",
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100, "blank": True, "default": ""},
+                    },
+                ],
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "reference/crop_info.csv",
+                    "unique_on": ["name"],
+                },
+            },
+        ],
+    }
+
+
 def _contract_no_imports() -> dict:
     """Return a v1.1 contract with no import_config blocks."""
     return {
@@ -241,6 +275,14 @@ def test_tab_config_has_column_map():
     source = render_import_py(_contract_with_imports(), app_label="core")
     assert '"column_map"' in source
     assert "'name': 'Crop'" in source
+
+
+def test_column_map_auto_derived_when_absent():
+    """When no column_map in import_config, auto-derive from columns array."""
+    source = render_import_py(_contract_no_column_map(), app_label="core")
+    assert "'name': 'Crop'" in source
+    assert "'crop_type': 'Type'" in source
+    assert '"column_map"' in source
 
 
 def test_tab_config_has_default_values():
