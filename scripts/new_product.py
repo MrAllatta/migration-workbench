@@ -391,7 +391,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
+.PHONY: venv install install-dev-workbench migrate check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
 
 venv:
 	python3 -m venv $(VENV)
@@ -494,6 +494,12 @@ drift-check:
 
 pull-bundle:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG required}" BUNDLE_OUTPUT_DIR="$(BUNDLE_OUT)" INCLUDE_STRUCTURE=true scripts/run_import.sh pull_bundle
+
+load-data:
+	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" IMPORT_DATA_DIR="$${IMPORT_DATA_DIR:-example_data}" IMPORT_COMMAND="$${IMPORT_COMMAND:-import_reference_example}" IMPORT_SUMMARY_JSON="$${IMPORT_SUMMARY_JSON:-}" scripts/run_import.sh import_apply
+
+push-data:
+	@gzip -c backend/db.sqlite3 | flyctl ssh console -a $${FLY_APP:-{product_kebab}-production} -C "gunzip > /data/db.sqlite3" 2>/dev/null || echo "push-data: set FLY_APP and ensure flyctl is authenticated"
 
 generate-view-manifest:
 	@test -f "$(BUNDLE_OUT)/structure.json" || (echo >&2 "structure.json not found at $(BUNDLE_OUT)/structure.json. Run make pull-bundle first."; exit 1)

@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+.PHONY: install migrate run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -94,6 +94,12 @@ import-preflight:
 
 import-apply:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" IMPORT_DATA_DIR="$${IMPORT_DATA_DIR:-example_data}" IMPORT_COMMAND="$${IMPORT_COMMAND:-import_reference_example}" IMPORT_SUMMARY_JSON="$${IMPORT_SUMMARY_JSON:-}" scripts/run_import.sh import_apply
+
+load-data:
+	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" IMPORT_DATA_DIR="$${IMPORT_DATA_DIR:-example_data}" IMPORT_COMMAND="$${IMPORT_COMMAND:-import_reference_example}" IMPORT_SUMMARY_JSON="$${IMPORT_SUMMARY_JSON:-}" scripts/run_import.sh import_apply
+
+push-data:
+	@gzip -c backend/db.sqlite3 | flyctl ssh console -a $${FLY_APP:-product-production} -C "gunzip > /data/db.sqlite3" 2>/dev/null || echo "push-data: set FLY_APP and ensure flyctl is authenticated"
 
 pull-preflight:
 	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG is required}" BUNDLE_OUTPUT_DIR="$${BUNDLE_OUTPUT_DIR:-bundle_out}" IMPORT_COMMAND="$${IMPORT_COMMAND:-import_reference_example}" IMPORT_SUMMARY_JSON="$${IMPORT_SUMMARY_JSON:-}" scripts/run_import.sh pull_preflight
