@@ -33,10 +33,12 @@ import hashlib
 import json
 import math
 import re
+import re as _re
 import logging
 import sys
 import time
 from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from django.core.management.base import CommandError
@@ -51,6 +53,94 @@ from profiler.management.commands.profile_tab import (
 )
 
 logger = logging.getLogger(__name__)
+
+_TRUNCATE_LENGTH = 200
+
+
+@dataclass
+class ColumnProfile:
+    letter: str
+    header_slug: str
+    header_raw: str
+    inferred_type: str
+    formula_pattern: str
+    non_empty_cells: int
+    unique_value_sample: list = field(default_factory=list)
+    is_section_header: bool = False
+    cross_sheet_refs: list = field(default_factory=list)
+    pattern_truncated: bool = False
+    pattern_hash: str = ""
+
+
+def _slugify_header(header: str) -> str:
+    return _re.sub(r"[^a-z0-9]+", "_", header.lower()).strip("_") if header else ""
+
+
+def compute_column_profiles(summary: dict, return_patterns_by_slug: bool = False):
+    raw_patterns = summary.get("column_formula_patterns") or {}
+    if isinstance(raw_patterns, dict) and raw_patterns:
+        first_key = next(iter(raw_patterns))
+        patterns_by_letter = raw_patterns if not isinstance(raw_patterns[first_key], dict) else {}
+    else:
+        patterns_by_letter = {}
+
+    candidates = summary.get("column_candidates") or summary.get("columns") or []
+    total_columns = max(
+        (c.get("total_columns") or c.get("total_count") or len(candidates)) for c in candidates
+    ) if candidates else 0
+
+    profiles = []
+    for cand in candidates:
+        letter = cand.get("letter") or cand.get("col_letter") or ""
+        header_raw = cand.get("header") or cand.get("header_label") or cand.get("name") or ""
+        header_slug = _slugify_header(header_raw) if header_raw else f"col_{letter.lower()}"
+        pattern = patterns_by_letter.get(letter, "raw")
+
+        pattern_truncated = len(pattern) > _TRUNCATE_LENGTH
+        pattern_hash = hashlib.sha256(pattern.encode()).hexdigest()[:8] if pattern else ""
+        if pattern_truncated:
+            pattern = pattern[:_TRUNCATE_LENGTH]
+
+        unique_count = cand.get("unique_count") or 0
+        total_count = cand.get("total_count") or cand.get("non_empty_cells") or 0
+        merged_span = cand.get("merged_span") or 0
+
+        is_section_header = (
+            bool(header_raw)
+            and header_raw == header_raw.upper()
+            and unique_count <= 2
+            and total_count > 0
+            and (total_columns > 0 and merged_span > total_columns * 0.5)
+        )
+
+        inferred_type = cand.get("format_type") or cand.get("type") or "text"
+        if pattern in ("expansion_formula", "row_formula"):
+            inferred_type = "formula"
+
+        cross_refs = cand.get("cross_sheet_refs") or []
+        unique_values = cand.get("unique_values_sample") or cand.get("sample_values") or []
+
+        profiles.append(ColumnProfile(
+            letter=letter,
+            header_slug=header_slug,
+            header_raw=header_raw,
+            inferred_type=inferred_type,
+            formula_pattern=pattern,
+            non_empty_cells=total_count,
+            unique_value_sample=unique_values[:5],
+            is_section_header=is_section_header,
+            cross_sheet_refs=cross_refs,
+            pattern_truncated=pattern_truncated,
+            pattern_hash=pattern_hash,
+        ))
+
+    if return_patterns_by_slug:
+        return {
+            p.header_slug: {"letter": p.letter, "pattern": p.formula_pattern}
+            for p in profiles
+        }
+    return profiles
+
 
 DEFAULT_YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
 DEFAULT_WORKBOOK_ID_PATTERN = re.compile(r"\b(\d{3})\b")

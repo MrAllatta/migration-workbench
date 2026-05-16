@@ -9,8 +9,10 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from profiler.tools.cohort_corpus import (
+    ColumnProfile,
     apply_tab_selection_overrides,
     build_cohort_corpus_index,
+    compute_column_profiles,
     run_cohort_corpus,
     score_tab,
     select_tabs_from_inventory,
@@ -1149,3 +1151,60 @@ def test_score_tab_exclude_pattern_multiple_rules():
     )
     assert score == -8
     assert breakdown["exclude_penalties"] == -8
+
+
+class TestColumnProfile:
+    def test_dataclass_fields(self):
+        cp = ColumnProfile(
+            letter="A", header_slug="product_sku", header_raw="Product SKU",
+            inferred_type="text", formula_pattern="raw", non_empty_cells=10,
+        )
+        assert cp.letter == "A"
+        assert cp.header_slug == "product_sku"
+        assert cp.is_section_header is False
+        assert cp.pattern_truncated is False
+
+    def test_compute_column_profiles_basic(self):
+        summary = {
+            "column_formula_patterns": {"A": "raw", "B": "row_formula"},
+            "column_candidates": [
+                {"letter": "A", "header": "Product SKU", "format_type": "text", "unique_count": 50, "total_count": 50},
+                {"letter": "B", "header": "Format", "format_type": "text", "unique_count": 3, "total_count": 50},
+            ],
+        }
+        profiles = compute_column_profiles(summary)
+        assert len(profiles) == 2
+        assert profiles[0].letter == "A"
+        assert profiles[0].header_slug == "product_sku"
+        assert profiles[0].formula_pattern == "raw"
+
+    def test_compute_column_patterns_by_slug(self):
+        summary = {
+            "column_formula_patterns": {"A": "raw", "B": "expansion_formula"},
+            "column_candidates": [
+                {"letter": "A", "header": "Product SKU", "format_type": "text"},
+                {"letter": "B", "header": "Format Code", "format_type": "formula"},
+            ],
+        }
+        patterns = compute_column_profiles(summary, return_patterns_by_slug=True)
+        assert "product_sku" in patterns
+        assert patterns["product_sku"]["pattern"] == "raw"
+        assert patterns["format_code"]["letter"] == "B"
+
+    def test_section_header_detection(self):
+        summary = {
+            "column_formula_patterns": {"A": "raw"},
+            "column_candidates": [
+                {
+                    "letter": "A",
+                    "header": "HARVEST INFO",
+                    "format_type": "text",
+                    "unique_count": 1,
+                    "total_count": 50,
+                    "merged_span": 45,
+                    "total_columns": 50,
+                },
+            ],
+        }
+        profiles = compute_column_profiles(summary)
+        assert profiles[0].is_section_header is True
