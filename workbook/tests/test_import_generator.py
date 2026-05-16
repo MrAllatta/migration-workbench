@@ -183,6 +183,37 @@ def test_render_has_tier_calls():
     assert crop_idx < planting_idx
 
 
+def test_render_all_tables_get_tier_call():
+    """Every table with import_config gets its own tier() call, even same tier."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "bundle_worksheet_title": "Crop Info",
+                "suggested_model_name": "crop",
+                "bundle_output_path": "crop_info.csv",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
+                ],
+                "import_config": {"tier": 1, "bundle_path": "crop_info.csv", "column_map": {"name": "Crop"}, "unique_on": ["name"]},
+            },
+            {
+                "bundle_worksheet_title": "Crop Planner",
+                "suggested_model_name": "planting",
+                "bundle_output_path": "crop_planner.csv",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
+                ],
+                "import_config": {"tier": 1, "bundle_path": "crop_planner.csv", "column_map": {"name": "Name"}, "unique_on": ["name"]},
+            },
+        ],
+    }
+    source = render_import_py(contract, app_label="core")
+    # Both tables are tier 1 — without fix, only 1 tier() call because seen_tiers dedup
+    assert source.count("self.tier(") == 2
+
+
 def test_render_has_import_methods():
     source = render_import_py(_contract_with_imports(), app_label="core")
     assert "def _import_crop(self):" in source

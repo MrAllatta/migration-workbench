@@ -631,12 +631,8 @@ def render_import_py(
 
     # _run_import_pipeline with tier calls.
     parts.append("    def _run_import_pipeline(self):")
-    seen_tiers: set[int] = set()
     for tier, name, _ in candidates:
-        if tier not in seen_tiers:
-            parts.append(f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})')
-            seen_tiers.add(tier)
-        # If same tier as previous, add without tier heading.
+        parts.append(f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})')
     parts.append("")
 
     # Per-model import methods.
