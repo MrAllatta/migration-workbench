@@ -1,6 +1,5 @@
 """Tests for the generate_models management command."""
 
-from pathlib import Path
 from django.core.management import call_command
 
 
