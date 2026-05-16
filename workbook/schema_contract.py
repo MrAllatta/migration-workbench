@@ -32,6 +32,27 @@ from workbook.field_mapping import (
 )
 
 
+def _filter_section_headers(columns: list[dict]) -> list[dict]:
+    """Remove section-header columns from a column list.
+
+    A section header is identified by:
+    - ``is_section_header`` flag set to True (from ColumnProfile), or
+    - Header is ALL CAPS and the column has very few unique values.
+    """
+    filtered = []
+    for col in columns:
+        if col.get("is_section_header"):
+            continue
+        source = col.get("source_column") or col.get("suggested_field_name") or ""
+        if source == source.upper() and len(source) > 2 and source.strip():
+            unique_count = col.get("unique_count") or 0
+            total_count = col.get("total_count") or col.get("non_empty_cells") or 0
+            if total_count > 0 and unique_count <= 2:
+                continue
+        filtered.append(col)
+    return filtered
+
+
 def load_json(path: Path) -> Any:
     """Read and parse a UTF-8 JSON file.
 
@@ -209,6 +230,8 @@ def build_contract(
                     "notes": hint.get("notes") or [],
                 }
             )
+
+        django_columns = _filter_section_headers(django_columns)
 
         entry: dict[str, Any] = {
             "bundle_worksheet_title": title,

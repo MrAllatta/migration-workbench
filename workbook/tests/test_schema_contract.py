@@ -1,4 +1,4 @@
-from workbook.schema_contract import build_contract
+from workbook.schema_contract import build_contract, _filter_section_headers
 from workbook.field_mapping import map_profiler_column_to_django_field
 
 
@@ -123,3 +123,24 @@ def test_contract_scaffold_auto_generates_import_config():
     assert table["import_config"]["bundle_path"] == "reference/crop_info.csv"
     assert "Crop" in table["import_config"]["required_headers"]
     assert table["import_config"]["unique_on"] is not None
+
+
+def test_filter_section_headers_removes_all_caps_low_unique():
+    columns = [
+        {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
+        {"suggested_field_name": "harvest_info", "source_column": "HARVEST INFO", "django_field_class": "models.TextField", "is_section_header": True},
+        {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField"},
+    ]
+    result = _filter_section_headers(columns)
+    assert len(result) == 2
+    names = [c["suggested_field_name"] for c in result]
+    assert "harvest_info" not in names
+
+
+def test_filter_section_headers_keeps_normal_columns():
+    columns = [
+        {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
+        {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField"},
+    ]
+    result = _filter_section_headers(columns)
+    assert len(result) == 2
