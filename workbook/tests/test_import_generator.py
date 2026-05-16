@@ -285,6 +285,16 @@ def test_column_map_auto_derived_when_absent():
     assert '"column_map"' in source
 
 
+def test_required_headers_auto_derived_from_unique_on():
+    """When required_headers absent, derive from unique_on via column_map."""
+    contract = _contract_no_column_map()
+    source = render_import_py(contract, app_label="core")
+    # unique_on: ['name'] -> column_map: {'name': 'Crop'} -> required_headers: ['Crop']
+    # Should not be empty:  "required_headers": [],
+    assert '"required_headers": []' not in source
+    assert '"required_headers": [\'Crop\']' in source
+
+
 def test_tab_config_has_default_values():
     source = render_import_py(_contract_with_imports(), app_label="core")
     assert '"default_values"' in source

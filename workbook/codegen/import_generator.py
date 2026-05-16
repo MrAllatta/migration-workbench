@@ -563,6 +563,12 @@ def render_import_py(
             skipped.append(f"# Skipped {name}: no import_config (worksheet: {ws})")
             continue
         cfg.setdefault("column_map", _derive_column_map(table))
+        if not cfg.get("required_headers"):
+            cmap = cfg.get("column_map") or {}
+            unique_on = cfg.get("unique_on") or []
+            derived = [cmap.get(f, f) for f in unique_on]
+            if derived:
+                cfg["required_headers"] = derived
         tier = tier_map.get(name, 99)
         candidates.append((tier, name, table))
 
