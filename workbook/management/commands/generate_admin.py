@@ -91,6 +91,12 @@ class Command(BaseCommand):
                 f"({len(contract.get('tables') or [])} table(s))"
             )
         )
+        if not options.get("manifest"):
+            self.stderr.write(self.style.WARNING(
+                "No --manifest provided. Admin will lack list_display, list_filter, "
+                "and readonly_fields. Re-run with --manifest after 'make pull-bundle' "
+                "and 'make generate-view-manifest' for a richer admin."
+            ))
         if manifest:
             views = len(manifest.get("views") or [])
             self.stdout.write(

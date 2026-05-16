@@ -391,7 +391,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
+.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate generate-all profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
 
 venv:
 	python3 -m venv $(VENV)
@@ -469,6 +469,13 @@ generate-import:
 	$(MANAGE) generate_import --contract "$(CONTRACT)" --app-label core --force
 
 generate: generate-models generate-admin generate-import
+
+generate-view-manifest:
+	@test -f "$(BUNDLE_OUT)/structure.json" || (echo >&2 "structure.json not found at $(BUNDLE_OUT)/structure.json. Run make pull-bundle first."; exit 1)
+	$(MANAGE) scaffold_view_manifest --structure "$(BUNDLE_OUT)/structure.json" --schema-contract "$(CONTRACT)" --out "$(VIEW_MANIFEST)" --summary-json build/view-manifest-summary.json
+
+generate-all: generate-models generate-view-manifest generate-admin generate-import
+	@echo "All code generation complete. Run 'make check-generated' to verify."
 
 diff-generated:
 	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --diff
