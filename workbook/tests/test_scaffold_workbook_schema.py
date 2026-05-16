@@ -1,6 +1,5 @@
 """Tests for the scaffold_workbook_schema management command."""
 
-from io import StringIO
 from pathlib import Path
 from django.core.management import call_command
 
