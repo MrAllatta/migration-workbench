@@ -18,6 +18,7 @@ tables:
     import_config:
       import_key: name
       unique_on: [name]
+      bundle_path: "widgets.csv"
 """
 
 
@@ -81,3 +82,23 @@ def test_generate_import_falls_back_to_core(tmp_path):
 
     source = out_path.read_text()
     assert "from core.models import Widget" in source
+
+
+def test_generate_import_auto_derives_output_path(tmp_path, monkeypatch):
+    """When --out is omitted, generate_import should derive path from --app-label."""
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(CONTRACT_WITH_APP_LABEL)
+    monkeypatch.chdir(tmp_path)
+    app_dir = tmp_path / "backend" / "apps" / "myapp"
+    mgmt_dir = app_dir / "management" / "commands"
+    mgmt_dir.mkdir(parents=True, exist_ok=True)
+
+    call_command(
+        "generate_import",
+        contract=str(contract_path),
+        app_label="myapp",
+        force=True,
+    )
+
+    expected = mgmt_dir / "import_myapp.py"
+    assert expected.exists(), f"Expected {expected} to exist"

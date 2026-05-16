@@ -461,7 +461,7 @@ generate-admin:
 	fi
 
 generate-import:
-	$(MANAGE) generate_import --contract "$(CONTRACT)" --out "$(CORE)/imports.py" --app-label core --force
+	$(MANAGE) generate_import --contract "$(CONTRACT)" --app-label core --force
 
 generate: generate-models generate-admin generate-import
 

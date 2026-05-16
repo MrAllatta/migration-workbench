@@ -54,8 +54,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--out",
-            required=True,
-            help="Output path for the import command (e.g. backend/apps/core/management/commands/import_data.py)",
+            default=None,
+            help="Output path for the import command. When omitted, auto-derived from --app-label into <app>/management/commands/import_<label>.py",
         )
         parser.add_argument(
             "--app-label",
@@ -78,16 +78,12 @@ class Command(BaseCommand):
         if not contract_path.is_file():
             raise CommandError(f"contract not found: {contract_path}")
 
-        out_path = Path(options["out"]).resolve()
-        app_label = options["app_label"]
-        force = options["force"]
-        show_diff = options["diff"]
-
         try:
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
 
+        app_label = options["app_label"]
         if app_label is None:
             for table in contract.get("tables", []):
                 meta = table.get("model_meta") or {}
@@ -96,6 +92,19 @@ class Command(BaseCommand):
                     break
         if app_label is None:
             app_label = "core"
+
+        out_path = options.get("out")
+        if out_path is None:
+            from pathlib import Path as _Path
+            app_dir = _Path.cwd() / "backend" / "apps" / app_label
+            mgmt_dir = app_dir / "management" / "commands"
+            mgmt_dir.mkdir(parents=True, exist_ok=True)
+            (app_dir / "management" / "__init__.py").touch()
+            (mgmt_dir / "__init__.py").touch()
+            out_path = str(mgmt_dir / f"import_{app_label}.py")
+        out_path = Path(out_path).resolve()
+        force = options["force"]
+        show_diff = options["diff"]
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
