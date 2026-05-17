@@ -144,7 +144,9 @@ def shape_sheet_structure(response: dict, worksheet_title: str) -> dict | None:
 
 
 class GoogleSheetsAdapter(ProviderAdapter):
+    """Google Sheets provider adapter for the profiler/importer pipeline."""
     def __init__(self, config: dict, throttle: SheetsThrottle | None = None):
+        """Initialize the adapter from a source config dict. Optionally accepts a ``SheetsThrottle`` instance for API rate limiting."""
         self.throttle = throttle or default_throttle
         self.folder_id = extract_drive_folder_id(
             config.get("drive_folder_id") or config.get("drive_folder_url")
@@ -155,6 +157,7 @@ class GoogleSheetsAdapter(ProviderAdapter):
         self.sheets_service = build_google_service("sheets", "v4", [SHEETS_READONLY_SCOPE])
 
     def fetch_tab_rows(self, tab_config: dict) -> dict:
+        """Fetch rows from a Google Sheets tab identified by *tab_config*. Resolves the spreadsheet by ID, URL, or folder search, then fetches and normalizes rows."""
         worksheet_title = tab_config.get("worksheet_title")
         resolved = resolve_spreadsheet(
             tab_config,
