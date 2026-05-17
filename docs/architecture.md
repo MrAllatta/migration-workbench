@@ -36,3 +36,8 @@ The **`profiler`** app exposes management commands used before bundle design: Go
 ## Workbook commands
 
 - **`scaffold_workbook_schema`**: reads a pull-bundle style JSON config (`tabs[]`, `required_headers`) plus optional `profile_coda_doc` / `profile_coda_table` outputs, and writes a **schema contract** YAML for human review. Example inputs: [`example_data/scaffold_workbook_bundle.example.json`](../example_data/scaffold_workbook_bundle.example.json), [`example_data/scaffold_workbook_table_profile.example.json`](../example_data/scaffold_workbook_table_profile.example.json).
+
+## Further reading
+
+- [End-to-end tutorial](end-to-end-tutorial.md) — step-by-step walkthrough
+- [Pull bundle guide](pull-bundle.md) — source config and bundle validation

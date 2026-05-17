@@ -187,6 +187,11 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 | [docs/google-auth.md](docs/google-auth.md)                                                        | Sheets/Drive profiling auth                                   |
 | [docs/google-corpus.md](docs/google-corpus.md)                                                    | Drive folder / multi-workbook Sheets corpus profiling         |
 | [docs/coda.md](docs/coda.md)                                                                      | Coda profiling                                                |
+| [docs/contributing.md](docs/contributing.md)                                                      | Development setup, test suite, PR expectations                |
+| [docs/end-to-end-tutorial.md](docs/end-to-end-tutorial.md)                                        | Step-by-step walkthrough from profile to import               |
+| [docs/pull-bundle.md](docs/pull-bundle.md)                                                        | Source config, live/offline modes, bundle validation           |
+| [docs/schema-contract.md](docs/schema-contract.md)                                                | YAML contract format reference (v1.0–v1.3)                   |
+| [docs/troubleshooting.md](docs/troubleshooting.md)                                                | Consolidated FAQ for common errors                            |
 | Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
 
 
