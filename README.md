@@ -191,6 +191,8 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 | [docs/end-to-end-tutorial.md](docs/end-to-end-tutorial.md)                                        | Step-by-step walkthrough from profile to import               |
 | [docs/pull-bundle.md](docs/pull-bundle.md)                                                        | Source config, live/offline modes, bundle validation           |
 | [docs/schema-contract.md](docs/schema-contract.md)                                                | YAML contract format reference (v1.0–v1.3)                   |
+| [docs/view-manifest.md](docs/view-manifest.md)                                                    | View manifest YAML format, admin generation effects           |
+| [docs/pipeline-manifest.md](docs/pipeline-manifest.md)                                            | Machine-generated execution plan format                       |
 | [docs/troubleshooting.md](docs/troubleshooting.md)                                                | Consolidated FAQ for common errors                            |
 | Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
 

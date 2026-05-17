@@ -270,6 +270,39 @@ And for multi-source `column_map` or field transforms:
 
 ---
 
+## Step 5b: Generate the View Manifest
+
+A view manifest adds UI and workflow concerns on top of the schema contract:
+which fields are editable, which column tracks status, which columns drive
+temporal scoping, and which columns should appear in admin list filters.
+
+```bash
+python manage.py scaffold_view_manifest \
+  --structure profiler-output/structure.json \
+  --contract build/schema-contract.yaml \
+  --out build/view-manifest.yaml
+```
+
+> **Tip:** If you ran `pull_bundle --include-structure`, the `structure.json`
+> file is already in `profiler-output/`. The view manifest is re-generatable
+> at any time by re-running this command.
+
+The generated `build/view-manifest.yaml` contains one entry per spreadsheet
+tab. Open it and review:
+- **`status_field`** / **`status_values`** — does the correct status column
+  have its distinct values listed?
+- **`time_scope`** — are the year/week/date columns correctly identified?
+- **`editable_fields`** — do these match the columns users should edit?
+- **`computed_fields`** — do these match formula columns?
+
+Edit the manifest if needed — it is hand-editable. The admin generator reads
+these values to produce `list_display`, `list_filter`, `date_hierarchy`,
+`get_queryset` year-scoping, and bulk status actions.
+
+See the [View Manifest Reference](view-manifest.md) for the full format.
+
+---
+
 ## Step 6: Generate models, admin, and import command
 
 ### 6a — Generate models
@@ -376,6 +409,25 @@ summary artifact.
 - `failure_signatures` — structured errors by code
   (`unique_violation`, `type_mismatch`, `row_exception`).
 - `escalation_summary` — rollup for CI gates.
+
+---
+
+## Step 7b: Generate the Pipeline Manifest
+
+A pipeline manifest is an execution plan that maps each contract table to its
+source spreadsheets per year. It is used by downstream tooling to orchestrate
+pull and import commands across years.
+
+```bash
+python manage.py generate_pipeline_manifest \
+  --contract build/schema-contract.yaml \
+  --corpus-config config/cohort_corpus.json \
+  --out build/pipeline-manifest.yaml
+```
+
+The generated file is machine-only and should not be hand-edited.
+
+See the [Pipeline Manifest Reference](pipeline-manifest.md) for the full format.
 
 ---
 
