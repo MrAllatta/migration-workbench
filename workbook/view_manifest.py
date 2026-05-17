@@ -25,6 +25,9 @@ VIEW_MANIFEST_VERSION = "view-manifest-draft-1"
 # Headers that look like state machines: 'Status', 'state', 'Stage', etc.
 # Whole-word match (case-insensitive) keeps obviously-unrelated headers out.
 _STATUS_HEADER_RE = re.compile(r"^(status|state|stage)$", re.IGNORECASE)
+_WEEK_FIELD_RE = re.compile(r".*_week$", re.IGNORECASE)
+_DATE_FIELD_RE = re.compile(r".*_date$", re.IGNORECASE)
+_YEAR_FIELD_RE = re.compile(r".*_year$", re.IGNORECASE)
 
 
 def _index_schema_contract_tables(
@@ -57,6 +60,7 @@ def _index_schema_contract_tables(
         out[title] = {
             "model": str(table.get("suggested_model_name") or ""),
             "field_by_source": field_by_source,
+            "columns": table.get("columns") or [],
         }
     return out
 
@@ -94,6 +98,38 @@ def _resolve_field_name(
         if mapped:
             return mapped
     return suggested_field_name(source_column)
+
+
+def _field_class_short(raw: str) -> str:
+    """Strip the ``models.`` prefix from a Django field class string."""
+    return raw.removeprefix("models.")
+
+
+def _infer_time_scope(entity: str | None, contract_index: dict) -> dict | None:
+    """Scan the matching contract table for temporal fields.
+
+    Returns a dict with keys ``year_field``, ``week_field``, and/or
+    ``date_field`` plus ``default_scope``, or ``None`` if no temporal
+    columns are found for *entity*.
+    """
+    if not entity:
+        return None
+    for info in contract_index.values():
+        if info.get("model") == entity:
+            ts: dict[str, Any] = {}
+            for col in info.get("columns") or []:
+                name = col.get("suggested_field_name") or ""
+                klass = _field_class_short(str(col.get("django_field_class") or ""))
+                if name == "source_bundle_year":
+                    ts["year_field"] = name
+                elif _WEEK_FIELD_RE.match(name) and klass in ("IntegerField",):
+                    ts["week_field"] = name
+                elif _DATE_FIELD_RE.match(name) and klass in ("DateField", "DateTimeField"):
+                    ts["date_field"] = name
+            if ts:
+                ts["default_scope"] = "current_season"
+                return ts
+    return None
 
 
 def _build_view_entry(
@@ -155,6 +191,7 @@ def build_view_manifest(
     structure: dict[str, Any],
     *,
     schema_contract: dict[str, Any] | None = None,
+    column_profiles: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a ``view-manifest-draft-1`` dict from a profiler structure artifact.
 
@@ -170,12 +207,14 @@ def build_view_manifest(
             ``"1.0"``).  When provided, ``entity`` binds per worksheet title
             and ``editable_fields`` reuse the contract's
             ``suggested_field_name`` slugs.
+        column_profiles: Optional dict keyed by tab title then field name,
+            each containing ``distinct_values`` for the status state machine.
 
     Returns:
         dict: View-manifest dict conforming to ``view-manifest-draft-1``::
 
             {
-                "version": "view-manifest-draft-1",
+                "version": "...",
                 "source": {"source_id": ..., "provider": ...},
                 "views": [
                     {
@@ -187,6 +226,8 @@ def build_view_manifest(
                         "computed_fields": [...],
                         "filterable_by": [...],
                         "status_field": "..." | None,
+                        "status_values": [...] | None,
+                        "time_scope": {...} | None,
                         "notes": None,
                     },
                     ...
@@ -202,6 +243,24 @@ def build_view_manifest(
     contract_index = _index_schema_contract_tables(schema_contract)
 
     views = [_build_view_entry(tab, contract_index) for tab in tabs]
+
+    for view in views:
+        entity = view.get("entity")
+        ts = _infer_time_scope(entity, contract_index)
+        if ts is not None:
+            view["time_scope"] = ts
+
+    if column_profiles:
+        for view in views:
+            status_field = view.get("status_field")
+            source_tab = view.get("source_tab")
+            if status_field and source_tab:
+                tab_profiles = column_profiles.get(source_tab) or {}
+                col_profile = tab_profiles.get(status_field) or {}
+                distinct = col_profile.get("distinct_values")
+                if distinct:
+                    view["status_values"] = list(distinct)
+
     workflow_hints = _build_workflow_hints(tabs)
 
     return {

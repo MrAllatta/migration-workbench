@@ -193,6 +193,141 @@ def test_build_view_manifest_excludes_hidden_tabs_from_sequence():
     assert manifest["workflow_hints"]["weekly_actions"] == []
 
 
+def test_build_view_manifest_infers_time_scope_from_year_and_week():
+    structure = {
+        "schema_version": "structure-draft-1",
+        "source_id": "demo",
+        "provider": "google_sheets",
+        "tabs": [
+            {
+                "worksheet_title": "Crop Plans",
+                "tab_position": 0,
+                "hidden": False,
+                "columns": [
+                    {"header_label": "Block", "is_formula": False, "data_validation_type": None},
+                    {"header_label": "Plan Field Week", "is_formula": False, "data_validation_type": None},
+                    {"header_label": "Source Bundle Year", "is_formula": False, "data_validation_type": None},
+                ],
+            }
+        ],
+    }
+    schema_contract = {
+        "version": "1.0",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "bundle_worksheet_title": "Crop Plans",
+                "suggested_model_name": "crop_plan",
+                "bundle_output_path": "data/crop_plans.csv",
+                "columns": [
+                    {"source_column": "Block", "suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock"}},
+                    {"source_column": "Plan Field Week", "suggested_field_name": "plan_field_week", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                    {"source_column": "Source Bundle Year", "suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                ],
+            }
+        ],
+    }
+    manifest = build_view_manifest(structure, schema_contract=schema_contract)
+    view = manifest["views"][0]
+    assert "time_scope" in view
+    ts = view["time_scope"]
+    assert ts["year_field"] == "source_bundle_year"
+    assert ts["week_field"] == "plan_field_week"
+    assert ts["default_scope"] == "current_season"
+
+
+def test_build_view_manifest_time_scope_with_date_field():
+    structure = {
+        "schema_version": "structure-draft-1",
+        "source_id": "demo",
+        "provider": "google_sheets",
+        "tabs": [
+            {
+                "worksheet_title": "Market Data",
+                "tab_position": 0,
+                "hidden": False,
+                "columns": [
+                    {"header_label": "Outlet", "is_formula": False, "data_validation_type": None},
+                    {"header_label": "Distribution Date", "is_formula": False, "data_validation_type": None},
+                ],
+            }
+        ],
+    }
+    schema_contract = {
+        "version": "1.0",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "bundle_worksheet_title": "Market Data",
+                "suggested_model_name": "market_entry",
+                "bundle_output_path": "data/market.csv",
+                "columns": [
+                    {"source_column": "Outlet", "suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"source_column": "Distribution Date", "suggested_field_name": "distribution_date", "django_field_class": "models.DateField", "django_field_kwargs": {"null": True}},
+                ],
+            }
+        ],
+    }
+    manifest = build_view_manifest(structure, schema_contract=schema_contract)
+    view = manifest["views"][0]
+    ts = view.get("time_scope")
+    assert ts is not None
+    assert ts["date_field"] == "distribution_date"
+
+
+def test_build_view_manifest_no_time_scope_when_no_temporal():
+    structure = _orders_structure()
+    manifest = build_view_manifest(structure)
+    view = manifest["views"][0]
+    assert view.get("time_scope") is None
+
+
+def test_build_view_manifest_status_values_with_column_profiles():
+    """When column_profiles provides distinct values, status_values is populated."""
+    structure = _orders_structure()
+    schema_contract = {
+        "version": "1.0",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "bundle_worksheet_title": "Orders",
+                "suggested_model_name": "orders",
+                "bundle_output_path": "data/orders.csv",
+                "columns": [
+                    {"source_column": "Order ID", "suggested_field_name": "order_id", "django_field_class": "models.IntegerField", "django_field_kwargs": {}},
+                    {"source_column": "Customer", "suggested_field_name": "customer", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"source_column": "Status", "suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"source_column": "Total", "suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                ],
+            }
+        ],
+    }
+    column_profiles = {
+        "Orders": {
+            "status": {
+                "distinct_values": ["Planted", "Harvested", "Finished"],
+                "distinct_count": 3,
+            }
+        }
+    }
+    manifest = build_view_manifest(
+        structure,
+        schema_contract=schema_contract,
+        column_profiles=column_profiles,
+    )
+    view = manifest["views"][0]
+    assert view["status_field"] == "status"
+    assert view["status_values"] == ["Planted", "Harvested", "Finished"]
+
+
+def test_build_view_manifest_status_values_none_when_no_profiles():
+    """Without column_profiles, status_values is not populated."""
+    structure = _orders_structure()
+    manifest = build_view_manifest(structure)
+    view = manifest["views"][0]
+    assert view.get("status_values") is None
+
+
 def test_scaffold_view_manifest_command_writes_yaml(tmp_path):
     structure_path = tmp_path / "structure.json"
     structure_path.write_text(
