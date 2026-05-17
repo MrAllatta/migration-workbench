@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Enumerate a Drive folder tree and list spreadsheet tabs."""
+
 import json
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,7 @@ FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 
 def list_children(drive_service, folder_id: str) -> list[dict]:
+    """List direct children of a Drive folder, returning file resource dicts."""
     items: list[dict] = []
     page_token: str | None = None
     query = f"'{folder_id}' in parents and trashed=false"
@@ -43,6 +46,7 @@ def list_children(drive_service, folder_id: str) -> list[dict]:
 
 
 def list_tabs(sheets_service, spreadsheet_id: str) -> list[dict]:
+    """List sheet metadata dicts for the given spreadsheet."""
     response = (
         sheets_service.spreadsheets()
         .get(
@@ -72,6 +76,7 @@ def walk_folder(
     max_depth: int | None,
     _depth: int = 0,
 ) -> dict[str, Any]:
+    """Recursively walk a Drive folder tree, building a nested dict of folders and spreadsheet metadata. Returns a tree dict suitable for ``render_tree``."""
     children = list_children(drive_service, folder_id)
     sub_folders: list[dict] = []
     spreadsheets: list[dict] = []
@@ -137,6 +142,7 @@ def walk_folder(
 
 
 def render_tree(node: dict, *, name: str, heading_level: int = 1) -> list[str]:
+    """Render a folder tree dict as a Markdown list with heading levels."""
     safe_heading_level = max(1, min(heading_level, 6))
     heading_prefix = "#" * safe_heading_level
     lines: list[str] = [f"{heading_prefix} Folder: {name}"]
@@ -173,9 +179,11 @@ def render_tree(node: dict, *, name: str, heading_level: int = 1) -> list[str]:
 
 
 class Command(BaseCommand):
+    """Enumerate a Drive folder tree and list spreadsheet tabs."""
     help = "Enumerate a Drive folder tree and list spreadsheet tabs"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_drive_folder."""
         parser.add_argument("--folder", help="Drive folder id or URL")
         parser.add_argument(
             "--config",
@@ -188,6 +196,7 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true", help="Run without network calls")
 
     def handle(self, *args, **options):
+        """Execute the drive folder profiling pipeline. Walks the specified folder tree, collecting spreadsheet and tab metadata, and renders a Markdown tree artifact."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_drive_folder smoke ok"))
             return

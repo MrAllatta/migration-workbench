@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Profile one workbook tab or list workbook tabs (Google Sheets)."""
+
 import json
 import random
 import re
@@ -20,6 +22,7 @@ from profiler.tools.formula_classifier import classify_column_formula_pattern
 
 
 def _col_letter(idx0: int) -> str:
+    """Convert a 0-based column index to a column letter (A, B, ..., Z, AA, ...)."""
     n = idx0 + 1
     s = ""
     while n > 0:
@@ -57,6 +60,7 @@ def _execute_sheets_http_request(request, *, max_attempts: int = 10) -> dict:
 
 
 def list_tabs(sheets_service, spreadsheet_id: str) -> list[dict]:
+    """List sheet metadata dicts for the given spreadsheet."""
     request = sheets_service.spreadsheets().get(
         spreadsheetId=spreadsheet_id,
         fields="properties(title),sheets(properties(sheetId,title,index,gridProperties))",
@@ -75,6 +79,7 @@ def list_tabs(sheets_service, spreadsheet_id: str) -> list[dict]:
 
 
 def fetch_tab_grid(sheets_service, spreadsheet_id: str, tab_title: str) -> dict:
+    """Fetch the full grid data for a specific tab. Returns the Sheets API response dict for the requested range."""
     fields = (
         "properties(title),"
         "sheets(properties(sheetId,title,gridProperties),"
@@ -93,6 +98,7 @@ def fetch_tab_grid(sheets_service, spreadsheet_id: str, tab_title: str) -> dict:
 
 
 def _user_entered_repr(ue: dict | None) -> tuple[str, str]:
+    """Extract a (kind, text) tuple from a user-entered value dict."""
     if not ue:
         return ("empty", "")
     if "formulaValue" in ue:
@@ -107,6 +113,7 @@ def _user_entered_repr(ue: dict | None) -> tuple[str, str]:
 
 
 def formula_skeleton(formula: str) -> str:
+    """Reduce a formula string to its function name and argument structure, stripping cell references."""
     text = formula
     text = re.sub(r"'([^']*)'!", lambda m: f"'{m.group(1)}'!", text)
     text = re.sub(r"\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?", "<RANGE>", text)
@@ -121,6 +128,7 @@ FUNCTION_RE = re.compile(r"\b([A-Z][A-Z0-9_\.]*)\s*\(")
 
 
 def extract_references(formula: str) -> dict:
+    """Extract cross-sheet and cross-workbook references from a formula string. Returns a dict with keys ``sheets`` and ``workbooks``."""
     sheet_refs = set()
     for m in SHEET_REF_RE.finditer(formula):
         sheet_refs.add(m.group(1) or m.group(2))
@@ -134,6 +142,7 @@ def extract_references(formula: str) -> dict:
 
 
 def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dict:
+    """Produce a structured summary dict from a tab grid payload, including column profiles and formula analysis. Optionally focus on a specific column identified by ``focus_col_letter``."""
     workbook_title = tab_payload.get("properties", {}).get("title")
     sheet = tab_payload["sheets"][0]
     props = sheet["properties"]
@@ -233,6 +242,7 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
 
 
 def render_markdown(summary: dict) -> str:
+    """Render a tab summary dict as a Markdown string suitable for writing to a profile artifact file."""
     lines = [f"# {summary['workbook_title']} / {summary['tab_title']}", ""]
     g = summary["grid"]
     lines.append(
@@ -247,9 +257,11 @@ def render_markdown(summary: dict) -> str:
 
 
 class Command(BaseCommand):
+    """Profile one workbook tab, or list workbook tabs."""
     help = "Profile one workbook tab, or list workbook tabs"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_tab."""
         parser.add_argument("--spreadsheet-id", help="Spreadsheet id or URL")
         parser.add_argument("--tab", help="Worksheet tab title. If omitted, list tabs and exit")
         parser.add_argument("--focus-col", default=None, help="Column letter to trace (e.g. B)")
@@ -257,6 +269,7 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true", help="Run without network calls")
 
     def handle(self, *args, **options):
+        """Execute the tab profiling pipeline. Connects to Sheets API, fetches grid data, analyzes formulas and structure, and writes a Markdown + JSON profile artifact."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_tab smoke ok"))
             return

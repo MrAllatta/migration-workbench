@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Enumerate tables and views in a Coda doc (and optionally column metadata)."""
+
 import json
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,7 @@ from connectors.coda_source import (
 def summarize_table_meta(
     table: dict[str, Any], columns: list[dict[str, Any]] | None
 ) -> dict[str, Any]:
+    """Produce a summary dict for a Coda table from its metadata and column list."""
     entry: dict[str, Any] = {
         "id": table.get("id"),
         "name": table.get("name"),
@@ -50,6 +53,7 @@ def summarize_table_meta(
 def render_doc_tree(
     doc_meta: dict[str, Any], tables_payload: list[dict[str, Any]]
 ) -> str:
+    """Render a Coda document's tables and pages as a Markdown tree string."""
     name = doc_meta.get("name") or doc_meta.get("id", "")
     lines = [f"[doc] {name}  (id={doc_meta.get('id')})"]
     for item in tables_payload:
@@ -73,9 +77,11 @@ def render_doc_tree(
 
 
 class Command(BaseCommand):
+    """Enumerate tables and views in a Coda doc (and optionally column metadata)."""
     help = "Enumerate tables and views in a Coda doc (and optionally column metadata)"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_coda_doc."""
         parser.add_argument(
             "--doc", "--doc-url", dest="doc", help="Coda doc URL or raw doc id"
         )
@@ -92,6 +98,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the Coda doc profiling pipeline. Connects to the Coda API, enumerates tables and pages, and writes a Markdown tree + JSON artifact."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_coda_doc smoke ok"))
             return

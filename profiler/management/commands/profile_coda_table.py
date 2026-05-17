@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Profile one Coda table or view, or list tables in a doc."""
+
 import json
 from collections import Counter
 from pathlib import Path
@@ -30,6 +32,7 @@ def _resolve_table_id(tables: list[dict[str, Any]], table_arg: str) -> tuple[str
 
 
 def _table_meta_for_id(tables: list[dict[str, Any]], table_id: str) -> dict[str, Any]:
+    """Look up a table metadata dict by table ID. Returns ``None`` if not found."""
     for t in tables:
         if t.get("id") == table_id:
             return t
@@ -37,6 +40,7 @@ def _table_meta_for_id(tables: list[dict[str, Any]], table_id: str) -> dict[str,
 
 
 def _parent_table_summary(meta: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract a summary dict from a parent table's metadata, or ``None`` if no parent."""
     pt = meta.get("parentTable")
     if isinstance(pt, dict):
         return {"id": pt.get("id"), "name": pt.get("name")}
@@ -54,6 +58,7 @@ def summarize_coda_table(
     focus_col: str | None,
     table_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """Produce a structured summary dict from a Coda table, including column profiles, row counts, and formula analysis."""
     table_meta = table_meta or {}
     coda_type = str(table_meta.get("type") or "table").lower()
     is_view = coda_type == "view"
@@ -130,6 +135,7 @@ def summarize_coda_table(
 
 
 def render_markdown(summary: dict[str, Any]) -> str:
+    """Render a Coda table summary dict as a Markdown string."""
     view_note = ""
     if summary.get("is_view"):
         view_note = "  |  **view** (not ETL-importable; use base table)"
@@ -155,9 +161,11 @@ def render_markdown(summary: dict[str, Any]) -> str:
 
 
 class Command(BaseCommand):
+    """Profile one Coda table or view, or list tables in a doc."""
     help = "Profile one Coda table or view, or list tables in a doc"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_coda_table."""
         parser.add_argument(
             "--doc", "--doc-url", dest="doc", help="Coda doc URL or raw doc id"
         )
@@ -183,6 +191,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the Coda table profiling pipeline. Fetches rows and columns from the specified table, analyzes formula structure and data types, and writes a Markdown + JSON profile artifact."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_coda_table smoke ok"))
             return

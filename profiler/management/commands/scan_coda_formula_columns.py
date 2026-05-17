@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Scan Coda docs for column-level formula text matching regex patterns."""
+
 import argparse
 import json
 import re
@@ -18,6 +20,7 @@ from profiler.management.commands.scan_formula_patterns import load_patterns
 
 
 def load_coda_workbooks(session, config: dict) -> list[tuple[str, str]]:
+    """Load Coda doc ID/name pairs from the scan config. Returns list of ``(name, doc_id)`` tuples."""
     workbooks = config.get("workbooks", [])
     if not workbooks:
         raise CommandError("Config must include a non-empty 'workbooks' list")
@@ -33,6 +36,7 @@ def load_coda_workbooks(session, config: dict) -> list[tuple[str, str]]:
 
 
 def scan_doc_for_formula_columns(session, doc_id: str, patterns: list[tuple[str, re.Pattern[str]]]):
+    """Scan a Coda document's columns for formula text matching the given regex patterns. Returns a list of match dicts."""
     matches = []
     tables = list_tables(session, doc_id)
     for table in tables:
@@ -61,14 +65,17 @@ def scan_doc_for_formula_columns(session, doc_id: str, patterns: list[tuple[str,
 
 
 class Command(BaseCommand):
+    """Scan Coda docs for column-level formula text matching regex patterns."""
     help = "Scan Coda docs for column-level formula text matching regex patterns"
 
     def add_arguments(self, parser: argparse.ArgumentParser):
+        """Add command-line arguments for scan_coda_formula_columns."""
         parser.add_argument("--config", required=True, help="JSON config with workbooks (doc_url) and patterns")
         parser.add_argument("--out", required=True, help="Output JSON path")
         parser.add_argument("--smoke", action="store_true", help="Run without network calls")
 
     def handle(self, *args, **options):
+        """Execute the Coda formula scan pipeline. Connects to the Coda API, scans column formula text for pattern matches, and writes results to ``--out``."""
         config_path = Path(options["config"]).resolve()
         out_path = Path(options["out"]).resolve()
         if not config_path.exists():

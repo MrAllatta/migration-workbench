@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Scan configured workbooks for formula regex patterns."""
+
 import argparse
 import json
 import re
@@ -13,6 +15,7 @@ from connectors.google_sheets import SHEETS_READONLY_SCOPE, build_google_service
 
 
 def execute_with_retry(request, max_retries: int = 8):
+    """Execute a Google API request with exponential backoff retry on transient failures."""
     delay = 5.0
     for attempt in range(max_retries):
         try:
@@ -30,6 +33,7 @@ def execute_with_retry(request, max_retries: int = 8):
 
 
 def load_patterns(config: dict) -> list[tuple[str, re.Pattern[str]]]:
+    """Load regex pattern tuples from a scan config dict. Returns list of ``(name, compiled_pattern)`` pairs."""
     pattern_items = config.get("patterns", [])
     if not pattern_items:
         raise CommandError("Config must include a non-empty 'patterns' list")
@@ -43,6 +47,7 @@ def load_patterns(config: dict) -> list[tuple[str, re.Pattern[str]]]:
 
 
 def load_workbooks(config: dict) -> list[tuple[str, str]]:
+    """Load workbook ID/title pairs from a scan config dict."""
     workbooks = config.get("workbooks", [])
     if not workbooks:
         raise CommandError("Config must include a non-empty 'workbooks' list")
@@ -50,6 +55,7 @@ def load_workbooks(config: dict) -> list[tuple[str, str]]:
 
 
 def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]):
+    """Scan a single workbook for cells matching the given regex patterns. Returns a list of match dicts."""
     sheets_resp = execute_with_retry(
         svc.spreadsheets().get(spreadsheetId=spreadsheet_id, fields="sheets(properties(title))")
     )
@@ -79,14 +85,17 @@ def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern
 
 
 class Command(BaseCommand):
+    """Scan configured workbooks for formula regex patterns."""
     help = "Scan configured workbooks for formula regex patterns"
 
     def add_arguments(self, parser: argparse.ArgumentParser):
+        """Add command-line arguments for scan_formula_patterns."""
         parser.add_argument("--config", required=True, help="JSON config with workbooks and patterns")
         parser.add_argument("--out", required=True, help="Output JSON path")
         parser.add_argument("--smoke", action="store_true", help="Run without network calls")
 
     def handle(self, *args, **options):
+        """Execute the formula scan pipeline. Reads workbook and pattern config, scans each workbook cell for pattern matches, and writes results to ``--out``."""
         config_path = Path(options["config"]).resolve()
         out_path = Path(options["out"]).resolve()
         if not config_path.exists():
