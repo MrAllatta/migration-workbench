@@ -248,7 +248,7 @@ def _render_fk_link_method(
         f"            url = reverse('admin:{app_label}_{target_snake}_change', args=[obj.{field_name}_id])",
         f"            return format_html('<a href=\"{{}}\">{{}}</a>', url, obj.{field_name})",
         "        return '-'",
-        f"    {field_name}_link.short_description = '{field_name.capitalize()}'",
+        f"    {field_name}_link.short_description = '{field_name.replace('_', ' ').title()}'",
     ]
     return "\n".join(lines)
 
@@ -483,14 +483,15 @@ def render_admin_py(
             if _is_fk_field(field):
                 target = field["kwargs"].get("to", "")
                 if target and isinstance(target, str) and target != "self":
-                    link_methods.append(
-                        _render_fk_link_method(field["name"], target, app_label)
-                    )
-                    display = [
-                        f"{fn}_link" if fn == field["name"] else fn
-                        for fn in display
-                    ]
-                    needs_fk_links = True
+                    if field["name"] in display:
+                        link_methods.append(
+                            _render_fk_link_method(field["name"], target, app_label)
+                        )
+                        display = [
+                            f"{fn}_link" if fn == field["name"] else fn
+                            for fn in display
+                        ]
+                        needs_fk_links = True
 
         admin_class_parts.append(
             _render_admin_class(
