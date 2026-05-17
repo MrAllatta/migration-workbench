@@ -77,6 +77,7 @@ def _slugify_header(header: str) -> str:
 
 
 def compute_column_profiles(summary: dict, return_patterns_by_slug: bool = False):
+    """Build ``ColumnProfile`` instances from a tab summary, classifying each column's formula pattern, type, and section-header status. Returns a list of profiles or a slug-to-pattern dict if ``return_patterns_by_slug`` is True."""
     raw_patterns = summary.get("column_formula_patterns") or {}
     if isinstance(raw_patterns, dict) and raw_patterns:
         first_key = next(iter(raw_patterns))
@@ -509,6 +510,7 @@ def select_tabs_from_inventory(
     min_final_score: float = 2.0,
     tab_score_heuristics: dict | None = None,
 ) -> list[dict]:
+    """Score, aggregate across years, and filter inventory tabs by final score. Applies coverage bonus for tabs appearing in 3+ years. Returns a sorted shortlist."""
     by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
     scored: list[dict] = []
     for row in inventory_rows:
@@ -622,6 +624,7 @@ def select_tabs_from_inventory(
 def auto_select_tabs(
     tab_shortlist: list[dict], *, per_workbook: int = 3, per_code_overrides: dict[str, int] | None = None
 ) -> dict[str, list[str]]:
+    """Group shortlisted tabs by workbook code, sort by score/occurrences, and pick the top N per workbook. Returns ``{workbook_code: [tab_titles]}``."""
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
@@ -727,6 +730,7 @@ def apply_tab_selection_overrides(
 
 
 def make_slug(text: str) -> str:
+    """Convert arbitrary text into a filesystem-safe slug (lowercase alphanumeric + underscores, max 50 chars). Falls back to ``"tab"`` if empty."""
     slug = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_").lower()
     return slug[:50] or "tab"
 
@@ -745,6 +749,7 @@ def derive_column_candidates(
     payload: dict,
     column_score_heuristics: dict | None = None,
 ) -> list[dict]:
+    """Extract column headers from a raw sheet payload and score each by domain keywords and formula density. Returns a list of candidate dicts with canonical field name proposals."""
     summary = payload.get("summary", {})
     raw = payload.get("raw", {})
     formula_count = int(summary.get("formula_cell_count") or 0)
@@ -808,11 +813,13 @@ def derive_column_candidates(
 
 
 def write_json(path: Path, payload: dict):
+    """Create parent directories if needed and write *payload* as pretty-printed JSON to *path*."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def parse_tab_inventory_output(text: str) -> list[dict]:
+    """Parse a text inventory format like ``[ 1] sheetId=123 rows=45 cols=6 TabName`` into structured dicts."""
     pattern = re.compile(
         r"^\[(\s*\d+)\]\s+sheetId=\s*([0-9]+)\s+rows=\s*([0-9]+)\s+cols=\s*([0-9]+)\s+(.+)$"
     )

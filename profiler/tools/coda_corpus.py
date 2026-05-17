@@ -268,6 +268,7 @@ def auto_select_tables(
     *,
     per_doc: int = 5,
 ) -> dict[str, list[str]]:
+    """Group shortlisted tables by doc, sort by score descending, and pick the top ``per_doc`` per doc. Returns ``{doc_name: [table_names]}``."""
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in shortlist:
         dn = str(row.get("doc_name") or "doc")
@@ -304,6 +305,7 @@ def derive_column_candidates(
     summary: dict[str, Any],
     column_score_heuristics: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    """Score each column in a Coda table summary for domain relevance. Produces a list of candidate dicts with canonical field name proposals."""
     heuristics = _normalize_column_heuristics(column_score_heuristics)
     domain_keyword_tokens = heuristics["domain_keyword_tokens"]
     candidates: list[dict[str, Any]] = []
@@ -346,6 +348,7 @@ def derive_column_candidates(
 
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Create parent directories if needed and write *payload* as pretty-printed JSON to *path*."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
@@ -353,6 +356,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def load_coda_docs_from_config(
     session: requests.Session, config: dict[str, Any]
 ) -> list[tuple[str, str]]:
+    """Resolve each doc entry in the corpus config to a ``(display_name, doc_id)`` pair. Raises ``CommandError`` if any entry lacks a resolvable doc ID."""
     docs = config.get("docs") or []
     if not docs:
         raise CommandError("Config must include a non-empty 'docs' list")
@@ -434,6 +438,7 @@ def collect_relationship_edges_from_summary(
     from_table_name: str,
     summary: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    """Scan a table summary's columns for cross-table relation references. Returns a list of edge dicts linking source columns to target tables."""
     edges: list[dict[str, Any]] = []
     for col in summary.get("columns") or []:
         cname = col.get("name")
@@ -458,6 +463,7 @@ def collect_relationship_edges_from_summary(
 def finalize_relationship_summary(
     edges: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    """Deduplicate raw relationship edges by ``(doc_id, from_table, to_table)`` and return a summary dict with total/unique counts."""
     uniq_links: dict[tuple[str, str, str], dict[str, Any]] = {}
     for e in edges:
         key = (e["doc_id"], e["from_table_id"], e["to_table_id"])

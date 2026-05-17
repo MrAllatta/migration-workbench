@@ -1,3 +1,5 @@
+"""Shared configuration-loading helpers for profiler management commands."""
+
 from __future__ import annotations
 
 import json

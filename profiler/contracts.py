@@ -1,9 +1,9 @@
-# source_config supports:
-# - worksheet_title_by_year: {"2023": "Products", "2024": "Products 302 + 602"}
-#   Maps year strings to year-specific worksheet titles. Falls back to
-#   worksheet_title if the year is not found.
-# - years: {"2023": {"spreadsheet_id": "...", "source_bundle_year": 2023}, ...}
-#   Top-level mapping that replicates tab entries per year.
+"""Live-source normalizer contract and structure schema version for bundle artifacts.
+
+Defines ``LIVE_SOURCE_NORMALIZER_CONTRACT`` — the column/handler contract used
+by the normalizer when processing live source data, and ``STRUCTURE_SCHEMA_VERSION``,
+the version tag applied to ``structure.json`` bundle artifacts.
+"""
 
 LIVE_SOURCE_NORMALIZER_CONTRACT = {
     "schema_version": "bundle-draft-1",
