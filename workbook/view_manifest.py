@@ -27,7 +27,6 @@ VIEW_MANIFEST_VERSION = "view-manifest-draft-1"
 _STATUS_HEADER_RE = re.compile(r"^(status|state|stage)$", re.IGNORECASE)
 _WEEK_FIELD_RE = re.compile(r".*_week$", re.IGNORECASE)
 _DATE_FIELD_RE = re.compile(r".*_date$", re.IGNORECASE)
-_YEAR_FIELD_RE = re.compile(r".*_year$", re.IGNORECASE)
 
 
 def _index_schema_contract_tables(
