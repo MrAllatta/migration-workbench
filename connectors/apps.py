@@ -1,3 +1,4 @@
+"""Django app configuration for the connectors package."""
 from django.apps import AppConfig
 
 

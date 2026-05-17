@@ -1,3 +1,4 @@
+"""Django app configuration for the workbook package."""
 from django.apps import AppConfig
 
 
