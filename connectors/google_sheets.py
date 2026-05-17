@@ -1,3 +1,9 @@
+"""Google Sheets API helpers for spreadsheet row fetching, ID extraction, and Drive folder traversal.
+
+Provides service-account credential helpers, spreadsheet/tab resolution, and
+``SheetsThrottle`` for API rate limiting.
+"""
+
 import logging
 import os
 import time
@@ -9,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _fill_merged_cell_headers(headers: list[str]) -> list[str]:
+    """Fill ``None`` entries in a header row by carrying forward the last non-None value. Handles merged cells in Sheets header rows."""
     result = list(headers)
     last = None
     for i, h in enumerate(result):
@@ -32,6 +39,7 @@ FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 
 def _extract_id_from_url(url, marker):
+    """Extract the segment after *marker* from a URL path component."""
     parsed = urlparse(url)
     parts = [part for part in parsed.path.split("/") if part]
     if marker in parts:
@@ -42,6 +50,7 @@ def _extract_id_from_url(url, marker):
 
 
 def extract_drive_folder_id(value):
+    """Extract a Drive folder ID from a URL or return the value unchanged if already an ID."""
     if not value:
         return None
     if value.startswith("http://") or value.startswith("https://"):
@@ -56,6 +65,7 @@ def extract_drive_folder_id(value):
 
 
 def extract_spreadsheet_id(value):
+    """Extract a spreadsheet ID from a URL or return the value unchanged if already an ID."""
     if not value:
         return None
     if value.startswith("http://") or value.startswith("https://"):
@@ -70,6 +80,7 @@ def extract_spreadsheet_id(value):
 
 
 def get_service_account_credentials(scopes=None):
+    """Build Google service-account credentials from ``GOOGLE_SA_JSON`` or ``GOOGLE_APPLICATION_CREDENTIALS`` env vars. Optionally restrict to *scopes* (defaults to Sheets and Drive scopes)."""
     import google.auth
     from google.auth import impersonated_credentials
     from google.oauth2 import service_account
@@ -104,6 +115,7 @@ def get_service_account_credentials(scopes=None):
 
 
 def build_google_service(service_name, version, scopes):
+    """Build an authenticated Google API service object for the given *service_name* and *version* using service-account credentials with *scopes*."""
     from googleapiclient.discovery import build
 
     credentials = get_service_account_credentials(scopes=scopes)
@@ -111,6 +123,7 @@ def build_google_service(service_name, version, scopes):
 
 
 def list_spreadsheets_in_folder(folder_id, drive_service):
+    """List spreadsheet file resources in a Drive folder. Returns a list of file dicts with ``id`` and ``name``."""
     files = []
     page_token = None
     query = f"'{folder_id}' in parents and mimeType='{SPREADSHEET_MIME_TYPE}' and trashed=false"
@@ -135,6 +148,7 @@ def list_spreadsheets_in_folder(folder_id, drive_service):
 
 
 def list_child_folder_ids(folder_id, drive_service):
+    """List child folder IDs immediately under *folder_id* in Drive."""
     ids = []
     page_token = None
     query = f"'{folder_id}' in parents and mimeType='{FOLDER_MIME_TYPE}' and trashed=false"
@@ -190,6 +204,7 @@ def find_spreadsheet_by_name_in_folder_tree(drive_service, root_folder_id, sprea
 
 
 def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descendants=False):
+    """Resolve a spreadsheet ID from a tab config dict. Tries ``tab.spreadsheet_id`` first, then ``tab.spreadsheet_url``, then folder+name search (optionally recursive)."""
     spreadsheet_id = extract_spreadsheet_id(tab.get("spreadsheet_id") or tab.get("spreadsheet_url"))
     if spreadsheet_id:
         return {
@@ -240,6 +255,7 @@ class SheetsThrottle:
     """
 
     def __init__(self, min_interval: float | None = None):
+        """Initialize throttle with an optional *min_interval* in seconds between requests."""
         if min_interval is None:
             env_val = os.environ.get("GOOGLE_SHEETS_THROTTLE_INTERVAL")
             if env_val is not None:
@@ -253,6 +269,7 @@ class SheetsThrottle:
         self._last = 0.0
 
     def wait(self):
+        """Block until at least *min_interval* seconds have elapsed since the last call to ``wait``."""
         elapsed = time.monotonic() - self._last
         if elapsed < self._min_interval:
             time.sleep(self._min_interval - elapsed)
@@ -266,6 +283,7 @@ _RETRY_BASE_DELAY = 2.0
 
 
 def _execute_with_retry(execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_BASE_DELAY):
+    """Execute a Sheets API request with exponential backoff retry on transient failures."""
     from googleapiclient.errors import HttpError
 
     for attempt in range(max_retries + 1):
@@ -283,6 +301,7 @@ def _execute_with_retry(execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_
 
 
 def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service, *, throttle=None):
+    """Fetch all rows from a specific worksheet tab as a list of dicts keyed by header names. Uses *sheets_service* for the API call and optional *throttle* for rate limiting."""
     if throttle is None:
         throttle = default_throttle
     throttle.wait()
