@@ -10,7 +10,7 @@ from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
 
 class Command(BaseCommand):
-    """Normalize local tab snapshots into an offline bundle."""
+    """Normalize local tab snapshots into an offline bundle"""
     help = "Normalize local tab snapshots into an offline bundle"
 
     def add_arguments(self, parser):

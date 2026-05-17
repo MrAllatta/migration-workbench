@@ -35,7 +35,7 @@ def _merge_coda_doc_ids(config: dict) -> None:
 
 
 class Command(BaseCommand):
-    """Run multi-doc Coda profiling pipeline (discovery to column candidates)."""
+    """Run multi-doc Coda profiling pipeline (discovery → index → broad → deep → column candidates)."""
     help = "Run multi-doc Coda profiling pipeline (discovery → index → broad → deep → column candidates)."
 
     def add_arguments(self, parser):

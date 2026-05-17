@@ -62,7 +62,7 @@ def expand_years_config(config: dict) -> dict:
 
 
 class Command(BaseCommand):
-    """Fetch provider tabs and normalize them into a bundle."""
+    """Fetch provider tabs and normalize them into a bundle"""
     help = "Fetch provider tabs and normalize them into a bundle"
 
     def add_arguments(self, parser):
