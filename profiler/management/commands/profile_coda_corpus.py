@@ -1,4 +1,4 @@
-"""Run multi-doc Coda profiling pipeline (discovery to column candidates)."""
+"""Run multi-doc Coda profiling pipeline (discovery → index → broad → deep → column candidates)."""
 
 from __future__ import annotations
 

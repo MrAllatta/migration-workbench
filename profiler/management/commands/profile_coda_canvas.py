@@ -49,7 +49,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        """Execute the Coda canvas extraction pipeline. Reads pages from the configured Coda document and writes extracted content to ``--out-dir``."""
+        """Execute the Coda canvas extraction pipeline. Reads pages from the configured Coda document and writes extracted content as JSON to ``--out``."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_coda_canvas smoke ok"))
             return
