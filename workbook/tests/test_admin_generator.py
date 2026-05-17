@@ -632,3 +632,210 @@ def test_status_field_comment_emitted_even_when_not_in_contract():
     source = render_admin_py(contract, manifest, app_label="core")
     assert "# status_field: nonexistent_field_name" in source
     _check_compiles(source)
+
+
+# ---------------------------------------------------------------------------
+# Time scope: year_field / date_field / current-season filtering
+# ---------------------------------------------------------------------------
+
+
+def test_temporal_year_field_in_list_filter():
+    """source_bundle_year should appear in list_filter when present."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["crop"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "time_scope": {"year_field": "source_bundle_year", "default_scope": "current_season"},
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "source_bundle_year" in source
+    assert "list_filter" in source
+    _check_compiles(source)
+
+
+def test_date_hierarchy_for_date_fields():
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "market_entry",
+                "columns": [
+                    {"suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "distribution_date", "django_field_class": "models.DateField", "django_field_kwargs": {"null": True}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "market",
+                "entity": "market_entry",
+                "source_tab": "Market",
+                "type": "list",
+                "editable_fields": ["outlet"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": {"date_field": "distribution_date", "default_scope": "current_season"},
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "date_hierarchy = 'distribution_date'" in source
+    _check_compiles(source)
+
+
+def test_current_season_queryset_filter():
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["crop"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": {"year_field": "source_bundle_year", "default_scope": "current_season"},
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "get_queryset" in source
+    assert "timezone" in source
+    assert "source_bundle_year" in source
+    _check_compiles(source)
+
+
+def test_status_field_generates_admin_actions():
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "field_record",
+                "columns": [
+                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"suggested_field_name": "crop_variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "field_record",
+                "entity": "field_record",
+                "source_tab": "Field Records",
+                "type": "list",
+                "editable_fields": ["status", "crop_variety"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "status_values": ["Planted", "Harvested", "Finished"],
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "mark_as_planted" in source
+    assert "mark_as_harvested" in source
+    assert "mark_as_finished" in source
+    assert "actions =" in source
+    _check_compiles(source)
+
+
+def test_editable_fields_become_fields():
+    """editable_fields from manifest become the fields attribute."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
+                    {"suggested_field_name": "bed", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "location", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "weekly_yield", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["block", "bed", "crop"],
+                "computed_fields": ["location", "weekly_yield"],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "readonly_fields = ['location', 'weekly_yield']" in source
+    assert "fields = ['block', 'bed', 'crop']" in source
+    _check_compiles(source)
