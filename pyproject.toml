@@ -82,7 +82,7 @@ python_files = ["tests.py", "test_*.py", "*_tests.py"]
 
 [tool.interrogate]
 fail-under = 80
-exclude = ["migrations", "setup.py", "conftest.py"]
+exclude = ["migrations", "*tests.py", "*test_*.py", "*_tests.py", "*__init__.py", "setup.py", "*conftest.py"]
 ignore-init-method = true
 ignore-init-module = true
 ignore-magic = true
