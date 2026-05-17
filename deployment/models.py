@@ -1,7 +1,17 @@
+"""Django models for deployment release tracking.
+
+Stores ``ReleaseRecord`` instances recording each deploy's outcome, health
+status, and metadata for the ``wb deploy`` lifecycle.
+"""
+
 from django.db import models
 
 
 class ReleaseRecord(models.Model):
+    """Record of a deployment event: space, environment, release ID, and outcome.
+
+    Used by the ``wb`` CLI to track deploy history and health checks per space/environment.
+    """
     space = models.CharField(max_length=128)
     environment = models.CharField(max_length=32)
     release_id = models.CharField(max_length=128)

@@ -1,3 +1,9 @@
+"""Structured failure-signature ownership mapping for the import pipeline.
+
+``FAILURE_SIGNATURE_OWNERSHIP`` maps error categories to their owning area,
+team, severity, escalation path, and recovery instructions.
+"""
+
 FAILURE_SIGNATURE_OWNERSHIP = {
     "missing_required": {
         "owner_area": "data-contracts",
