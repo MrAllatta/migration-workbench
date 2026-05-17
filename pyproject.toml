@@ -63,6 +63,7 @@ dev = [
   "black",
   "build>=1.2",
   "twine>=5.0",
+  "interrogate>=1.5",
 ]
 release = [
   "build>=1.2",
@@ -78,3 +79,11 @@ include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "exa
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "migration_workbench.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
+
+[tool.interrogate]
+fail-under = 80
+exclude = ["migrations", "setup.py", "conftest.py"]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+verbose = 1

@@ -20,6 +20,9 @@ jobs:
       - name: Run chassis gate
         run: make chassis-gate
 
+      - name: Doc coverage gate
+        run: make doc-coverage
+
   packaging:
     runs-on: ubuntu-latest
     steps:

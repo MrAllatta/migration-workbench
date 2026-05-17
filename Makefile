@@ -8,7 +8,9 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+<<<<<<< HEAD
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-admin generate-admin-light generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+>>>>>>> 0cd302e (ci: add interrogate dependency, Makefile target, and CI doc coverage gate)
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -175,6 +177,9 @@ new-product:
 publish:
 	$(PYTHON) -m build
 	$(PYTHON) -m twine upload dist/*
+
+doc-coverage:  ## Check PEP 257 docstring coverage (threshold: 80%)
+	$(VENV)/bin/interrogate -v --fail-under 80 connectors profiler importer workbook deployment
 
 # ---------------------------------------------------------------------------
 # Docker / Fly.io deployment
