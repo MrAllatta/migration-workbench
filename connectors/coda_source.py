@@ -24,6 +24,7 @@ _DOC_ID_AFTER_D = re.compile(r"_d([\w-]+)$")
 
 
 def _doc_segment_from_url(url: str) -> str | None:
+    """Extract the Coda document segment (``d{doc_id}``) from a Coda URL."""
     parsed = urlparse(url)
     parts = [p for p in parsed.path.split("/") if p]
     if "d" not in parts:
@@ -100,6 +101,7 @@ def resolve_doc_id(session: requests.Session, url_or_id: str) -> str | None:
 
 
 def build_coda_session(api_token: str | None = None) -> requests.Session:
+    """Build and return a ``requests.Session`` authenticated with the Coda API token. Falls back to the ``CODA_API_TOKEN`` environment variable if *api_token* is ``None``."""
     token = api_token or os.environ.get("CODA_API_TOKEN")
     if not token:
         raise ValueError(
@@ -125,6 +127,7 @@ def _request_with_retry(
     json_body: dict[str, Any] | None = None,
     max_retries: int = 8,
 ) -> dict[str, Any]:
+    """Execute an HTTP request with exponential backoff on 429/5xx responses. Returns the parsed JSON response dict."""
     delay = 2.0
     last_exc: Exception | None = None
     for attempt in range(max_retries):
@@ -210,6 +213,7 @@ def list_tables(
 def list_columns(
     session: requests.Session, doc_id: str, table_id: str
 ) -> list[dict[str, Any]]:
+    """List column metadata dicts for the given Coda table. Returns the API's column list response."""
     return coda_list_paginated_items(
         session,
         f"/docs/{doc_id}/tables/{table_id}/columns",
@@ -260,6 +264,7 @@ def list_rows(
 
 
 def get_doc(session: requests.Session, doc_id: str) -> dict[str, Any]:
+    """Fetch document metadata for *doc_id* from the Coda API. Returns a dict with ``name``, ``id``, and other doc-level fields."""
     return _request_with_retry(session, "GET", f"{CODA_API_BASE}/docs/{doc_id}")
 
 
@@ -354,6 +359,7 @@ def get_page_export_status(
     page_id_or_name: str,
     request_id: str,
 ) -> dict[str, Any]:
+    """Poll the status of an async page export request. Returns the API status dict (``status`` key will be ``"complete"`` or ``"in_progress"``)."""
     return _request_with_retry(
         session,
         "GET",
@@ -583,6 +589,7 @@ def _format_rich_payload(obj: Any, *, _depth: int = 0) -> str:
 
 
 def _cell_to_str(cell: Any) -> str:
+    """Convert a Coda cell value to a string, handling ``None``, lists, and rich text payloads."""
     if cell is None:
         return ""
     if isinstance(cell, str):
@@ -634,8 +641,10 @@ def rows_to_grid(
 
 
 def column_has_formula(column: dict[str, Any]) -> bool:
+    """Return ``True`` if the Coda *column* dict indicates the column has a formula."""
     return bool(column.get("formula") or column.get("formulaText"))
 
 
 def formula_text(column: dict[str, Any]) -> str:
+    """Return the formula text from a Coda *column* dict, or an empty string if none."""
     return str(column.get("formulaText") or column.get("formula") or "")

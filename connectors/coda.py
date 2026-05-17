@@ -1,3 +1,10 @@
+"""Coda provider adapter implementing the ``ProviderAdapter`` interface.
+
+``CodaAdapter`` fetches tab rows and structure from Coda documents via the
+Coda API, normalizing them into the row/structure format expected by the
+profiler and importer pipeline.
+"""
+
 from connectors.base import ProviderAdapter
 from connectors.tab_name_utils import sanitize_tab_name
 from connectors.coda_source import (
@@ -70,7 +77,10 @@ def shape_coda_table_structure(
 
 
 class CodaAdapter(ProviderAdapter):
+    """Coda provider adapter for the profiler/importer pipeline."""
+
     def __init__(self, config: dict):
+        """Initialize the adapter from a source config dict. Validates API token and resolves the document."""
         self.config = config
         self.session = build_coda_session(config.get("api_token"))
         raw = config.get("doc_url") or config.get("doc_id")
@@ -82,6 +92,7 @@ class CodaAdapter(ProviderAdapter):
         self._tables_order: list[str] | None = None
 
     def _ensure_table_index(self):
+        """Build an internal lookup index mapping table names to table metadata dicts."""
         if self._tables_by_name is None:
             tables = list_tables(self.session, self.doc_id)
             self._tables_by_name = {t["name"]: t for t in tables if t.get("name")}
@@ -89,6 +100,7 @@ class CodaAdapter(ProviderAdapter):
             self._tables_order = [t.get("id") for t in tables if t.get("id")]
 
     def _resolve_table(self, tab_config: dict):
+        """Resolve a tab config entry to a Coda table, returning the table metadata dict."""
         if tab_config.get("table_id"):
             tid = tab_config["table_id"]
             return (
@@ -109,6 +121,7 @@ class CodaAdapter(ProviderAdapter):
         return meta["id"], meta["name"]
 
     def fetch_tab_rows(self, tab_config: dict) -> dict:
+        """Fetch rows from a Coda table identified by *tab_config*. Returns a dict with ``rows`` and ``headers`` keys."""
         table_id, table_name = self._resolve_table(tab_config)
         columns = list_columns(self.session, self.doc_id, table_id)
         max_rows = tab_config.get("max_rows")
