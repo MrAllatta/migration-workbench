@@ -14,6 +14,7 @@ Usage::
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from workbook.codegen.contract import (
@@ -230,6 +231,28 @@ def _inline_field_names(
     return [f["name"] for f in source_fields if f["name"] != fk_field_name]
 
 
+def _render_fk_link_method(
+    field_name: str,
+    target_model_name: str,
+    app_label: str,
+) -> str:
+    """Render a ``{field_name}_link`` display method for FK admin columns.
+
+    Generates a method that produces a clickable admin change link for the
+    FK's related object, falling back to ``'-'`` when the FK is null.
+    """
+    target_snake = re.sub(r"(?<!^)(?=[A-Z])", "_", target_model_name).lower()
+    lines = [
+        f"    def {field_name}_link(self, obj):",
+        f"        if obj.{field_name}_id:",
+        f"            url = reverse('admin:{app_label}_{target_snake}_change', args=[obj.{field_name}_id])",
+        f"            return format_html('<a href=\"{{}}\">{{}}</a>', url, obj.{field_name})",
+        "        return '-'",
+        f"    {field_name}_link.short_description = '{field_name.capitalize()}'",
+    ]
+    return "\n".join(lines)
+
+
 # -- rendering --------------------------------------------------------------
 
 
@@ -279,6 +302,7 @@ def _render_admin_class(
     verbose_name: str | None,
     admin_base_class: str = "admin.ModelAdmin",
     status_field: str | None = None,
+    link_methods: list[str] | None = None,
 ) -> str:
     """Render a ``ModelAdmin`` class with ``@admin.register``."""
     lines: list[str] = []
@@ -295,6 +319,10 @@ def _render_admin_class(
     if display_fields:
         items = ", ".join(repr(f) for f in display_fields)
         lines.append(f"    list_display = [{items}]")
+
+    if link_methods:
+        lines.append("")
+        lines.extend(link_methods)
 
     if filter_fields:
         items = ", ".join(repr(f) for f in filter_fields)
@@ -339,11 +367,14 @@ def _render_header(app_label: str) -> str:
     )
 
 
-def _render_imports(tables: list[dict[str, Any]], *, needs_user_admin: bool) -> str:
+def _render_imports(tables: list[dict[str, Any]], *, needs_user_admin: bool, needs_fk_links: bool = False) -> str:
     """Render the ``import`` block."""
     model_names = sorted({get_model_name(t) for t in tables})
     imports = ", ".join(model_names)
     lines = ["from django.contrib import admin"]
+    if needs_fk_links:
+        lines.append("from django.urls import reverse")
+        lines.append("from django.utils.html import format_html")
     if needs_user_admin:
         lines.append("from django.contrib.auth.admin import UserAdmin as BaseUserAdmin")
     lines.append(f"from .models import {imports}")
@@ -377,10 +408,19 @@ def render_admin_py(
         return _render_header(app_label) + "from django.contrib import admin\n" + "\n"
 
     needs_user_admin = any(_is_abstract_user_model(t) for t in tables)
+    # Pre-scan for FK fields that need link methods (two-pass for imports).
+    needs_fk_links = any(
+        _is_fk_field(f)
+        and f["kwargs"].get("to", "")
+        and isinstance(f["kwargs"].get("to", ""), str)
+        and f["kwargs"]["to"] != "self"
+        for t in tables
+        for f in get_fields(t)
+    )
 
     parts: list[str] = [
         _render_header(app_label),
-        _render_imports(tables, needs_user_admin=needs_user_admin),
+        _render_imports(tables, needs_user_admin=needs_user_admin, needs_fk_links=needs_fk_links),
     ]
 
     # Collect all inline classes (must be defined before admin classes).
@@ -437,6 +477,21 @@ def render_admin_py(
             valid = {f["name"] for f in contract_fields if _is_fk_field(f)}
             autocomplete = [f for f in autocomplete if f in valid]
 
+        # FK link display methods — generate _link methods and swap into list_display.
+        link_methods: list[str] = []
+        for field in contract_fields:
+            if _is_fk_field(field):
+                target = field["kwargs"].get("to", "")
+                if target and isinstance(target, str) and target != "self":
+                    link_methods.append(
+                        _render_fk_link_method(field["name"], target, app_label)
+                    )
+                    display = [
+                        f"{fn}_link" if fn == field["name"] else fn
+                        for fn in display
+                    ]
+                    needs_fk_links = True
+
         admin_class_parts.append(
             _render_admin_class(
                 model_name=model_name,
@@ -450,6 +505,7 @@ def render_admin_py(
                 verbose_name=verbose_name,
                 admin_base_class="BaseUserAdmin" if is_user else "admin.ModelAdmin",
                 status_field=status_field,
+                link_methods=link_methods,
             )
         )
 

@@ -597,6 +597,141 @@ def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
     _check_compiles(source)
 
 
+# ---------------------------------------------------------------------------
+# FK link display methods
+# ---------------------------------------------------------------------------
+
+
+def test_fk_field_gets_link_method():
+    """FK fields should get a _link display method."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "field_block",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["block", "crop"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "block_link" in source
+    assert "reverse(" in source
+    assert "format_html" in source
+    assert "short_description" in source
+    _check_compiles(source)
+
+
+def test_fk_link_appears_in_list_display_instead_of_raw_fk():
+    """list_display should use block_link instead of block."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "field_block",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["block", "crop"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "list_display = ['crop', 'block_link']" in source or "list_display = ['block_link', 'crop']" in source
+    assert "'block'" not in source.replace("'block_link'", "").replace("'block_id'", "")
+    _check_compiles(source)
+
+
+def test_non_fk_fields_not_turned_into_links():
+    """Non-FK fields should not get _link methods."""
+    contract = {
+        "version": "1.1",
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop_plan_entry",
+                "columns": [
+                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop_plan",
+                "entity": "crop_plan_entry",
+                "source_tab": "Crop Planner",
+                "type": "list",
+                "editable_fields": ["crop"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "_link" not in source
+    assert "format_html" not in source
+    _check_compiles(source)
+
+
 def test_status_field_comment_emitted_even_when_not_in_contract():
     """The status_field comment is emitted as informational even for non-existent fields."""
     contract = {
