@@ -10,6 +10,7 @@ from __future__ import annotations
 import difflib
 import json
 import sys
+import yaml
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
@@ -62,9 +63,11 @@ class Command(BaseCommand):
         if not corpus_config_path.is_file():
             raise CommandError(f"corpus_config not found: {corpus_config_path}")
 
-        import yaml
         contract = load_contract(str(contract_path))
-        corpus_config = json.loads(corpus_config_path.read_text(encoding="utf-8"))
+        try:
+            corpus_config = json.loads(corpus_config_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"invalid JSON in {corpus_config_path}: {exc}") from exc
         corpus_dir = options.get("corpus_dir")
 
         manifest = build_pipeline_manifest(

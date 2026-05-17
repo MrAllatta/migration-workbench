@@ -94,7 +94,7 @@ def build_pipeline_manifest(
             spreadsheet_id = ""
             worksheet_title = title
 
-            for code, display_name in workbook_codes.items():
+            for code in workbook_codes:
                 if (
                     corpus_index
                     and year_key in corpus_index
