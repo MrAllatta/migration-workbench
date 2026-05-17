@@ -1,3 +1,5 @@
+"""Validate profiling auth/runtime prerequisites (credentials + optional folder access)."""
+
 from __future__ import annotations
 
 import os
@@ -10,9 +12,11 @@ from connectors.google_sheets import DRIVE_READONLY_SCOPE, SHEETS_READONLY_SCOPE
 
 
 class Command(BaseCommand):
+    """Validate profiling auth/runtime prerequisites (credentials + optional folder access)."""
     help = "Validate profiling auth/runtime prerequisites (credentials + optional folder access)."
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_preflight."""
         parser.add_argument("--folder", help="Drive folder id or URL to validate read access")
         parser.add_argument(
             "--config",
@@ -22,6 +26,7 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true", help="Run local-only checks without network calls")
 
     def handle(self, *args, **options):
+        """Execute the preflight check. Verifies Google Sheets/Drive credentials and optionally tests folder access."""
         credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
         if credentials_path:
             path = Path(credentials_path).expanduser()

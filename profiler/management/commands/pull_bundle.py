@@ -1,3 +1,5 @@
+"""Fetch provider tabs and normalize them into a local bundle directory."""
+
 import copy
 import csv
 import json
@@ -60,9 +62,11 @@ def expand_years_config(config: dict) -> dict:
 
 
 class Command(BaseCommand):
+    """Fetch provider tabs and normalize them into a bundle."""
     help = "Fetch provider tabs and normalize them into a bundle"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for pull_bundle."""
         parser.add_argument("--config", required=True, help="JSON config describing live source tabs")
         parser.add_argument("--output-dir", required=True, help="Directory for the normalized bundle")
         parser.add_argument(
@@ -76,6 +80,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the pull-bundle pipeline. Reads source config from ``--config``, routes through the configured provider adapter, normalizes rows, and writes CSV + ``manifest.json`` to ``--output-dir``."""
         config_path = Path(options["config"]).resolve()
         output_dir = Path(options["output_dir"]).resolve()
         if not config_path.exists():

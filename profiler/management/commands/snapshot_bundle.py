@@ -1,3 +1,5 @@
+"""Normalize local tab snapshots into an offline bundle directory."""
+
 import json
 from pathlib import Path
 
@@ -8,13 +10,16 @@ from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
 
 class Command(BaseCommand):
+    """Normalize local tab snapshots into an offline bundle."""
     help = "Normalize local tab snapshots into an offline bundle"
 
     def add_arguments(self, parser):
+        """Add command-line arguments for snapshot_bundle."""
         parser.add_argument("--config", required=True, help="JSON config describing source tabs")
         parser.add_argument("--output-dir", required=True, help="Directory for the normalized bundle")
 
     def handle(self, *args, **options):
+        """Execute the snapshot-bundle pipeline. Reads local CSV/JSON snapshots from ``--config`` and normalizes them into a bundle at ``--output-dir``."""
         config_path = Path(options["config"]).resolve()
         output_dir = Path(options["output_dir"]).resolve()
         if not config_path.exists():

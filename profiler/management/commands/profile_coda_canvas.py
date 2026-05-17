@@ -1,3 +1,5 @@
+"""Extract plain text from Coda canvas pages (content API) or optional markdown export."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -10,9 +12,11 @@ from profiler.tools.coda_corpus import build_canvas_artifact_for_doc, write_json
 
 
 class Command(BaseCommand):
+    """Extract plain text from Coda canvas pages (content API) or optional markdown export."""
     help = "Extract plain text from Coda canvas pages (content API) or optional markdown export."
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_coda_canvas."""
         parser.add_argument(
             "--doc",
             "--doc-url",
@@ -45,6 +49,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the Coda canvas extraction pipeline. Reads pages from the configured Coda document and writes extracted content to ``--out-dir``."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_coda_canvas smoke ok"))
             return

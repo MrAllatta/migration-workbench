@@ -1,3 +1,5 @@
+"""Run multi-doc Coda profiling pipeline (discovery to column candidates)."""
+
 from __future__ import annotations
 
 import json
@@ -33,9 +35,11 @@ def _merge_coda_doc_ids(config: dict) -> None:
 
 
 class Command(BaseCommand):
+    """Run multi-doc Coda profiling pipeline (discovery to column candidates)."""
     help = "Run multi-doc Coda profiling pipeline (discovery → index → broad → deep → column candidates)."
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_coda_corpus."""
         parser.add_argument(
             "--config", required=True, help="JSON config path for Coda corpus profiling"
         )
@@ -60,6 +64,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the Coda corpus profiling pipeline. Orchestrates discovery, indexing, broad profiling, deep profiling, and column candidate derivation for each configured Coda document."""
         config_path = Path(options["config"]).resolve()
         if not config_path.exists():
             raise CommandError(f"Config not found: {config_path}")

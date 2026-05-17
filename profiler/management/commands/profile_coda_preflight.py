@@ -1,3 +1,5 @@
+"""Validate Coda API token and optional doc access (read-only)."""
+
 from __future__ import annotations
 
 import os
@@ -13,9 +15,11 @@ from connectors.coda_source import (
 
 
 class Command(BaseCommand):
+    """Validate Coda API token and optional doc access (read-only)."""
     help = "Validate Coda API token and optional doc access (read-only)."
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_coda_preflight."""
         parser.add_argument(
             "--doc",
             "--doc-url",
@@ -29,6 +33,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the Coda preflight check. Verifies the CODA_API_TOKEN and optionally tests access to a specific Coda document."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("profile_coda_preflight smoke ok"))
             return

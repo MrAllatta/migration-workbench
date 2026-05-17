@@ -1,3 +1,5 @@
+"""Run cohort-corpus profiling pipeline for config-driven workbook sets."""
+
 from __future__ import annotations
 
 import json
@@ -12,9 +14,11 @@ from profiler.tools.cohort_corpus import run_cohort_corpus
 
 
 class Command(BaseCommand):
+    """Run cohort-corpus profiling pipeline for config-driven workbook sets."""
     help = "Run cohort-corpus profiling pipeline for config-driven workbook sets."
 
     def add_arguments(self, parser):
+        """Add command-line arguments for profile_cohort_corpus."""
         parser.add_argument("--config", required=True, help="JSON config path for cohort-corpus profiling")
         parser.add_argument("--folder", help="Drive folder id or URL (default: DRIVE_FOLDER_ID env)")
         parser.add_argument("--out-dir", required=True, help="Output directory for profiling artifacts")
@@ -60,6 +64,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Execute the cohort-corpus profiling pipeline. Discovers, scores, and profiles workbook tabs across multiple years, writing artifacts to ``--out-dir``."""
         config_path = Path(options["config"]).resolve()
         if not config_path.exists():
             raise CommandError(f"Config not found: {config_path}")
