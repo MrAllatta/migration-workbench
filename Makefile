@@ -73,7 +73,7 @@ generate-admin:
 generate-pipeline-manifest:
 	$(MANAGE) generate_pipeline_manifest --contract $(CONTRACT) --corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} --out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml} $(if $(FORCE),--force)
 
-generate-all: generate-models generate-view-manifest generate-admin generate-import
+generate-all: generate-models generate-view-manifest generate-admin generate-import generate-pipeline-manifest
 	@echo "All code generation complete. Run 'make check-generated' to verify."
 
 post-generate:
