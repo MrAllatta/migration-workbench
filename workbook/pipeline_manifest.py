@@ -64,7 +64,6 @@ def build_pipeline_manifest(
     corpus_years.sort()
 
     workbook_codes = corpus_config.get("workbook_codes") or {}
-    tab_overrides = corpus_config.get("tab_selection_overrides") or {}
 
     corpus_index = _load_corpus_index(corpus_dir) if corpus_dir else {}
 

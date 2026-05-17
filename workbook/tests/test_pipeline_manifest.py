@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+from workbook.pipeline_manifest import build_pipeline_manifest
+
 
 def _minimal_contract() -> dict:
     return {
@@ -67,7 +69,6 @@ def _minimal_corpus_dir(tmp_path) -> Path:
 
 
 def test_build_pipeline_manifest_returns_version():
-    from workbook.pipeline_manifest import build_pipeline_manifest
     contract = _minimal_contract()
     corpus_config = _minimal_corpus_config()
     result = build_pipeline_manifest(contract, corpus_config, corpus_dir=None)
@@ -75,7 +76,6 @@ def test_build_pipeline_manifest_returns_version():
 
 
 def test_build_pipeline_manifest_maps_tables_to_years():
-    from workbook.pipeline_manifest import build_pipeline_manifest
     contract = _minimal_contract()
     corpus_config = _minimal_corpus_config()
     result = build_pipeline_manifest(contract, corpus_config, corpus_dir=None)
@@ -87,7 +87,6 @@ def test_build_pipeline_manifest_maps_tables_to_years():
 
 
 def test_build_pipeline_manifest_includes_required_headers():
-    from workbook.pipeline_manifest import build_pipeline_manifest
     contract = _minimal_contract()
     corpus_config = _minimal_corpus_config()
     result = build_pipeline_manifest(contract, corpus_config, corpus_dir=None)
@@ -96,20 +95,16 @@ def test_build_pipeline_manifest_includes_required_headers():
     assert "Crop" in table["required_headers"]
 
 
-def test_build_pipeline_manifest_with_corpus_dir_adds_years():
-    from workbook.pipeline_manifest import build_pipeline_manifest
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        corpus_dir = _minimal_corpus_dir(tmp_path)
-        contract = _minimal_contract()
-        corpus_config = _minimal_corpus_config()
-        result = build_pipeline_manifest(
-            contract, corpus_config, corpus_dir=str(corpus_dir)
-        )
-        table = result["tables"][0]
-        assert "years" in table
-        assert len(table["years"]) >= 1
-        year_entry = table["years"][0]
-        assert year_entry["year"] == 2025
-        assert year_entry["spreadsheet_id"] == "FROM_INDEX_FILE_456"
+def test_build_pipeline_manifest_with_corpus_dir_adds_years(tmp_path):
+    corpus_dir = _minimal_corpus_dir(tmp_path)
+    contract = _minimal_contract()
+    corpus_config = _minimal_corpus_config()
+    result = build_pipeline_manifest(
+        contract, corpus_config, corpus_dir=str(corpus_dir)
+    )
+    table = result["tables"][0]
+    assert "years" in table
+    assert len(table["years"]) >= 1
+    year_entry = table["years"][0]
+    assert year_entry["year"] == 2025
+    assert year_entry["spreadsheet_id"] == "FROM_INDEX_FILE_456"
