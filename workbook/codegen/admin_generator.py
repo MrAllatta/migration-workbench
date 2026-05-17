@@ -14,6 +14,7 @@ Usage::
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from workbook.codegen.contract import (
@@ -355,13 +356,14 @@ def _render_admin_class(
     if status_values and status_field:
         action_names: list[str] = []
         for value in status_values:
-            method_name = f"mark_as_{value.lower().replace(' ', '_')}"
+            slugified = re.sub(r'[^a-z0-9_]+', '_', value.lower()).strip('_')
+            method_name = f"mark_as_{slugified}"
             action_names.append(method_name)
             lines.extend([
                 "",
                 f"    @admin.action(description='Mark as {value}')",
                 f"    def {method_name}(self, request, queryset):",
-                f"        queryset.update({status_field}='{value}')",
+                f"        queryset.update({status_field}=\"{value}\")",
             ])
         if action_names:
             items = ", ".join(action_names)
