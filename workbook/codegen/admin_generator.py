@@ -279,6 +279,9 @@ def _render_admin_class(
     verbose_name: str | None,
     admin_base_class: str = "admin.ModelAdmin",
     status_field: str | None = None,
+    time_scope: dict[str, Any] | None = None,
+    status_values: list[str] | None = None,
+    editable_fields: list[str] | None = None,
 ) -> str:
     """Render a ``ModelAdmin`` class with ``@admin.register``."""
     lines: list[str] = []
@@ -291,6 +294,12 @@ def _render_admin_class(
         f"@admin.register({model_name})",
         f"class {model_name}Admin({admin_base_class}):",
     ])
+
+    # Ensure year_field from time_scope is in filter_fields
+    if time_scope and time_scope.get("year_field"):
+        year_field = time_scope["year_field"]
+        if year_field not in filter_fields:
+            filter_fields = list(filter_fields) + [year_field]
 
     if display_fields:
         items = ", ".join(repr(f) for f in display_fields)
@@ -320,11 +329,56 @@ def _render_admin_class(
         items = ", ".join(inline_classes)
         lines.append(f"    inlines = [{items}]")
 
+    # date_hierarchy from time_scope
+    if time_scope and time_scope.get("date_field"):
+        lines.append(f"    date_hierarchy = '{time_scope['date_field']}'")
+
+    # fields (change form) from editable_fields
+    if editable_fields:
+        items = ", ".join(repr(f) for f in editable_fields)
+        lines.append(f"    fields = [{items}]")
+
+    # get_queryset for current-season default filtering
+    if time_scope and time_scope.get("year_field"):
+        year_field = time_scope["year_field"]
+        lines.extend([
+            "",
+            "    def get_queryset(self, request):",
+            f"        qs = super().get_queryset(request)",
+            f"        year = request.GET.get('{year_field}__exact')",
+            f"        if not year:",
+            f"            qs = qs.filter({year_field}=timezone.now().year)",
+            f"        return qs",
+        ])
+
+    # Admin action methods from status_values
+    if status_values and status_field:
+        action_names: list[str] = []
+        for value in status_values:
+            method_name = f"mark_as_{value.lower().replace(' ', '_')}"
+            action_names.append(method_name)
+            lines.extend([
+                "",
+                f"    @admin.action(description='Mark as {value}')",
+                f"    def {method_name}(self, request, queryset):",
+                f"        queryset.update({status_field}='{value}')",
+            ])
+        if action_names:
+            items = ", ".join(action_names)
+            lines.append(f"    actions = [{items}]")
+
     if all(
         not x
         for x in [display_fields, filter_fields, search_fields, readonly_fields, list_editable_fields, autocomplete_fields_list, inline_classes]
     ):
-        lines.append("    pass")
+        has_new_content = (
+            (time_scope and time_scope.get("date_field"))
+            or (time_scope and time_scope.get("year_field"))
+            or (status_values and status_field)
+            or editable_fields
+        )
+        if not has_new_content:
+            lines.append("    pass")
 
     lines.append("")
     return "\n".join(lines)
@@ -339,13 +393,15 @@ def _render_header(app_label: str) -> str:
     )
 
 
-def _render_imports(tables: list[dict[str, Any]], *, needs_user_admin: bool) -> str:
+def _render_imports(tables: list[dict[str, Any]], *, needs_user_admin: bool, needs_timezone: bool = False) -> str:
     """Render the ``import`` block."""
     model_names = sorted({get_model_name(t) for t in tables})
     imports = ", ".join(model_names)
     lines = ["from django.contrib import admin"]
     if needs_user_admin:
         lines.append("from django.contrib.auth.admin import UserAdmin as BaseUserAdmin")
+    if needs_timezone:
+        lines.append("from django.utils import timezone")
     lines.append(f"from .models import {imports}")
     return "\n".join(lines) + "\n"
 
@@ -378,9 +434,21 @@ def render_admin_py(
 
     needs_user_admin = any(_is_abstract_user_model(t) for t in tables)
 
+    # Determine if any view uses time_scope with year_field (needs timezone import).
+    needs_timezone = False
+    if manifest:
+        for table in tables:
+            raw_entity = str(table.get("suggested_model_name") or "").lower()
+            view = find_view_for_entity(manifest, raw_entity)
+            if view:
+                ts = view.get("time_scope") or {}
+                if ts.get("year_field"):
+                    needs_timezone = True
+                    break
+
     parts: list[str] = [
         _render_header(app_label),
-        _render_imports(tables, needs_user_admin=needs_user_admin),
+        _render_imports(tables, needs_user_admin=needs_user_admin, needs_timezone=needs_timezone),
     ]
 
     # Collect all inline classes (must be defined before admin classes).
@@ -422,6 +490,9 @@ def render_admin_py(
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
         status_field = (view.get("status_field") or None) if view else None
+        time_scope = view.get("time_scope") if view else None
+        status_values = view.get("status_values") if view else None
+        editable_fields = view.get("editable_fields") if view else None
         display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_user)
         filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user, status_field=status_field)
         search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_user)
@@ -450,6 +521,9 @@ def render_admin_py(
                 verbose_name=verbose_name,
                 admin_base_class="BaseUserAdmin" if is_user else "admin.ModelAdmin",
                 status_field=status_field,
+                time_scope=time_scope,
+                status_values=status_values,
+                editable_fields=editable_fields,
             )
         )
 
