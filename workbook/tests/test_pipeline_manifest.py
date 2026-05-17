@@ -54,7 +54,7 @@ def _minimal_corpus_dir(tmp_path) -> Path:
             {
                 "workbook_code": "201",
                 "year": 2025,
-                "spreadsheet_id": "1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE",
+                "spreadsheet_id": "FROM_INDEX_FILE_456",
                 "title": "2025 Farm Plan",
                 "tabs": [
                     {"worksheet_title": "Crop Planner", "tab_position": 0},
@@ -112,4 +112,4 @@ def test_build_pipeline_manifest_with_corpus_dir_adds_years():
         assert len(table["years"]) >= 1
         year_entry = table["years"][0]
         assert year_entry["year"] == 2025
-        assert "spreadsheet_id" in year_entry
+        assert year_entry["spreadsheet_id"] == "FROM_INDEX_FILE_456"

@@ -96,7 +96,15 @@ def build_pipeline_manifest(
             worksheet_title = title
 
             for code, display_name in workbook_codes.items():
-                if code in workbook_ids:
+                if (
+                    corpus_index
+                    and year_key in corpus_index
+                    and code in corpus_index[year_key]
+                ):
+                    wid = corpus_index[year_key][code].get("spreadsheet_id", "")
+                    if wid and not spreadsheet_id:
+                        spreadsheet_id = wid
+                elif code in workbook_ids:
                     wid = workbook_ids[code]
                     if not spreadsheet_id:
                         spreadsheet_id = wid
