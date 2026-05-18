@@ -1393,6 +1393,7 @@ class TestEnrichImportKeyCandidates:
 
     def test_computed_field_is_not_import_key(self):
         cols = [self._make_col(canonical="product_id", formula_pattern="row_formula")]
+        enrich_computed_fields(cols)
         enrich_import_key_candidates(cols)
         assert cols[0]["is_import_key_candidate"] is False
 
@@ -1429,8 +1430,7 @@ class TestEnrichEntityGroupings:
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
         ]
-        workbook_index = {"402": {"workbook_code": "402"}}
-        entity_map = enrich_entity_groupings(cols, workbook_index)
+        entity_map = enrich_entity_groupings(cols)
         assert "Plan A" in entity_map
         assert "Plan B" in entity_map
         assert entity_map["Plan A"] == entity_map["Plan B"]
@@ -1443,8 +1443,7 @@ class TestEnrichEntityGroupings:
             self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
         ]
-        workbook_index = {"402": {"workbook_code": "402"}}
-        entity_map = enrich_entity_groupings(cols, workbook_index)
+        entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
         for col in cols:
             assert col.get("suggested_entity") is None
@@ -1455,8 +1454,7 @@ class TestEnrichEntityGroupings:
             self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
         ]
-        workbook_index = {"402": {"workbook_code": "402"}}
-        entity_map = enrich_entity_groupings(cols, workbook_index)
+        entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
 
     def test_different_workbooks_not_grouped(self):
@@ -1466,11 +1464,7 @@ class TestEnrichEntityGroupings:
             self._make_col(workbook_code="503", tab_title="Plan A", canonical="farm_id"),
             self._make_col(workbook_code="503", tab_title="Plan A", canonical="crop_name"),
         ]
-        workbook_index = {
-            "402": {"workbook_code": "402"},
-            "503": {"workbook_code": "503"},
-        }
-        entity_map = enrich_entity_groupings(cols, workbook_index)
+        entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
 
     def test_returns_tab_to_entity_map(self):
@@ -1481,7 +1475,6 @@ class TestEnrichEntityGroupings:
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
             self._make_col(workbook_code="402", tab_title="Plan B", canonical="season_name"),
         ]
-        workbook_index = {"402": {"workbook_code": "402"}}
-        entity_map = enrich_entity_groupings(cols, workbook_index)
+        entity_map = enrich_entity_groupings(cols)
         assert isinstance(entity_map, dict)
         assert all(isinstance(v, str) for v in entity_map.values())

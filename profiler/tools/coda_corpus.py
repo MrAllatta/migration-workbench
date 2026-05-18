@@ -51,16 +51,11 @@ from connectors.coda_source import (
     rows_to_grid,
 )
 from profiler.management.commands.profile_coda_table import summarize_coda_table
-
-
-_IDENTIFIER_SUFFIXES = {"_id", "_code", "_key"}
-_IDENTIFIER_NAMES = {"id", "name", "code", "slug", "uid", "uuid", "external_id"}
-
-
-def _to_pascal_case(raw: str) -> str:
-    if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
-        return raw
-    return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
+from profiler.tools.enrichment_utils import (
+    _IDENTIFIER_NAMES,
+    _IDENTIFIER_SUFFIXES,
+    _to_pascal_case,
+)
 
 
 def enrich_coda_columns(columns: list[dict[str, Any]]) -> None:

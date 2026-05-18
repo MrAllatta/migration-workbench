@@ -17,40 +17,7 @@ from workbook.codegen.designed_model_detection import (
 )
 from workbook.field_mapping import map_profiler_column_to_django_field, suggested_field_name
 from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year, _compute_bundle_paths, load_json
-
-
-def _infer_format_type_from_samples(samples: list[str]) -> str | None:
-    """Guess a profiler ``format_type`` from a list of sample string values."""
-    non_empty = [s for s in samples if s and s.strip()]
-    if not non_empty:
-        return None
-    numeric_count = 0
-    date_count = 0
-    for value in non_empty:
-        cleaned = value.strip().replace(",", "").replace("$", "").replace("%", "")
-        if re.match(r"^-?\d+(\.\d+)?$", cleaned):
-            numeric_count += 1
-        elif re.match(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$", value.strip()):
-            date_count += 1
-    if numeric_count == len(non_empty):
-        return "number"
-    if date_count > len(non_empty) / 2:
-        return "date"
-    return "text"
-
-
-def _to_pascal_case(raw: str) -> str:
-    """Convert a label to PascalCase.
-
-    If the input is already PascalCase (no underscores/hyphens, has uppercase
-    after position 0), pass it through unchanged.
-    """
-    if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
-        return raw
-    return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
-
-
-_ENTITY_KEYWORDS = {"channel", "season", "crop", "block", "farm", "field", "variety"}
+from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case
 
 
 def _flag_fk_columns(columns: list[dict]) -> None:

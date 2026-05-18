@@ -52,19 +52,16 @@ from profiler.management.commands.profile_tab import (
     summarize_tab,
 )
 
+from profiler.tools.enrichment_utils import (
+    _ENTITY_KEYWORDS,
+    _IDENTIFIER_NAMES,
+    _IDENTIFIER_SUFFIXES,
+    _to_pascal_case,
+)
+
 logger = logging.getLogger(__name__)
 
 _TRUNCATE_LENGTH = 200
-
-_ENTITY_KEYWORDS = {"channel", "season", "crop", "block", "farm", "field", "variety"}
-_IDENTIFIER_SUFFIXES = {"_id", "_code", "_key"}
-_IDENTIFIER_NAMES = {"id", "name", "code", "slug", "uid", "uuid", "external_id"}
-
-
-def _to_pascal_case(raw: str) -> str:
-    if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
-        return raw
-    return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
 
 
 @dataclass
@@ -851,8 +848,6 @@ def enrich_fk_candidates(columns: list[dict], entity_names: set[str]) -> None:
 def enrich_import_key_candidates(columns: list[dict]) -> None:
     for col in columns:
         name = col.get("proposed_canonical_field", "")
-        evidence = col.get("evidence") or {}
-        pattern = evidence.get("formula_pattern", "raw")
         is_identifier = False
         for suffix in _IDENTIFIER_SUFFIXES:
             if name.endswith(suffix):
@@ -860,11 +855,12 @@ def enrich_import_key_candidates(columns: list[dict]) -> None:
                 break
         if name in _IDENTIFIER_NAMES:
             is_identifier = True
-        col["is_import_key_candidate"] = is_identifier and pattern == "raw"
+        is_computed = col.get("is_computed", False)
+        col["is_import_key_candidate"] = is_identifier and not is_computed
 
 
 def enrich_entity_groupings(
-    columns: list[dict], workbook_index: dict[str, dict]
+    columns: list[dict],
 ) -> dict[str, str]:
     tab_headers: dict[tuple[str, str], set[str]] = {}
     for col in columns:
@@ -1511,13 +1507,9 @@ def run_cohort_corpus(
     )
 
     enrich_computed_fields(candidate_columns)
-
-    workbook_index: dict[str, dict] = {
-        rec["workbook_code"]: rec for rec in index_records if "workbook_code" in rec
-    }
     enrich_fk_candidates(candidate_columns, set())
     enrich_import_key_candidates(candidate_columns)
-    enrich_entity_groupings(candidate_columns, workbook_index)
+    enrich_entity_groupings(candidate_columns)
 
     deduped: dict[tuple[str, str, str], dict] = {}
     for candidate in candidate_columns:
