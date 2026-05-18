@@ -102,24 +102,40 @@ def _pick_display_fields(
 ) -> list[str]:
     """Pick ``list_display`` field names for a model.
 
-    Preference order:
-    1. ``admin.list_display`` from the contract.
-    2. ``editable_fields`` from the view manifest (up to *max_count*).
-    3. First non-id field from the contract if no match.
+    Priority:
+    1. Contract ``admin.list_display`` (if set, authoritative)
+    2. Manifest suggested_display_fields (if no explicit admin config)
+    3. Auto-detect from field type (name, date, FK fields)
     """
-    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
-        raw = admin_cfg.get("list_display")
-        if raw and isinstance(raw, list):
-            return raw[:max_count] if authoritative else [f for f in raw if f in valid][:max_count]
+        explicit = admin_cfg.get("list_display")
+        if explicit:
+            return list(explicit)
+
     if view:
-        editable = view.get("editable_fields") or []
-        if authoritative:
-            return editable[:max_count]
-        return [f for f in editable if f in valid][:max_count]
-    if contract_fields:
-        return [contract_fields[0]["name"]]
-    return []
+        suggested = (view.get("suggested_display_fields") or
+                     view.get("display_fields") or
+                     view.get("editable_fields") or [])
+        if suggested:
+            valid = {f["name"] for f in contract_fields}
+            return [f for f in suggested if f in valid][:max_count]
+
+    if admin_cfg and authoritative:
+        return []
+
+    # Auto-detect
+    ordered = []
+    # name/title first
+    name_fields = [f for f in contract_fields if f["name"] in ("name", "title")]
+    ordered.extend(f["name"] for f in name_fields if f["name"] not in ordered)
+    # date fields
+    date_fields = [f for f in contract_fields if _is_date_field(f)]
+    ordered.extend(f["name"] for f in date_fields if f["name"] not in ordered)
+    # FK fields
+    fk_fields = [f for f in contract_fields if _is_fk_field(f)]
+    ordered.extend(f["name"] for f in fk_fields if f["name"] not in ordered)
+
+    return ordered[:max_count]
 
 
 def _promote_status(
@@ -143,36 +159,39 @@ def _pick_filter_fields(
     view: dict[str, Any] | None,
     contract_fields: list[dict[str, Any]],
     admin_cfg: dict[str, Any] | None = None,
+    max_count: int = 5,
     *,
     authoritative: bool = False,
     status_field: str | None = None,
 ) -> list[str]:
     """Pick ``list_filter`` fields.
 
-    Preference order:
-    1. ``admin.list_filter`` from the contract.
-    2. ``filterable_by`` from the view manifest.
-    3. Date fields from the contract.
-
-    When *status_field* is set and present in the result, it is promoted
-    to the front of the list so status-based filtering is immediately
-    accessible in the admin changelist.
+    Priority:
+    1. Contract ``admin.list_filter`` (if set, authoritative)
+    2. Manifest suggested_filter_fields / status_field
+    3. Auto-detect from status_field
     """
-    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
-        raw = admin_cfg.get("list_filter")
-        if raw and isinstance(raw, list):
-            result = raw if authoritative else [f for f in raw if f in valid]
-            return _promote_status(result, status_field, valid_fields=valid)
+        explicit = admin_cfg.get("list_filter")
+        if explicit:
+            result = list(explicit)
+            if status_field and status_field not in result:
+                result.insert(0, status_field)
+            return result
+
     if view:
-        fb = view.get("filterable_by") or []
-        if authoritative:
-            result = fb
-        else:
-            result = [f for f in fb if f in valid]
-        return _promote_status(result, status_field, valid_fields=valid)
-    result = [f["name"] for f in contract_fields if _is_date_field(f)]
-    return _promote_status(result, status_field, valid_fields=valid)
+        suggested = (view.get("suggested_filter_fields") or
+                     view.get("filterable_by") or
+                     view.get("status_field") and [view["status_field"]] or [])
+        if suggested:
+            valid = {f["name"] for f in contract_fields}
+            result = [f for f in suggested if f in valid][:max_count]
+            return _promote_status(result, status_field, valid_fields=valid)
+
+    if admin_cfg and authoritative:
+        return [status_field] if status_field else []
+
+    return [status_field] if status_field else []
 
 
 def _pick_search_fields(
@@ -184,15 +203,18 @@ def _pick_search_fields(
 ) -> list[str]:
     """Pick ``search_fields``.
 
-    Preference order:
-    1. ``admin.search_fields`` from the contract.
-    2. Text-type fields and FK names.
+    Priority:
+    1. Contract ``admin.search_fields`` (if set, authoritative)
+    2. Auto-detect from text fields and FK names
     """
-    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
-        raw = admin_cfg.get("search_fields")
-        if raw and isinstance(raw, list):
-            return raw if authoritative else [f for f in raw if f in valid]
+        explicit = admin_cfg.get("search_fields")
+        if explicit:
+            return list(explicit)
+
+    if admin_cfg and authoritative:
+        return []
+
     fields: list[str] = []
     for f in contract_fields:
         if _is_text_field(f):
@@ -211,21 +233,26 @@ def _pick_readonly_fields(
 ) -> list[str]:
     """Pick ``readonly_fields``.
 
-    Preference order:
-    1. ``admin.readonly_fields`` from the contract.
-    2. ``computed_fields`` from the view manifest.
+    Priority:
+    1. Contract ``admin.readonly_fields`` (if set, authoritative)
+    2. Manifest readonly_fields / computed_fields
+    3. Empty (auto-detect has no readonly defaults)
     """
-    valid = {f["name"] for f in contract_fields}
     if admin_cfg:
-        raw = admin_cfg.get("readonly_fields")
-        if raw and isinstance(raw, list):
-            return raw if authoritative else [f for f in raw if f in valid]
-    if not view:
+        explicit = admin_cfg.get("readonly_fields")
+        if explicit:
+            return list(explicit)
+
+    if view:
+        readonly = (view.get("readonly_fields") or
+                    view.get("computed_fields") or [])
+        if readonly:
+            return readonly
+
+    if admin_cfg and authoritative:
         return []
-    computed = view.get("computed_fields") or []
-    if authoritative:
-        return computed
-    return [f for f in computed if f in valid]
+
+    return []
 
 
 def _inline_field_names(
@@ -541,14 +568,15 @@ def render_admin_py(
 
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
+        is_authoritative = bool(admin_cfg) or is_user
         status_field = (view.get("status_field") or None) if view else None
         time_scope = view.get("time_scope") if view else None
         status_values = view.get("status_values") if view else None
         editable_fields = view.get("editable_fields") if view else None
-        display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_user)
-        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_user, status_field=status_field)
-        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_user)
-        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_user)
+        display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative)
+        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative, status_field=status_field)
+        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_authoritative)
+        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative)
 
         list_editable = admin_cfg.get("list_editable") or []
         if list_editable:

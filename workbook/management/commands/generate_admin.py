@@ -42,8 +42,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--app-label",
-            default="core",
-            help="Django app label for model imports (default: core)",
+            default=None,
+            help="Django app label for model imports (default: auto-detect from contract, fallback 'core')",
         )
         parser.add_argument(
             "--force",
@@ -72,14 +72,23 @@ class Command(BaseCommand):
                 raise CommandError(str(exc)) from exc
 
         out_path = Path(options["out"]).resolve()
-        app_label = options["app_label"]
-        force = options["force"]
-        show_diff = options["diff"]
 
         try:
             contract = load_contract(str(contract_path))
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
+
+        app_label = options["app_label"]
+        if app_label is None:
+            for table in contract.get("tables", []):
+                meta = table.get("model_meta") or {}
+                if meta.get("app_label"):
+                    app_label = meta["app_label"]
+                    break
+        if app_label is None:
+            app_label = "core"
+        force = options["force"]
+        show_diff = options["diff"]
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
@@ -91,12 +100,6 @@ class Command(BaseCommand):
                 f"({len(contract.get('tables') or [])} table(s))"
             )
         )
-        if not options.get("manifest"):
-            self.stderr.write(self.style.WARNING(
-                "No --manifest provided. Admin will lack list_display, list_filter, "
-                "and readonly_fields. Re-run with --manifest after 'make pull-bundle' "
-                "and 'make generate-view-manifest' for a richer admin."
-            ))
         if manifest:
             views = len(manifest.get("views") or [])
             self.stdout.write(
