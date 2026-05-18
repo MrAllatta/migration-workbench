@@ -29,8 +29,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--out",
-            required=True,
-            help="Output path for models.py (use /dev/null for smoke-only)",
+            default=None,
+            help="Output path for models_auto.py (default: <app_dir>/models_auto.py when --app-label resolves)",
         )
         parser.add_argument(
             "--app-label",
@@ -53,7 +53,6 @@ class Command(BaseCommand):
         if not contract_path.is_file():
             raise CommandError(f"contract not found: {contract_path}")
 
-        out_path = Path(options["out"]).resolve()
         app_label = options["app_label"]
         force = options["force"]
         show_diff = options["diff"]
@@ -76,6 +75,15 @@ class Command(BaseCommand):
                 if "model_meta" not in table:
                     table["model_meta"] = {}
                 table["model_meta"]["app_label"] = app_label
+
+        out_path = options.get("out")
+        if out_path is not None:
+            out_path = Path(out_path).resolve()
+            stub_path = None
+        else:
+            app_dir = Path.cwd() / "backend" / "apps" / app_label
+            out_path = app_dir / "models_auto.py"
+            stub_path = app_dir / "models.py"
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
@@ -115,6 +123,10 @@ class Command(BaseCommand):
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(source, encoding="utf-8")
+
+        if stub_path:
+            from workbook.codegen.stub_writer import ensure_stub
+            ensure_stub(stub_path, "models_auto")
 
         model_count = len(contract.get("tables") or [])
         line_count = source.count("\n")

@@ -37,8 +37,8 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--out",
-            required=True,
-            help="Output path for admin.py (use /dev/null for smoke-only)",
+            default=None,
+            help="Output path for admin_auto.py (default: <app_dir>/admin_auto.py when --app-label resolves)",
         )
         parser.add_argument(
             "--app-label",
@@ -71,8 +71,6 @@ class Command(BaseCommand):
             except ValueError as exc:
                 raise CommandError(str(exc)) from exc
 
-        out_path = Path(options["out"]).resolve()
-
         try:
             contract = load_contract(str(contract_path))
         except ValueError as exc:
@@ -87,6 +85,15 @@ class Command(BaseCommand):
                     break
         if app_label is None:
             app_label = "core"
+
+        out_path = options.get("out")
+        if out_path is not None:
+            out_path = Path(out_path).resolve()
+            stub_path = None
+        else:
+            app_dir = Path.cwd() / "backend" / "apps" / app_label
+            out_path = app_dir / "admin_auto.py"
+            stub_path = app_dir / "admin.py"
         force = options["force"]
         show_diff = options["diff"]
 
@@ -150,6 +157,10 @@ class Command(BaseCommand):
                     )
                     self.stdout.write(diff_text)
         out_path.write_text(source, encoding="utf-8")
+
+        if stub_path:
+            from workbook.codegen.stub_writer import ensure_stub
+            ensure_stub(stub_path, "admin_auto")
 
         line_count = source.count("\n")
         self.stdout.write(

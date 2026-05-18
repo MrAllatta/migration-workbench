@@ -1,0 +1,52 @@
+"""Write or update auto-generated stub files that re-export from *_auto modules."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+
+MARKER = "# --- custom models below this line ---"
+IMPORT_LINE = "from .{module} import *  # noqa: F401, F403"
+
+
+def ensure_stub(
+    stub_path: str | Path,
+    auto_module: str,
+    marker: str = MARKER,
+) -> Path:
+    path = Path(stub_path)
+    import_line = IMPORT_LINE.format(module=auto_module)
+
+    if not path.exists():
+        path.write_text(f"{import_line}\n\n\n{marker}\n", encoding="utf-8")
+        return path
+
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    new_lines: list[str] = []
+    import_written = False
+    marker_found = False
+    custom_section: list[str] = []
+
+    for line in lines:
+        if line.startswith("from .") and not import_written:
+            new_lines.append(f"{import_line}\n")
+            import_written = True
+        elif line.strip() == marker.strip():
+            marker_found = True
+            new_lines.append(line)
+        elif marker_found:
+            custom_section.append(line)
+        else:
+            new_lines.append(line)
+
+    if not import_written:
+        new_lines.insert(0, f"{import_line}\n\n")
+
+    if not marker_found:
+        new_lines.append(f"\n\n{marker}\n")
+    else:
+        new_lines.extend(custom_section)
+
+    path.write_text("".join(new_lines), encoding="utf-8")
+    return path
