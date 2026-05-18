@@ -1,5 +1,5 @@
 """Tests for the new_product scaffold generator."""
-from scripts.new_product import render_makefile, render_models_py
+from scripts.new_product import render_makefile, render_models_py, render_env_example
 
 
 def test_makefile_has_validate_contract_target():
@@ -52,6 +52,21 @@ def test_render_urls_py_redirects_root_to_admin():
     content = render_urls_py()
     assert 'RedirectView.as_view(url="/admin/"' in content
     assert 'path("", RedirectView' in content
+
+
+def test_makefile_has_createsuperuser_target():
+    """The scaffolded Makefile includes a createsuperuser target."""
+    content = render_makefile("test-product")
+    assert "createsuperuser:" in content
+    assert "DJANGO_SUPERUSER_USERNAME" in content
+    assert "DJANGO_SUPERUSER_PASSWORD" in content
+
+
+def test_env_example_has_superuser_vars():
+    """The scaffolded .env.example includes DJANGO_SUPERUSER_* variables."""
+    content = render_env_example("google_sheets")
+    assert "DJANGO_SUPERUSER_USERNAME" in content
+    assert "DJANGO_SUPERUSER_PASSWORD" in content
 
 
 def test_render_models_py_includes_stub_marker():

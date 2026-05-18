@@ -79,6 +79,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "fly-secrets",
         "fly-deploy",
         "deploy",
+        "createsuperuser",
     ]
 
 
@@ -446,6 +447,24 @@ def deploy_blocks(ctx: MakeContext) -> str:
     )
 
 
+def createsuperuser_block(ctx: MakeContext) -> str:
+    """Target for non-interactive superuser creation."""
+    return (
+        "createsuperuser:\n"
+        + _indent(
+            '@if [ -z "$(DJANGO_SUPERUSER_PASSWORD)" ]; then \\\n'
+            '$(MANAGE) createsuperuser; \\\n'
+            "else \\\n"
+            "DJANGO_SUPERUSER_PASSWORD='$(DJANGO_SUPERUSER_PASSWORD)' \\\n"
+            '$(MANAGE) createsuperuser --noinput '
+            "--username '$(DJANGO_SUPERUSER_USERNAME)' "
+            "--email '$(DJANGO_SUPERUSER_EMAIL)'; \\\n"
+            "fi"
+        )
+        + "\n"
+    )
+
+
 def full_targets_block(ctx: MakeContext) -> str:
     """Return all shared target blocks concatenated into one Makefile section."""
     parts = [
@@ -466,5 +485,7 @@ def full_targets_block(ctx: MakeContext) -> str:
         profile_blocks(ctx),
         "\n",
         deploy_blocks(ctx),
+        "\n",
+        createsuperuser_block(ctx),
     ]
     return "".join(parts)

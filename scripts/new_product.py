@@ -491,6 +491,10 @@ DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 
 # SQLite: relative paths resolve under backend/; use absolute path in production (e.g. /data/db.sqlite3).
 SQLITE_PATH=db.sqlite3
+
+# Superuser creation (non-interactive via make createsuperuser)
+# DJANGO_SUPERUSER_USERNAME=admin
+# DJANGO_SUPERUSER_PASSWORD=replace_me
 """
 
     if provider == PROVIDER_CODA:
