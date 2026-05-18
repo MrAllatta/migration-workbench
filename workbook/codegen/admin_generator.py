@@ -522,7 +522,7 @@ def render_admin_py(
                 t for t in tables if get_model_name(t) == ref["source_name"]
             )
             source_fields = get_fields(ref_table)
-            ref_entity = get_model_name(ref_table).lower()
+            ref_entity = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", get_model_name(ref_table)).lower()
             override_fields = inline_overrides.get(ref_entity)
             inline_class_defs.append(
                 _render_inline_class(
