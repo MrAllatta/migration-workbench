@@ -870,13 +870,8 @@ def enrich_entity_groupings(
     for col in columns:
         key = (col.get("workbook_code", ""), col.get("tab_title", ""))
         tab_headers.setdefault(key, set()).add(col.get("proposed_canonical_field", ""))
-    wb_cols: dict[str, set[str]] = {}
-    for (wb_code, _tab), headers in tab_headers.items():
-        wb_cols.setdefault(wb_code, set()).update(headers)
     tabs_by_wb: dict[str, list[tuple[str, set[str]]]] = {}
     for (wb_code, tab_title), headers in tab_headers.items():
-        if wb_code not in wb_cols:
-            continue
         tabs_by_wb.setdefault(wb_code, []).append((tab_title, headers))
     entity_map: dict[str, str] = {}
     group_counter = 0
@@ -901,7 +896,6 @@ def enrich_entity_groupings(
         for tab_title, entity_name in assigned.items():
             entity_map[tab_title] = entity_name
     for col in columns:
-        key = (col.get("workbook_code", ""), col.get("tab_title", ""))
         entity_name = entity_map.get(col.get("tab_title", ""))
         if entity_name is not None:
             col["suggested_entity"] = entity_name
@@ -1521,12 +1515,9 @@ def run_cohort_corpus(
     workbook_index: dict[str, dict] = {
         rec["workbook_code"]: rec for rec in index_records if "workbook_code" in rec
     }
-    entity_names: set[str] = {
-        _to_pascal_case(code) for code in approved_tabs
-    }
-    enrich_fk_candidates(candidate_columns, entity_names)
+    enrich_fk_candidates(candidate_columns, set())
     enrich_import_key_candidates(candidate_columns)
-    entity_map = enrich_entity_groupings(candidate_columns, workbook_index)
+    enrich_entity_groupings(candidate_columns, workbook_index)
 
     deduped: dict[tuple[str, str, str], dict] = {}
     for candidate in candidate_columns:
