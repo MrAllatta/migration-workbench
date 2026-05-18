@@ -339,9 +339,14 @@ def render_models_py(model_prefix: str, user_model_name: str) -> str:
     return f"""from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from .models_auto import *  # noqa: F401, F403
+
 
 class {user_model_name}(AbstractUser):
     pass
+
+
+# --- custom models below this line ---
 """
 
 

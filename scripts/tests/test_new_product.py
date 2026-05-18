@@ -1,5 +1,5 @@
 """Tests for the new_product scaffold generator."""
-from scripts.new_product import render_makefile
+from scripts.new_product import render_makefile, render_models_py
 
 
 def test_makefile_has_validate_contract_target():
@@ -44,3 +44,11 @@ def test_generate_admin_does_not_require_manifest_file():
     ]
     assert "else" in generate_admin_section
     assert "--manifest" not in generate_admin_section.split("else")[1].split("fi")[0]
+
+
+def test_render_models_py_includes_stub_marker():
+    """The scaffolded models.py includes the custom-models marker and auto import."""
+    content = render_models_py("core", "FarmUser")
+    assert "from .models_auto import *  # noqa: F401, F403" in content
+    assert "# --- custom models below this line ---" in content
+    assert "class FarmUser(AbstractUser):" in content
