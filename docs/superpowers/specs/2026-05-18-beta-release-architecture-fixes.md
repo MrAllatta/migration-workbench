@@ -6,82 +6,110 @@
 
 ## Overview
 
-Eight friction points encountered during a full workflow walkthrough reveal deeper
-architectural issues in the migration-workbench codegen pipeline. This spec
-describes the foundation changes needed to resolve them.  All changes are
-designed to be **backward-compatible**: existing contracts continue to work with
-no modifications.
+Eight friction points from a full workflow walkthrough reveal deeper
+architectural issues in the codegen pipeline.  This spec describes the fixes
+as a ground-up redesign of the naming contract, output convention, CLI entry
+points, and error handling.  No backward-compatibility constraints apply.
 
 ---
 
-## 1. Contract Schema: Explicit `model_name` Field
+## 1. Contract Schema: Required `model_name` Field
 
 ### Problem
 
-`get_model_name()` (workbook/codegen/contract.py:134-139) derives the Python
-class name from `suggested_model_name` via `.capitalize()`, which mangles
-PascalCase: `SalesChannel` → `Saleschannel`. FK targets use dotted qualified
-names (`examples.ExampleFarm`) that don't round-trip through
-`get_model_name()`. The validator (`validate_contract_tables()` at
-contract.py:378-435) compares against raw `suggested_model_name` values, not
-the resolved model names, producing false-positive FK warnings.
+`get_model_name()` derives the Python class name from `suggested_model_name`
+using `.capitalize()`, which mangles PascalCase: `SalesChannel` →
+`Saleschannel`.  FK targets use dotted qualified names (`examples.ExampleFarm`)
+that don't round-trip through `get_model_name()`.  The validator compares
+against raw `suggested_model_name` values, not resolved model names,
+producing false-positive FK warnings.
+
+`suggested_model_name` conflates two concerns: (1) a human-readable label for
+the table, and (2) the exact Python identifier for the model class.  These
+should be separate.
 
 ### Design
 
-Add an optional `model_name` field to each table entry in the schema contract:
+Every table **must** have a `model_name` field holding the exact PascalCase
+class name:
 
 ```yaml
 tables:
-  - suggested_model_name: SalesChannel
-    model_name: SalesChannel
+  - suggested_model_name: Sales Channel    # human label — anything goes
+    model_name: SalesChannel               # exact Python class name
 ```
 
-#### `get_model_name()` changes (contract.py:134-139)
+#### `get_model_name()` — required, no fallback
 
 ```python
-def _to_pascal_case(raw: str) -> str:
-    """Convert snake_case or kebab-case to PascalCase."""
-    parts = raw.replace("-", "_").split("_")
-    return "".join(p.capitalize() for p in parts if p) or "Model"
-
 def get_model_name(table: dict[str, Any]) -> str:
-    explicit = table.get("model_name")
-    if explicit and isinstance(explicit, str):
-        return explicit
-    raw = str(table.get("suggested_model_name") or "model")
-    return _to_pascal_case(raw)
+    return str(table["model_name"])
 ```
 
-#### `validate_contract_tables()` changes (contract.py:378-435)
+No derivation.  No fallback.  If `model_name` is missing, the KeyError
+propagates and is caught by the management command with a clear message
+("table 'Sales Channel' is missing required field 'model_name'").
 
-Build the table-names index from `get_model_name(t)` instead of
-`suggested_model_name`. Compare FK targets against this resolved index.
-The `table_names` set at line 393 already calls `get_model_name()` — this is
-correct but the *field-level* FK target (`field["kwargs"].get("to")`) may
-still use `suggested_model_name`. The `_build_fk_index()` helper in
-admin_generator.py also needs alignment.
+#### `suggested_model_name` — label only
 
-#### Scaffold changes (scaffold_workbook_schema.py)
+`suggested_model_name` becomes a purely human-readable label.  It is:
+- Displayed in progress messages and validation output
+- Used as the seed for auto-deriving `bundle_path` (Section 7)
+- Not used for any codegen resolution
 
-The scaffold auto-populates `model_name` by running `_to_pascal_case()` on
-`suggested_model_name` when no explicit `model_name` is provided in the bundle
-config.
+#### Resolution everywhere uses `model_name`
 
-#### Contract versioning
+`model_name` stores the bare PascalCase class name — no app-label prefix.
 
-The `model_name` field is optional — contracts without it continue to work via
-the fallback path.  No version bump required.  FH targets that use
-`suggested_model_name` values (rather than `model_name`) continue to resolve
-correctly because `get_model_name()` is the single source of truth.
+**Before:** `to: examples.ExampleFarm`  (dotted, fragile, duplicated)
+**After:**  `to: ExampleFarm`            (bare, matches model_name exactly)
+
+Cross-app imports are resolved at generation time using each table's
+`model_meta.app_label`.
+
+- FK targets in `django_field_kwargs.to` and `import_config.fk_lookup.model`
+  use `model_name` values (bare, no prefix)
+- `validate_contract_tables()` builds its index from `get_model_name(t)` and
+  compares FK targets against it
+- `_build_fk_index()` in `admin_generator.py` uses `get_model_name()` for
+  target and source names
+- View manifest entity lookup uses `model_name` (lowercased), not
+  `suggested_model_name`
+
+#### Validator also checks `model_name` presence
+
+```python
+def validate_contract_tables(contract):
+    warnings = []
+    for table in contract.get("tables", []):
+        if "model_name" not in table:
+            warnings.append(
+                f"Table '{table.get('suggested_model_name', '?')}' "
+                f"missing required 'model_name'"
+            )
+    # ... existing FK checks using get_model_name() ...
+```
+
+#### Scaffold
+
+`scaffold_workbook_schema` always outputs `model_name` in every table,
+derived from `suggested_model_name` by removing spaces and ensuring
+PascalCase.
+
+#### Contract version
+
+Bump to v2.0.  `load_contract()` rejects contracts with missing `model_name`
+on any table.  All existing contract fixtures and test data in the repo are
+updated to include `model_name`.
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `workbook/codegen/contract.py` | Add `_to_pascal_case()`. Modify `get_model_name()`. Align `validate_contract_tables()` |
-| `workbook/codegen/admin_generator.py` | Align `_build_fk_index()` to use `get_model_name()` for target comparison |
-| `workbook/management/commands/scaffold_workbook_schema.py` | Populate `model_name` from `suggested_model_name` |
-| `workbook/codegen/import_generator.py` | Verify FK target references use consistent naming |
+| `workbook/codegen/contract.py` | Make `get_model_name()` a simple accessor. Update `validate_contract_tables()`. Add version-migration warning for v1.x contracts |
+| `workbook/codegen/admin_generator.py` | Align `_build_fk_index()` and view-entity lookup to use `get_model_name()` |
+| `workbook/management/commands/scaffold_workbook_schema.py` | Always output `model_name` |
+| `scripts/validate_contract.py` | Update to report `model_name` presence per table |
 
 ---
 
@@ -90,67 +118,63 @@ correctly because `get_model_name()` is the single source of truth.
 ### Problem
 
 `generate_models --force` overwrites the entire `models.py`, destroying
-hand-authored models like `FarmUser(AbstractUser)`. Django immediately fails
-with `ImproperlyConfigured: AUTH_USER_MODEL refers to model 'core.FarmUser'
-that has not been installed`.
+hand-authored models like `FarmUser(AbstractUser)`.
 
 ### Design
 
-Generated code goes into `*_auto.py` files. Hand-authored code stays in the
-base file and imports from generated files.
+All generated code goes into `*_auto.py` files.  Hand-authored code stays in
+the base file and re-exports from generated files via an auto-maintained stub.
 
 #### Output path defaults
 
-| Command | Old default | New default |
-|---------|-------------|-------------|
-| `generate_models` | `models.py` (required `--out`) | `models_auto.py` (omittable `--out`) |
-| `generate_admin` | `admin.py` (required `--out`) | `admin_auto.py` (omittable `--out`) |
-| `generate_import` | `import_<label>.py` (auto-derived) | Unchanged (already separate) |
+| Command | Output file |
+|---------|-------------|
+| `generate_models` | `models_auto.py` |
+| `generate_admin` | `admin_auto.py` |
+| `generate_import` | `import_<app_label>.py` (unchanged — already separate) |
 
-#### `--out` behavior
+`--out` is optional on all commands.  When omitted, the path is derived from
+`--app-label` (or auto-detected from the contract).  `--out` exists for
+explicit redirection (`/dev/null`, build directories) but is not required.
 
-- When `--out PATH` is provided explicitly, write to that exact path (current
-  behavior, fully backward-compatible).
-- When `--out` is omitted, write to `{app_dir}/{models_auto,admin_auto}.py`.
-  If the `--app-label` directory doesn't exist, error with guidance.
+#### Stub generation (always on)
 
-#### `--with-stub` flag (both commands)
-
-Generates (or updates) the companion base file that re-exports everything:
+Every generator creates or updates a companion stub file that re-exports the
+generated classes:
 
 **`models.py`:**
 ```python
-# Auto-generated stub — do not edit manually.
+# Auto-generated — do not edit manually.
 from .models_auto import *  # noqa: F401, F403
 
 # --- custom models below this line ---
 ```
 
-If `models.py` already exists, only the first line is updated (the import
-line), preserving any hand-authored models below the marker comment.  If no
-marker comment exists, it's appended at the end.
-
 **`admin.py`:**
 ```python
-# Auto-generated stub — do not edit manually.
+# Auto-generated — do not edit manually.
 from .admin_auto import *  # noqa: F401, F403
 ```
 
-#### Backward compatibility
+If the stub file already exists:
+- The `from .*_auto import *` line is updated to point at the current
+  auto-generated file
+- Everything below the `# --- custom ... ---` marker is preserved unchanged
+- If the marker comment is missing, it's appended at the end of the file
 
-Existing workflows that pass `--out backend/apps/core/models.py` continue to
-write to that exact path.  Only users who omit `--out` (or migrate to the new
-default) get the separate-file behavior.  The `--force` flag works identically
-on both paths.
+#### `generate_admin` app_label fix
+
+The command auto-detects `app_label` from the contract's `model_meta`
+(like `generate_models` and `generate_import` already do), instead of
+hardcoding `default="core"`.
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `workbook/management/commands/generate_models.py` | Make `--out` optional. Add `--with-stub`. Change default to `models_auto.py` |
-| `workbook/management/commands/generate_admin.py` | Same changes + fix hardcoded `app_label="core"` to auto-detect from contract |
-| New helper: `workbook/codegen/stub_writer.py` | Shared logic for writing/updating stub import files |
-| `Makefile` | Update `generate-admin-light`, `generate-admin` targets if needed |
+| `workbook/management/commands/generate_models.py` | Make `--out` optional. Always generate stub `models.py`. Change default to `models_auto.py` |
+| `workbook/management/commands/generate_admin.py` | Same + fix hardcoded `app_label="core"` to auto-detect from contract |
+| New: `workbook/codegen/stub_writer.py` | Shared logic for writing/updating stub import files with marker preservation |
 
 ---
 
@@ -158,15 +182,16 @@ on both paths.
 
 ### Problem
 
-Codegen is only accessible via `manage.py` commands while `wb` is a separate
-deployment CLI.  The Makefile target for contract validation uses
-`scripts/validate_contract.py` instead of `wb`.  Users must know two entry
-points and have the package installed.
+Codegen is only accessible via `manage.py` commands.  The `wb` CLI exists
+(for deployment) but has no codegen subcommands.  The Makefile target for
+contract validation uses a standalone script instead of `wb`.
 
 ### Design
 
-Add `generate` and `validate` subcommands to `wb` that thin-wrap the Django
-management commands:
+`wb` becomes the canonical entry point for all workbench operations —
+codegen, validation, and deployment.
+
+#### New subcommands
 
 ```
 wb generate models --contract build/schema-contract.yaml
@@ -186,13 +211,10 @@ wb validate contract --contract build/schema-contract.yaml
   [--json] [--exit-zero]
 ```
 
-#### Wrapper pattern (wb_cli.py)
+#### Wrapper pattern
 
-Each `generate` subcommand:
-1. Calls `_setup_django()` with the project's settings module
-2. Calls `call_command(CommandClass, **kwargs)` with the Django management
-   command's class directly
-3. Stdout/stderr pass through naturally
+Each subcommand calls `_setup_django()` then invokes the management command
+via `call_command()`:
 
 ```python
 def _generate_models(args: argparse.Namespace) -> int:
@@ -203,12 +225,13 @@ def _generate_models(args: argparse.Namespace) -> int:
     return 0
 ```
 
-#### Makefile alignment
+Stdout from the management command passes through naturally.
+
+#### Makefile
+
+All codegen and validation targets use `wb`:
 
 ```makefile
-CONTRACT ?= build/schema-contract.yaml
-OUT ?= build/out.py
-
 validate-contract:
 	wb validate contract --contract "$(CONTRACT)"
 
@@ -225,20 +248,23 @@ generate-import:
 	wb generate import --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)
 ```
 
-#### Existing `wb contract review` command
+Also fix the `generate-all` target to actually define the `generate-models`,
+`generate-view-manifest`, and `generate-import` targets (currently listed in
+`.PHONY` with no recipe — `make generate-all` silently skips them).
 
-The `wb contract review` subcommand already exists at `wb_cli.py:681-685` and
-calls `review_contract()` (different from `validate_contract_tables()` —
-design review checks vs structural validation).  The new `wb validate contract`
-is a separate code path that wraps the management command.  Both coexist.
+#### Existing `wb contract review`
+
+The existing `wb contract review` subcommand (`wb_cli.py:681`) calls
+`review_contract()` which runs design-review checks.  The new `wb validate
+contract` calls `validate_contract_tables()` for structural validation.  Both
+coexist.
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `deployment/wb_cli.py` | Add `generate` and `validate` subcommand trees with wrappers |
-| `Makefile` | Replace `$(MANAGE)` and `$(PYTHON) scripts/...` with `wb` equivalents |
-| `pyproject.toml` | No change needed — `wb` entry point already registered |
+| `deployment/wb_cli.py` | Add `generate` subcommand tree with `{models,admin,import,manifest}` and `validate contract` subcommand |
+| `Makefile` | Replace `$(MANAGE)` and `$(PYTHON) scripts/...` with `wb`. Add missing `generate-models`, `generate-view-manifest`, `generate-import` targets |
 
 ---
 
@@ -247,12 +273,13 @@ is a separate code path that wraps the management command.  Both coexist.
 ### Problem
 
 No standalone validation command.  Validation only runs as a side effect of
-`generate_models` / `generate_import` / `generate_admin` — coupling validation
-to code generation.
+code generation.
 
 ### Design
 
-New management command at
+New management command that loads and validates a contract without generating
+any code:
+
 `workbook/management/commands/validate_contract.py`:
 
 ```python
@@ -274,24 +301,31 @@ class Command(BaseCommand):
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
-            self.stdout.write(self.style.WARNING(f"  validation: {w}"))
+            self.stdout.write(self.style.WARNING(f"  {w}"))
 
         if not warnings:
             self.stdout.write(
-                self.style.SUCCESS(f"Contract is valid: {len(contract.get('tables',[]))} table(s)")
+                self.style.SUCCESS(
+                    f"Contract is valid: "
+                    f"{len(contract.get('tables', []))} table(s)"
+                )
             )
-        else:
-            raise CommandError(f"{len(warnings)} validation warning(s) found")
+            return
+
+        raise CommandError(f"{len(warnings)} validation warning(s) found")
 ```
 
-Also available as `wb validate contract` (see Section 3).
+The command exits 0 when clean, 1 when warnings exist (useful for CI gating).
+
+Canonical invocation is `wb validate contract --contract ...` (Section 3).
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| New: `workbook/management/commands/validate_contract.py` | Full command implementation |
-| `deployment/wb_cli.py` | Wire `validate contract` to use `call_command(Command, ...)` |
+| New: `workbook/management/commands/validate_contract.py` | Full command |
+| `deployment/wb_cli.py` | Wire `validate contract` to `call_command()` |
+| `scripts/validate_contract.py` | Remove — superseded by management command |
 
 ---
 
@@ -299,13 +333,14 @@ Also available as `wb validate contract` (see Section 3).
 
 ### Problem
 
-`_render_import_method()` (import_generator.py:393-398) raises a raw
-`ValueError` when `import_config.bundle_path` is missing, which propagates
-as an ugly Python traceback with no remediation guidance.
+`_render_import_method()` raises a raw `ValueError` when
+`import_config.bundle_path` is missing, producing an ugly Python traceback
+with no remediation guidance.
 
 ### Design
 
-Catch the `ValueError` in `generate_import.handle()` and emit a clean error:
+Catch the `ValueError` in `generate_import.handle()` and emit a clean,
+actionable error:
 
 ```python
 try:
@@ -313,10 +348,12 @@ try:
 except ValueError as exc:
     if "bundle_path" in str(exc):
         raise CommandError(
-            f"Import generation failed: {exc}\n\n"
-            "To fix, run:\n"
-            f"  manage.py scaffold_workbook_schema --hardened --out config/contract.yaml\n"
-            "Or add bundle_path to each table's import_config section in the contract."
+            "Import generation failed — bundle_path is missing.\n\n"
+            "Each table with import_config needs a bundle_path:\n"
+            "  import_config:\n"
+            "    bundle_path: reference/<table_name>.csv\n\n"
+            "Re-generate the contract from the scaffold, which now\n"
+            "auto-generates bundle_path from the model name."
         )
     raise
 ```
@@ -333,70 +370,50 @@ except ValueError as exc:
 
 ### Problem
 
-When `generate_admin` runs with no `--manifest`, the contract's `admin:`
-blocks (which can include `list_display`, `list_filter`, `search_fields`,
-`readonly_fields`, `inlines`, etc.) are ignored.  The command prints a
-warning implying the output will be bare.
-
-When a manifest IS provided, manifest values unconditionally override the
-contract's admin config, even though the contract is the user's explicit
-configuration.
+`generate_admin` ignores the contract's `admin:` blocks when no `--manifest`
+is provided, printing a warning that the output will be bare.  When a
+manifest IS provided, manifest values unconditionally override the contract's
+admin config, even though the contract is the user's explicit configuration.
 
 ### Design
 
-#### No-manifest case (admin_generator.py)
+The contract's `admin:` blocks are authoritative.  The manifest enriches
+(provides fields the contract doesn't explicitly set) but never overrides.
+
+#### No-manifest case
 
 `_pick_display_fields()`, `_pick_filter_fields()`, `_pick_search_fields()`,
-`_pick_readonly_fields()` already accept `admin_cfg` as a parameter.  When no
-manifest is provided at all:
+`_pick_readonly_fields()` already accept `admin_cfg`.  When no manifest:
 
-- Pass `admin_cfg=get_admin_config(table)` (already done)
-- Pass `view=None` (already done)
-- The `authoritative` flag becomes `True` when `admin_cfg` is non-empty,
-  meaning the contract's `admin:` fields are used as-is rather than being
-  auto-inferred from field types
+- `admin_cfg` is passed as-is from `get_admin_config(table)`
+- `authoritative=True` when `admin_cfg` has relevant keys (list_display etc.)
+- No warning about missing manifest — the contract is sufficient
 
-This is already partially implemented — the `authoritative` parameter exists.
-The change is to set `authoritative=True` when `admin_cfg` has the relevant
-keys (list_display, etc.), even without a manifest.
+#### Manifest-present case
 
-#### Manifest-present case (admin_generator.py)
-
-Change priority: contract admin block values take precedence over manifest
-values for the same field name.  Manifest values fill in fields that the
-contract admin block doesn't explicitly set.
-
-In `_pick_display_fields()` and friends:
+Manifest fills gaps the contract admin block leaves open:
 
 ```python
-# If admin_cfg explicitly sets list_display, those are authoritative.
-# Manifest fields are added only for positions not in the admin list.
-if admin_cfg.get("list_display"):
-    return list(admin_cfg["list_display"])
-# Otherwise, prefer explicit admin fields to inferred manifest fields.
+# Contract admin block fields stay as authored.
+# Manifest adds fields for positions the admin block doesn't set.
+explicit = admin_cfg.get("list_display", [])
+manifest_fields = view.get("suggested_display_fields", [])
+# Merge: explicit fields keep their position and value,
+# manifest fields are appended when not already present.
 ```
 
-#### Warning message update (generate_admin.py)
+#### Warning removed
 
-Change from:
-```
-No --manifest provided. Admin will lack list_display, list_filter,
-and readonly_fields.
-```
-
-To:
-```
-No --manifest provided. Using contract admin: blocks for admin config.
-Re-run with --manifest after 'make pull-bundle' to enrich with
-field-level hints from bundle data.
-```
+The "No --manifest provided. Admin will lack list_display..." message is
+removed.  The contract is the source of truth.  The manifest is an optional
+enrichment.
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `workbook/codegen/admin_generator.py` | Update `_pick_display_fields()` and related to prefer contract admin over manifest |
-| `workbook/management/commands/generate_admin.py` | Update warning message, fix `app_label` default detection |
+| `workbook/codegen/admin_generator.py` | Update `_pick_display_fields()` and related to prefer contract admin over manifest; remove manifest-dependency for `authoritative` |
+| `workbook/management/commands/generate_admin.py` | Remove the no-manifest warning; fix `app_label` auto-detection |
 
 ---
 
@@ -405,74 +422,52 @@ field-level hints from bundle data.
 ### Problem
 
 `scaffold_workbook_schema` produces columns but no `import_config.bundle_path`.
-The `--hardened` flag adds it but is not the default and its purpose isn't
-documented in the command help.  Generated contracts can't be used for import
-generation without manual editing.
+The `--hardened` flag adds it but is not the default.  Generated contracts
+can't be used for import generation without manual editing.
 
 ### Design
 
-Even in non-hardened mode, auto-derive `bundle_path` from
-`suggested_model_name`:
+`bundle_path` is always auto-derived from `suggested_model_name` (the
+human-readable label), regardless of `--hardened`:
 
 ```python
-def _derive_bundle_path(suggested_model_name: str) -> str:
+def _derive_bundle_path(label: str) -> str:
     """Derive a default CSV bundle_path from a suggested model name.
 
-    Examples:
-        SalesChannel -> reference/sales_channels.csv
-        Farm         -> reference/farms.csv
-        Address      -> reference/addresses.csv
-        Person       -> reference/persons.csv
+    Sales Channel  -> reference/sales_channels.csv
+    Farm           -> reference/farms.csv
+    Address        -> reference/addresses.csv
+    Business Unit  -> reference/business_units.csv
     """
-    rough = suggested_model_name.replace(" ", "_").lower()
-    # Crude pluralization: add "es" if ends in s, add "s" otherwise.
-    if rough.endswith("s"):
-        plural = rough + "es"
-    else:
-        plural = rough + "s"
+    stem = label.strip().lower().replace(" ", "_")
+    plural = stem + "es" if stem.endswith("s") else stem + "s"
     return f"reference/{plural}.csv"
 ```
 
-The logic is intentionally simple and predictable — users override it in their
-contract when needed.  The key is that the scaffold produces a *working*
-contract out of the box.
-
 When `import_config` already has an explicit `bundle_path` (from a table
-profile or bundle config), the scaffold respects it.  Only auto-derive when
-no `bundle_path` exists.
+profile or bundle config), the scaffold respects it.  Auto-derive is the
+fallback.
+
+The `--hardened` flag continues to control other production defaults (data
+types, constraints, field transforms) but no longer controls `bundle_path`.
 
 ### Files changed
 
 | File | Change |
 |------|--------|
-| `workbook/management/commands/scaffold_workbook_schema.py` | Add `_derive_bundle_path()`, call for each table's `import_config` block |
-| `workbook/management/commands/scaffold_workbook_schema.py` | Update `--help` to mention bundle_path auto-generation |
+| `workbook/management/commands/scaffold_workbook_schema.py` | Add `_derive_bundle_path()`; call for each table's `import_config` outside the hardened guard |
 
 ---
 
 ## Implementation Order
 
-The changes should be implemented in this order (each step builds on the
-previous):
+Each step builds on the previous.  No step should break the test suite.
 
-1. **`model_name` field** (Section 1) — foundation contract change
-2. **`bundle_path` auto-derive** (Section 7) — trivial addition on scaffold
-3. **Error handling** (Section 5) — small, self-contained catch
-4. **`validate_contract` command** (Section 4) — new command, no side effects
-5. **Admin config priority** (Section 6) — codegen logic change
-6. **Separate generated files** (Section 2) — output convention change
-7. **Unified wb CLI** (Section 3) — CLI entry points + Makefile update
-
----
-
-## Compatibility Notes
-
-- **Contract v1.0–1.3**: All existing contracts remain valid.  The `model_name`
-  field is optional.  The fallback path in `get_model_name()` is designed to
-  produce the same output as current code for snake_case input.
-- **Existing generated files**: Files at explicit `--out` paths are unchanged.
-  Only users who omit `--out` see the new default paths.
-- **Existing Makefiles**: Targets using `manage.py` continue to work.  The
-  Makefile changes in this spec are additions/new defaults, not removals.
-- **`wb` CLI**: The existing `wb contract review` subcommand is unchanged.
-  New subcommands are additive.
+1. **`model_name` field** (Section 1) — contract.py, admin_generator.py, scaffold.
+   Update example contracts and tests.  Run all tests.
+2. **`bundle_path` auto-derive** (Section 7) — scaffold only.  Small, trivial.
+3. **Error handling** (Section 5) — generate_import.py catch.  Small.
+4. **`validate_contract` command** (Section 4) — new file, independent.
+5. **Admin config priority** (Section 6) — admin_generator.py logic change.
+6. **Separate generated files** (Section 2) — generators + new stub_writer.py.
+7. **Unified wb CLI** (Section 3) — wb_cli.py + Makefile.
