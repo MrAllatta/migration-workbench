@@ -10,6 +10,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure the project root is importable when this script is run directly.
+_script_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(_script_dir.parent))
+
+from workbook.makefile_targets import (
+    MakeContext,
+    phonies,
+    full_targets_block,
+    deploy_blocks,
+)
+
 PROVIDER_GOOGLE_SHEETS = "google_sheets"
 PROVIDER_CODA = "coda"
 
@@ -366,7 +377,11 @@ DJANGO_SETTINGS_MODULE = "config.settings"
 
 
 def render_makefile(product_kebab: str) -> str:
-    return r"""-include .env
+    ctx = MakeContext(product_kebab=product_kebab)
+    product_ctx = ctx.with_overrides(core="backend/apps/core")
+
+    return (
+        r"""-include .env
 # ── Environment variable loading ──────────────────────────────────────────
 # .env is loaded by Make's `-include` above. Vars are available inside recipe
 # shells (after the `export` lines below), NOT in raw `bash`.
@@ -391,7 +406,7 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate generate-models generate-admin generate-import generate generate-all profile-preflight profile-drive-folder profile-coda-corpus profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 pull-bundle load-data push-data generate-view-manifest generate-discovery-interview merge-discovery-notes diff-generated generate-admin-light post-generate check-generated snapshot-codegen check-snapshots drift-check
+.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate """ + " ".join(phonies(product_ctx)) + r"""
 
 venv:
 	python3 -m venv $(VENV)
@@ -447,139 +462,18 @@ check-env:
 	done; \
 	exit $$err
 
-CONTRACT = config/contract.yaml
-CORE = backend/apps/core
-BUNDLE_OUT = build/bundle
-VIEW_MANIFEST = config/view-manifest.yaml
-
-# Corpus profiling date stamp — set to the date of your Phase 1 run for resume phases.
-DATE_STAMP = $(shell date +%Y-%m-%d)
-
-generate-models:
-	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --force
-
-generate-admin:
-	@if [ -f "$(VIEW_MANIFEST)" ]; then \
-		$(MANAGE) generate_admin --contract "$(CONTRACT)" --manifest "$(VIEW_MANIFEST)" --out "$(CORE)/admin.py" --app-label core --force; \
-	else \
-		$(MANAGE) generate_admin --contract "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force; \
-	fi
-
-generate-import:
-	$(MANAGE) generate_import --contract "$(CONTRACT)" --app-label core --force
-
-generate: generate-models generate-admin generate-import
-
-generate-view-manifest:
-	@test -f "$(BUNDLE_OUT)/structure.json" || (echo >&2 "structure.json not found at $(BUNDLE_OUT)/structure.json. Run make pull-bundle first."; exit 1)
-	$(MANAGE) scaffold_view_manifest --structure "$(BUNDLE_OUT)/structure.json" --schema-contract "$(CONTRACT)" --out "$(VIEW_MANIFEST)" --summary-json build/view-manifest-summary.json
-
-generate-all: generate-models generate-view-manifest generate-admin generate-import
-	@echo "All code generation complete. Run 'make check-generated' to verify."
-
-diff-generated:
-	$(MANAGE) generate_models --contract "$(CONTRACT)" --out "$(CORE)/models.py" --diff
-
-generate-admin-light:
-	$(MANAGE) generate_admin --contract "$(CONTRACT)" --out "$(CORE)/admin.py" --app-label core --force
-
-post-generate:
-	@test -f scripts/post-generate.sh && bash scripts/post-generate.sh || echo "No scripts/post-generate.sh found"
-
-check-generated:
-	$(PYTHON) -c "from backend.apps.core.models import *; print('import OK')"
-	$(MANAGE) check
-
-snapshot-codegen:
-	$(MANAGE) generate_models --contract "$(CONTRACT)" --out build/snapshots/models.py --force
-	$(MANAGE) generate_admin --contract "$(CONTRACT)" --out build/snapshots/admin.py --force
-	$(MANAGE) generate_import --contract "$(CONTRACT)" --out build/snapshots/imports.py --force
-
-check-snapshots:
-	@echo "=== Model import ==="
-	$(PYTHON) -c "from backend.apps.core.models import *; print('OK')"
-	@echo "=== Django check ==="
-	$(MANAGE) check
-
-drift-check:
-	$(PYTHON) -m deployment.wb_cli drift check --baseline "$(CONTRACT)" --new "$(CONTRACT)"
-
-pull-bundle:
-	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" SOURCE_CONFIG="$${SOURCE_CONFIG:?SOURCE_CONFIG required}" BUNDLE_OUTPUT_DIR="$(BUNDLE_OUT)" INCLUDE_STRUCTURE=true scripts/run_import.sh pull_bundle
-
-load-data:
-	RUNNER_MODE=local MANAGE_PY="$(MANAGE)" IMPORT_DATA_DIR="$${IMPORT_DATA_DIR:-example_data}" IMPORT_COMMAND="$${IMPORT_COMMAND:-import_reference_example}" IMPORT_SUMMARY_JSON="$${IMPORT_SUMMARY_JSON:-}" scripts/run_import.sh import_apply
-
-push-data:
-	@gzip -c backend/db.sqlite3 | flyctl ssh console -a $${FLY_APP:-{product_kebab}-production} -C "gunzip > /data/db.sqlite3" 2>/dev/null || echo "push-data: set FLY_APP and ensure flyctl is authenticated"
-
-generate-view-manifest:
-	@test -f "$(BUNDLE_OUT)/structure.json" || (echo >&2 "structure.json not found at $(BUNDLE_OUT)/structure.json. Run make pull-bundle first."; exit 1)
-	$(MANAGE) scaffold_view_manifest --structure "$(BUNDLE_OUT)/structure.json" --schema-contract "$(CONTRACT)" --out "$(VIEW_MANIFEST)" --summary-json build/view-manifest-summary.json
-
-generate-discovery-interview:
-	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
-	$(MANAGE) generate_discovery_interview --manifest "$(VIEW_MANIFEST)" --out build/discovery-interview.md
-
-merge-discovery-notes:
-	@test -f "$(VIEW_MANIFEST)" || (echo >&2 "View manifest not found at $(VIEW_MANIFEST). Run make generate-view-manifest first."; exit 1)
-	@test -f build/discovery-interview.md || (echo >&2 "Discovery interview not found at build/discovery-interview.md. Run make generate-discovery-interview first."; exit 1)
-	$(MANAGE) merge_discovery_notes --manifest "$(VIEW_MANIFEST)" --interview build/discovery-interview.md --out "$(VIEW_MANIFEST)" --summary-out build/discovery-summary.md
-
+""" + full_targets_block(product_ctx) + r"""
 chassis-gate:
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
 	$(MAKE) -C "$(WORKBENCH)" chassis-gate
-
-profile-preflight:
-	DB_ENGINE=sqlite $(MANAGE) profile_preflight --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG}"
-
-profile-drive-folder:
-	DB_ENGINE=sqlite $(MANAGE) profile_drive_folder --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG}" --out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"
-
-profile-coda-corpus:
-	DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus --config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" --out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"
-
-profile-cohort-corpus:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)"
-
-# Phase 1: discovery + tab selection only (no deep API calls). Inspect tab_selection_<date>.json, then configure heuristics.
-profile-cohort-corpus-phase1:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --stop-before-deep
-
-# Phase 2: re-run heuristics from broad coverage (no API calls). Iterate on cohort_corpus.json, then re-run.
-profile-cohort-corpus-phase2:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-broad --stop-before-deep
-
-# Phase 3: deep profile from hand-edited tab_selection_<date>.json. Run after heuristics are final.
-# Available tab_score heuristics: tab_exclude_patterns (regex block list),
-# expansion_formula_penalty, expansion_formula_threshold, plus token lists.
-profile-cohort-corpus-phase3:
-	DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus --config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" --out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" --date-stamp "$(DATE_STAMP)" --resume-from-tab-selection
 
 # ---------------------------------------------------------------------------
 # Docker / Fly.io deployment
 # ---------------------------------------------------------------------------
 
 DOCKER_IMAGE ?= product
-FLY_APP ?= {product_kebab}-production
-
-docker-build:
-	docker build -t $(DOCKER_IMAGE) .
-
-fly-launch:
-	flyctl launch --name $(FLY_APP) --region ewr --no-deploy --copy-config || true
-
-fly-volume:
-	flyctl volumes create data --app $(FLY_APP) --region ewr --size 1 --yes
-
-fly-secrets:
-	flyctl secrets set DJANGO_SECRET_KEY=$$(python3 -c "import secrets; print(secrets.token_urlsafe(50))") DJANGO_ALLOWED_HOSTS=$(FLY_APP).fly.dev DJANGO_DEBUG=0
-
-fly-deploy: docker-build
-	flyctl deploy --app $(FLY_APP)
-
-deploy: fly-launch fly-volume fly-secrets fly-deploy
-""".replace("{product_kebab}", product_kebab)
+FLY_APP ?=""" + f" {product_kebab}-production" + "\n"
+    )
 
 
 def render_env_example(provider: str) -> str:
