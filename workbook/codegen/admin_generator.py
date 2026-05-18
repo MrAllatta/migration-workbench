@@ -29,6 +29,11 @@ from workbook.codegen.manifest import find_view_for_entity
 
 # -- helpers ----------------------------------------------------------------
 
+
+def _to_snake_case(pascal: str) -> str:
+    """Convert PascalCase to snake_case."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", pascal).lower()
+
 _MODEL_CLASSES_WITH_SEARCH = {
     "CharField",
     "TextField",
@@ -241,7 +246,7 @@ def _render_fk_link_method(
     Generates a method that produces a clickable admin change link for the
     FK's related object, falling back to ``'-'`` when the FK is null.
     """
-    target_snake = re.sub(r"(?<!^)(?=[A-Z])", "_", target_model_name).lower()
+    target_snake = _to_snake_case(target_model_name)
     lines = [
         f"    def {field_name}_link(self, obj):",
         f"        if obj.{field_name}_id:",
@@ -485,7 +490,7 @@ def render_admin_py(
     needs_timezone = False
     if manifest:
         for table in tables:
-            raw_entity = str(table.get("suggested_model_name") or "").lower()
+            raw_entity = _to_snake_case(get_model_name(table))
             view = find_view_for_entity(manifest, raw_entity)
             if view:
                 ts = view.get("time_scope") or {}
@@ -505,8 +510,8 @@ def render_admin_py(
     for table in tables:
         model_name = get_model_name(table)
         contract_fields = get_fields(table)
-        # View manifest entities are stored as snake_case (derived from suggested_model_name).
-        raw_entity = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", get_model_name(table)).lower()
+        # View manifest entities are stored as snake_case (derived from model_name).
+        raw_entity = _to_snake_case(get_model_name(table))
         view = find_view_for_entity(manifest, raw_entity) if manifest else None
         meta = get_model_meta(table)
         verbose_name = meta.get("verbose_name")
@@ -522,7 +527,7 @@ def render_admin_py(
                 t for t in tables if get_model_name(t) == ref["source_name"]
             )
             source_fields = get_fields(ref_table)
-            ref_entity = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", get_model_name(ref_table)).lower()
+            ref_entity = _to_snake_case(get_model_name(ref_table))
             override_fields = inline_overrides.get(ref_entity)
             inline_class_defs.append(
                 _render_inline_class(
