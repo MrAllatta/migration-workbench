@@ -10,6 +10,7 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _suggest_tab_merges,
     _merge_domain_knowledge,
 )
+from workbook.schema_contract import build_contract
 
 
 def test_to_pascal_case_preserves_pascalcase():
@@ -168,3 +169,116 @@ def test_domain_knowledge_merge_warns_unmatched_entities():
     warnings = []
     _merge_domain_knowledge([], domain, warnings.append)
     assert any("GhostEntity" in w for w in warnings)
+
+
+def test_build_contract_passes_enrichment_fields_through():
+    """build_contract() should include enrichment fields in column dicts."""
+    bundle_config = {
+        "provider": "coda",
+        "doc_url": "https://example.com",
+        "doc_id": "abc123",
+        "source_id": "src1",
+        "tabs": [
+            {
+                "worksheet_title": "Seasons",
+                "output_path": "data/seasons.csv",
+                "required_headers": ["Season ID", "Name", "Crop ID", "Computed Total"],
+            }
+        ],
+    }
+    doc_profile = {
+        "tables": [
+            {
+                "name": "Seasons",
+                "columns": [
+                    {
+                        "name": "Season ID",
+                        "format_type": "text",
+                        "suggested_entity": "Season",
+                        "suggested_fk_target": None,
+                        "is_computed": False,
+                        "is_import_key_candidate": True,
+                        "cross_tab_group": None,
+                    },
+                    {
+                        "name": "Name",
+                        "format_type": "text",
+                        "suggested_entity": None,
+                        "suggested_fk_target": None,
+                        "is_computed": False,
+                        "is_import_key_candidate": False,
+                        "cross_tab_group": None,
+                    },
+                    {
+                        "name": "Crop ID",
+                        "format_type": "text",
+                        "suggested_entity": "Crop",
+                        "suggested_fk_target": "Crop",
+                        "is_computed": False,
+                        "is_import_key_candidate": False,
+                        "cross_tab_group": "crop_data",
+                    },
+                    {
+                        "name": "Computed Total",
+                        "format_type": "number",
+                        "suggested_entity": None,
+                        "suggested_fk_target": None,
+                        "is_computed": True,
+                        "is_import_key_candidate": False,
+                        "cross_tab_group": None,
+                    },
+                ],
+            }
+        ],
+    }
+    contract = build_contract(bundle_config, doc_profile=doc_profile)
+    tables = contract["tables"]
+    assert len(tables) == 1
+    cols = tables[0]["columns"]
+    cols_by_name = {c["source_column"]: c for c in cols}
+
+    assert cols_by_name["Season ID"]["is_import_key_candidate"] is True
+    assert cols_by_name["Season ID"]["suggested_entity"] == "Season"
+
+    assert cols_by_name["Crop ID"]["suggested_fk_target"] == "Crop"
+    assert cols_by_name["Crop ID"]["cross_tab_group"] == "crop_data"
+
+    assert cols_by_name["Computed Total"]["is_computed"] is True
+
+    assert cols_by_name["Name"]["is_computed"] is False
+    assert cols_by_name["Name"]["is_import_key_candidate"] is False
+
+
+def test_flag_fk_columns_skips_profiler_enriched_columns():
+    """_flag_fk_columns() should skip columns that already have suggested_fk_target."""
+    columns = [
+        {
+            "suggested_field_name": "season_id",
+            "source_column": "Season ID",
+            "suggested_fk_target": "SeasonProfile",
+        },
+        {"suggested_field_name": "crop_id", "source_column": "Crop ID"},
+    ]
+    _flag_fk_columns(columns)
+    assert columns[0]["suggested_fk_target"] == "SeasonProfile"
+    assert columns[1]["suggested_fk_target"] == "Crop"
+
+
+def test_flag_computed_fields_catches_is_computed():
+    """_flag_computed_fields() should move columns with is_computed=True to computed_fields."""
+    table = {
+        "suggested_model_name": "CropPlan",
+        "columns": [
+            {"suggested_field_name": "name", "formula_pattern": None, "is_computed": False},
+            {"suggested_field_name": "total", "formula_pattern": None, "is_computed": True, "source_column": "Total", "django_field_class": "models.FloatField"},
+            {"suggested_field_name": "yield_est", "formula_pattern": "row_formula", "source_column": "Yield Est"},
+        ],
+    }
+    _flag_computed_fields(table)
+    remaining = {c["suggested_field_name"] for c in table["columns"]}
+    assert "name" in remaining
+    assert "total" not in remaining
+    assert "yield_est" not in remaining
+    computed = table.get("computed_fields", {})
+    assert "total" in computed
+    assert "yield_est" in computed

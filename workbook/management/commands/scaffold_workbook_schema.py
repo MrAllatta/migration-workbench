@@ -57,9 +57,12 @@ def _flag_fk_columns(columns: list[dict]) -> None:
     """Flag columns that look like FK references with suggested_fk_target.
 
     Detects: columns ending in '_id', or columns named after entity keywords.
+    Skips columns that already have suggested_fk_target set by profiler enrichment.
     Mutates columns in-place.
     """
     for col in columns:
+        if col.get("suggested_fk_target"):
+            continue
         name = col.get("suggested_field_name", "")
         if name.endswith("_id"):
             target = _to_pascal_case(name[:-3])
@@ -76,13 +79,15 @@ def _flag_computed_fields(table: dict) -> None:
 
     Columns with formula_pattern 'row_formula' or 'expansion_formula' are
     removed from the stored columns list and added as computed field stubs.
+    Columns with is_computed=True are also moved.
     """
     columns = table.get("columns", [])
     kept = []
     computed = {}
     for col in columns:
         pattern = col.get("formula_pattern")
-        if pattern in ("row_formula", "expansion_formula"):
+        is_computed = col.get("is_computed", False)
+        if pattern in ("row_formula", "expansion_formula") or is_computed:
             name = col["suggested_field_name"]
             computed[name] = {
                 "return_type": col.get("django_field_class", "models.FloatField"),
@@ -210,6 +215,12 @@ def _build_cohort_contract(
         headers_raw = row_lists[header_index]
         data_rows = row_lists[header_index + 1:]
 
+        summary_col_meta: dict[str, dict[str, Any]] = {}
+        for sc in summary.get("columns") or []:
+            sn = str(sc.get("name") or "")
+            if sn:
+                summary_col_meta[sn] = sc
+
         columns: list[dict[str, Any]] = []
         for col_index, header in enumerate(headers_raw):
             if not header.strip():
@@ -221,6 +232,7 @@ def _build_cohort_contract(
             fmt = _infer_format_type_from_samples(sample_values)
             col_meta = {"name": header, "format_type": fmt}
             hint = map_profiler_column_to_django_field(col_meta)
+            enrichment = summary_col_meta.get(header.strip(), {})
             columns.append(
                 {
                     "source_column": header.strip(),
@@ -231,6 +243,11 @@ def _build_cohort_contract(
                     "django_field_class": hint["django_field_class"],
                     "django_field_kwargs": hint["django_field_kwargs"],
                     "notes": hint.get("notes") or [],
+                    "suggested_entity": enrichment.get("suggested_entity"),
+                    "suggested_fk_target": enrichment.get("suggested_fk_target"),
+                    "is_computed": enrichment.get("is_computed", False),
+                    "is_import_key_candidate": enrichment.get("is_import_key_candidate", False),
+                    "cross_tab_group": enrichment.get("cross_tab_group"),
                 }
             )
 
@@ -341,9 +358,15 @@ def _harden_contract(contract: dict[str, Any]) -> None:
         if not columns:
             continue
         first_field = columns[0]["suggested_field_name"]
+        import_key_candidates = [
+            c["suggested_field_name"]
+            for c in columns
+            if c.get("is_import_key_candidate")
+        ]
+        unique_on = import_key_candidates if import_key_candidates else [first_field]
         table["import_config"] = {
-            "import_key": first_field,
-            "unique_on": [first_field],
+            "import_key": unique_on[0] if unique_on else first_field,
+            "unique_on": unique_on,
         }
         ik = _suggest_import_keys(table.get("columns", []))
         if ik:
