@@ -38,6 +38,24 @@ def _infer_format_type_from_samples(samples: list[str]) -> str | None:
     return "text"
 
 
+def _to_pascal_case(raw: str) -> str:
+    """Convert a label to PascalCase."""
+    return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
+
+
+def _derive_bundle_path(label: str) -> str:
+    """Derive a default CSV bundle_path from a suggested model name.
+
+    Sales Channel  -> reference/sales_channels.csv
+    Farm           -> reference/farms.csv
+    Address        -> reference/addresses.csv
+    Business Unit  -> reference/business_units.csv
+    """
+    stem = label.strip().lower().replace(" ", "_")
+    plural = stem + "es" if stem.endswith("s") else stem + "s"
+    return f"reference/{plural}.csv"
+
+
 def _inject_designed_models(tables: list[dict]) -> list[dict]:
     """Detect overlapping tab column sets and inject designed model entries.
 
@@ -149,6 +167,14 @@ def _build_cohort_contract(
             "suggested_model_name": model_slug,
             "columns": columns,
         }
+        table_entry["model_name"] = _to_pascal_case(
+            table_entry.get("suggested_model_name", "")
+        )
+        import_config = table_entry.setdefault("import_config", {})
+        if "bundle_path" not in import_config:
+            import_config["bundle_path"] = _derive_bundle_path(
+                table_entry.get("suggested_model_name", "")
+            )
         tables.append(table_entry)
 
     _inject_designed_models(tables)
