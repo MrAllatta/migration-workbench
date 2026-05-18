@@ -28,6 +28,7 @@ def _contract_with_imports() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "reference/crop_info.csv",
                 "model_meta": {"verbose_name": "Crop"},
                 "str_template": "{self.name}",
@@ -59,6 +60,7 @@ def _contract_with_imports() -> dict:
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "planting",
+                "model_name": "Planting",
                 "bundle_output_path": "year_2025/crop_planner.csv",
                 "model_meta": {"verbose_name": "Planting"},
                 "fk_resolutions": {"crop": "Crop"},
@@ -116,6 +118,7 @@ def _contract_no_column_map() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "reference/crop_info.csv",
                 "columns": [
                     {
@@ -150,6 +153,7 @@ def _contract_no_imports() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {}}
                 ],
@@ -227,6 +231,7 @@ def test_render_all_tables_get_tier_call():
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "crop_info.csv",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
@@ -236,6 +241,7 @@ def test_render_all_tables_get_tier_call():
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "planting",
+                "model_name": "Planting",
                 "bundle_output_path": "crop_planner.csv",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
@@ -467,6 +473,7 @@ def _contract_examplecrop() -> dict:
         "tables": [
             {
                 "suggested_model_name": "example_crop",
+                "model_name": "ExampleCrop",
                 "columns": [
                     {
                         "suggested_field_name": "name",
@@ -498,6 +505,7 @@ def _contract_exampleblock_with_fk() -> dict:
         "tables": [
             {
                 "suggested_model_name": "example_crop",
+                "model_name": "ExampleCrop",
                 "columns": [
                     {
                         "suggested_field_name": "name",
@@ -519,6 +527,7 @@ def _contract_exampleblock_with_fk() -> dict:
             },
             {
                 "suggested_model_name": "example_block",
+                "model_name": "ExampleBlock",
                 "columns": [
                     {
                         "suggested_field_name": "crop",
@@ -565,6 +574,7 @@ def _contract_examplecrop_required() -> dict:
         "tables": [
             {
                 "suggested_model_name": "example_crop",
+                "model_name": "ExampleCrop",
                 "columns": [
                     {
                         "suggested_field_name": "name",
@@ -736,6 +746,7 @@ def _contract_multi_source() -> dict:
         "tables": [
             {
                 "suggested_model_name": "person",
+                "model_name": "Person",
                 "columns": [
                     {
                         "suggested_field_name": "full_name",

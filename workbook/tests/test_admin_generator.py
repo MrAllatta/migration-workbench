@@ -23,6 +23,7 @@ def _contract() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "reference/crop_info.csv",
                 "model_meta": {"verbose_name": "Crop", "ordering": ["name"]},
                 "columns": [
@@ -43,6 +44,7 @@ def _contract() -> dict:
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "planting",
+                "model_name": "Planting",
                 "bundle_output_path": "year_2025/crop_planner.csv",
                 "model_meta": {
                     "verbose_name": "Planting", "ordering": ["-plant_date"]
@@ -396,6 +398,7 @@ def _contract_abstract_user_admin() -> dict:
         "tables": [
             {
                 "suggested_model_name": "farm_user",
+                "model_name": "FarmUser",
                 "model_base": "django.contrib.auth.models.AbstractUser",
                 "model_meta": {"verbose_name": "Farm User"},
                 "admin": {
@@ -443,6 +446,7 @@ def test_status_field_added_to_list_filter_when_not_in_filterable():
         "tables": [
             {
                 "suggested_model_name": "order",
+                "model_name": "Order",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                     {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
@@ -480,6 +484,7 @@ def test_admin_class_includes_status_field_comment():
         "tables": [
             {
                 "suggested_model_name": "order",
+                "model_name": "Order",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                     {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
@@ -523,6 +528,7 @@ def test_manifest_round_trip_in_end_to_end_admin_generation():
         "tables": [
             {
                 "suggested_model_name": "order",
+                "model_name": "Order",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                     {"suggested_field_name": "customer", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
@@ -568,6 +574,7 @@ def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
         "tables": [
             {
                 "suggested_model_name": "order",
+                "model_name": "Order",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                 ],
@@ -610,12 +617,14 @@ def test_fk_field_gets_link_method():
         "tables": [
             {
                 "suggested_model_name": "field_block",
+                "model_name": "FieldBlock",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                 ],
             },
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
                     {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
@@ -657,12 +666,14 @@ def test_fk_link_appears_in_list_display_instead_of_raw_fk():
         "tables": [
             {
                 "suggested_model_name": "field_block",
+                "model_name": "FieldBlock",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                 ],
             },
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
                     {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
@@ -704,6 +715,7 @@ def test_non_fk_fields_not_turned_into_links():
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                 ],
@@ -742,6 +754,7 @@ def test_status_field_comment_emitted_even_when_not_in_contract():
         "tables": [
             {
                 "suggested_model_name": "order",
+                "model_name": "Order",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                 ],
@@ -784,6 +797,7 @@ def test_temporal_year_field_in_list_filter():
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                     {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
@@ -824,6 +838,7 @@ def test_date_hierarchy_for_date_fields():
         "tables": [
             {
                 "suggested_model_name": "market_entry",
+                "model_name": "MarketEntry",
                 "columns": [
                     {"suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                     {"suggested_field_name": "distribution_date", "django_field_class": "models.DateField", "django_field_kwargs": {"null": True}},
@@ -862,6 +877,7 @@ def test_current_season_queryset_filter():
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                     {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
@@ -902,6 +918,7 @@ def test_status_field_generates_admin_actions():
         "tables": [
             {
                 "suggested_model_name": "field_record",
+                "model_name": "FieldRecord",
                 "columns": [
                     {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
                     {"suggested_field_name": "crop_variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
@@ -944,6 +961,7 @@ def test_editable_fields_become_fields():
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "columns": [
                     {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
                     {"suggested_field_name": "bed", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},

@@ -17,6 +17,7 @@ def _contract_yaml() -> str:
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "bundle_output_path": "2025/crop_plan_entry.csv",
                 "columns": [
                     {"source_column": "Block", "suggested_field_name": "block"},

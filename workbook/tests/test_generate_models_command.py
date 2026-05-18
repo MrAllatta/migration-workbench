@@ -6,6 +6,7 @@ from django.core.management import call_command
 CONTRACT_WITH_APP_LABEL = """\
 tables:
   - suggested_model_name: "Widget"
+    model_name: "Widget"
     columns:
       - suggested_field_name: name
         django_field_class: models.CharField

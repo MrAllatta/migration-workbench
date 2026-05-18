@@ -37,6 +37,7 @@ def _contract_v1_0() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "reference/crop_info.csv",
                 "columns": [
                     {
@@ -62,6 +63,7 @@ def _contract_v1_0() -> dict:
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "planting",
+                "model_name": "Planting",
                 "bundle_output_path": "year_2025/crop_planner.csv",
                 "columns": [
                     {
@@ -303,9 +305,11 @@ def test_load_contract_v1_1(tmp_path):
 
 
 def test_get_model_name():
-    assert get_model_name({"suggested_model_name": "crop_block"}) == "CropBlock"
-    assert get_model_name({"suggested_model_name": "crop"}) == "Crop"
-    assert get_model_name({}) == "Model"
+    table = {"suggested_model_name": "crop_block", "model_name": "CropBlock"}
+    assert get_model_name(table) == "CropBlock"
+
+    table2 = {"suggested_model_name": "sales_channel", "model_name": "SalesChannel"}
+    assert get_model_name(table2) == "SalesChannel"
 
 
 def test_get_db_table_name_explicit():
@@ -365,6 +369,7 @@ def test_get_fields_extra_fields():
 def test_get_fields_preserves_extra_fields_order():
     table = {
         "suggested_model_name": "crop",
+        "model_name": "Crop",
         "columns": [
             {
                 "suggested_field_name": "name",
@@ -447,7 +452,7 @@ def test_render_model_fk_resolved():
 
 def test_render_model_empty_fields():
     """A table with no columns still produces a valid class."""
-    t = {"suggested_model_name": "empty", "columns": []}
+    t = {"suggested_model_name": "empty", "model_name": "Empty", "columns": []}
     source = render_model(t, app_label="core")
     assert "class Empty(models.Model):" in source
     assert "pass" in source
@@ -502,7 +507,7 @@ def test_generated_python_compiles_empty():
 def test_generated_python_compiles_single_table_no_fields():
     contract = {
         "source": {},
-        "tables": [{"suggested_model_name": "widget", "columns": []}],
+        "tables": [{"suggested_model_name": "widget", "model_name": "Widget", "columns": []}],
     }
     _check_compiles(render_models_py(contract))
 

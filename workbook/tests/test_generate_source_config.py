@@ -9,6 +9,7 @@ def test_generate_source_config_from_contract(tmp_path):
     contract_path.write_text("""
 tables:
   - suggested_model_name: Crop
+    model_name: Crop
     bundle_worksheet_title: Crop Info
     import_config:
       bundle_path: crop_info.csv

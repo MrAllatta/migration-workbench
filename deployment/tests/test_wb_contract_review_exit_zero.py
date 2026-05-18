@@ -19,6 +19,7 @@ _CONTRACT_WITH_ISSUES = {
     "tables": [
         {
             "suggested_model_name": "Widget",
+            "model_name": "Widget",
             "columns": [
                 {
                     "suggested_field_name": "label",

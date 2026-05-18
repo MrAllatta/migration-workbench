@@ -380,6 +380,7 @@ def test_discovery_round_trip_generates_admin():
         "tables": [
             {
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "columns": [
                     {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
                     {"suggested_field_name": "crop_type", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}},

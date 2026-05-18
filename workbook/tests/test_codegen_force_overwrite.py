@@ -16,6 +16,7 @@ def _contract() -> dict:
             {
                 "bundle_worksheet_title": "Crop Info",
                 "suggested_model_name": "crop",
+                "model_name": "Crop",
                 "bundle_output_path": "reference/crop_info.csv",
                 "columns": [
                     {

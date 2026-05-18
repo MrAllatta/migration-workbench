@@ -160,6 +160,7 @@ def test_build_view_manifest_binds_entity_from_contract():
             {
                 "bundle_worksheet_title": "Orders",
                 "suggested_model_name": "orders",
+                "model_name": "Orders",
                 "bundle_output_path": "data/orders.csv",
                 "columns": [
                     {"source_column": "Order ID", "suggested_field_name": "order_id_pk"},
@@ -218,6 +219,7 @@ def test_build_view_manifest_infers_time_scope_from_year_and_week():
             {
                 "bundle_worksheet_title": "Crop Plans",
                 "suggested_model_name": "crop_plan",
+                "model_name": "CropPlan",
                 "bundle_output_path": "data/crop_plans.csv",
                 "columns": [
                     {"source_column": "Block", "suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock"}},
@@ -260,6 +262,7 @@ def test_build_view_manifest_time_scope_with_date_field():
             {
                 "bundle_worksheet_title": "Market Data",
                 "suggested_model_name": "market_entry",
+                "model_name": "MarketEntry",
                 "bundle_output_path": "data/market.csv",
                 "columns": [
                     {"source_column": "Outlet", "suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
@@ -292,6 +295,7 @@ def test_build_view_manifest_status_values_with_column_profiles():
             {
                 "bundle_worksheet_title": "Orders",
                 "suggested_model_name": "orders",
+                "model_name": "Orders",
                 "bundle_output_path": "data/orders.csv",
                 "columns": [
                     {"source_column": "Order ID", "suggested_field_name": "order_id", "django_field_class": "models.IntegerField", "django_field_kwargs": {}},
@@ -342,6 +346,7 @@ def test_scaffold_view_manifest_command_writes_yaml(tmp_path):
             {
                 "bundle_worksheet_title": "Orders",
                 "suggested_model_name": "orders",
+                "model_name": "Orders",
                 "bundle_output_path": "data/orders.csv",
                 "columns": [
                     {"source_column": "Order ID", "suggested_field_name": "order_id"},

@@ -12,8 +12,10 @@ def test_include_list_splices_into_tables(tmp_path):
     tables_path.write_text(
         """
 - suggested_model_name: inventory
+  model_name: Inventory
   columns: []
 - suggested_model_name: field
+  model_name: Field
   columns: []
 """.lstrip(),
         encoding="utf-8",
@@ -25,9 +27,11 @@ def test_include_list_splices_into_tables(tmp_path):
 
 tables:
   - suggested_model_name: crop
+    model_name: Crop
     columns: []
   - !include_list tables.yaml
   - suggested_model_name: farmer
+    model_name: Farmer
     columns: []
 """.lstrip(),
         encoding="utf-8",
@@ -68,6 +72,7 @@ def test_nested_includes_resolve_relative_to_including_file(tmp_path):
     nested_tables_path.write_text(
         """
 - suggested_model_name: shipment
+  model_name: Shipment
   columns: []
 """.lstrip(),
         encoding="utf-8",
@@ -77,6 +82,7 @@ def test_nested_includes_resolve_relative_to_including_file(tmp_path):
     tables_path.write_text(
         """
 - suggested_model_name: harvest
+  model_name: Harvest
   columns: []
 - !include_list nested_tables.yaml
 """.lstrip(),
@@ -140,10 +146,13 @@ def test_tables_flattening_is_recursive(tmp_path):
 
 tables:
   - - - suggested_model_name: planting
+        model_name: Planting
         columns: []
     - - suggested_model_name: harvest
+        model_name: Harvest
         columns: []
   - suggested_model_name: shipment
+    model_name: Shipment
     columns: []
 """.lstrip(),
         encoding="utf-8",

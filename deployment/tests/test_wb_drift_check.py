@@ -11,11 +11,13 @@ import yaml
 
 
 def _contract_with_model(model_name: str = "crop") -> dict:
+    pname = "".join(p.capitalize() for p in model_name.replace("-", "_").split("_"))
     return {
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": model_name,
+                "model_name": pname,
                 "columns": [
                     {
                         "suggested_field_name": "name",
@@ -54,6 +56,7 @@ def test_drift_check_detects_added_model(tmp_path):
     new_data = _contract_with_model("crop")
     new_data["tables"].append({
         "suggested_model_name": "variety",
+        "model_name": "Variety",
         "columns": [
             {
                 "suggested_field_name": "name",

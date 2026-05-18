@@ -128,15 +128,32 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         return flattened
 
     raw["tables"] = _walk_table_entries(tables)
+
+    _validate_contract_v2(raw)
     return raw
 
 
+def _validate_contract_v2(contract: dict[str, Any]) -> None:
+    """Check v2.0 contract requirements.  Raises ValueError on violation."""
+    for table in contract.get("tables", []):
+        label = table.get("suggested_model_name", "?")
+        if "model_name" not in table:
+            raise ValueError(
+                f"Table '{label}' is missing required field 'model_name'"
+            )
+        mn = str(table["model_name"]).strip()
+        if not mn:
+            raise ValueError(
+                f"Table '{label}' has empty 'model_name'"
+            )
+
+
 def get_model_name(table: dict[str, Any]) -> str:
-    """Return the PascalCase Django model class name for *table*."""
-    raw = str(table.get("suggested_model_name") or "model")
-    parts = raw.replace("-", "_").split("_")
-    name = "".join(p.capitalize() for p in parts if p)
-    return name or "Model"
+    """Return the PascalCase Django model class name from *table*.
+
+    Reads the required ``model_name`` field.  Raises KeyError if absent.
+    """
+    return str(table["model_name"])
 
 
 def get_db_table_name(table: dict[str, Any], app_label: str) -> str:
@@ -381,6 +398,7 @@ def validate_contract_tables(
     """Run validation checks on a schema contract and return warning messages.
 
     Checks:
+    - ``model_name`` is present on every table
     - FK target models exist in the contract table list
     - ``import_config.fk_lookup`` field references resolve to actual fields
     - ``import_config.unique_on`` fields have no duplicates
@@ -390,9 +408,20 @@ def validate_contract_tables(
     """
     warnings: list[str] = []
     tables = list(contract.get("tables") or [])
-    table_names = {get_model_name(t) for t in tables}
 
     for table in tables:
+        if "model_name" not in table:
+            warnings.append(
+                f"Table '{table.get('suggested_model_name', '?')}' "
+                f"missing required 'model_name'"
+            )
+            continue
+
+    table_names = {get_model_name(t) for t in tables if "model_name" in t}
+
+    for table in tables:
+        if "model_name" not in table:
+            continue
         name = get_model_name(table)
         fields = get_fields(table)
         field_names = {f["name"] for f in fields}

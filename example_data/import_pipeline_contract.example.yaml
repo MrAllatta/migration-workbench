@@ -4,6 +4,7 @@ source:
 
 tables:
   - suggested_model_name: ExampleFarm
+    model_name: ExampleFarm
     bundle_worksheet_title: Farms
     columns:
       - source_column: "Farm Name"
@@ -47,6 +48,7 @@ tables:
         region: "Unknown"
 
   - suggested_model_name: ExampleField
+    model_name: ExampleField
     bundle_worksheet_title: Fields
     columns:
       - source_column: "Field Name"
@@ -95,6 +97,7 @@ tables:
       unique_on: ["name"]
 
   - suggested_model_name: ExampleVariety
+    model_name: ExampleVariety
     bundle_worksheet_title: Varieties
     columns:
       - source_column: Variety

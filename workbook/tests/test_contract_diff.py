@@ -7,8 +7,12 @@ from workbook.codegen.contract import diff_contracts
 
 def _make_table(name, fields=None, meta=None):
     """Build a minimal contract table dict."""
+    model_name = "".join(
+        p.capitalize() for p in name.replace("-", "_").split("_")
+    )
     table = {
         "suggested_model_name": name,
+        "model_name": model_name,
         "columns": fields or [],
     }
     if meta:

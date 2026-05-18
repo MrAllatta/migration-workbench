@@ -13,6 +13,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "inventory",
+                    "model_name": "Inventory",
                     "columns": [
                         {
                             "source_column": "Crop",
@@ -43,6 +44,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "planting",
+                    "model_name": "Planting",
                     "columns": [
                         {
                             "source_column": "Name",
@@ -71,6 +73,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "crop",
+                    "model_name": "Crop",
                     "columns": [
                         {
                             "source_column": "Name",
@@ -102,6 +105,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "crop",
+                    "model_name": "Crop",
                     "columns": [
                         {
                             "source_column": "Name",
@@ -124,6 +128,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "planting",
+                    "model_name": "Planting",
                     "columns": [
                         {
                             "source_column": "Crop",
@@ -155,6 +160,7 @@ class TestReviewContract:
             "tables": [
                 {
                     "suggested_model_name": "planting",
+                    "model_name": "Planting",
                     "columns": [
                         {
                             "source_column": "Crop",

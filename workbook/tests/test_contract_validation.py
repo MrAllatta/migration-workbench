@@ -8,6 +8,7 @@ def test_validate_contract_tables_warns_on_missing_fk_target_in_extra_fields():
         "tables": [
             {
                 "suggested_model_name": "planting",
+                "model_name": "Planting",
                 "columns": [],
                 "extra_fields": {
                     "crop": {

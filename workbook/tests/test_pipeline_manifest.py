@@ -15,6 +15,7 @@ def _minimal_contract() -> dict:
             {
                 "bundle_worksheet_title": "Crop Planner",
                 "suggested_model_name": "crop_plan_entry",
+                "model_name": "CropPlanEntry",
                 "bundle_output_path": "{year}/crop_plan_entry.csv",
                 "columns": [
                     {"source_column": "Block", "suggested_field_name": "block"},

@@ -7,6 +7,7 @@ from django.core.management import call_command
 CONTRACT_WITH_APP_LABEL = """\
 tables:
   - suggested_model_name: "Widget"
+    model_name: "Widget"
     bundle_worksheet_title: "Widgets"
     columns:
       - suggested_field_name: name
