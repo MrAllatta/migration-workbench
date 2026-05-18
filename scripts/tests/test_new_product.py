@@ -75,3 +75,13 @@ def test_render_models_py_includes_stub_marker():
     assert "from .models_auto import *  # noqa: F401, F403" in content
     assert "# --- custom models below this line ---" in content
     assert "class FarmUser(AbstractUser):" in content
+
+
+def test_schema_contract_md_includes_entity_guidance():
+    """The scaffolded schema-contract.md has structured entity guidance, not just headings."""
+    from scripts.new_product import render_schema_contract_md
+    content = render_schema_contract_md("test-product")
+    assert "**Purpose**" in content
+    assert "**Source tabs**" in content
+    assert "**Import key**" in content
+    assert "domain-knowledge.yaml" in content

@@ -1043,6 +1043,13 @@ def render_schema_contract_md(project_name: str) -> str:
 
 Living document for entities, attributes, and sheet/tab mapping. Align with the **schema design loop** in migration-workbench (`docs/schema-design-loop.md`).
 
+## Entity Map YAML
+
+This document is paired with `docs/domain-knowledge.yaml`.
+Run the scaffold to merge domain knowledge with profiler data:
+
+    scaffold_workbook_schema --bundle-config ... --domain-knowledge docs/domain-knowledge.yaml
+
 ## Sources
 
 - Profile snapshots: `data/profile_snapshots/`
@@ -1050,7 +1057,24 @@ Living document for entities, attributes, and sheet/tab mapping. Align with the 
 
 ## Entities
 
-(Add sections per entity: purpose, source tabs, key columns, formulas, FK targets.)
+For each entity, document:
+- **Purpose** — what real-world concept this represents
+- **Source tabs** — which profiler tabs map to this entity
+- **Fields** — name, type, constraints, and whether stored or computed
+- **FK targets** — which other entities this references
+- **Import key** — natural key for idempotent re-import
+
+### Example: Season
+
+```yaml
+Season:
+  purpose: "Named set of planned plantings"
+  source_tabs: ["Crop Planner"]
+  fields:
+    name: CharField(unique=True)
+    year: PositiveIntegerField
+  import_key: [name]
+```
 
 ## Decisions
 
@@ -1058,7 +1082,7 @@ Living document for entities, attributes, and sheet/tab mapping. Align with the 
 
 ## Drift
 
-(Re-profile after source changes; note date and what changed.)
+Re-profile after source changes; note date and what changed.
 """
 
 
