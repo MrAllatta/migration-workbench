@@ -39,7 +39,13 @@ def _infer_format_type_from_samples(samples: list[str]) -> str | None:
 
 
 def _to_pascal_case(raw: str) -> str:
-    """Convert a label to PascalCase."""
+    """Convert a label to PascalCase.
+
+    If the input is already PascalCase (no underscores/hyphens, has uppercase
+    after position 0), pass it through unchanged.
+    """
+    if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
+        return raw
     return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
 
 

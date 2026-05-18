@@ -3,6 +3,22 @@
 from pathlib import Path
 from django.core.management import call_command
 
+from workbook.management.commands.scaffold_workbook_schema import _to_pascal_case
+
+
+def test_to_pascal_case_preserves_pascalcase():
+    """Input that is already PascalCase passes through unchanged."""
+    assert _to_pascal_case("SalesChannel") == "SalesChannel"
+    assert _to_pascal_case("FarmUser") == "FarmUser"
+    assert _to_pascal_case("FieldBlock") == "FieldBlock"
+
+
+def test_to_pascal_case_converts_snake_case():
+    """Standard snake_case to PascalCase conversion still works."""
+    assert _to_pascal_case("sales_channel") == "SalesChannel"
+    assert _to_pascal_case("farm_user") == "FarmUser"
+    assert _to_pascal_case("field_block") == "FieldBlock"
+
 
 def test_scaffold_stores_app_label_in_contract(tmp_path, monkeypatch):
     """scaffold_workbook_schema should store --models-app-label in each table's model_meta."""
