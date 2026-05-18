@@ -85,3 +85,15 @@ def test_schema_contract_md_includes_entity_guidance():
     assert "**Source tabs**" in content
     assert "**Import key**" in content
     assert "domain-knowledge.yaml" in content
+
+
+def test_domain_knowledge_example_yaml_includes_entities():
+    """The domain-knowledge example YAML has populated entity examples."""
+    from scripts.new_product import render_domain_knowledge_example_yaml
+    content = render_domain_knowledge_example_yaml()
+    assert "entities:" in content
+    assert "Season:" in content
+    assert "Planting:" in content
+    assert "import_key:" in content
+    assert "fk_to:" in content
+    assert "ForeignKey" in content

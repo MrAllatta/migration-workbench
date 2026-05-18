@@ -483,6 +483,46 @@ FLY_APP ?=""" + f" {product_kebab}-production" + "\n"
     )
 
 
+def render_domain_knowledge_example_yaml() -> str:
+    return """# docs/domain-knowledge.yaml — Entity definitions for contract generation
+# Used by: scaffold_workbook_schema --domain-knowledge docs/domain-knowledge.yaml
+
+entities:
+  Season:
+    description: "Named set of planned plantings — the top-level organizational unit."
+    source_tabs: ["Crop Planner"]
+    fields:
+      name:
+        type: CharField
+        max_length: 100
+        unique: true
+      year:
+        type: PositiveIntegerField
+      is_active:
+        type: BooleanField
+        default: false
+    import_key: [name]
+    fk_to: []
+
+  Planting:
+    description: "Individual planting record tied to a season and crop."
+    source_tabs: ["Crop Planner", "Crop Plan 501+503+801"]
+    fields:
+      planting_id:
+        type: CharField
+        max_length: 50
+        unique: true
+      crop_variety:
+        type: CharField
+        max_length: 200
+      season:
+        type: ForeignKey
+        to: Season
+    import_key: [planting_id]
+    fk_to: [Season]
+"""
+
+
 def render_env_example(provider: str) -> str:
     shared_env = """DJANGO_DEBUG=1
 DJANGO_SECRET_KEY=replace-me
