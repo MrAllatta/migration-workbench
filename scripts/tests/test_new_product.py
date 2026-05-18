@@ -46,6 +46,14 @@ def test_generate_admin_does_not_require_manifest_file():
     assert "--manifest" not in generate_admin_section.split("else")[1].split("fi")[0]
 
 
+def test_render_urls_py_redirects_root_to_admin():
+    """Root URL / redirects to /admin/."""
+    from scripts.new_product import render_urls_py
+    content = render_urls_py()
+    assert 'RedirectView.as_view(url="/admin/"' in content
+    assert 'path("", RedirectView' in content
+
+
 def test_render_models_py_includes_stub_marker():
     """The scaffolded models.py includes the custom-models marker and auto import."""
     content = render_models_py("core", "FarmUser")

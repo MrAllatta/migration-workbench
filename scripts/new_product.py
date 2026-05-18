@@ -296,9 +296,11 @@ AUTH_USER_MODEL = "core.{user_model_name}"
 def render_urls_py() -> str:
     return """from django.contrib import admin
 from django.urls import path
+from django.views.generic import RedirectView
 from migration_workbench.views import healthz
 
 urlpatterns = [
+    path("", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("healthz", healthz),
     path("healthz/", healthz),
