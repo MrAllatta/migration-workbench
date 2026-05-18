@@ -56,6 +56,16 @@ logger = logging.getLogger(__name__)
 
 _TRUNCATE_LENGTH = 200
 
+_ENTITY_KEYWORDS = {"channel", "season", "crop", "block", "farm", "field", "variety"}
+_IDENTIFIER_SUFFIXES = {"_id", "_code", "_key"}
+_IDENTIFIER_NAMES = {"id", "name", "code", "slug", "uid", "uuid", "external_id"}
+
+
+def _to_pascal_case(raw: str) -> str:
+    if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
+        return raw
+    return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
+
 
 @dataclass
 class ColumnProfile:
@@ -812,6 +822,96 @@ def derive_column_candidates(
     return candidates
 
 
+def enrich_computed_fields(columns: list[dict]) -> None:
+    computed_patterns = {"row_formula", "expansion_formula"}
+    for col in columns:
+        evidence = col.get("evidence") or {}
+        pattern = evidence.get("formula_pattern")
+        col["is_computed"] = pattern in computed_patterns
+
+
+def enrich_fk_candidates(columns: list[dict], entity_names: set[str]) -> None:
+    for col in columns:
+        name = col.get("proposed_canonical_field", "")
+        evidence = col.get("evidence") or {}
+        target = None
+        if name.endswith("_id"):
+            prefix = name[:-3]
+            target = _to_pascal_case(prefix)
+        elif name.lower() in _ENTITY_KEYWORDS:
+            target = _to_pascal_case(name)
+        elif evidence.get("cross_sheet_refs"):
+            target = _to_pascal_case(name)
+        if target is not None:
+            if entity_names and target not in entity_names:
+                target = None
+        col["suggested_fk_target"] = target
+
+
+def enrich_import_key_candidates(columns: list[dict]) -> None:
+    for col in columns:
+        name = col.get("proposed_canonical_field", "")
+        evidence = col.get("evidence") or {}
+        pattern = evidence.get("formula_pattern", "raw")
+        is_identifier = False
+        for suffix in _IDENTIFIER_SUFFIXES:
+            if name.endswith(suffix):
+                is_identifier = True
+                break
+        if name in _IDENTIFIER_NAMES:
+            is_identifier = True
+        col["is_import_key_candidate"] = is_identifier and pattern == "raw"
+
+
+def enrich_entity_groupings(
+    columns: list[dict], workbook_index: dict[str, dict]
+) -> dict[str, str]:
+    tab_headers: dict[tuple[str, str], set[str]] = {}
+    for col in columns:
+        key = (col.get("workbook_code", ""), col.get("tab_title", ""))
+        tab_headers.setdefault(key, set()).add(col.get("proposed_canonical_field", ""))
+    wb_cols: dict[str, set[str]] = {}
+    for (wb_code, _tab), headers in tab_headers.items():
+        wb_cols.setdefault(wb_code, set()).update(headers)
+    tabs_by_wb: dict[str, list[tuple[str, set[str]]]] = {}
+    for (wb_code, tab_title), headers in tab_headers.items():
+        if wb_code not in wb_cols:
+            continue
+        tabs_by_wb.setdefault(wb_code, []).append((tab_title, headers))
+    entity_map: dict[str, str] = {}
+    group_counter = 0
+    for wb_code, tab_list in tabs_by_wb.items():
+        if len(tab_list) < 2:
+            continue
+        assigned: dict[str, str] = {}
+        for i, (title_a, headers_a) in enumerate(tab_list):
+            if title_a in assigned:
+                continue
+            for j, (title_b, headers_b) in enumerate(tab_list):
+                if j <= i:
+                    continue
+                if title_b in assigned:
+                    continue
+                if len(headers_a & headers_b) >= 2:
+                    if title_a not in assigned:
+                        group_name = f"{wb_code}_entity_{group_counter}"
+                        group_counter += 1
+                        assigned[title_a] = group_name
+                    assigned[title_b] = assigned[title_a]
+        for tab_title, entity_name in assigned.items():
+            entity_map[tab_title] = entity_name
+    for col in columns:
+        key = (col.get("workbook_code", ""), col.get("tab_title", ""))
+        entity_name = entity_map.get(col.get("tab_title", ""))
+        if entity_name is not None:
+            col["suggested_entity"] = entity_name
+            col["cross_tab_group"] = entity_name
+        else:
+            col["suggested_entity"] = None
+            col["cross_tab_group"] = None
+    return entity_map
+
+
 def write_json(path: Path, payload: dict):
     """Create parent directories if needed and write *payload* as pretty-printed JSON to *path*."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1415,6 +1515,18 @@ def run_cohort_corpus(
             "results": deep_results,
         },
     )
+
+    enrich_computed_fields(candidate_columns)
+
+    workbook_index: dict[str, dict] = {
+        rec["workbook_code"]: rec for rec in index_records if "workbook_code" in rec
+    }
+    entity_names: set[str] = {
+        _to_pascal_case(code) for code in approved_tabs
+    }
+    enrich_fk_candidates(candidate_columns, entity_names)
+    enrich_import_key_candidates(candidate_columns)
+    entity_map = enrich_entity_groupings(candidate_columns, workbook_index)
 
     deduped: dict[tuple[str, str, str], dict] = {}
     for candidate in candidate_columns:

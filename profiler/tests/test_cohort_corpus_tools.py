@@ -13,6 +13,10 @@ from profiler.tools.cohort_corpus import (
     apply_tab_selection_overrides,
     build_cohort_corpus_index,
     compute_column_profiles,
+    enrich_computed_fields,
+    enrich_entity_groupings,
+    enrich_fk_candidates,
+    enrich_import_key_candidates,
     run_cohort_corpus,
     score_tab,
     select_tabs_from_inventory,
@@ -1208,3 +1212,276 @@ class TestColumnProfile:
         }
         profiles = compute_column_profiles(summary)
         assert profiles[0].is_section_header is True
+
+
+class TestEnrichComputedFields:
+    def _make_col(self, formula_pattern="raw", **overrides):
+        col = {
+            "workbook_code": "402",
+            "tab_title": "Plan Board",
+            "proposed_canonical_field": "crop_name",
+            "priority_score": 0,
+            "priority_reasons": [],
+            "evidence": {"formula_pattern": formula_pattern},
+        }
+        col.update(overrides)
+        return col
+
+    def test_sets_is_computed_true_for_row_formula(self):
+        cols = [self._make_col(formula_pattern="row_formula")]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is True
+
+    def test_sets_is_computed_true_for_expansion_formula(self):
+        cols = [self._make_col(formula_pattern="expansion_formula")]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is True
+
+    def test_sets_is_computed_false_for_raw(self):
+        cols = [self._make_col(formula_pattern="raw")]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is False
+
+    def test_sets_is_computed_false_for_other_pattern(self):
+        cols = [self._make_col(formula_pattern="partial_formula")]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is False
+
+    def test_handles_missing_evidence(self):
+        cols = [self._make_col()]
+        del cols[0]["evidence"]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is False
+
+    def test_handles_missing_formula_pattern(self):
+        cols = [self._make_col()]
+        del cols[0]["evidence"]["formula_pattern"]
+        enrich_computed_fields(cols)
+        assert cols[0]["is_computed"] is False
+
+
+class TestEnrichFkCandidates:
+    def _make_col(self, canonical="farm_id", **overrides):
+        col = {
+            "workbook_code": "402",
+            "tab_title": "Plan Board",
+            "proposed_canonical_field": canonical,
+            "priority_score": 0,
+            "priority_reasons": [],
+            "evidence": {"formula_pattern": "raw"},
+        }
+        col.update(overrides)
+        return col
+
+    def test_id_suffix_sets_fk_target(self):
+        cols = [self._make_col(canonical="farm_id")]
+        enrich_fk_candidates(cols, entity_names={"Farm"})
+        assert cols[0]["suggested_fk_target"] == "Farm"
+
+    def test_id_suffix_uses_pascal_case(self):
+        cols = [self._make_col(canonical="crop_variety_id")]
+        enrich_fk_candidates(cols, entity_names={"CropVariety"})
+        assert cols[0]["suggested_fk_target"] == "CropVariety"
+
+    def test_entity_keyword_sets_fk_target(self):
+        cols = [self._make_col(canonical="channel")]
+        enrich_fk_candidates(cols, entity_names={"Channel"})
+        assert cols[0]["suggested_fk_target"] == "Channel"
+
+    def test_cross_sheet_refs_sets_fk_target(self):
+        col = self._make_col(canonical="lookup_value")
+        col["evidence"]["cross_sheet_refs"] = ["Sheet2!A1"]
+        cols = [col]
+        enrich_fk_candidates(cols, entity_names=set())
+        assert cols[0]["suggested_fk_target"] == "LookupValue"
+
+    def test_no_match_leaves_no_fk_target(self):
+        cols = [self._make_col(canonical="description")]
+        enrich_fk_candidates(cols, entity_names=set())
+        assert cols[0].get("suggested_fk_target") is None
+
+    def test_entity_names_filter_when_provided(self):
+        cols = [self._make_col(canonical="farm_id")]
+        enrich_fk_candidates(cols, entity_names={"DifferentEntity"})
+        assert cols[0].get("suggested_fk_target") is None
+
+    def test_empty_entity_names_allows_all(self):
+        cols = [self._make_col(canonical="farm_id")]
+        enrich_fk_candidates(cols, entity_names=set())
+        assert cols[0]["suggested_fk_target"] == "Farm"
+
+    def test_entity_names_match_allows_fk(self):
+        cols = [self._make_col(canonical="farm_id")]
+        enrich_fk_candidates(cols, entity_names={"Farm"})
+        assert cols[0]["suggested_fk_target"] == "Farm"
+
+    def test_entity_keyword_with_entity_names_match(self):
+        cols = [self._make_col(canonical="season")]
+        enrich_fk_candidates(cols, entity_names={"Season"})
+        assert cols[0]["suggested_fk_target"] == "Season"
+
+    def test_cross_sheet_refs_with_empty_entity_names(self):
+        col = self._make_col(canonical="ref_value")
+        col["evidence"]["cross_sheet_refs"] = ["Other!B2"]
+        cols = [col]
+        enrich_fk_candidates(cols, entity_names=set())
+        assert cols[0]["suggested_fk_target"] == "RefValue"
+
+
+class TestEnrichImportKeyCandidates:
+    def _make_col(self, canonical="product_id", formula_pattern="raw", **overrides):
+        col = {
+            "workbook_code": "402",
+            "tab_title": "Plan Board",
+            "proposed_canonical_field": canonical,
+            "priority_score": 0,
+            "priority_reasons": [],
+            "evidence": {"formula_pattern": formula_pattern},
+        }
+        col.update(overrides)
+        return col
+
+    def test_id_suffix_raw_is_import_key(self):
+        cols = [self._make_col(canonical="product_id")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_code_suffix_raw_is_import_key(self):
+        cols = [self._make_col(canonical="area_code")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_key_suffix_raw_is_import_key(self):
+        cols = [self._make_col(canonical="sort_key")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_id_is_import_key(self):
+        cols = [self._make_col(canonical="id")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_name_is_import_key(self):
+        cols = [self._make_col(canonical="name")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_code_is_import_key(self):
+        cols = [self._make_col(canonical="code")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_slug_is_import_key(self):
+        cols = [self._make_col(canonical="slug")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_uid_is_import_key(self):
+        cols = [self._make_col(canonical="uid")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_uuid_is_import_key(self):
+        cols = [self._make_col(canonical="uuid")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_exact_name_external_id_is_import_key(self):
+        cols = [self._make_col(canonical="external_id")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+    def test_computed_field_is_not_import_key(self):
+        cols = [self._make_col(canonical="product_id", formula_pattern="row_formula")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is False
+
+    def test_regular_field_is_not_import_key(self):
+        cols = [self._make_col(canonical="description")]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is False
+
+    def test_missing_evidence_defaults_to_raw(self):
+        col = self._make_col(canonical="product_id")
+        del col["evidence"]
+        cols = [col]
+        enrich_import_key_candidates(cols)
+        assert cols[0]["is_import_key_candidate"] is True
+
+
+class TestEnrichEntityGroupings:
+    def _make_col(self, workbook_code="402", tab_title="Plan Board", canonical="farm_id", **overrides):
+        col = {
+            "workbook_code": workbook_code,
+            "tab_title": tab_title,
+            "proposed_canonical_field": canonical,
+            "priority_score": 0,
+            "priority_reasons": [],
+            "evidence": {"formula_pattern": "raw"},
+        }
+        col.update(overrides)
+        return col
+
+    def test_tabs_sharing_headers_get_entity(self):
+        cols = [
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
+        ]
+        workbook_index = {"402": {"workbook_code": "402"}}
+        entity_map = enrich_entity_groupings(cols, workbook_index)
+        assert "Plan A" in entity_map
+        assert "Plan B" in entity_map
+        assert entity_map["Plan A"] == entity_map["Plan B"]
+        for col in cols:
+            assert col.get("suggested_entity") is not None
+            assert col.get("cross_tab_group") is not None
+
+    def test_tabs_not_sharing_headers_no_entity(self):
+        cols = [
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
+        ]
+        workbook_index = {"402": {"workbook_code": "402"}}
+        entity_map = enrich_entity_groupings(cols, workbook_index)
+        assert entity_map == {}
+        for col in cols:
+            assert col.get("suggested_entity") is None
+            assert col.get("cross_tab_group") is None
+
+    def test_tabs_sharing_one_header_not_enough(self):
+        cols = [
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
+        ]
+        workbook_index = {"402": {"workbook_code": "402"}}
+        entity_map = enrich_entity_groupings(cols, workbook_index)
+        assert entity_map == {}
+
+    def test_different_workbooks_not_grouped(self):
+        cols = [
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
+            self._make_col(workbook_code="503", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="503", tab_title="Plan A", canonical="crop_name"),
+        ]
+        workbook_index = {
+            "402": {"workbook_code": "402"},
+            "503": {"workbook_code": "503"},
+        }
+        entity_map = enrich_entity_groupings(cols, workbook_index)
+        assert entity_map == {}
+
+    def test_returns_tab_to_entity_map(self):
+        cols = [
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
+            self._make_col(workbook_code="402", tab_title="Plan B", canonical="season_name"),
+        ]
+        workbook_index = {"402": {"workbook_code": "402"}}
+        entity_map = enrich_entity_groupings(cols, workbook_index)
+        assert isinstance(entity_map, dict)
+        assert all(isinstance(v, str) for v in entity_map.values())
