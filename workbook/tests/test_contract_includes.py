@@ -170,6 +170,7 @@ def test_tables_entries_must_be_mappings_includes_type_name(tmp_path):
 
 tables:
   - suggested_model_name: crop
+    model_name: Crop
     columns: []
   - not a mapping
 """.lstrip(),
