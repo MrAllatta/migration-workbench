@@ -49,6 +49,72 @@ def _to_pascal_case(raw: str) -> str:
     return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
 
 
+_ENTITY_KEYWORDS = {"channel", "season", "crop", "block", "farm", "field", "variety"}
+
+
+def _flag_fk_columns(columns: list[dict]) -> None:
+    """Flag columns that look like FK references with suggested_fk_target.
+
+    Detects: columns ending in '_id', or columns named after entity keywords.
+    Mutates columns in-place.
+    """
+    for col in columns:
+        name = col.get("suggested_field_name", "")
+        if name.endswith("_id"):
+            target = _to_pascal_case(name[:-3])
+            col["suggested_fk_target"] = target
+            col["review_note"] = f"Auto-detected FK: {target}"
+        elif name.lower() in _ENTITY_KEYWORDS:
+            target = _to_pascal_case(name)
+            col["suggested_fk_target"] = target
+            col["review_note"] = f"Auto-detected FK: {target}"
+
+
+def _flag_computed_fields(table: dict) -> None:
+    """Move formula-derived columns from columns[] to computed_fields{}.
+
+    Columns with formula_pattern 'row_formula' or 'expansion_formula' are
+    removed from the stored columns list and added as computed field stubs.
+    """
+    columns = table.get("columns", [])
+    kept = []
+    computed = {}
+    for col in columns:
+        pattern = col.get("formula_pattern")
+        if pattern in ("row_formula", "expansion_formula"):
+            name = col["suggested_field_name"]
+            computed[name] = {
+                "return_type": col.get("django_field_class", "models.FloatField"),
+                "expression": f"# TODO: {col.get('source_column', name)} is formula-derived",
+            }
+        else:
+            kept.append(col)
+    table["columns"] = kept
+    if computed:
+        table.setdefault("computed_fields", {}).update(computed)
+
+
+def _suggest_tab_merges(tabs: dict[str, dict]) -> list[dict]:
+    """Suggest which tabs from the same workbook should be merged into one entity.
+
+    Tabs sharing 2+ column header names are merge candidates.
+    Returns a list of {tabs: set[str], shared_headers: list[str]} dicts.
+    """
+    tab_names = list(tabs.keys())
+    candidates = []
+    for i in range(len(tab_names)):
+        for j in range(i + 1, len(tab_names)):
+            a_headers = set(tabs[tab_names[i]].get("columns", []))
+            b_headers = set(tabs[tab_names[j]].get("columns", []))
+            shared = a_headers & b_headers
+            if len(shared) >= 2:
+                candidates.append({
+                    "tabs": {tab_names[i], tab_names[j]},
+                    "shared_headers": sorted(shared),
+                })
+    return candidates
+
+
 def _derive_bundle_path(label: str) -> str:
     """Derive a default CSV bundle_path from a suggested model name.
 
@@ -184,9 +250,19 @@ def _build_cohort_contract(
         tables.append(table_entry)
 
     _inject_designed_models(tables)
+    for table in tables:
+        _flag_fk_columns(table.get("columns", []))
+        _flag_computed_fields(table)
+
+    tab_headers = {}
+    for table in tables:
+        title = table.get("bundle_worksheet_title", "")
+        cols = [c.get("source_column", "") for c in table.get("columns", [])]
+        if title:
+            tab_headers[title] = {"columns": cols}
+    merge_candidates = _suggest_tab_merges(tab_headers)
 
     contract = {
-        "version": version,
         "source": {
             "provider": "google_sheets",
             "doc_url": None,
@@ -195,6 +271,8 @@ def _build_cohort_contract(
         },
         "tables": tables,
     }
+    if merge_candidates:
+        contract["_merge_candidates"] = merge_candidates
     if hardened:
         _harden_contract(contract)
     return contract
@@ -443,6 +521,18 @@ class Command(BaseCommand):
             _harden_contract(contract)
         tables = contract.get("tables", [])
         _inject_designed_models(tables)
+        for table in tables:
+            _flag_fk_columns(table.get("columns", []))
+            _flag_computed_fields(table)
+        tab_headers = {}
+        for tab in bundle_config.get("tabs", []):
+            title = tab.get("worksheet_title", "")
+            cols = tab.get("required_headers", [])
+            if title:
+                tab_headers[title] = {"columns": cols}
+        merge_candidates = _suggest_tab_merges(tab_headers)
+        if merge_candidates:
+            contract["_merge_candidates"] = merge_candidates
         return contract
 
     def _handle_cohort_corpus(
