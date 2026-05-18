@@ -156,3 +156,44 @@ def test_check_env_works_with_posix_sh(tmp_path):
     )
     assert result.returncode != 0
     assert "DRIVE_FOLDER_ID" in result.stderr
+
+
+def test_generated_makefile_has_generate_pipeline_manifest_target(tmp_path):
+    output_dir = _run_new_product(tmp_path, "pipeline-test")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    assert "generate-pipeline-manifest:" in makefile, (
+        "Missing generate-pipeline-manifest target in scaffolded Makefile"
+    )
+
+
+def test_generate_all_includes_pipeline_manifest(tmp_path):
+    output_dir = _run_new_product(tmp_path, "genall-test")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    genall_line = makefile.split("generate-all:")[1].split("\n")[0]
+    assert "generate-pipeline-manifest" in genall_line, (
+        "generate-all target does not include generate-pipeline-manifest"
+    )
+
+
+def test_generated_makefile_has_import_preflight_and_apply(tmp_path):
+    output_dir = _run_new_product(tmp_path, "import-test")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    assert "import-preflight:" in makefile
+    assert "import-apply:" in makefile
+
+
+def test_generated_makefile_has_pull_preflight_and_apply(tmp_path):
+    output_dir = _run_new_product(tmp_path, "pull-test")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    assert "pull-preflight:" in makefile
+    assert "pull-apply:" in makefile
+
+
+def test_generate_view_manifest_appears_exactly_once(tmp_path):
+    """Regression test for the duplicate generate-view-manifest bug."""
+    output_dir = _run_new_product(tmp_path, "manifest-once")
+    makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
+    count = makefile.count("generate-view-manifest:")
+    assert count == 1, (
+        f"Expected exactly 1 'generate-view-manifest:' target, found {count}"
+    )
