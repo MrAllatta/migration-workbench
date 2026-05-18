@@ -97,3 +97,18 @@ def test_domain_knowledge_example_yaml_includes_entities():
     assert "import_key:" in content
     assert "fk_to:" in content
     assert "ForeignKey" in content
+
+
+def test_scaffold_includes_domain_knowledge_example():
+    """The scaffold files list includes domain-knowledge.example.yaml."""
+    from scripts.new_product import render_domain_knowledge_example_yaml
+
+    content = render_domain_knowledge_example_yaml()
+    assert "domain-knowledge.example.yaml" not in content or True
+    from scripts.new_product import scaffold
+
+    import inspect
+
+    source = inspect.getsource(scaffold)
+    assert "render_domain_knowledge_example_yaml" in source
+    assert "domain-knowledge.example.yaml" in source

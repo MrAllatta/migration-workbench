@@ -1346,6 +1346,7 @@ def scaffold(
         ("README.md", render_readme_md(product_kebab, provider)),
         ("docs/operator.md", render_operator_md(product_kebab)),
         ("docs/schema-contract.md", render_schema_contract_md(product_kebab)),
+        ("docs/domain-knowledge.example.yaml", render_domain_knowledge_example_yaml()),
         ("data/raw_notes/README.md", render_raw_notes_readme()),
         (".gitignore", render_gitignore()),
         ("Dockerfile", render_dockerfile()),
