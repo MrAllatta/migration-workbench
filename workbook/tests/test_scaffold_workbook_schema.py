@@ -8,6 +8,7 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _flag_fk_columns,
     _flag_computed_fields,
     _suggest_tab_merges,
+    _merge_domain_knowledge,
 )
 
 
@@ -119,3 +120,51 @@ def test_suggest_tab_merges_groups_by_shared_headers():
         for r in result
     )
     assert not any("Harvest" in r["tabs"] for r in result)
+
+
+def test_domain_knowledge_merge_overrides_field_types():
+    """Domain knowledge field types override profiler-inferred types for matching fields."""
+    domain = {
+        "entities": {
+            "Season": {
+                "fields": {
+                    "name": {"type": "CharField", "max_length": 200},
+                    "year": {"type": "PositiveIntegerField"},
+                },
+                "source_tabs": ["Crop Planner"],
+            }
+        }
+    }
+    tables = [
+        {
+            "suggested_model_name": "Season",
+            "bundle_worksheet_title": "Crop Planner",
+            "columns": [
+                {"suggested_field_name": "name", "django_field_class": "models.TextField"},
+                {"suggested_field_name": "year", "django_field_class": "models.TextField"},
+                {"suggested_field_name": "notes", "django_field_class": "models.TextField"},
+            ],
+        }
+    ]
+    _merge_domain_knowledge(tables, domain)
+    season = tables[0]
+    cols_by_name = {c["suggested_field_name"]: c for c in season["columns"]}
+    assert cols_by_name["name"]["django_field_class"] == "CharField"
+    assert cols_by_name["name"]["max_length"] == 200
+    assert cols_by_name["year"]["django_field_class"] == "PositiveIntegerField"
+    assert cols_by_name["notes"].get("review_note") is not None
+
+
+def test_domain_knowledge_merge_warns_unmatched_entities():
+    """Domain entities not matched to any profiler tab produce a warning."""
+    domain = {
+        "entities": {
+            "GhostEntity": {
+                "fields": {"name": {"type": "CharField"}},
+                "source_tabs": ["Nonexistent Tab"],
+            }
+        }
+    }
+    warnings = []
+    _merge_domain_knowledge([], domain, warnings.append)
+    assert any("GhostEntity" in w for w in warnings)

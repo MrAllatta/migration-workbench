@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
@@ -382,6 +383,52 @@ def _harden_contract(contract: dict[str, Any]) -> None:
     _compute_bundle_paths(contract.get("tables", []))
 
 
+def _merge_domain_knowledge(
+    tables: list[dict],
+    domain_knowledge: dict,
+    warn: Callable[..., None] | None = None,
+) -> None:
+    """Merge domain-knowledge entity definitions into scaffolded tables.
+
+    Domain-knowledge field types override profiler-inferred types for matching
+    fields. Profiler columns not mentioned in the domain entity get a
+    review_note. Domain entities not matched to any profiler tab produce a
+    warning.
+    """
+    if warn is None:
+        warn = lambda _: None
+
+    entities = domain_knowledge.get("entities", {})
+    tab_to_entity: dict[str, tuple[str, dict]] = {}
+    for entity_name, entity_def in entities.items():
+        for tab in entity_def.get("source_tabs", []):
+            tab_to_entity[tab] = (entity_name, entity_def)
+
+    for table in tables:
+        tab_title = table.get("bundle_worksheet_title", "")
+        match = tab_to_entity.get(tab_title)
+        if not match:
+            continue
+        entity_name, entity_def = match
+        domain_fields = entity_def.get("fields", {})
+        for col in table.get("columns", []):
+            field_name = col.get("suggested_field_name", "")
+            if field_name in domain_fields:
+                df = domain_fields[field_name]
+                col["django_field_class"] = df.get("type", col.get("django_field_class"))
+                for key, value in df.items():
+                    if key != "type":
+                        col[key] = value
+            else:
+                col["review_note"] = f"Not mapped in domain knowledge for {entity_name}"
+
+    matched_tabs = {t.get("bundle_worksheet_title", "") for t in tables}
+    for entity_name, entity_def in entities.items():
+        for tab in entity_def.get("source_tabs", []):
+            if tab not in matched_tabs:
+                warn(f"Entity '{entity_name}' references tab '{tab}' not found in profiler output")
+
+
 class Command(BaseCommand):
     help = (
         "Build schema-contract YAML from pull_bundle config plus optional "
@@ -435,10 +482,22 @@ class Command(BaseCommand):
             default="domain",
             help="App label for Meta.db_table prefix on stub (default: domain)",
         )
+        parser.add_argument(
+            "--domain-knowledge",
+            default=None,
+            help="Path to a domain-knowledge YAML file with entity definitions",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out"]).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise CommandError(
+                "PyYAML is required for YAML output. Install migration-workbench with dependencies."
+            ) from exc
 
         cohort_dir = options.get("cohort_corpus_out_dir")
         bundle_config_path = options.get("bundle_config")
@@ -460,12 +519,14 @@ class Command(BaseCommand):
             meta = table.setdefault("model_meta", {})
             meta.setdefault("app_label", app_label)
 
-        try:
-            import yaml  # type: ignore[import-untyped]
-        except ImportError as exc:
-            raise CommandError(
-                "PyYAML is required for YAML output. Install migration-workbench with dependencies."
-            ) from exc
+        domain_knowledge_path = options.get("domain_knowledge")
+        if domain_knowledge_path:
+            dk_path = Path(domain_knowledge_path)
+            if not dk_path.exists():
+                raise CommandError(f"Domain knowledge file not found: {domain_knowledge_path}")
+            with dk_path.open() as f:
+                domain_knowledge = yaml.safe_load(f) or {}
+            _merge_domain_knowledge(contract.get("tables", []), domain_knowledge, self.stdout.write)
 
         text = yaml.safe_dump(
             contract,
