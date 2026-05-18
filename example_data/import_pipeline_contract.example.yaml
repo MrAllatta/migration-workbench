@@ -1,4 +1,3 @@
-version: "1.3"
 source:
   provider: local
   source_id: import_pipeline_e2e

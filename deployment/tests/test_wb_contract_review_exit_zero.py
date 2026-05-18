@@ -15,7 +15,6 @@ import yaml
 
 
 _CONTRACT_WITH_ISSUES = {
-    "version": "1.1",
     "source": {"provider": "test"},
     "tables": [
         {

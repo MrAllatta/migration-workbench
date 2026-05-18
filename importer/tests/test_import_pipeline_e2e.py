@@ -26,7 +26,6 @@ def fresh_db(db):
 class TestImportPipelineE2E:
     def test_contract_loads_with_import_configs(self):
         contract = load_contract(CONTRACT_PATH)
-        assert contract["version"] in ("1.0", "1.1", "1.2", "1.3")
         tables_with_import = [
             t for t in contract["tables"]
             if t.get("import_config")

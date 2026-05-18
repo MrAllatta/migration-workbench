@@ -376,7 +376,6 @@ def test_parse_interview_with_extra_blank_lines():
 def test_discovery_round_trip_generates_admin():
     """Full round-trip: manifest -> interview -> fill -> parse -> merge -> admin generation."""
     contract = {
-        "version": "1.1",
         "source": {"provider": "google_sheets"},
         "tables": [
             {

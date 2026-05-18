@@ -25,9 +25,8 @@ from workbook.codegen.import_generator import render_import_py
 from workbook.codegen.model_generator import render_models_py
 
 
-def _version_dir(contract: dict, base: Path) -> Path:
-    version = contract.get("version", "unknown")
-    return base / f"v{version}"
+def _version_dir(base: Path) -> Path:
+    return base
 
 
 def _generate_all(contract: dict, app_label: str) -> dict[str, str]:
@@ -44,19 +43,18 @@ def _take_snapshot(
     out_dir: Path,
     app_label: str,
 ) -> int:
-    version_dir = _version_dir(contract, out_dir)
-    version_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     files = _generate_all(contract, app_label)
     for name, content in sorted(files.items()):
-        target = version_dir / name
+        target = out_dir / name
         existed = target.exists()
         target.write_text(content, encoding="utf-8")
         label = "overwritten" if existed else "written"
         print(f"  {label}: {target}")
 
     model_count = len(contract.get("tables") or [])
-    print(f"snapshot v{contract['version']} ({model_count} model(s)): {version_dir}")
+    print(f"snapshot ({model_count} model(s)): {out_dir}")
     return 0
 
 
@@ -66,16 +64,15 @@ def _check_snapshot(
     out_dir: Path,
     app_label: str,
 ) -> int:
-    version_dir = _version_dir(contract, out_dir)
-    if not version_dir.is_dir():
-        print(f"no snapshot directory: {version_dir}")
+    if not out_dir.is_dir():
+        print(f"no snapshot directory: {out_dir}")
         print("run with --snapshot first")
         return 1
 
     files = _generate_all(contract, app_label)
     exit_code = 0
     for name, content in sorted(files.items()):
-        snapshot_path = version_dir / name
+        snapshot_path = out_dir / name
         if not snapshot_path.is_file():
             print(f"MISSING: {snapshot_path}")
             exit_code = 1
@@ -96,7 +93,7 @@ def _check_snapshot(
             exit_code = 1
 
     if exit_code == 0:
-        print(f"all snapshots match for v{contract['version']}")
+        print(f"all snapshots match")
     return exit_code
 
 

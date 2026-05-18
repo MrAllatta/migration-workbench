@@ -41,7 +41,7 @@ def test_scaffold_includes_designed_models():
             "scaffold_workbook_schema",
             "--bundle-config", cfg_path,
             "--out", out_path,
-            "--contract-version", "1.3",
+
             stdout=out,
         )
         import yaml

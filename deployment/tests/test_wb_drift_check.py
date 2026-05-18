@@ -12,7 +12,6 @@ import yaml
 
 def _contract_with_model(model_name: str = "crop") -> dict:
     return {
-        "version": "1.3",
         "source": {"provider": "google_sheets"},
         "tables": [
             {

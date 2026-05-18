@@ -154,7 +154,7 @@ def test_build_view_manifest_filterable_from_validation():
 def test_build_view_manifest_binds_entity_from_contract():
     structure = _orders_structure()
     schema_contract = {
-        "version": "1.0",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -212,7 +212,7 @@ def test_build_view_manifest_infers_time_scope_from_year_and_week():
         ],
     }
     schema_contract = {
-        "version": "1.0",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -254,7 +254,7 @@ def test_build_view_manifest_time_scope_with_date_field():
         ],
     }
     schema_contract = {
-        "version": "1.0",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -286,7 +286,7 @@ def test_build_view_manifest_status_values_with_column_profiles():
     """When column_profiles provides distinct values, status_values is populated."""
     structure = _orders_structure()
     schema_contract = {
-        "version": "1.0",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -336,7 +336,7 @@ def test_scaffold_view_manifest_command_writes_yaml(tmp_path):
 
     contract_path = tmp_path / "schema-contract.yaml"
     contract = {
-        "version": "1.0",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {

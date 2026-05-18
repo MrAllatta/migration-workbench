@@ -22,7 +22,7 @@ def test_include_list_splices_into_tables(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - suggested_model_name: crop
     columns: []
@@ -45,7 +45,7 @@ def test_include_list_requires_a_yaml_list(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - !include_list not_a_list.yaml
 """.lstrip(),
@@ -86,7 +86,7 @@ def test_nested_includes_resolve_relative_to_including_file(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - !include_list includes/tables.yaml
 """.lstrip(),
@@ -118,7 +118,7 @@ def test_multi_hop_include_cycle_reports_cyclic_and_file_names(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - !include_list cycle_first.yaml
 """.lstrip(),
@@ -137,7 +137,7 @@ def test_tables_flattening_is_recursive(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - - - suggested_model_name: planting
         columns: []
@@ -158,7 +158,7 @@ def test_tables_entries_must_be_mappings_includes_type_name(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
         """
-version: "1.3"
+
 tables:
   - suggested_model_name: crop
     columns: []

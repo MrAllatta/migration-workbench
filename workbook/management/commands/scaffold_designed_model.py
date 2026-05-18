@@ -140,7 +140,6 @@ class Command(BaseCommand):
             table["str_template"] = str_template
 
         output = {
-            "version": "1.3",
             "tables": [table],
         }
 

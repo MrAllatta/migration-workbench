@@ -160,7 +160,6 @@ wrote /tmp/schema-contract.yaml
 The generated YAML looks like:
 
 ```yaml
-version: "1.0"
 source:
   provider: google_sheets
   source_id: farm-2025
@@ -197,7 +196,6 @@ Edit `/tmp/schema-contract.yaml` to add production-grade metadata.  Save as
 `contract-v1.yaml`.
 
 ```yaml
-version: "1.1"
 source:
   provider: google_sheets
   source_id: farm-2025

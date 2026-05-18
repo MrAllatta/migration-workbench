@@ -17,7 +17,7 @@ from workbook.codegen.manifest import find_view_for_entity, load_manifest
 def _contract() -> dict:
     """Return a v1.1 contract with Crop + Planting (Planting FK to Crop)."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -292,7 +292,7 @@ def test_generated_admin_compiles_no_manifest():
 def test_generated_admin_compiles_empty():
     _check_compiles(
         render_admin_py(
-            {"version": "1.0", "source": {}, "tables": []},
+            {"source": {}, "tables": []},
             manifest=None,
             app_label="core",
         )
@@ -391,7 +391,7 @@ def test_command_warns_on_existing_output(tmp_path):
 def _contract_abstract_user_admin() -> dict:
     """Return a contract with an AbstractUser model and an ``admin:`` block."""
     return {
-        "version": "1.2",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -438,7 +438,7 @@ def test_status_field_promoted_in_list_filter():
 def test_status_field_added_to_list_filter_when_not_in_filterable():
     """When manifest has status_field not in filterable_by, it is added and promoted first."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -475,7 +475,7 @@ def test_status_field_added_to_list_filter_when_not_in_filterable():
 def test_admin_class_includes_status_field_comment():
     """When status_field is set, a comment appears above the admin class."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -518,7 +518,7 @@ def test_no_status_field_comment_when_absent():
 def test_manifest_round_trip_in_end_to_end_admin_generation():
     """Verify manifest fields flow through to generated admin output end-to-end."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -563,7 +563,7 @@ def test_manifest_round_trip_in_end_to_end_admin_generation():
 def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
     """Manifest status_field referencing a non-existent field is not added to list_filter."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -605,7 +605,7 @@ def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
 def test_fk_field_gets_link_method():
     """FK fields should get a _link display method."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -652,7 +652,7 @@ def test_fk_field_gets_link_method():
 def test_fk_link_appears_in_list_display_instead_of_raw_fk():
     """list_display should use block_link instead of block."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -699,7 +699,7 @@ def test_fk_link_appears_in_list_display_instead_of_raw_fk():
 def test_non_fk_fields_not_turned_into_links():
     """Non-FK fields should not get _link methods."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -737,7 +737,7 @@ def test_non_fk_fields_not_turned_into_links():
 def test_status_field_comment_emitted_even_when_not_in_contract():
     """The status_field comment is emitted as informational even for non-existent fields."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -779,7 +779,7 @@ def test_status_field_comment_emitted_even_when_not_in_contract():
 def test_temporal_year_field_in_list_filter():
     """source_bundle_year should appear in list_filter when present."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -819,7 +819,7 @@ def test_temporal_year_field_in_list_filter():
 
 def test_date_hierarchy_for_date_fields():
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -857,7 +857,7 @@ def test_date_hierarchy_for_date_fields():
 
 def test_current_season_queryset_filter():
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -897,7 +897,7 @@ def test_current_season_queryset_filter():
 
 def test_status_field_generates_admin_actions():
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -939,7 +939,7 @@ def test_status_field_generates_admin_actions():
 def test_editable_fields_become_fields():
     """editable_fields from manifest become the fields attribute."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {

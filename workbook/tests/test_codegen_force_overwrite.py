@@ -9,9 +9,8 @@ from django.core.management import call_command
 
 
 def _contract() -> dict:
-    """Return a minimal v1.1 contract with one table."""
+    """Return a minimal contract with one table."""
     return {
-        "version": "1.1",
         "source": {"provider": "google_sheets"},
         "tables": [
             {

@@ -7,7 +7,6 @@ from django.core.management import call_command
 def test_generate_source_config_from_contract(tmp_path):
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text("""
-version: "1.0"
 tables:
   - suggested_model_name: Crop
     bundle_worksheet_title: Crop Info

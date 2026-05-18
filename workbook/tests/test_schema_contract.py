@@ -39,7 +39,6 @@ def test_build_contract_with_table_profile():
         doc_profile=None,
         table_profiles={"Clients": tp},
     )
-    assert contract["version"] == "1.0"
     assert len(contract["tables"]) == 1
     tab = contract["tables"][0]
     assert tab["suggested_model_name"] == "clients"

@@ -9,7 +9,7 @@ class TestReviewContract:
     def test_fk_lookup_references_nonexistent_model(self):
         """Warn when fk_lookup.model targets a model not in the contract."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "inventory",
@@ -39,7 +39,7 @@ class TestReviewContract:
     def test_admin_inlines_target_nonexistent_model(self):
         """Warn when admin.inlines references a model not in the contract."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "planting",
@@ -67,7 +67,7 @@ class TestReviewContract:
     def test_computed_field_naming_convention(self):
         """Warn when computed_fields use non-snake_case names."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "crop",
@@ -98,7 +98,7 @@ class TestReviewContract:
     def test_clean_contract_no_issues(self):
         """A well-formed minimal contract produces no review issues."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "crop",
@@ -120,7 +120,7 @@ class TestReviewContract:
     def test_all_issues_include_rule_id(self):
         """Every issue produced by review_contract must have a rule_id key."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "planting",
@@ -151,7 +151,7 @@ class TestReviewContract:
     def test_suppress_review_warning_multiple_fk_without_unique(self):
         """Allow suppressing specific review warnings per table by rule_id."""
         contract = {
-            "version": "1.3",
+
             "tables": [
                 {
                     "suggested_model_name": "planting",

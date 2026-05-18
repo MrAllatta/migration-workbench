@@ -1,7 +1,7 @@
 """Build schema contract dicts from bundle config and profiler JSON artifacts.
 
-A *schema contract* is a JSON document (schema version ``"1.0"``) that maps
-every worksheet tab in a bundle config to:
+A *schema contract* is a YAML/JSON document that maps every worksheet tab
+in a bundle config to:
 
 * A suggested Django model name.
 * An ordered list of columns, each annotated with a suggested Django field
@@ -287,10 +287,9 @@ def build_contract(
             mapping.  Takes precedence over *doc_profile* for the matched table.
 
     Returns:
-        dict: Schema contract conforming to version ``"1.0"``::
+        dict: Schema contract dict::
 
             {
-                "version": "1.0",
                 "source": {"provider": ..., "doc_url": ..., ...},
                 "tables": [
                     {
@@ -381,7 +380,6 @@ def build_contract(
         contract_tables.append(entry)
 
     return {
-        "version": "1.0",
         "source": {
             "provider": bundle_config.get("provider"),
             "doc_url": bundle_config.get("doc_url"),

@@ -248,7 +248,7 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 - **Auto-detect import tier ordering:** `assign_import_tiers()` topological sorts FK dependency chains; explicit tiers override auto-detection.
 - **Contract diff tool:** `wb contract diff --old contract-v1.yaml --new contract-v2.yaml` compares models, fields, and meta with text and JSON (`--json`) output.
 - **Schema review checklist:** `wb contract review --contract <yaml>` checks CharField max_length, nullable FK on_delete, missing unique_together, and str_template.
-- **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` stores generated output per contract version for regression detection.
+- **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` stores generated output for regression detection.
 - **`check-generated` Makefile target:** py_compile validation of generated Python files.
 
 ### 0.3.0

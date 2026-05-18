@@ -1,9 +1,8 @@
 """Load, normalise, and query a schema-contract YAML for code generation.
 
-A schema contract may be version ``"1.0"`` (auto-generated hints) or ``"1.1"``
-(human-hardened with model metadata, FK resolutions, field overrides, and
-extra fields).  This module provides a uniform access layer so generators
-don't need to branch on the version.
+Provides a uniform access layer so generators don't need to branch on
+contract features — accessor functions return sensible defaults for
+absent keys.
 """
 
 from __future__ import annotations
@@ -90,13 +89,12 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
 
     Returns:
-        Normalised contract dict with ``"version"``, ``"source"``, and
-        ``"tables"`` keys guaranteed present.
+        Normalised contract dict with ``"source"`` and ``"tables"`` keys
+        guaranteed present.
 
     Raises:
         CommandError (via caller) or ``ValueError`` if the file is missing,
-        unparseable, has an unsupported version, or includes a cyclic
-        reference.
+        unparseable or includes a cyclic reference.
     """
     import yaml
 
@@ -106,13 +104,9 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("schema contract must be a YAML mapping")
 
-    version = str(raw.get("version") or "1.0")
-    if version not in ("1.0", "1.1", "1.2", "1.3"):
-        raise ValueError(f"unsupported schema contract version: {version}")
-
+    raw.setdefault("version", "")
     raw.setdefault("source", {})
     raw.setdefault("tables", [])
-    raw["version"] = version
 
     tables = raw.get("tables")
     if not isinstance(tables, list):

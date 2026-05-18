@@ -12,7 +12,6 @@ from django.core.management import call_command, CommandError
 
 def _contract_yaml() -> str:
     return yaml.safe_dump({
-        "version": "1.0",
         "source": {"provider": "google_sheets", "doc_id": "sheet123"},
         "tables": [
             {

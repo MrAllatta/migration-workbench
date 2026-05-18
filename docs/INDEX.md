@@ -14,7 +14,7 @@
 |-----|----------|-------------|
 | [Architecture](architecture.md) | all | Five-layer design, data flow, Django project layout |
 | [Schema Design Loop](schema-design-loop.md) | adopter | Contract-first importer workflow |
-| [Schema Contract Reference](schema-contract.md) | adopter | YAML contract format reference (v1.0–v1.3) |
+| [Schema Contract Reference](schema-contract.md) | adopter | YAML contract format reference |
 | [View Manifest Reference](view-manifest.md) | adopter | View manifest YAML format, admin generation effects |
 | [Pipeline Manifest Reference](pipeline-manifest.md) | operator | Machine-generated execution plan format |
 | [Roadmap](roadmap.md) | all | Feature history and v1.0 criteria |

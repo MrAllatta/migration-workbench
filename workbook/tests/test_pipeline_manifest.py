@@ -10,7 +10,6 @@ from workbook.pipeline_manifest import build_pipeline_manifest
 
 def _minimal_contract() -> dict:
     return {
-        "version": "1.0",
         "source": {"provider": "google_sheets", "doc_id": "sheet123"},
         "tables": [
             {

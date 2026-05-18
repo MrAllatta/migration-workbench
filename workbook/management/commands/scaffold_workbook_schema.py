@@ -76,7 +76,6 @@ def _build_cohort_contract(
     deep_dir: Path,
     coverage_payload: dict,
     *,
-    version: str = "1.0",
     hardened: bool = False,
 ) -> dict[str, Any]:
     """Build a schema contract from a cohort corpus ``deep_profile_coverage`` payload.
@@ -84,7 +83,6 @@ def _build_cohort_contract(
     Args:
         deep_dir: Directory containing per-tab deep JSON artifacts.
         coverage_payload: Parsed ``deep_profile_coverage_*.json`` content.
-        version: Schema contract version.  Defaults to ``"1.0"``.
         hardened: When ``True``, emit ``import_config``, ``fk_resolutions``,
             ``field_overrides``, and ``admin`` blocks.  Defaults to ``False``.
 
@@ -313,11 +311,6 @@ class Command(BaseCommand):
             "admin blocks in the contract",
         )
         parser.add_argument(
-            "--contract-version",
-            default="1.0",
-            help="Schema contract version string (default: 1.0)",
-        )
-        parser.add_argument(
             "--out",
             required=True,
             help="Output schema contract path (.yaml or .yml)",
@@ -344,7 +337,6 @@ class Command(BaseCommand):
             contract = self._handle_cohort_corpus(
                 Path(cohort_dir).resolve(),
                 hardened=bool(options.get("hardened")),
-                version=options.get("contract_version", "1.0"),
             )
         elif bundle_config_path:
             contract = self._handle_bundle_config(options)
@@ -410,13 +402,11 @@ class Command(BaseCommand):
             table_profiles[title] = payload
 
         hardened = bool(options.get("hardened"))
-        version = options.get("contract_version", "1.0")
         contract = build_contract(
             bundle_config,
             doc_profile=doc_profile,
             table_profiles=table_profiles or None,
         )
-        contract["version"] = version
         if hardened:
             _harden_contract(contract)
         tables = contract.get("tables", [])
@@ -424,7 +414,7 @@ class Command(BaseCommand):
         return contract
 
     def _handle_cohort_corpus(
-        self, cohort_dir: Path, *, hardened: bool, version: str
+        self, cohort_dir: Path, *, hardened: bool
     ) -> dict[str, Any]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))
         if not coverage_files:
@@ -441,7 +431,6 @@ class Command(BaseCommand):
         contract = _build_cohort_contract(
             deep_dir,
             coverage_payload,
-            version=version,
             hardened=hardened,
         )
         return contract

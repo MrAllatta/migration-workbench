@@ -14,35 +14,23 @@ profile → contract → harden → generate_models
 
 1. **Profile** — `profile_tab` / `scan_formula_patterns` produces column metadata.
 2. **Contract** — `scaffold_workbook_schema` merges bundle config + profiler output into a YAML schema contract.
-3. **Harden** — A human edits the v1.0 output, adding `model_meta`, `fk_resolutions`, `field_overrides`, `extra_fields`, `import_config`, `computed_fields`, and `admin` blocks.
+ 3. **Harden** — A human edits the auto-generated output, adding `model_meta`, `fk_resolutions`, `field_overrides`, `extra_fields`, `import_config`, `computed_fields`, and `admin` blocks.
 4. **Generate** — `generate_models`, `generate_admin`, and `generate_import` consume the hardened contract to produce `models.py`, `admin.py`, and import commands.
 
 For the command reference see [`workbook/README.md`](../workbook/README.md).
 
----
 
-## Contract versions
-
-| Version | Additions |
-|---------|-----------|
-| **v1.0** | Auto-generated hints from bundle config + profiler JSON: `columns[]` with `django_field_class`, `django_field_kwargs`, `suggested_field_name`. |
-| **v1.1** | `model_meta` (verbose_name, ordering, unique_together), `str_template`, `fk_resolutions`, `field_overrides`, `extra_fields`, `import_config`. |
-| **v1.2** | `computed_fields`, `model_base`, `extra_imports`, richer `model_meta` (constraints, indexes), `admin` block. |
-| **v1.3** | `!include` / `!include_list` composition, `enums`, `hooks`, `is_abstract`, `model_name`, `source_tab: null` for designed models, `import_config.field_transforms`, `import_config.field_parsers`, `suppress_review_warnings`. |
-
----
 
 ## Top-level structure
 
 ```yaml
-version: "1.3"                   # required; one of 1.0, 1.1, 1.2, 1.3
 source:                           # informational metadata
   provider: "google_sheets"
   doc_url: "https://..."
   doc_id: "abc123"
   source_id: "my_project"
 
-enums:                            # v1.3 — enum definitions for choices
+enums:                            # enum definitions for choices
   EventType:
     - [seeded, "Seeded"]
     - [harvested, "Harvested"]
@@ -50,7 +38,7 @@ enums:                            # v1.3 — enum definitions for choices
 tables: []                        # list of model definitions (see below)
 ```
 
-### `!include` composition (v1.3)
+### `!include` composition
 
 Contract files can be split across multiple YAML files using the `!include` and `!include_list` tags:
 
@@ -90,7 +78,7 @@ model_meta:
   app_label: "inventory"
 ```
 
-### `model_name` (v1.3)
+### `model_name`
 
 PascalCase model class name. Used by designed models that have no source tab; otherwise derived from `suggested_model_name`.
 
@@ -98,7 +86,7 @@ PascalCase model class name. Used by designed models that have no source tab; ot
 model_name: "FieldEvent"
 ```
 
-### `source_tab` (v1.3)
+### `source_tab`
 
 Override for the source tab name. When set to `null`, the model has no source-tab association (a "designed model").
 
@@ -124,7 +112,7 @@ columns:
     notes: []                                     # advisory strings
 ```
 
-### `computed_fields` (v1.2)
+### `computed_fields`
 
 Fields rendered as `@property` methods instead of database columns. Each key is the property name:
 
@@ -147,15 +135,15 @@ model_meta:
   verbose_name: "Crop"
   verbose_name_plural: "Crops"
   ordering: ["name"]                  # default ordering
-  unique_together:                    # (v1.1)
+  unique_together:                    #
     - [crop, plant_date]
-  constraints: []                     # (v1.2) — list of constraint dicts
-  indexes: []                         # (v1.2) — list of index dicts
+  constraints: []                     # — list of constraint dicts
+  indexes: []                         # — list of index dicts
   db_table: "my_table"               # explicit table name
   app_label: "core"                  # per-model app override
 ```
 
-### `admin` (v1.2)
+### `admin`
 
 Configuration for the generated `admin.py`:
 
@@ -184,9 +172,9 @@ import_config:
   column_map:                                 # field → source header
     name: Crop
     crop_type: Type
-  field_parsers:                              # (v1.3) explicit parser per field
+  field_parsers:                              # explicit parser per field
     plant_date: parse_date
-  field_transforms:                           # (v1.3) lambda for multi-source fields
+  field_transforms:                           # lambda for multi-source fields
     full_name: "' '.join(p for p in parts if p)"
   default_values:                             # fallback defaults
     crop_type: ""
@@ -198,7 +186,7 @@ import_config:
       on: name                                # field on target to match
 ```
 
-### `is_abstract` (v1.3)
+### `is_abstract`
 
 When `true`, the model is rendered as an abstract base (`class Meta: abstract = True`). No migration is created.
 
@@ -208,20 +196,20 @@ is_abstract: true
 
 ### Additional table-level keys
 
-| Key | Version | Description |
-|-----|---------|-------------|
-| `bundle_worksheet_title` | v1.0 | Source worksheet tab name |
-| `bundle_output_path` | v1.0 | Bundle output CSV path |
-| `suggested_model_name` | v1.0 | Snake_case model name |
-| `str_template` | v1.1 | `__str__` f-string body, e.g. `"{self.name}"` |
-| `fk_resolutions` | v1.1 | `{field_name: target_model}` FK target overrides |
-| `field_overrides` | v1.1 | Per-field class/kwarg overrides |
-| `extra_fields` | v1.1 | Hand-authored fields not from any column |
-| `model_base` | v1.2 | Model base class, defaults to `"models.Model"` |
-| `extra_imports` | v1.2 | Extra import lines for non-standard bases |
-| `hooks` | v1.3 | Code injection points: `after_model`, `after_meta`, `before_return` |
-| `suppress_review_warnings` | v1.3 | List of `rule_id` strings to silence in `review_contract` |
-| `import_key` | v1.0 | Auto-suggested import key `{fields, confidence, note}` |
+| Key | Description |
+|-----|-------------|
+| `bundle_worksheet_title` | Source worksheet tab name |
+| `bundle_output_path` | Bundle output CSV path |
+| `suggested_model_name` | Snake_case model name |
+| `str_template` | `__str__` f-string body, e.g. `"{self.name}"` |
+| `fk_resolutions` | `{field_name: target_model}` FK target overrides |
+| `field_overrides` | Per-field class/kwarg overrides |
+| `extra_fields` | Hand-authored fields not from any column |
+| `model_base` | Model base class, defaults to `"models.Model"` |
+| `extra_imports` | Extra import lines for non-standard bases |
+| `hooks` | Code injection points: `after_model`, `after_meta`, `before_return` |
+| `suppress_review_warnings` | List of `rule_id` strings to silence in `review_contract` |
+| `import_key` | Auto-suggested import key `{fields, confidence, note}` |
 
 ---
 
@@ -237,7 +225,7 @@ django_field_kwargs:
   blank: true
   null: true
   default: ""
-  choices: EventType    # bare enum name (v1.1+)
+  choices: EventType    # bare enum name
 ```
 
 ### `IntegerField`
@@ -339,7 +327,7 @@ django_field_kwargs:
 
 ---
 
-## `computed_fields` (v1.2)
+## `computed_fields`
 
 Computed fields are rendered as `@property` methods in the generated model. They are excluded from import and admin forms.
 
@@ -365,7 +353,7 @@ def total_value(self) -> Decimal:
 
 ---
 
-## `model_meta` (v1.1+)
+## `model_meta`
 
 All keys are passed through to Django's `class Meta`:
 
@@ -374,14 +362,12 @@ model_meta:
   verbose_name: "Planting"
   verbose_name_plural: "Plantings"
   ordering: ["-plant_date"]                  # descending order
-  unique_together:                           # multi-field uniqueness (v1.1)
+  unique_together:                           # multi-field uniqueness
     - [crop, plant_date]
     - [field, block, season]
-  constraints:                               # v1.2 — arbitrary constraints
-    - type: unique
-      fields: [crop, season]
-      name: unique_crop_per_season
-  indexes:                                   # v1.2 — explicit indexes
+  constraints:                               # arbitrary constraints
+
+  indexes:                                   # explicit indexes
     - fields: [status]
       name: idx_planting_status
   db_table: "my_app_planting"               # explicit table name
@@ -390,7 +376,7 @@ model_meta:
 
 ---
 
-## Admin configuration (v1.2+)
+## Admin configuration
 
 The `admin` block is consumed by `generate_admin` to produce `ModelAdmin` classes:
 
@@ -434,9 +420,9 @@ import_config:
   column_map:                            # field_name → source_header
     name: Crop
     crop_type: Type
-  field_transforms:                      # (v1.3) lambda for multi-column sources
+  field_transforms:                      # lambda for multi-column sources
     full_name: "' '.join(p for p in parts if p)"
-  field_parsers:                         # (v1.3) explicit parser override
+  field_parsers:                         # explicit parser override
     plant_date: parse_date
     quantity: int
   default_values:                        # fallback when CSV value is empty
@@ -462,7 +448,7 @@ When `field_parsers` is not specified, the generator infers parsers from the Dja
 | `BooleanField` | `self._bool()` |
 | `CharField` / `TextField` / others | `row.get(...).strip()` |
 
-### Multi-source column_map (v1.3)
+### Multi-source column_map
 
 When a `column_map` value is a list, the field is assembled from multiple source columns:
 
@@ -475,7 +461,7 @@ This generates a `full_name_parts` collection and applies the `field_transforms`
 
 ---
 
-## `!include` composition (v1.3)
+## `!include` composition
 
 ### Syntax
 
@@ -508,52 +494,4 @@ cyclic include detected: /tmp/cycle_first.yaml -> /tmp/cycle_second.yaml -> /tmp
 
 ---
 
-## Version changelog
 
-### v1.3
-
-| Addition | Location |
-|----------|----------|
-| `!include` / `!include_list` YAML tags | Top-level `tables` list |
-| `enums` | Top-level |
-| `hooks` | Per-table |
-| `is_abstract` | Per-table |
-| `model_name` | Per-table (PascalCase) |
-| `source_tab: null` | Per-table (designed models) |
-| `field_transforms` | `import_config` |
-| `field_parsers` | `import_config` |
-| `suppress_review_warnings` | Per-table |
-| Multi-source `column_map` (list values) | `import_config.column_map` |
-
-### v1.2
-
-| Addition | Location |
-|----------|----------|
-| `computed_fields` | Per-table |
-| `model_base` | Per-table |
-| `extra_imports` | Per-table |
-| `constraints`, `indexes` | `model_meta` |
-| `admin` block | Per-table |
-
-### v1.1
-
-| Addition | Location |
-|----------|----------|
-| `model_meta` | Per-table (verbose_name, ordering, unique_together, db_table, app_label) |
-| `str_template` | Per-table |
-| `fk_resolutions` | Per-table |
-| `field_overrides` | Per-table |
-| `extra_fields` | Per-table |
-| `import_config` | Per-table |
-
-### v1.0
-
-| Addition | Location |
-|----------|----------|
-| `version` | Top-level |
-| `source` | Top-level |
-| `tables[]` | Top-level |
-| `columns[]` with `django_field_class` / `django_field_kwargs` | Per-table |
-| `bundle_worksheet_title` | Per-table |
-| `bundle_output_path` | Per-table |
-| `suggested_model_name` | Per-table |

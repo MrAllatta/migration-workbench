@@ -19,7 +19,7 @@ def _make_table(name, fields=None, meta=None):
 def test_diff_identical_contracts():
     """Two identical contracts produce an empty diff."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             _make_table("crop", [
@@ -35,7 +35,7 @@ def test_diff_identical_contracts():
 
 def test_diff_model_added_and_removed():
     old_contract = {
-        "version": "1.1",
+
         "source": {},
         "tables": [
             _make_table("crop"),
@@ -43,7 +43,7 @@ def test_diff_model_added_and_removed():
         ],
     }
     new_contract = {
-        "version": "1.1",
+
         "source": {},
         "tables": [
             _make_table("crop"),
@@ -74,8 +74,8 @@ def test_diff_field_changes():
          "django_field_class": "models.CharField",
          "django_field_kwargs": {"max_length": 100}},
     ])
-    old_contract = {"version": "1.1", "source": {}, "tables": [old_table]}
-    new_contract = {"version": "1.1", "source": {}, "tables": [new_table]}
+    old_contract = {"source": {}, "tables": [old_table]}
+    new_contract = {"source": {}, "tables": [new_table]}
     result = diff_contracts(old_contract, new_contract)
     diffs = result["model_diffs"]["Crop"]
     assert diffs["fields_added"] == [
@@ -103,8 +103,8 @@ def test_diff_meta_changes():
         "unique_together": [["name", "variety"]],
         "ordering": ["name"],
     })
-    old_contract = {"version": "1.1", "source": {}, "tables": [old_table]}
-    new_contract = {"version": "1.1", "source": {}, "tables": [new_table]}
+    old_contract = {"source": {}, "tables": [old_table]}
+    new_contract = {"source": {}, "tables": [new_table]}
     result = diff_contracts(old_contract, new_contract)
     diffs = result["model_diffs"]["Crop"]
     assert "meta_changed" in diffs
@@ -129,8 +129,8 @@ def test_diff_field_class_change():
          "django_field_class": "models.CharField",
          "django_field_kwargs": {"max_length": 500}},
     ])
-    old_contract = {"version": "1.1", "source": {}, "tables": [old_table]}
-    new_contract = {"version": "1.1", "source": {}, "tables": [new_table]}
+    old_contract = {"source": {}, "tables": [old_table]}
+    new_contract = {"source": {}, "tables": [new_table]}
     result = diff_contracts(old_contract, new_contract)
     changed = result["model_diffs"]["Crop"]["fields_changed"]
     assert len(changed) == 1

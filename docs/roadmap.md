@@ -30,10 +30,9 @@ what to build next, what to fix, and what to defer.
 These are fixes and small enhancements exposed by the farm exercise that
 can ship without major rearchitecture.
 
-### Contract schema v1.3
+### Contract schema hardening
 
-The v1.2 contract supports enums, admin config, model_base, and field
-overrides. The farm exercise revealed missing Meta options and awkward
+The farm exercise revealed missing Meta options and awkward
 patterns for designed models.
 
 **Add to `model_meta`:**
@@ -110,7 +109,7 @@ Most of the repetition is structural (every extra_field needs class +
 kwargs dict). Two approaches:
 
 **1. Contract scaffolding for designed models**
-`scaffold_workbook_schema` already produces v1.0 drafts for source-aligned
+`scaffold_workbook_schema` already produces auto-generated drafts for source-aligned
 models. Add `scaffold_designed_model --name FieldEvent --fields "event_type:CharField(30):choices=EventType,timestamp:DateTimeField"` that
 emits a contract table skeleton with extra_fields pre-populated.
 
@@ -308,7 +307,7 @@ or wished for during the farm implementation:
 |---|---|
 | Hand-authored 663-line contract | Contract scaffolding, hooks system, unique_together in model_meta |
 | `make generate-admin` blocked by missing manifest | Makefile flag fix, `generate-admin-light` target |
-| `unique_together` required hand-edit after generation | Add to model_meta in v1.3 |
+| `unique_together` required hand-edit after generation | Add to model_meta |
 | Properties/methods required hand-edit after generation | `contract.hooks` block |
 | Designed models (FieldEvent, InventoryEntry) have no scaffolding | `source_tab: null`, designed model scaffold command |
 | No way to validate contract before codegen | `make validate-contract`, codegen-time contract validation |

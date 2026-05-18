@@ -30,9 +30,8 @@ from workbook.codegen.python_render import (
 
 
 def _contract_v1_0() -> dict:
-    """Return a minimal v1.0 contract with two tables."""
+    """Return a minimal contract with two tables."""
     return {
-        "version": "1.0",
         "source": {"provider": "google_sheets", "doc_url": None},
         "tables": [
             {
@@ -97,7 +96,6 @@ def _contract_v1_0() -> dict:
 def _contract_v1_1() -> dict:
     """Return a hardened v1.1 contract building on the v1.0 base."""
     c = _contract_v1_0()
-    c["version"] = "1.1"
 
     # Harden Crop
     c["tables"][0].update(
@@ -289,7 +287,6 @@ def test_load_contract_v1_0(tmp_path):
     p = tmp_path / "contract.yaml"
     p.write_text(yaml.dump(_contract_v1_0()), encoding="utf-8")
     c = load_contract(str(p))
-    assert c["version"] == "1.0"
     assert len(c["tables"]) == 2
 
 
@@ -297,17 +294,7 @@ def test_load_contract_v1_1(tmp_path):
     p = tmp_path / "contract.yaml"
     p.write_text(yaml.dump(_contract_v1_1()), encoding="utf-8")
     c = load_contract(str(p))
-    assert c["version"] == "1.1"
     assert c["tables"][0].get("str_template") == "{self.name}"
-
-
-def test_load_contract_bad_version(tmp_path):
-    p = tmp_path / "bad.yaml"
-    p.write_text(yaml.dump({"version": "2.0", "tables": []}), encoding="utf-8")
-    import pytest
-
-    with pytest.raises(ValueError, match="unsupported.*2.0"):
-        load_contract(str(p))
 
 
 # ---------------------------------------------------------------------------
@@ -509,12 +496,11 @@ def test_generated_python_compiles_v1_1():
 
 
 def test_generated_python_compiles_empty():
-    _check_compiles(render_models_py({"version": "1.0", "source": {}, "tables": []}))
+    _check_compiles(render_models_py({"source": {}, "tables": []}))
 
 
 def test_generated_python_compiles_single_table_no_fields():
     contract = {
-        "version": "1.0",
         "source": {},
         "tables": [{"suggested_model_name": "widget", "columns": []}],
     }

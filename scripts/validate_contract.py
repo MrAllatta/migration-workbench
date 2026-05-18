@@ -32,14 +32,9 @@ def main() -> None:
         print("ERROR: schema contract must be a YAML mapping")
         sys.exit(1)
 
-    version = str(data.get("version") or "1.0")
-    if version not in ("1.0", "1.1", "1.2", "1.3"):
-        print(f"ERROR: unsupported version: {version}")
-        sys.exit(1)
-
     tables = data.get("tables") or []
     table_names = {t.get("suggested_model_name", "?") for t in tables}
-    print(f"Contract v{version}: {len(tables)} table(s)")
+    print(f"Contract: {len(tables)} table(s)")
     for name in sorted(table_names):
         print(f"  - {name}")
 

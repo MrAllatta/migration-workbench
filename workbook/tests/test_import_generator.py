@@ -22,7 +22,7 @@ from workbook.codegen.import_generator import render_import_py
 def _contract_with_imports() -> dict:
     """Return a v1.1 contract with two models that have import_config."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -110,7 +110,7 @@ def _contract_with_imports() -> dict:
 def _contract_no_column_map() -> dict:
     """Contract with import_config but no column_map (to test auto-derivation)."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -144,7 +144,7 @@ def _contract_no_column_map() -> dict:
 def _contract_no_imports() -> dict:
     """Return a v1.1 contract with no import_config blocks."""
     return {
-        "version": "1.1",
+
         "source": {},
         "tables": [
             {
@@ -221,7 +221,7 @@ def test_render_has_tier_calls():
 def test_render_all_tables_get_tier_call():
     """Every table with import_config gets its own tier() call, even same tier."""
     contract = {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -383,7 +383,7 @@ def test_generated_import_compiles():
 def test_generated_import_compiles_empty():
     _check_compiles(
         render_import_py(
-            {"version": "1.0", "source": {}, "tables": []},
+            {"source": {}, "tables": []},
             app_label="core",
         )
     )
@@ -462,7 +462,7 @@ def test_command_warns_on_existing_output(tmp_path):
 def _contract_examplecrop() -> dict:
     """Contract matching the real ``ExampleCrop`` model from the examples app."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -493,7 +493,7 @@ def _contract_examplecrop() -> dict:
 def _contract_exampleblock_with_fk() -> dict:
     """Contract for ExampleBlock with FK lookup to ExampleCrop."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -560,7 +560,7 @@ def _contract_exampleblock_with_fk() -> dict:
 def _contract_examplecrop_required() -> dict:
     """Contract for ExampleCrop with a required column check."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -731,7 +731,7 @@ def test_generated_import_reports_missing_required(tmp_path, db):
 def _contract_multi_source() -> dict:
     """Return a v1.1 contract with a multi-source column_map entry."""
     return {
-        "version": "1.1",
+
         "source": {"provider": "google_sheets"},
         "tables": [
             {

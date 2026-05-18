@@ -4,7 +4,6 @@ from django.core.management import call_command
 
 
 CONTRACT_WITH_APP_LABEL = """\
-version: "1.0"
 tables:
   - suggested_model_name: "Widget"
     columns:

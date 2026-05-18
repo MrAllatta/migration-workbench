@@ -160,8 +160,8 @@ def test_contract_safety_cli_text(tmp_path, capsys):
 
     old_path = tmp_path / "old.yaml"
     new_path = tmp_path / "new.yaml"
-    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
-    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    old_path.write_text("source: {}\ntables: []\n")
+    new_path.write_text("source: {}\ntables: []\n")
 
     args = argparse.Namespace(
         old=str(old_path), new=str(new_path), json=False
@@ -180,8 +180,8 @@ def test_contract_safety_cli_json(tmp_path, capsys):
 
     old_path = tmp_path / "old.yaml"
     new_path = tmp_path / "new.yaml"
-    old_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
-    new_path.write_text("version: '1.1'\nsource: {}\ntables: []\n")
+    old_path.write_text("source: {}\ntables: []\n")
+    new_path.write_text("source: {}\ntables: []\n")
 
     args = argparse.Namespace(
         old=str(old_path), new=str(new_path), json=True

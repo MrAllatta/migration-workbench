@@ -5,7 +5,6 @@ from django.core.management import call_command
 
 
 CONTRACT_WITH_APP_LABEL = """\
-version: "1.0"
 tables:
   - suggested_model_name: "Widget"
     bundle_worksheet_title: "Widgets"

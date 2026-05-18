@@ -35,7 +35,7 @@ def _index_schema_contract_tables(
     """Index a schema-contract dict by ``bundle_worksheet_title``.
 
     Args:
-        contract: Schema-contract dict (version ``"1.0"``) as produced by
+        contract: Schema-contract dict as produced by
             :func:`workbook.schema_contract.build_contract`, or ``None``.
 
     Returns:
@@ -202,8 +202,8 @@ def build_view_manifest(
         structure: Parsed ``structure.json`` from
             ``pull_bundle --include-structure``.  Must include a ``"tabs"``
             list; ``source_id`` and ``provider`` are propagated when present.
-        schema_contract: Optional parsed schema-contract dict (version
-            ``"1.0"``).  When provided, ``entity`` binds per worksheet title
+        schema_contract: Optional parsed schema-contract dict.  When
+            provided, ``entity`` binds per worksheet title
             and ``editable_fields`` reuse the contract's
             ``suggested_field_name`` slugs.
         column_profiles: Optional dict keyed by tab title then field name,
