@@ -505,8 +505,8 @@ def render_admin_py(
     for table in tables:
         model_name = get_model_name(table)
         contract_fields = get_fields(table)
-        # View manifest entities are stored as suggested_model_name (lowercase).
-        raw_entity = str(table.get("suggested_model_name") or "").lower()
+        # View manifest entities are stored as snake_case (derived from suggested_model_name).
+        raw_entity = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", get_model_name(table)).lower()
         view = find_view_for_entity(manifest, raw_entity) if manifest else None
         meta = get_model_meta(table)
         verbose_name = meta.get("verbose_name")
@@ -522,7 +522,7 @@ def render_admin_py(
                 t for t in tables if get_model_name(t) == ref["source_name"]
             )
             source_fields = get_fields(ref_table)
-            ref_entity = str(ref_table.get("suggested_model_name") or "").lower()
+            ref_entity = get_model_name(ref_table).lower()
             override_fields = inline_overrides.get(ref_entity)
             inline_class_defs.append(
                 _render_inline_class(

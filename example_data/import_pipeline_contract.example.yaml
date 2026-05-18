@@ -64,7 +64,7 @@ tables:
         has_formula: false
         django_field_class: models.ForeignKey
         django_field_kwargs:
-          to: examples.ExampleFarm
+          to: ExampleFarm
           on_delete: models.CASCADE
           related_name: fields
       - source_column: Acreage
@@ -93,7 +93,7 @@ tables:
         is_active: Active
       required_source_columns: ["name"]
       fk_lookup:
-        farm: { model: "examples.ExampleFarm", on: name }
+        farm: { model: "ExampleFarm", on: name }
       unique_on: ["name"]
 
   - suggested_model_name: ExampleVariety
@@ -114,7 +114,7 @@ tables:
         has_formula: false
         django_field_class: models.ForeignKey
         django_field_kwargs:
-          to: examples.ExampleCrop
+          to: ExampleCrop
           on_delete: models.CASCADE
           related_name: varieties
       - source_column: Farm
@@ -123,7 +123,7 @@ tables:
         has_formula: false
         django_field_class: models.ForeignKey
         django_field_kwargs:
-          to: examples.ExampleFarm
+          to: ExampleFarm
           on_delete: models.SET_NULL
           null: true
           blank: true
@@ -159,8 +159,8 @@ tables:
         full_description: "' — '.join(p for p in parts if p)"
       required_source_columns: ["name"]
       fk_lookup:
-        crop: { model: "examples.ExampleCrop", on: name }
-        farm: { model: "examples.ExampleFarm", on: name }
+        crop: { model: "ExampleCrop", on: name }
+        farm: { model: "ExampleFarm", on: name }
       unique_on: ["name"]
       default_values:
         full_description: ""
