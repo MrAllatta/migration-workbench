@@ -2,6 +2,8 @@
 
 from pathlib import Path
 from django.core.management import call_command
+from django.core.management.base import CommandError
+import pytest
 
 
 CONTRACT_WITH_APP_LABEL = """\
@@ -102,3 +104,28 @@ def test_generate_import_auto_derives_output_path(tmp_path, monkeypatch):
 
     expected = mgmt_dir / "import_myapp.py"
     assert expected.exists(), f"Expected {expected} to exist"
+
+
+def test_generate_import_missing_bundle_path(tmp_path):
+    """generate_import emits a clean error when bundle_path is missing."""
+    from io import StringIO
+
+    contract = tmp_path / "contract.yaml"
+    contract.write_text("""\
+version: "2.0"
+tables:
+  - suggested_model_name: Widget
+    model_name: Widget
+    columns:
+      - source_column: Name
+        suggested_field_name: name
+        django_field_class: models.CharField
+        django_field_kwargs: {max_length: 200}
+    import_config:
+      tier: 1
+      # no bundle_path
+""")
+
+    out = tmp_path / "import_test.py"
+    with pytest.raises(CommandError, match="bundle_path"):
+        call_command("generate_import", contract=str(contract), out=str(out))

@@ -121,7 +121,19 @@ class Command(BaseCommand):
             )
         )
 
-        source = render_import_py(contract, app_label=app_label)
+        try:
+            source = render_import_py(contract, app_label=app_label)
+        except ValueError as exc:
+            if "bundle_path" in str(exc):
+                raise CommandError(
+                    "Import generation failed — bundle_path is missing.\n\n"
+                    "Each table with import_config needs a bundle_path:\n"
+                    "  import_config:\n"
+                    "    bundle_path: reference/<table_name>.csv\n\n"
+                    "Re-generate the contract from the scaffold, which now\n"
+                    "auto-generates bundle_path from the model name."
+                )
+            raise
 
         if show_diff:
             diff_text, has_changes = _render_diff(source, out_path)
