@@ -348,6 +348,84 @@ def _contract_safety(args: argparse.Namespace) -> int:
     return 0 if not danger else 1
 
 
+def _contract_validate(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+    from workbook.management.commands.validate_contract import Command
+
+    try:
+        call_command(Command, contract=args.contract)
+        return 0
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 1
+
+
+def _generate_models(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+    from workbook.management.commands.generate_models import Command
+
+    kwargs = {
+        "contract": args.contract,
+        "out": args.out,
+        "app_label": args.app_label,
+        "force": args.force,
+        "diff": args.diff,
+    }
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    call_command(Command, **kwargs)
+    return 0
+
+
+def _generate_admin(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+    from workbook.management.commands.generate_admin import Command
+
+    kwargs = {
+        "contract": args.contract,
+        "manifest": args.manifest,
+        "out": args.out,
+        "app_label": args.app_label,
+        "force": args.force,
+        "diff": args.diff,
+    }
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    call_command(Command, **kwargs)
+    return 0
+
+
+def _generate_import(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+    from workbook.management.commands.generate_import import Command
+
+    kwargs = {
+        "contract": args.contract,
+        "out": args.out,
+        "app_label": args.app_label,
+        "force": args.force,
+        "diff": args.diff,
+    }
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    call_command(Command, **kwargs)
+    return 0
+
+
+def _generate_manifest(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+    from workbook.management.commands.generate_view_manifest import Command
+
+    kwargs = {
+        "structure": args.structure,
+        "out": args.out,
+    }
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    call_command(Command, **kwargs)
+    return 0
+
+
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     try:
@@ -655,6 +733,47 @@ def _drift_check(args: argparse.Namespace) -> int:
     return 1  # drift detected
 
 
+def _build_generate_parser(sub: argparse._SubParsersAction) -> None:
+    """Add 'generate {models,admin,import,manifest}' subcommands to *sub*."""
+    gen_cmd = sub.add_parser("generate", help="Generate code from a schema contract")
+    gen_sub = gen_cmd.add_subparsers(dest="generate_command", required=True)
+
+    models_cmd = gen_sub.add_parser("models", help="Generate Django models.py")
+    models_cmd.add_argument("--contract", required=True)
+    models_cmd.add_argument("--out", default=None)
+    models_cmd.add_argument("--app-label", default=None)
+    models_cmd.add_argument("--force", action="store_true")
+    models_cmd.add_argument("--diff", action="store_true")
+    models_cmd.add_argument("--django-settings", default=None)
+    models_cmd.set_defaults(func=_generate_models)
+
+    admin_cmd = gen_sub.add_parser("admin", help="Generate Django admin.py")
+    admin_cmd.add_argument("--contract", required=True)
+    admin_cmd.add_argument("--manifest", default=None)
+    admin_cmd.add_argument("--out", default=None)
+    admin_cmd.add_argument("--app-label", default=None)
+    admin_cmd.add_argument("--force", action="store_true")
+    admin_cmd.add_argument("--diff", action="store_true")
+    admin_cmd.add_argument("--django-settings", default=None)
+    admin_cmd.set_defaults(func=_generate_admin)
+
+    import_cmd = gen_sub.add_parser("import", help="Generate Django import command")
+    import_cmd.add_argument("--contract", required=True)
+    import_cmd.add_argument("--out", default=None)
+    import_cmd.add_argument("--app-label", default=None)
+    import_cmd.add_argument("--force", action="store_true")
+    import_cmd.add_argument("--diff", action="store_true")
+    import_cmd.add_argument("--django-settings", default=None)
+    import_cmd.set_defaults(func=_generate_import)
+
+    manifest_cmd = gen_sub.add_parser("manifest", help="Generate view manifest")
+    manifest_cmd.add_argument("--contract", required=True)
+    manifest_cmd.add_argument("--out", default=None)
+    manifest_cmd.add_argument("--structure", default=None)
+    manifest_cmd.add_argument("--django-settings", default=None)
+    manifest_cmd.set_defaults(func=_generate_manifest)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Construct and return the ``wb`` argument parser.
 
@@ -700,6 +819,15 @@ def build_parser() -> argparse.ArgumentParser:
     safety_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     safety_cmd.set_defaults(func=_contract_safety)
 
+    validate_cmd = contract_sub.add_parser(
+        "validate", help="Validate a schema contract (structural checks)"
+    )
+    validate_cmd.add_argument("--contract", required=True)
+    validate_cmd.add_argument("--json", action="store_true")
+    validate_cmd.add_argument("--exit-zero", action="store_true")
+    validate_cmd.add_argument("--django-settings", default=None)
+    validate_cmd.set_defaults(func=_contract_validate)
+
     drift_cmd = sub.add_parser("drift", help="Drift detection operations")
     drift_sub = drift_cmd.add_subparsers(dest="drift_command", required=True)
     check_cmd = drift_sub.add_parser("check", help="Check for drift between two schema contracts")
@@ -725,6 +853,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     deploy_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
     deploy_cmd.set_defaults(func=_deploy_dry_run)
+
+    _build_generate_parser(sub)
     return parser
 
 
