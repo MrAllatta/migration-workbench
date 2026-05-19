@@ -77,7 +77,7 @@ spaces:
       preview:
         branch_pattern: "preview/*"
       production:
-        branch_pattern: main
+        branch_pattern: master
 
   farm:
     owner: product
