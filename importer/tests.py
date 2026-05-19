@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from importer.base import live12_block_message_for_sample_into_dev_sqlite
+from importer.sample_guard import live12_block_message_for_sample_into_dev_sqlite
 
 
 def test_sample_guard_blocks_default_sqlite_apply(tmp_path):
