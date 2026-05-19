@@ -9,6 +9,7 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _flag_computed_fields,
     _suggest_tab_merges,
     _merge_domain_knowledge,
+    _harden_contract,
 )
 from workbook.schema_contract import build_contract
 
@@ -95,6 +96,50 @@ def test_flag_computed_fields_moves_formula_columns():
     assert "total" in computed
     assert "return_type" in computed["yield_est"]
     assert "expression" in computed["yield_est"]
+
+
+def test_harden_contract_preserves_existing_bundle_path():
+    contract = {
+        "tables": [
+            {
+                "suggested_model_name": "Sales Channel",
+                "model_name": "SalesChannel",
+                "bundle_worksheet_title": "Sales Channels",
+                "columns": [
+                    {"suggested_field_name": "name", "source_column": "Name",
+                     "django_field_class": "models.CharField",
+                     "django_field_kwargs": {"max_length": 120},
+                     "notes": []}
+                ],
+                "import_config": {
+                    "bundle_path": "reference/sales_channels.csv",
+                },
+            }
+        ]
+    }
+    _harden_contract(contract)
+    assert contract["tables"][0]["import_config"].get("bundle_path") == "reference/sales_channels.csv"
+
+
+def test_harden_contract_derives_bundle_path_when_missing():
+    contract = {
+        "tables": [
+            {
+                "suggested_model_name": "Farm",
+                "model_name": "Farm",
+                "bundle_worksheet_title": "Farms",
+                "columns": [
+                    {"suggested_field_name": "name", "source_column": "Name",
+                     "django_field_class": "models.CharField",
+                     "django_field_kwargs": {"max_length": 120},
+                     "notes": []}
+                ],
+            }
+        ]
+    }
+    _harden_contract(contract)
+    assert "bundle_path" in contract["tables"][0]["import_config"]
+    assert contract["tables"][0]["import_config"]["bundle_path"] == "reference/farms.csv"
 
 
 def test_flag_computed_fields_skips_missing_pattern():

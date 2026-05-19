@@ -331,10 +331,13 @@ def _harden_contract(contract: dict[str, Any]) -> None:
             if c.get("is_import_key_candidate")
         ]
         unique_on = import_key_candidates if import_key_candidates else [first_field]
+        existing_bundle_path = table.get("import_config", {}).get("bundle_path")
         table["import_config"] = {
             "import_key": unique_on[0] if unique_on else first_field,
             "unique_on": unique_on,
         }
+        model_name = table.get("model_name") or table.get("suggested_model_name", "")
+        table["import_config"]["bundle_path"] = existing_bundle_path or _derive_bundle_path(model_name)
         ik = _suggest_import_keys(table.get("columns", []))
         if ik:
             table.setdefault("import_key", {})
