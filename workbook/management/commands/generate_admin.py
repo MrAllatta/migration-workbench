@@ -27,6 +27,7 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add --contract, --manifest, --out, --app-label, --force, --diff arguments."""
         parser.add_argument(
             "--contract",
             required=True,
@@ -59,6 +60,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Load contract and manifest, render admin.py, and write to disk."""
         contract_path = Path(options["contract"]).resolve()
         if not contract_path.is_file():
             raise CommandError(f"contract not found: {contract_path}")

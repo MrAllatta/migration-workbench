@@ -19,6 +19,7 @@ class Command(BaseCommand):
     help = "Validate a schema-contract YAML without generating code."
 
     def add_arguments(self, parser):
+        """Add --contract argument."""
         parser.add_argument(
             "--contract",
             required=True,
@@ -26,6 +27,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Load and validate a schema contract, writing warnings to stdout."""
         contract_path = Path(options["contract"])
         if not contract_path.is_file():
             raise CommandError(f"contract not found: {contract_path}")

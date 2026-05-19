@@ -32,6 +32,7 @@ class MakeContext:
         python: str | None = None,
         product_kebab: str | None = None,
     ) -> MakeContext:
+        """Return a new MakeContext with only the given fields replaced."""
         kwargs = {
             k: v
             for k, v in {
@@ -97,6 +98,7 @@ def _indent(text: str, level: int = 1) -> str:
 
 
 def variables_block(ctx: MakeContext) -> str:
+    """Return the Makefile variable assignment block (CONTRACT, CORE, etc.)."""
     return """\
 CONTRACT = config/contract.yaml
 CORE = backend/apps/core
@@ -109,6 +111,7 @@ DATE_STAMP = $(shell date +%Y-%m-%d)
 
 
 def generate_models_block(ctx: MakeContext) -> str:
+    """Return the generate-models Makefile target block."""
     return (
         "generate-models:\n"
         + _indent(
@@ -120,6 +123,7 @@ def generate_models_block(ctx: MakeContext) -> str:
 
 
 def generate_admin_block(ctx: MakeContext) -> str:
+    """Return the generate-admin Makefile target block (with optional manifest)."""
     return (
         "generate-admin:\n"
         + _indent(
@@ -137,6 +141,7 @@ def generate_admin_block(ctx: MakeContext) -> str:
 
 
 def generate_import_block(ctx: MakeContext) -> str:
+    """Return the generate-import Makefile target block."""
     return (
         "generate-import:\n"
         + _indent(
@@ -147,10 +152,12 @@ def generate_import_block(ctx: MakeContext) -> str:
 
 
 def generate_block(ctx: MakeContext) -> str:
+    """Return the generate Makefile target (alias for models+admin+import)."""
     return "generate: generate-models generate-admin generate-import\n"
 
 
 def generate_view_manifest_block(ctx: MakeContext) -> str:
+    """Return the generate-view-manifest Makefile target block."""
     return (
         "generate-view-manifest:\n"
         + _indent(
@@ -170,6 +177,7 @@ def generate_view_manifest_block(ctx: MakeContext) -> str:
 
 
 def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
+    """Return the generate-pipeline-manifest Makefile target block."""
     return (
         "generate-pipeline-manifest:\n"
         + _indent(
@@ -182,6 +190,7 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
 
 
 def generate_all_block(ctx: MakeContext) -> str:
+    """Return the generate-all Makefile target block (runs every generator)."""
     return (
         "generate-all: generate-models generate-view-manifest generate-admin "
         "generate-import generate-pipeline-manifest\n"
@@ -194,6 +203,7 @@ def generate_all_block(ctx: MakeContext) -> str:
 
 
 def codegen_tooling_block(ctx: MakeContext) -> str:
+    """Return Makefile targets for diff, snapshot, drift-check, and admin-light."""
     return (
         "diff-generated:\n"
         + _indent(
@@ -253,6 +263,7 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
 
 
 def import_blocks(ctx: MakeContext) -> str:
+    """Return Makefile targets for bundle pull, import, and discovery."""
     return (
         "pull-bundle:\n"
         + _indent(
@@ -355,6 +366,7 @@ def import_blocks(ctx: MakeContext) -> str:
 
 
 def profile_blocks(ctx: MakeContext) -> str:
+    """Return Makefile targets for profiler commands (preflight, drive-folder, corpus phases)."""
     return (
         "profile-preflight:\n"
         + _indent(
@@ -424,6 +436,7 @@ def profile_blocks(ctx: MakeContext) -> str:
 
 
 def deploy_blocks(ctx: MakeContext) -> str:
+    """Return Makefile targets for Docker build, Fly.io, and deployment."""
     return (
         "docker-build:\n"
         + _indent("docker build -t $(DOCKER_IMAGE) .")
