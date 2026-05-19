@@ -70,7 +70,7 @@ jobs:
         id: params
         run: |
           BRANCH="${{ github.event.workflow_run.head_branch }}"
-          if [ "$BRANCH" = "main" ]; then
+          if [ "$BRANCH" = "master" ]; then
             ENVIRONMENT="production"
             FLY_CONFIG="fly.toml"
           else
