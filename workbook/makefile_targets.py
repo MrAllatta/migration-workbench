@@ -104,7 +104,7 @@ def generate_models_block(ctx: MakeContext) -> str:
     return (
         "generate-models:\n"
         + _indent(
-            f'$(MANAGE) generate_models --contract "{ctx.contract}" '
+            f'wb generate models --contract "{ctx.contract}" '
             f'--out "{ctx.core}/models.py" --force'
         )
         + "\n"
@@ -116,11 +116,11 @@ def generate_admin_block(ctx: MakeContext) -> str:
         "generate-admin:\n"
         + _indent(
             '@if [ -f "$(VIEW_MANIFEST)" ]; then \\\n'
-            '$(MANAGE) generate_admin --contract "$(CONTRACT)" '
+            'wb generate admin --contract "$(CONTRACT)" '
             '--manifest "$(VIEW_MANIFEST)" '
             '--out "$(CORE)/admin.py" --app-label core --force; \\\n'
             "else \\\n"
-            '$(MANAGE) generate_admin --contract "$(CONTRACT)" '
+            'wb generate admin --contract "$(CONTRACT)" '
             '--out "$(CORE)/admin.py" --app-label core --force; \\\n'
             "fi"
         )
@@ -132,7 +132,7 @@ def generate_import_block(ctx: MakeContext) -> str:
     return (
         "generate-import:\n"
         + _indent(
-            f'$(MANAGE) generate_import --contract "{ctx.contract}" '
+            f'wb generate import --contract "{ctx.contract}" '
             f"--app-label core --force"
         )
         + "\n"
@@ -152,7 +152,7 @@ def generate_view_manifest_block(ctx: MakeContext) -> str:
             'Run make pull-bundle first."; exit 1)\n'
         )
         + _indent(
-            f'$(MANAGE) scaffold_view_manifest '
+            f'wb generate manifest '
             f'--structure "{ctx.bundle_out}/structure.json" '
             f'--schema-contract "{ctx.contract}" '
             f'--out "{ctx.view_manifest}" '
@@ -166,7 +166,7 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
     return (
         "generate-pipeline-manifest:\n"
         + _indent(
-            '$(MANAGE) generate_pipeline_manifest --contract "$(CONTRACT)" '
+            'wb generate manifest --pipeline --contract "$(CONTRACT)" '
             '--corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} '
             '--out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml}'
         )
@@ -190,13 +190,13 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
     return (
         "diff-generated:\n"
         + _indent(
-            f'$(MANAGE) generate_models --contract "{ctx.contract}" '
+            f'wb generate models --contract "{ctx.contract}" '
             f'--out "{ctx.core}/models.py" --diff'
         )
         + "\n\n"
         + "generate-admin-light:\n"
         + _indent(
-            f'$(MANAGE) generate_admin --contract "{ctx.contract}" '
+            f'wb generate admin --contract "{ctx.contract}" '
             f'--out "{ctx.core}/admin.py" --app-label core --force'
         )
         + "\n\n"
@@ -215,17 +215,17 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
         + "\n\n"
         + "snapshot-codegen:\n"
         + _indent(
-            f'$(MANAGE) generate_models --contract "{ctx.contract}" '
+            f'wb generate models --contract "{ctx.contract}" '
             f"--out build/snapshots/models.py --force"
         )
         + "\n"
         + _indent(
-            f'$(MANAGE) generate_admin --contract "{ctx.contract}" '
+            f'wb generate admin --contract "{ctx.contract}" '
             f"--out build/snapshots/admin.py --force"
         )
         + "\n"
         + _indent(
-            f'$(MANAGE) generate_import --contract "{ctx.contract}" '
+            f'wb generate import --contract "{ctx.contract}" '
             f"--out build/snapshots/imports.py --force"
         )
         + "\n\n"
@@ -318,7 +318,7 @@ def import_blocks(ctx: MakeContext) -> str:
         )
         + "\n"
         + _indent(
-            '$(MANAGE) generate_discovery_interview '
+            'wb generate discovery-interview '
             '--manifest "$(VIEW_MANIFEST)" '
             "--out build/discovery-interview.md"
         )

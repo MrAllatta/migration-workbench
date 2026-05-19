@@ -46,14 +46,16 @@ def test_variables_block_contains_expected_assignments():
 def test_generate_models_block():
     block = generate_models_block(MakeContext())
     assert block.startswith("generate-models:")
-    assert "$(MANAGE) generate_models" in block
+    assert "wb generate models" in block
+    assert "$(MANAGE) generate_models" not in block
     assert "--contract" in block
 
 
 def test_generate_admin_block():
     block = generate_admin_block(MakeContext())
     assert block.startswith("generate-admin:")
-    assert "$(MANAGE) generate_admin" in block
+    assert "wb generate admin" in block
+    assert "$(MANAGE) generate_admin" not in block
     assert "--manifest" in block
     assert "else" in block
 
@@ -61,19 +63,22 @@ def test_generate_admin_block():
 def test_generate_import_block():
     block = generate_import_block(MakeContext())
     assert block.startswith("generate-import:")
-    assert "$(MANAGE) generate_import" in block
+    assert "wb generate import" in block
+    assert "$(MANAGE) generate_import" not in block
 
 
 def test_generate_view_manifest_block():
     block = generate_view_manifest_block(MakeContext())
     assert block.startswith("generate-view-manifest:")
-    assert "scaffold_view_manifest" in block
+    assert "wb generate manifest" in block
+    assert "scaffold_view_manifest" not in block
 
 
 def test_generate_pipeline_manifest_block():
     block = generate_pipeline_manifest_block(MakeContext())
     assert block.startswith("generate-pipeline-manifest:")
-    assert "generate_pipeline_manifest" in block
+    assert "wb generate manifest --pipeline" in block
+    assert "generate_pipeline_manifest" not in block
     assert "CORPUS_CONFIG" in block
     assert "PIPELINE_MANIFEST_OUT" in block
 
@@ -162,3 +167,30 @@ def test_generate_view_manifest_appears_exactly_once_in_full_output():
     block = full_targets_block(MakeContext())
     count = block.count("generate-view-manifest:")
     assert count == 1, f"Expected exactly 1 generate-view-manifest target, got {count}"
+
+
+def test_codegen_tooling_uses_wb_for_codegen():
+    block = codegen_tooling_block(MakeContext())
+    for cmd in ["generate_models", "generate_admin", "generate_import", "scaffold_view_manifest", "generate_pipeline_manifest"]:
+        assert f"$(MANAGE) {cmd}" not in block
+    assert "wb generate models" in block
+    assert "wb generate admin" in block
+    assert "wb generate import" in block
+    assert "$(MANAGE) check" in block
+
+
+def test_full_targets_no_manage_codegen():
+    from workbook.makefile_targets import full_targets_block
+    full = full_targets_block(MakeContext())
+    for cmd in ["generate_models", "generate_admin", "generate_import", "scaffold_view_manifest", "generate_pipeline_manifest", "generate_discovery_interview"]:
+        assert f"$(MANAGE) {cmd}" not in full
+    assert "wb generate models" in full
+    assert "wb generate admin" in full
+    assert "wb generate import" in full
+    assert "wb generate manifest" in full
+
+
+def test_import_blocks_discovery_interview_uses_wb():
+    block = import_blocks(MakeContext())
+    assert "wb generate discovery-interview" in block
+    assert "$(MANAGE) generate_discovery_interview" not in block
