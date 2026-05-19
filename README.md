@@ -155,15 +155,17 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 - Provider interface extraction after a second space is stable on Fly.
 - Postgres mode where concurrent writes demand it.
+- Management interface on the workbench Fly app exposing the profiling → contract loop as a hosted service. Products remain independent deployments; the workbench helps author and manage the contracts that drive them.
 
-### v1.0 criteria
+### v1.0 / beta criteria
 
 The pipeline is exercised toward v1.0 via a **product test repo** (farm). v1.0 is reached when:
 
-1. **End-to-end pipeline** — All five stages (Connectors → Profiler → Importer → Workbook → Deployment) exercised on a real corpus via the product repo.
-2. **Schema design loop completed** — At least one source corpus has gone through Profile → Observe → Draft → Decide → Author config → Author importer → Gate → Drift check.
+1. **No-friction pipeline on a full real product** — The full pipeline (profile → scaffold → contract → codegen → deploy) runs on a real product repo without manual workarounds, copy-paste steps, or undocumented incantations.
+2. **Healthy backups** — Backup/restore is documented, exercised, and verified for the workbench space. Operators can create a checkpoint, restore it, and confirm data integrity.
 3. **Production deployment live** — A scaffolded product is deployed to Fly.io with real imported data, health-check passing.
-4. **PyPI release cut** — All gaps identified during the test run are patched upstream, and a new PyPI release is published.
+
+When the above criteria are met, a PyPI release (v1.0.0) is cut. Version 1.0 is the beta.
 
 Semantic versioning applies; `**0.x`** may ship breaking changes — pin ranges in product repos.
 
@@ -198,6 +200,18 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.9.3
+
+- **`model_name` in `build_contract()`:** bundle-config path now produces valid v2 contracts with `model_name` on every table.
+- **Makefile targets use `wb generate`:** scaffolded Makefile targets call `wb generate models/admin/import/manifest` instead of `$(MANAGE) generate_*`.
+- **`bundle_path` consistency through harden:** `_harden_contract()` preserves existing `bundle_path` and falls back to `_derive_bundle_path()` using model name.
+- **Fly.io deployment configs:** `fly.toml` (production) and `fly.preview.toml` (preview) with correct `internal_port`, volume mounts, and release command.
+- **Deploy workflow branch fix:** `.github/workflows/deploy.yml` and `deploy/spaces.yml` use `master` instead of `main`.
+- **PyPI publish gated on CI:** `publish-pypi.yml` verifies CI passed for the same SHA before building and publishing.
+- **Ruff lint in CI:** `ruff check` and `ruff format --check` step added to CI before `chassis-gate`.
+- **Import path fix:** `importer/tests/test_sample_guard.py` and `importer/tests.py` import from `importer.sample_guard` instead of `importer.base`.
+- **Doc coverage gate:** docstrings added to `workbook/makefile_targets.py` functions, `profiler/tools/enrichment_utils.py`, and management commands to pass the 80% interrogate threshold.
 
 ### 0.9.2
 
