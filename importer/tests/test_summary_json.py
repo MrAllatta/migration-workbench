@@ -37,11 +37,31 @@ def test_failure_signature_ownership_includes_new_codes():
 def test_summary_payload_includes_per_model_error_count():
     cmd = DummyCommand()
     cmd.stats = {
-        "ExampleBlock": {"created": 1, "updated": 0, "skipped": 0, "error": 0, "processed": 0, "errors": 0},
-        "ExampleCrop": {"created": 2, "updated": 0, "skipped": 0, "error": 1, "processed": 0, "errors": 0},
+        "ExampleBlock": {
+            "created": 1,
+            "updated": 0,
+            "skipped": 0,
+            "error": 0,
+            "processed": 0,
+            "errors": 0,
+        },
+        "ExampleCrop": {
+            "created": 2,
+            "updated": 0,
+            "skipped": 0,
+            "error": 1,
+            "processed": 0,
+            "errors": 0,
+        },
     }
     cmd.row_errors = [
-        {"model": "ExampleCrop", "row": 5, "code": "stale_fk", "field_path": "crop.variety", "message": "Lettuce not found"},
+        {
+            "model": "ExampleCrop",
+            "row": 5,
+            "code": "stale_fk",
+            "field_path": "crop.variety",
+            "message": "Lettuce not found",
+        },
     ]
     payload = build_summary_payload(cmd, status="ok")
     assert payload["results"]["models"]["ExampleBlock"]["row_errors_count"] == 0

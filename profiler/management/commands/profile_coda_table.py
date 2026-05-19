@@ -162,6 +162,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
 
 class Command(BaseCommand):
     """Profile one Coda table or view, or list tables in a doc."""
+
     help = "Profile one Coda table or view, or list tables in a doc"
 
     def add_arguments(self, parser):
@@ -206,7 +207,7 @@ class Command(BaseCommand):
         tables = list_tables(session, doc_id)
 
         if not options.get("table"):
-            for t in sorted(tables, key=lambda x: (x.get("name") or "")):
+            for t in sorted(tables, key=lambda x: x.get("name") or ""):
                 self.stdout.write(
                     f"type={t.get('type', '?'):<6} id={t.get('id')!s:<18} rows={str(t.get('rowCount')):<6} {t.get('name')!r}"
                 )

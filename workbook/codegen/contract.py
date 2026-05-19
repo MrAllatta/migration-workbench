@@ -7,7 +7,6 @@ absent keys.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -53,16 +52,12 @@ def _make_contract_loader(base_path: str | Path) -> type:
         finally:
             loader._include_stack.pop()
 
-    def _include_constructor(
-        loader: ContractLoader, node: yaml.ScalarNode
-    ) -> Any:
+    def _include_constructor(loader: ContractLoader, node: yaml.ScalarNode) -> Any:
         path_str: str = str(loader.construct_scalar(node))
         target = _resolve_include_target(loader, path_str)
         return _load_included_yaml(loader, target)
 
-    def _include_list_constructor(
-        loader: ContractLoader, node: yaml.ScalarNode
-    ) -> Any:
+    def _include_list_constructor(loader: ContractLoader, node: yaml.ScalarNode) -> Any:
         path_str: str = str(loader.construct_scalar(node))
         target = _resolve_include_target(loader, path_str)
         included = _load_included_yaml(loader, target)
@@ -138,14 +133,10 @@ def _validate_contract_v2(contract: dict[str, Any]) -> None:
     for table in contract.get("tables", []):
         label = table.get("suggested_model_name", "?")
         if "model_name" not in table:
-            raise ValueError(
-                f"Table '{label}' is missing required field 'model_name'"
-            )
+            raise ValueError(f"Table '{label}' is missing required field 'model_name'")
         mn = str(table["model_name"]).strip()
         if not mn:
-            raise ValueError(
-                f"Table '{label}' has empty 'model_name'"
-            )
+            raise ValueError(f"Table '{label}' has empty 'model_name'")
 
 
 def get_model_name(table: dict[str, Any]) -> str:
@@ -432,7 +423,7 @@ def validate_contract_tables(
             fk_to = field["kwargs"].get("to")
             if fk_to and fk_to not in table_names and fk_to != "self":
                 warnings.append(
-                    f"{name}.{field['name']}: FK target \"{fk_to}\" "
+                    f'{name}.{field["name"]}: FK target "{fk_to}" '
                     f"is not a table in the contract"
                 )
 
@@ -449,7 +440,7 @@ def validate_contract_tables(
                 if target and target not in table_names:
                     warnings.append(
                         f"{name}.import_config.fk_lookup.{fk_field}: "
-                        f"FK target \"{target}\" is not a table in the contract"
+                        f'FK target "{target}" is not a table in the contract'
                     )
 
             unique_on = import_cfg.get("unique_on") or []
@@ -457,7 +448,7 @@ def validate_contract_tables(
             for f in unique_on:
                 if f in seen:
                     warnings.append(
-                        f"{name}.import_config.unique_on: \"{f}\" appears more than once"
+                        f'{name}.import_config.unique_on: "{f}" appears more than once'
                     )
                 seen.add(f)
 
@@ -528,10 +519,7 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
         # Check: multiple FK fields but no unique_together or constraints.
         fk_fields = [f for f in fields if f["class"] == "models.ForeignKey"]
         if len(fk_fields) >= 2:
-            has_unique = bool(
-                meta.get("unique_together")
-                or meta.get("constraints")
-            )
+            has_unique = bool(meta.get("unique_together") or meta.get("constraints"))
             if not has_unique:
                 add_issue(
                     "multiple_fk_without_unique",
@@ -674,7 +662,9 @@ def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
 
     for col in columns:
         fname = str(col.get("suggested_field_name") or "field")
-        fclass = _normalise_field_class(str(col.get("django_field_class") or "models.TextField"))
+        fclass = _normalise_field_class(
+            str(col.get("django_field_class") or "models.TextField")
+        )
         fkwargs = dict(col.get("django_field_kwargs") or {})
 
         fkwargs = _resolve_fk_target(fname, fkwargs, resolutions)
@@ -757,15 +747,11 @@ def _diff_tables(
     # Field additions / removals.
     added = sorted(new_names - old_names)
     if added:
-        result["fields_added"] = [
-            _field_summary(new_fields[f]) for f in added
-        ]
+        result["fields_added"] = [_field_summary(new_fields[f]) for f in added]
 
     removed = sorted(old_names - new_names)
     if removed:
-        result["fields_removed"] = [
-            _field_summary(old_fields[f]) for f in removed
-        ]
+        result["fields_removed"] = [_field_summary(old_fields[f]) for f in removed]
 
     # Field changes.
     changed: list[dict[str, Any]] = []
@@ -868,13 +854,15 @@ def migration_safety_checks(diffs: dict[str, Any]) -> list[dict[str, Any]]:
     for model_name, model_diff in (diffs.get("model_diffs") or {}).items():
         # Field removals.
         for f in model_diff.get("fields_removed") or []:
-            results.append({
-                "severity": MIGRATION_SEVERITY_DANGER,
-                "model": model_name,
-                "field": f["name"],
-                "message": "Field removed — existing data in source will be lost",
-                "detail": {"old_class": f.get("class", "")},
-            })
+            results.append(
+                {
+                    "severity": MIGRATION_SEVERITY_DANGER,
+                    "model": model_name,
+                    "field": f["name"],
+                    "message": "Field removed — existing data in source will be lost",
+                    "detail": {"old_class": f.get("class", "")},
+                }
+            )
 
         # Field changes.
         for fc in model_diff.get("fields_changed") or []:
@@ -885,83 +873,93 @@ def migration_safety_checks(diffs: dict[str, Any]) -> list[dict[str, Any]]:
             null_old = kwargs_diff.get("null", {}).get("old")
             null_new = kwargs_diff.get("null", {}).get("new")
             if null_old is True and null_new is not True:
-                results.append({
-                    "severity": MIGRATION_SEVERITY_DANGER,
-                    "model": model_name,
-                    "field": fname,
-                    "message": "Field changed from nullable to non-nullable — "
-                    "migration will fail if null rows exist",
-                    "detail": {"null": {"old": True, "new": null_new}},
-                })
+                results.append(
+                    {
+                        "severity": MIGRATION_SEVERITY_DANGER,
+                        "model": model_name,
+                        "field": fname,
+                        "message": "Field changed from nullable to non-nullable — "
+                        "migration will fail if null rows exist",
+                        "detail": {"null": {"old": True, "new": null_new}},
+                    }
+                )
 
             # Field class changed
             class_change = fc.get("class")
             if class_change and class_change["old"] != class_change["new"]:
-                results.append({
-                    "severity": MIGRATION_SEVERITY_WARNING,
-                    "model": model_name,
-                    "field": fname,
-                    "message": (
-                        f"Field class changed: "
-                        f"{_field_class_short(class_change['old'])} -> "
-                        f"{_field_class_short(class_change['new'])}"
-                        " — existing data may not cast cleanly"
-                    ),
-                    "detail": {"old_class": class_change["old"],
-                               "new_class": class_change["new"]},
-                })
+                results.append(
+                    {
+                        "severity": MIGRATION_SEVERITY_WARNING,
+                        "model": model_name,
+                        "field": fname,
+                        "message": (
+                            f"Field class changed: "
+                            f"{_field_class_short(class_change['old'])} -> "
+                            f"{_field_class_short(class_change['new'])}"
+                            " — existing data may not cast cleanly"
+                        ),
+                        "detail": {
+                            "old_class": class_change["old"],
+                            "new_class": class_change["new"],
+                        },
+                    }
+                )
 
             # max_length decreased
             max_old = kwargs_diff.get("max_length", {}).get("old")
             max_new = kwargs_diff.get("max_length", {}).get("new")
-            if (max_old is not None and max_new is not None
-                    and max_old > max_new):
-                results.append({
-                    "severity": MIGRATION_SEVERITY_WARNING,
-                    "model": model_name,
-                    "field": fname,
-                    "message": (
-                        f"max_length decreased: {max_old} -> {max_new}"
-                        " — existing data may be truncated"
-                    ),
-                    "detail": {"old_max_length": max_old,
-                               "new_max_length": max_new},
-                })
+            if max_old is not None and max_new is not None and max_old > max_new:
+                results.append(
+                    {
+                        "severity": MIGRATION_SEVERITY_WARNING,
+                        "model": model_name,
+                        "field": fname,
+                        "message": (
+                            f"max_length decreased: {max_old} -> {max_new}"
+                            " — existing data may be truncated"
+                        ),
+                        "detail": {
+                            "old_max_length": max_old,
+                            "new_max_length": max_new,
+                        },
+                    }
+                )
 
             # unique=True added
             unique_old = kwargs_diff.get("unique", {}).get("old")
             unique_new = kwargs_diff.get("unique", {}).get("new")
             if unique_new is True and unique_old is not True:
-                results.append({
-                    "severity": MIGRATION_SEVERITY_WARNING,
-                    "model": model_name,
-                    "field": fname,
-                    "message": (
-                        "unique=True added — "
-                        "migration will fail if duplicate values exist"
-                    ),
-                    "detail": {"unique": {"old": unique_old, "new": True}},
-                })
+                results.append(
+                    {
+                        "severity": MIGRATION_SEVERITY_WARNING,
+                        "model": model_name,
+                        "field": fname,
+                        "message": (
+                            "unique=True added — "
+                            "migration will fail if duplicate values exist"
+                        ),
+                        "detail": {"unique": {"old": unique_old, "new": True}},
+                    }
+                )
 
         # Field additions — check non-nullable without default.
         for f in model_diff.get("fields_added") or []:
             kwargs = f.get("kwargs") or {}
             null = kwargs.get("null")
-            has_default = (
-                "default" in kwargs
-                or null is True
-            )
+            has_default = "default" in kwargs or null is True
             if not has_default:
-                results.append({
-                    "severity": MIGRATION_SEVERITY_WARNING,
-                    "model": model_name,
-                    "field": f["name"],
-                    "message": (
-                        "Non-nullable field added without default — "
-                        "existing rows will need a backfill value"
-                    ),
-                    "detail": {"class": f.get("class", "")},
-                })
+                results.append(
+                    {
+                        "severity": MIGRATION_SEVERITY_WARNING,
+                        "model": model_name,
+                        "field": f["name"],
+                        "message": (
+                            "Non-nullable field added without default — "
+                            "existing rows will need a backfill value"
+                        ),
+                        "detail": {"class": f.get("class", "")},
+                    }
+                )
 
     return results
 
@@ -975,8 +973,13 @@ def _diff_meta(
     Only keys present in ``DIFF_META_KEYS`` are compared.
     """
     DIFF_META_KEYS = {
-        "unique_together", "indexes", "constraints",
-        "ordering", "verbose_name", "db_table", "app_label",
+        "unique_together",
+        "indexes",
+        "constraints",
+        "ordering",
+        "verbose_name",
+        "db_table",
+        "app_label",
     }
     result: dict[str, Any] = {}
     for key in DIFF_META_KEYS:

@@ -126,6 +126,7 @@ class Command(BaseCommand):
 
         if stub_path:
             from workbook.codegen.stub_writer import ensure_stub
+
             ensure_stub(stub_path, "models_auto")
 
         model_count = len(contract.get("tables") or [])

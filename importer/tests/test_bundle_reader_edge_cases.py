@@ -1,10 +1,7 @@
 """Edge-case tests for bundle reader column handling."""
 
 import csv
-import os
-import tempfile
 
-import pytest
 
 from importer.bundle_reader import iter_bundle_tab_rows
 

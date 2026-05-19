@@ -71,7 +71,6 @@ tables:
 
 def test_validate_contract_command_fk_target_not_found(tmp_path):
     """FK target that doesn't match any model_name produces a warning."""
-    from io import StringIO
     from django.core.management import call_command
     from django.core.management.base import CommandError
 

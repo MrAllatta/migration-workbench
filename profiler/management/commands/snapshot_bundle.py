@@ -11,12 +11,17 @@ from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
 class Command(BaseCommand):
     """Normalize local tab snapshots into an offline bundle"""
+
     help = "Normalize local tab snapshots into an offline bundle"
 
     def add_arguments(self, parser):
         """Add command-line arguments for snapshot_bundle."""
-        parser.add_argument("--config", required=True, help="JSON config describing source tabs")
-        parser.add_argument("--output-dir", required=True, help="Directory for the normalized bundle")
+        parser.add_argument(
+            "--config", required=True, help="JSON config describing source tabs"
+        )
+        parser.add_argument(
+            "--output-dir", required=True, help="Directory for the normalized bundle"
+        )
 
     def handle(self, *args, **options):
         """Execute the snapshot-bundle pipeline. Reads local CSV/JSON snapshots from ``--config`` and normalizes them into a bundle at ``--output-dir``."""
@@ -48,7 +53,9 @@ class Command(BaseCommand):
                 aliases=tab.get("aliases"),
                 max_scan_rows=tab.get(
                     "max_scan_rows",
-                    LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"]["max_scan_rows"],
+                    LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"][
+                        "max_scan_rows"
+                    ],
                 ),
                 anchor_token=tab.get("anchor_token"),
                 header_row_index=tab.get("header_row_index"),
@@ -74,5 +81,9 @@ class Command(BaseCommand):
             self.stdout.write(f"normalized {tab['source_csv']} -> {tab['output_path']}")
 
         manifest_path = output_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-        self.stdout.write(self.style.SUCCESS(f"wrote offline bundle manifest: {manifest_path}"))
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        self.stdout.write(
+            self.style.SUCCESS(f"wrote offline bundle manifest: {manifest_path}")
+        )

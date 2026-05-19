@@ -1,6 +1,5 @@
 """Tests for the generate_import management command."""
 
-from pathlib import Path
 from django.core.management import call_command
 from django.core.management.base import CommandError
 import pytest
@@ -69,7 +68,7 @@ def test_generate_import_cli_app_label_overrides_contract(tmp_path):
 def test_generate_import_falls_back_to_core(tmp_path):
     """When contract has no app_label, generate_import falls back to 'core'."""
     contract_no_label = CONTRACT_WITH_APP_LABEL.replace(
-        "    model_meta:\n      app_label: \"myapp\"\n", ""
+        '    model_meta:\n      app_label: "myapp"\n', ""
     )
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(contract_no_label)
@@ -108,7 +107,6 @@ def test_generate_import_auto_derives_output_path(tmp_path, monkeypatch):
 
 def test_generate_import_missing_bundle_path(tmp_path):
     """generate_import emits a clean error when bundle_path is missing."""
-    from io import StringIO
 
     contract = tmp_path / "contract.yaml"
     contract.write_text("""\

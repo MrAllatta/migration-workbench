@@ -119,7 +119,9 @@ def summarize_header_detection_failure(
                     {
                         "anchor_row_index": index,
                         "candidate_header_row_index": candidate_index,
-                        "candidate_preview": canonicalize_header_row(preview, aliases=aliases)[:12],
+                        "candidate_preview": canonicalize_header_row(
+                            preview, aliases=aliases
+                        )[:12],
                     }
                 )
 
@@ -141,7 +143,9 @@ def _project_rows(rows, output_headers=None, column_map=None, default_values=Non
         return rows
 
     source_header = rows[0] if rows else []
-    source_index = {_normalize_text(value): index for index, value in enumerate(source_header)}
+    source_index = {
+        _normalize_text(value): index for index, value in enumerate(source_header)
+    }
     column_map = column_map or {}
     default_values = default_values or {}
 
@@ -215,7 +219,9 @@ def _monday_for_iso_week(year_value, week_value):
     return date.fromisocalendar(year, week, 1).isoformat()
 
 
-def _value_for_transform(source_name, transformed_row, transformed_index, source_row, source_index):
+def _value_for_transform(
+    source_name, transformed_row, transformed_index, source_row, source_index
+):
     projected_idx = transformed_index.get(_normalize_text(source_name))
     if projected_idx is not None:
         return transformed_row[projected_idx]
@@ -230,14 +236,22 @@ def _apply_row_transforms(rows, row_transforms=None, source_rows=None):
         return rows
 
     output_headers = rows[0] if rows else []
-    transformed_index = {_normalize_text(value): index for index, value in enumerate(output_headers)}
+    transformed_index = {
+        _normalize_text(value): index for index, value in enumerate(output_headers)
+    }
     source_headers = source_rows[0] if source_rows else []
-    source_index = {_normalize_text(value): index for index, value in enumerate(source_headers)}
+    source_index = {
+        _normalize_text(value): index for index, value in enumerate(source_headers)
+    }
     transformed_rows = [output_headers]
 
     for row_number, row in enumerate(rows[1:], start=1):
         transformed_row = list(row)
-        source_row = source_rows[row_number] if source_rows and row_number < len(source_rows) else []
+        source_row = (
+            source_rows[row_number]
+            if source_rows and row_number < len(source_rows)
+            else []
+        )
         for transform in row_transforms:
             transform_type = transform["type"]
             if transform_type == "split":
@@ -251,8 +265,12 @@ def _apply_row_transforms(rows, row_transforms=None, source_rows=None):
                     ),
                     transform.get("delimiter", "//"),
                 )
-                left_target = transformed_index.get(_normalize_text(transform["left_target"]))
-                right_target = transformed_index.get(_normalize_text(transform["right_target"]))
+                left_target = transformed_index.get(
+                    _normalize_text(transform["left_target"])
+                )
+                right_target = transformed_index.get(
+                    _normalize_text(transform["right_target"])
+                )
                 if left_target is not None:
                     transformed_row[left_target] = left_value
                 if right_target is not None:
@@ -270,7 +288,9 @@ def _apply_row_transforms(rows, row_transforms=None, source_rows=None):
                     if target_index is not None:
                         transformed_row[target_index] = value
             elif transform_type == "week_monday":
-                target_index = transformed_index.get(_normalize_text(transform["target"]))
+                target_index = transformed_index.get(
+                    _normalize_text(transform["target"])
+                )
                 if target_index is None:
                     continue
                 transformed_row[target_index] = _monday_for_iso_week(
@@ -347,7 +367,9 @@ def _grid_unpivot_for_product_week_plan(source_rows, grid_unpivot):
         if not out_name:
             raise ValueError("each identity_columns entry needs output")
         if "fixed" in entry and entry["fixed"] is not None:
-            identity_specs.append({"output": out_name, "fixed": str(entry["fixed"]), "source_idx": None})
+            identity_specs.append(
+                {"output": out_name, "fixed": str(entry["fixed"]), "source_idx": None}
+            )
             continue
         src = entry.get("source")
         if not src:
@@ -387,7 +409,9 @@ def _grid_unpivot_for_product_week_plan(source_rows, grid_unpivot):
             else:
                 idx = spec["source_idx"]
                 cell = row[idx] if idx < len(row) else ""
-                id_values[spec["output"]] = str(cell).strip() if cell is not None else ""
+                id_values[spec["output"]] = (
+                    str(cell).strip() if cell is not None else ""
+                )
 
         product_val = id_values.get(prod_out, "")
         if not str(product_val).strip():
@@ -542,9 +566,7 @@ def _normalize_single_region(
     normalized_rows = _apply_fold_into_notes(
         normalized_rows, fold_into_notes or [], source_rows
     )
-    normalized_rows = _apply_constant_columns(
-        normalized_rows, constant_columns or {}
-    )
+    normalized_rows = _apply_constant_columns(normalized_rows, constant_columns or {})
     normalized_rows = _apply_row_transforms(
         normalized_rows,
         row_transforms=row_transforms,
@@ -591,7 +613,7 @@ def guess_header_row(rows, max_scan_rows=30, min_fill_ratio=0.4, min_cols=4):
         if len(non_empty) < min_cols:
             continue
         fill_ratio = len(non_empty) / len(row)
-        text_count = sum(1 for cell in non_empty if re.match(r'^[A-Za-z]', cell))
+        text_count = sum(1 for cell in non_empty if re.match(r"^[A-Za-z]", cell))
         if text_count < 3 or fill_ratio < min_fill_ratio:
             continue
         if fill_ratio > best_fill:
@@ -616,7 +638,10 @@ def raw_sheet_to_row_lists(raw: dict) -> list[list[str]]:
             if block.get("startRow", 0) != 0:
                 continue
             for row_entry in block.get("rowData", []):
-                cell_values = [value.get("formattedValue", "") for value in (row_entry.get("values") or [])]
+                cell_values = [
+                    value.get("formattedValue", "")
+                    for value in (row_entry.get("values") or [])
+                ]
                 rows.append(cell_values)
     except (KeyError, IndexError, TypeError):
         pass
@@ -694,7 +719,9 @@ def detect_header_row(
             if normalized_anchor in _normalize_text(first_cell):
                 candidate_index = index + 1
                 if candidate_index < len(rows):
-                    canonical = canonicalize_header_row(rows[candidate_index], aliases=aliases)
+                    canonical = canonicalize_header_row(
+                        rows[candidate_index], aliases=aliases
+                    )
                     return candidate_index, canonical, "anchor_token"
 
     for index in range(scan_limit):
@@ -714,7 +741,9 @@ def detect_header_row(
             if normalized_anchor in _normalize_text(first_cell):
                 candidate_index = index + 1
                 if candidate_index < len(rows):
-                    canonical = canonicalize_header_row(rows[candidate_index], aliases=aliases)
+                    canonical = canonicalize_header_row(
+                        rows[candidate_index], aliases=aliases
+                    )
                     return candidate_index, canonical, "anchor_token"
 
     if header_row_index is not None:
@@ -800,7 +829,9 @@ def normalize_rows(
             or if header detection fails without a fallback.
     """
     if grid_unpivot and source_regions:
-        raise ValueError("grid_unpivot cannot be combined with source_regions in one tab")
+        raise ValueError(
+            "grid_unpivot cannot be combined with source_regions in one tab"
+        )
 
     if not source_regions:
         return _normalize_single_region(
@@ -837,7 +868,9 @@ def normalize_rows(
                 default_values=region.get("default_values", default_values),
                 row_transforms=region.get("row_transforms", row_transforms),
                 stop_on_blank_in=region.get("stop_on_blank_in", stop_on_blank_in),
-                prefer_anchor_token=region.get("prefer_anchor_token", prefer_anchor_token),
+                prefer_anchor_token=region.get(
+                    "prefer_anchor_token", prefer_anchor_token
+                ),
                 grid_unpivot=region.get("grid_unpivot"),
                 fold_into_notes=region.get("fold_into_notes", fold_into_notes),
                 constant_columns=region.get("constant_columns", constant_columns),

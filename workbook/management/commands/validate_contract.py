@@ -40,9 +40,7 @@ class Command(BaseCommand):
         if not warnings:
             count = len(contract.get("tables", []))
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"Contract is valid: {count} table(s)"
-                )
+                self.style.SUCCESS(f"Contract is valid: {count} table(s)")
             )
             return
 

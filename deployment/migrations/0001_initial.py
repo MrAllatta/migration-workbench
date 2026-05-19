@@ -10,7 +10,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="ReleaseRecord",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("space", models.CharField(max_length=128)),
                 ("environment", models.CharField(max_length=32)),
                 ("release_id", models.CharField(max_length=128)),
@@ -25,7 +33,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="releaserecord",
-            index=models.Index(fields=["space", "environment", "-created_at"], name="deployment__space_3b83f5_idx"),
+            index=models.Index(
+                fields=["space", "environment", "-created_at"],
+                name="deployment__space_3b83f5_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="releaserecord",

@@ -9,21 +9,40 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from connectors.google_sheets import DRIVE_READONLY_SCOPE, SHEETS_READONLY_SCOPE, build_google_service
+from connectors.google_sheets import (
+    DRIVE_READONLY_SCOPE,
+    SHEETS_READONLY_SCOPE,
+    build_google_service,
+)
 from profiler.tools.cohort_corpus import run_cohort_corpus
 
 
 class Command(BaseCommand):
     """Run cohort-corpus profiling pipeline for config-driven workbook sets."""
+
     help = "Run cohort-corpus profiling pipeline for config-driven workbook sets."
 
     def add_arguments(self, parser):
         """Add command-line arguments for profile_cohort_corpus."""
-        parser.add_argument("--config", required=True, help="JSON config path for cohort-corpus profiling")
-        parser.add_argument("--folder", help="Drive folder id or URL (default: DRIVE_FOLDER_ID env)")
-        parser.add_argument("--out-dir", required=True, help="Output directory for profiling artifacts")
-        parser.add_argument("--date-stamp", default=None, help="Optional date stamp override (YYYY-MM-DD)")
-        parser.add_argument("--smoke", action="store_true", help="Run without Google API calls")
+        parser.add_argument(
+            "--config",
+            required=True,
+            help="JSON config path for cohort-corpus profiling",
+        )
+        parser.add_argument(
+            "--folder", help="Drive folder id or URL (default: DRIVE_FOLDER_ID env)"
+        )
+        parser.add_argument(
+            "--out-dir", required=True, help="Output directory for profiling artifacts"
+        )
+        parser.add_argument(
+            "--date-stamp",
+            default=None,
+            help="Optional date stamp override (YYYY-MM-DD)",
+        )
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without Google API calls"
+        )
         parser.add_argument(
             "--resume-from-tab-selection",
             action="store_true",
@@ -59,7 +78,7 @@ class Command(BaseCommand):
             help=(
                 "Reuse existing per-tab payloads under deep/ when filenames match pending jobs "
                 "instead of refetching Sheets grid data—useful together with backoff after 429 "
-                "throttling or with JSON \"deep_skip_existing\": true."
+                'throttling or with JSON "deep_skip_existing": true.'
             ),
         )
 
@@ -85,7 +104,9 @@ class Command(BaseCommand):
             }
             out_path = out_dir / f"profile_cohort_corpus_smoke_{date_stamp}.json"
             out_path.write_text(json.dumps(smoke_payload, indent=2), encoding="utf-8")
-            self.stdout.write(self.style.SUCCESS(f"profile_cohort_corpus smoke wrote {out_path}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"profile_cohort_corpus smoke wrote {out_path}")
+            )
             return
 
         folder_id = options.get("folder") or os.environ.get("DRIVE_FOLDER_ID")
@@ -94,6 +115,7 @@ class Command(BaseCommand):
                 "A Drive folder id is required. Pass --folder or set DRIVE_FOLDER_ID in .env"
             )
         from connectors.google_sheets import extract_drive_folder_id
+
         folder_id = extract_drive_folder_id(folder_id)
 
         scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]

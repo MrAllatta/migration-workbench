@@ -56,7 +56,9 @@ tables:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"include_list expects a YAML list") as excinfo:
+    with pytest.raises(
+        ValueError, match=r"include_list expects a YAML list"
+    ) as excinfo:
         load_contract(contract_path)
 
     message = str(excinfo.value)

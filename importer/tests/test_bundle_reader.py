@@ -8,9 +8,7 @@ from importer.bundle_reader import iter_bundle_tab_rows
 def test_iter_bundle_tab_rows_detects_header_with_aliases(tmp_path: Path):
     csv_path = tmp_path / "blocks.csv"
     csv_path.write_text(
-        "junk,not_header\n"
-        "Block Name,Type Label,Beds\n"
-        "A,Field,10\n",
+        "junk,not_header\nBlock Name,Type Label,Beds\nA,Field,10\n",
         encoding="utf-8",
     )
     config = {
@@ -20,7 +18,11 @@ def test_iter_bundle_tab_rows_detects_header_with_aliases(tmp_path: Path):
             "Block Type": ["Type Label"],
             "# of Beds": ["Beds"],
         },
-        "column_map": {"name": "Block", "block_type": "Block Type", "num_beds": "# of Beds"},
+        "column_map": {
+            "name": "Block",
+            "block_type": "Block Type",
+            "num_beds": "# of Beds",
+        },
     }
 
     rows = list(iter_bundle_tab_rows(str(csv_path), config))
@@ -31,8 +33,7 @@ def test_iter_bundle_tab_rows_detects_header_with_aliases(tmp_path: Path):
 def test_iter_bundle_tab_rows_applies_default_values(tmp_path: Path):
     csv_path = tmp_path / "crop_info.csv"
     csv_path.write_text(
-        "Crop,Type\n"
-        "Carrot,Root\n",
+        "Crop,Type\nCarrot,Root\n",
         encoding="utf-8",
     )
     config = {
@@ -49,8 +50,7 @@ def test_iter_bundle_tab_rows_applies_default_values(tmp_path: Path):
 def test_iter_bundle_tab_rows_raises_when_required_header_missing(tmp_path: Path):
     csv_path = tmp_path / "missing.csv"
     csv_path.write_text(
-        "A,B\n"
-        "x,y\n",
+        "A,B\nx,y\n",
         encoding="utf-8",
     )
     config = {

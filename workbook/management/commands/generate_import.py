@@ -96,6 +96,7 @@ class Command(BaseCommand):
         out_path = options.get("out")
         if out_path is None:
             from pathlib import Path as _Path
+
             app_dir = _Path.cwd() / "backend" / "apps" / app_label
             mgmt_dir = app_dir / "management" / "commands"
             mgmt_dir.mkdir(parents=True, exist_ok=True)
@@ -111,8 +112,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"validation: {w}"))
 
         tables_with_import = [
-            t for t in (contract.get("tables") or [])
-            if t.get("import_config")
+            t for t in (contract.get("tables") or []) if t.get("import_config")
         ]
         self.stdout.write(
             self.style.SUCCESS(
@@ -155,16 +155,10 @@ class Command(BaseCommand):
             diff_text, has_changes = _render_diff(source, out_path)
             if has_changes:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"regenerating {out_path} — changes detected:"
-                    )
+                    self.style.WARNING(f"regenerating {out_path} — changes detected:")
                 )
                 self.stdout.write(diff_text)
         out_path.write_text(source, encoding="utf-8")
 
         line_count = source.count("\n")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"wrote {out_path}  ({line_count} lines)"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"wrote {out_path}  ({line_count} lines)"))

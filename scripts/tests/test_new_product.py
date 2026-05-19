@@ -1,4 +1,5 @@
 """Tests for the new_product scaffold generator."""
+
 from scripts.new_product import render_makefile, render_models_py, render_env_example
 
 
@@ -37,11 +38,9 @@ def test_generate_admin_does_not_require_manifest_file():
     """The generate-admin target runs with or without a view-manifest file
     by using a shell conditional instead of a hard guard."""
     content = render_makefile("test-product")
-    assert "if [ -f \"$(VIEW_MANIFEST)\" ]; then" in content
-    assert "--manifest \"$(VIEW_MANIFEST)\"" in content
-    generate_admin_section = content[
-        content.index("generate-admin:") :
-    ]
+    assert 'if [ -f "$(VIEW_MANIFEST)" ]; then' in content
+    assert '--manifest "$(VIEW_MANIFEST)"' in content
+    generate_admin_section = content[content.index("generate-admin:") :]
     assert "else" in generate_admin_section
     assert "--manifest" not in generate_admin_section.split("else")[1].split("fi")[0]
 
@@ -49,6 +48,7 @@ def test_generate_admin_does_not_require_manifest_file():
 def test_render_urls_py_redirects_root_to_admin():
     """Root URL / redirects to /admin/."""
     from scripts.new_product import render_urls_py
+
     content = render_urls_py()
     assert 'RedirectView.as_view(url="/admin/"' in content
     assert 'path("", RedirectView' in content
@@ -80,6 +80,7 @@ def test_render_models_py_includes_stub_marker():
 def test_schema_contract_md_includes_entity_guidance():
     """The scaffolded schema-contract.md has structured entity guidance, not just headings."""
     from scripts.new_product import render_schema_contract_md
+
     content = render_schema_contract_md("test-product")
     assert "**Purpose**" in content
     assert "**Source tabs**" in content
@@ -90,6 +91,7 @@ def test_schema_contract_md_includes_entity_guidance():
 def test_domain_knowledge_example_yaml_includes_entities():
     """The domain-knowledge example YAML has populated entity examples."""
     from scripts.new_product import render_domain_knowledge_example_yaml
+
     content = render_domain_knowledge_example_yaml()
     assert "entities:" in content
     assert "Season:" in content

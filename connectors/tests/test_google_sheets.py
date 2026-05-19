@@ -4,7 +4,12 @@ from unittest.mock import MagicMock
 import pytest
 from googleapiclient.errors import HttpError
 
-from connectors.google_sheets import SheetsThrottle, fetch_tab_rows, fetch_sheet_structure_data, _fill_merged_cell_headers
+from connectors.google_sheets import (
+    SheetsThrottle,
+    fetch_tab_rows,
+    fetch_sheet_structure_data,
+    _fill_merged_cell_headers,
+)
 
 
 def test_fill_merged_cell_headers_no_gaps():
@@ -84,8 +89,11 @@ class TestFetchWithThrottle:
 
     def test_fetch_tab_rows_uses_default_throttle(self):
         mock_service = MagicMock()
-        mock_service.spreadsheets().values().get().execute.return_value = {"values": [["A", "B"]]}
+        mock_service.spreadsheets().values().get().execute.return_value = {
+            "values": [["A", "B"]]
+        }
         from connectors.google_sheets import default_throttle
+
         original = default_throttle._min_interval
         default_throttle._min_interval = 0.001
         try:
@@ -99,7 +107,9 @@ class TestFetchWithThrottle:
         mock_response = {"sheets": [], "namedRanges": [], "properties": {}}
         mock_service.spreadsheets().get().execute.return_value = mock_response
         throttle = SheetsThrottle(min_interval=0.001)
-        result = fetch_sheet_structure_data(mock_service, "sid", "Sheet1", throttle=throttle)
+        result = fetch_sheet_structure_data(
+            mock_service, "sid", "Sheet1", throttle=throttle
+        )
         assert result == mock_response
 
     def test_fetch_sheet_structure_default_throttle(self):
@@ -107,6 +117,7 @@ class TestFetchWithThrottle:
         mock_response = {"sheets": [], "namedRanges": [], "properties": {}}
         mock_service.spreadsheets().get().execute.return_value = mock_response
         from connectors.google_sheets import default_throttle
+
         original = default_throttle._min_interval
         default_throttle._min_interval = 0.001
         try:
@@ -128,7 +139,7 @@ class TestRetryOn429:
         error = self._make_429_error()
         mock_service.spreadsheets().values().get().execute.side_effect = [
             error,
-            {"values": [["A", "B"]]}
+            {"values": [["A", "B"]]},
         ]
         throttle = SheetsThrottle(min_interval=0.001)
         rows = fetch_tab_rows("sid", "Sheet1", mock_service, throttle=throttle)
@@ -148,10 +159,9 @@ class TestRetryOn429:
         mock_service = MagicMock()
         error = self._make_429_error()
         mock_response = {"sheets": [], "namedRanges": [], "properties": {}}
-        mock_service.spreadsheets().get().execute.side_effect = [
-            error,
-            mock_response
-        ]
+        mock_service.spreadsheets().get().execute.side_effect = [error, mock_response]
         throttle = SheetsThrottle(min_interval=0.001)
-        result = fetch_sheet_structure_data(mock_service, "sid", "Sheet1", throttle=throttle)
+        result = fetch_sheet_structure_data(
+            mock_service, "sid", "Sheet1", throttle=throttle
+        )
         assert result == mock_response

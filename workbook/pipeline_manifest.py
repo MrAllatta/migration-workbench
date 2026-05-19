@@ -108,22 +108,29 @@ def build_pipeline_manifest(
                     if not spreadsheet_id:
                         spreadsheet_id = wid
 
-            year_entries.append({
-                "year": year,
-                "spreadsheet_id": spreadsheet_id,
-                "worksheet_title": worksheet_title,
-            })
+            year_entries.append(
+                {
+                    "year": year,
+                    "spreadsheet_id": spreadsheet_id,
+                    "worksheet_title": worksheet_title,
+                }
+            )
 
-        output_pattern = import_cfg.get("bundle_path") or f"{{year}}/{_slugify_model_name(model_name)}.csv"
+        output_pattern = (
+            import_cfg.get("bundle_path")
+            or f"{{year}}/{_slugify_model_name(model_name)}.csv"
+        )
 
-        tables_out.append({
-            "model": model_name,
-            "bundle_worksheet_title": title,
-            "output_pattern": output_pattern,
-            "default_values": default_values,
-            "required_headers": required_headers,
-            "years": year_entries,
-        })
+        tables_out.append(
+            {
+                "model": model_name,
+                "bundle_worksheet_title": title,
+                "output_pattern": output_pattern,
+                "default_values": default_values,
+                "required_headers": required_headers,
+                "years": year_entries,
+            }
+        )
 
     return {
         "version": PIPELINE_MANIFEST_VERSION,
@@ -132,7 +139,8 @@ def build_pipeline_manifest(
             "corpus_config": "cohort_corpus.json",
         },
         "source": {
-            "provider": contract.get("source", {}).get("provider") or corpus_config.get("provider", ""),
+            "provider": contract.get("source", {}).get("provider")
+            or corpus_config.get("provider", ""),
             "corpus_years": corpus_years,
         },
         "tables": tables_out,

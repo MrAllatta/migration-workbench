@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from importer.base import BaseImportCommand
-from workbook.codegen.contract import get_import_config, load_contract
+from workbook.codegen.contract import get_import_config
 from workbook.codegen.import_generator import render_import_py
 
 
@@ -19,10 +19,10 @@ from workbook.codegen.import_generator import render_import_py
 # Test fixtures
 # ---------------------------------------------------------------------------
 
+
 def _contract_with_imports() -> dict:
     """Return a v1.1 contract with two models that have import_config."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -42,7 +42,9 @@ def _contract_with_imports() -> dict:
                         "suggested_field_name": "crop_type",
                         "django_field_class": "models.CharField",
                         "django_field_kwargs": {
-                            "max_length": 100, "blank": True, "default": ""
+                            "max_length": 100,
+                            "blank": True,
+                            "default": "",
                         },
                     },
                 ],
@@ -84,8 +86,10 @@ def _contract_with_imports() -> dict:
                         "suggested_field_name": "beds_used",
                         "django_field_class": "models.DecimalField",
                         "django_field_kwargs": {
-                            "max_digits": 6, "decimal_places": 1,
-                            "null": True, "blank": True,
+                            "max_digits": 6,
+                            "decimal_places": 1,
+                            "null": True,
+                            "blank": True,
                         },
                     },
                 ],
@@ -112,7 +116,6 @@ def _contract_with_imports() -> dict:
 def _contract_no_column_map() -> dict:
     """Contract with import_config but no column_map (to test auto-derivation)."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -131,7 +134,11 @@ def _contract_no_column_map() -> dict:
                         "source_column": "Type",
                         "suggested_field_name": "crop_type",
                         "django_field_class": "models.CharField",
-                        "django_field_kwargs": {"max_length": 100, "blank": True, "default": ""},
+                        "django_field_kwargs": {
+                            "max_length": 100,
+                            "blank": True,
+                            "default": "",
+                        },
                     },
                 ],
                 "import_config": {
@@ -147,7 +154,6 @@ def _contract_no_column_map() -> dict:
 def _contract_no_imports() -> dict:
     """Return a v1.1 contract with no import_config blocks."""
     return {
-
         "source": {},
         "tables": [
             {
@@ -155,7 +161,11 @@ def _contract_no_imports() -> dict:
                 "suggested_model_name": "crop",
                 "model_name": "Crop",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {}}
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {},
+                    }
                 ],
             }
         ],
@@ -225,7 +235,6 @@ def test_render_has_tier_calls():
 def test_render_all_tables_get_tier_call():
     """Every table with import_config gets its own tier() call, even same tier."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -234,9 +243,18 @@ def test_render_all_tables_get_tier_call():
                 "model_name": "Crop",
                 "bundle_output_path": "crop_info.csv",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
                 ],
-                "import_config": {"tier": 1, "bundle_path": "crop_info.csv", "column_map": {"name": "Crop"}, "unique_on": ["name"]},
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "crop_info.csv",
+                    "column_map": {"name": "Crop"},
+                    "unique_on": ["name"],
+                },
             },
             {
                 "bundle_worksheet_title": "Crop Planner",
@@ -244,9 +262,18 @@ def test_render_all_tables_get_tier_call():
                 "model_name": "Planting",
                 "bundle_output_path": "crop_planner.csv",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200, "unique": True}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200, "unique": True},
+                    },
                 ],
-                "import_config": {"tier": 1, "bundle_path": "crop_planner.csv", "column_map": {"name": "Name"}, "unique_on": ["name"]},
+                "import_config": {
+                    "tier": 1,
+                    "bundle_path": "crop_planner.csv",
+                    "column_map": {"name": "Name"},
+                    "unique_on": ["name"],
+                },
             },
         ],
     }
@@ -299,13 +326,13 @@ def test_required_headers_auto_derived_from_unique_on():
     # unique_on: ['name'] -> column_map: {'name': 'Crop'} -> required_headers: ['Crop']
     # Should not be empty:  "required_headers": [],
     assert '"required_headers": []' not in source
-    assert '"required_headers": [\'Crop\']' in source
+    assert "\"required_headers\": ['Crop']" in source
 
 
 def test_tab_config_has_default_values():
     source = render_import_py(_contract_with_imports(), app_label="core")
     assert '"default_values"' in source
-    assert 'crop_type' in source
+    assert "crop_type" in source
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +372,7 @@ def test_decimal_field_uses_dec():
 
 def test_char_field_uses_strip():
     source = render_import_py(_contract_with_imports(), app_label="core")
-    assert '.strip()' in source
+    assert ".strip()" in source
 
 
 # ---------------------------------------------------------------------------
@@ -468,7 +495,6 @@ def test_command_warns_on_existing_output(tmp_path):
 def _contract_examplecrop() -> dict:
     """Contract matching the real ``ExampleCrop`` model from the examples app."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -500,7 +526,6 @@ def _contract_examplecrop() -> dict:
 def _contract_exampleblock_with_fk() -> dict:
     """Contract for ExampleBlock with FK lookup to ExampleCrop."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -569,7 +594,6 @@ def _contract_exampleblock_with_fk() -> dict:
 def _contract_examplecrop_required() -> dict:
     """Contract for ExampleCrop with a required column check."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -741,7 +765,6 @@ def test_generated_import_reports_missing_required(tmp_path, db):
 def _contract_multi_source() -> dict:
     """Return a v1.1 contract with a multi-source column_map entry."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -818,7 +841,11 @@ def test_import_key_falls_back_to_unique_on():
         ic = table.get("import_config", {})
         if ic:
             ic["unique_on"] = []
-        table["import_key"] = {"fields": ["crop", "block"], "confidence": "high", "note": "test key"}
+        table["import_key"] = {
+            "fields": ["crop", "block"],
+            "confidence": "high",
+            "note": "test key",
+        }
     source = render_import_py(contract, app_label="core")
     assert "crop=crop" in source or "crop" in source
     _check_compiles(source)
@@ -864,7 +891,9 @@ def test_import_generator_diff_shows_changes(tmp_path):
         diff=True,
     )
     output = cmd.stdout.getvalue()
-    assert "---" in output or "+++" in output, "Expected diff output with change markers"
+    assert "---" in output or "+++" in output, (
+        "Expected diff output with change markers"
+    )
 
 
 def test_import_generator_diff_no_changes(tmp_path):

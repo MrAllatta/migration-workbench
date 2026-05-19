@@ -235,7 +235,9 @@ def test_merge_notes_command_writes_updated_manifest(tmp_path):
 
     updated = yaml.safe_load(out_path.read_text(encoding="utf-8"))
     assert updated["workflow_hints"]["role_hints"] == ["Orders: Finance team only."]
-    assert "Reconcile orders against CRM." in updated["workflow_hints"]["weekly_actions"]
+    assert (
+        "Reconcile orders against CRM." in updated["workflow_hints"]["weekly_actions"]
+    )
     orders_view = next(v for v in updated["views"] if v["source_tab"] == "Orders")
     assert orders_view["notes"] is not None
     assert "status[status]" in orders_view["notes"]
@@ -382,8 +384,16 @@ def test_discovery_round_trip_generates_admin():
                 "suggested_model_name": "crop",
                 "model_name": "Crop",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "crop_type", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100},
+                    },
                 ],
             },
         ],
@@ -404,18 +414,23 @@ def test_discovery_round_trip_generates_admin():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Crops"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     interview_md = render_interview(manifest)
     assert "<!-- q: role tab=Crops -->" in interview_md
     assert "<!-- q: status_override field=crop_type tab=Crops -->" in interview_md
 
     filled = (
-        interview_md
-        .replace("> _Your answer:_", "> Weekly workflow check.", 1)
+        interview_md.replace("> _Your answer:_", "> Weekly workflow check.", 1)
         .replace("> _Your answer:_", "> Farm manager.", 1)
         .replace("> _Your answer:_", "> active -> inactive", 1)
-        .replace("> _Your answer:_ (leave blank to keep **crop_type**)", "> priority", 1)
+        .replace(
+            "> _Your answer:_ (leave blank to keep **crop_type**)", "> priority", 1
+        )
     )
     patch = parse_interview(filled, manifest)
     assert "Farm manager" in patch["role_hints"][0]
@@ -424,4 +439,3 @@ def test_discovery_round_trip_generates_admin():
     source = render_admin_py(contract, merged, app_label="core")
     assert "@admin.register(Crop)" in source
     assert "list_filter" in source
-

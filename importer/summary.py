@@ -94,7 +94,9 @@ def build_failure_signatures(row_errors, status, fatal_error):
 
     signatures = []
     for signature in sorted(signature_counts.keys()):
-        ownership = FAILURE_SIGNATURE_OWNERSHIP.get(signature, FAILURE_SIGNATURE_OWNERSHIP["unknown"])
+        ownership = FAILURE_SIGNATURE_OWNERSHIP.get(
+            signature, FAILURE_SIGNATURE_OWNERSHIP["unknown"]
+        )
         signatures.append(
             {
                 "signature": signature,
@@ -145,7 +147,9 @@ def build_escalation_summary(failure_signatures):
         grouped[key]["count"] += item["count"]
         grouped[key]["signatures"].append(item["signature"])
         grouped[key]["recovery_steps"].append(item["recovery"])
-    rows = sorted(grouped.values(), key=lambda row: (row["severity"], row["owner_area"]))
+    rows = sorted(
+        grouped.values(), key=lambda row: (row["severity"], row["owner_area"])
+    )
     for row in rows:
         row["signatures"].sort()
         row["recovery_steps"] = sorted(set(row["recovery_steps"]))
@@ -170,7 +174,8 @@ def build_summary_payload(command, status="ok", fatal_error=None):
     totals = {"created": 0, "updated": 0, "skipped": 0, "error": 0}
     for model_name in sorted(command.stats.keys()):
         normalized = normalized_outcomes(
-            command.stats[model_name], write_disabled=(command.validate_only or command.dry_run)
+            command.stats[model_name],
+            write_disabled=(command.validate_only or command.dry_run),
         )
         model_error_count = sum(
             1 for err in command.row_errors if err.get("model") == model_name
@@ -179,7 +184,9 @@ def build_summary_payload(command, status="ok", fatal_error=None):
         for key in totals:
             totals[key] += normalized[key]
 
-    failure_signatures = build_failure_signatures(command.row_errors, status, fatal_error)
+    failure_signatures = build_failure_signatures(
+        command.row_errors, status, fatal_error
+    )
     return {
         "schema_version": "1.0",
         "status": status,
@@ -226,7 +233,9 @@ def write_summary_json(command, status="ok", fatal_error=None):
             json.dump(payload, handle, indent=2, sort_keys=True)
     except OSError:
         fallback_path = (
-            Path(command.data_dir) / "_import_artifacts" / f"import-summary-{command.run_id}.json"
+            Path(command.data_dir)
+            / "_import_artifacts"
+            / f"import-summary-{command.run_id}.json"
         )
         fallback_path.parent.mkdir(parents=True, exist_ok=True)
         with open(fallback_path, "w", encoding="utf-8") as handle:

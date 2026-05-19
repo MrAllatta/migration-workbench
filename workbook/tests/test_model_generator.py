@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import textwrap
-from pathlib import Path
 
 import yaml
 
@@ -55,7 +53,11 @@ def _contract_v1_0() -> dict:
                         "profiler_format_type": "text",
                         "has_formula": False,
                         "django_field_class": "models.CharField",
-                        "django_field_kwargs": {"max_length": 100, "blank": True, "default": ""},
+                        "django_field_kwargs": {
+                            "max_length": 100,
+                            "blank": True,
+                            "default": "",
+                        },
                         "notes": [],
                     },
                 ],
@@ -186,7 +188,9 @@ def test_render_field_kwargs_choices_accepts_bare_enum_name():
 
 def test_render_field_kwargs_choices_accepts_enum_dot_choices():
     """``EventType.choices`` input is normalised to ``choices=EventType.choices``."""
-    result = render_field_kwargs({"choices": "EventType.choices"}, enum_names={"EventType"})
+    result = render_field_kwargs(
+        {"choices": "EventType.choices"}, enum_names={"EventType"}
+    )
     assert result == "choices=EventType.choices"
 
 
@@ -202,7 +206,9 @@ def test_render_field_kwargs_choices_unknown_enum_falls_back():
 
 
 def test_render_field_charfield():
-    result = render_field("name", "models.CharField", {"max_length": 200, "unique": True})
+    result = render_field(
+        "name", "models.CharField", {"max_length": 200, "unique": True}
+    )
     assert "name = models.CharField(max_length=200, unique=True)" in result
 
 
@@ -214,7 +220,6 @@ def test_render_field_foreign_key_resolved():
     )
     assert "crop = models.ForeignKey(Crop, on_delete=models.PROTECT" in result
     assert "to=Crop" not in result
-
 
 
 def test_render_field_foreign_key_todo():
@@ -244,7 +249,9 @@ def test_render_import_block_default():
 
 
 def test_render_import_block_with_extras():
-    result = render_import_block("farm", extra_imports=["from django.conf import settings"])
+    result = render_import_block(
+        "farm", extra_imports=["from django.conf import settings"]
+    )
     assert "from django.conf import settings" in result
 
 
@@ -507,7 +514,9 @@ def test_generated_python_compiles_empty():
 def test_generated_python_compiles_single_table_no_fields():
     contract = {
         "source": {},
-        "tables": [{"suggested_model_name": "widget", "model_name": "Widget", "columns": []}],
+        "tables": [
+            {"suggested_model_name": "widget", "model_name": "Widget", "columns": []}
+        ],
     }
     _check_compiles(render_models_py(contract))
 
@@ -563,8 +572,6 @@ def test_command_warns_on_existing_output(tmp_path, capsys):
 
     out_path = tmp_path / "models.py"
     out_path.write_text("# existing")
-
-    import sys
 
     with pytest.raises(SystemExit):
         call_command(

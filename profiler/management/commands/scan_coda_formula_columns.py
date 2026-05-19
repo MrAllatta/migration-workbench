@@ -35,7 +35,9 @@ def load_coda_workbooks(session, config: dict) -> list[tuple[str, str]]:
     return resolved
 
 
-def scan_doc_for_formula_columns(session, doc_id: str, patterns: list[tuple[str, re.Pattern[str]]]):
+def scan_doc_for_formula_columns(
+    session, doc_id: str, patterns: list[tuple[str, re.Pattern[str]]]
+):
     """Scan a Coda document's columns for formula text matching the given regex patterns. Returns a list of match dicts."""
     matches = []
     tables = list_tables(session, doc_id)
@@ -66,13 +68,20 @@ def scan_doc_for_formula_columns(session, doc_id: str, patterns: list[tuple[str,
 
 class Command(BaseCommand):
     """Scan Coda docs for column-level formula text matching regex patterns."""
+
     help = "Scan Coda docs for column-level formula text matching regex patterns"
 
     def add_arguments(self, parser: argparse.ArgumentParser):
         """Add command-line arguments for scan_coda_formula_columns."""
-        parser.add_argument("--config", required=True, help="JSON config with workbooks (doc_url) and patterns")
+        parser.add_argument(
+            "--config",
+            required=True,
+            help="JSON config with workbooks (doc_url) and patterns",
+        )
         parser.add_argument("--out", required=True, help="Output JSON path")
-        parser.add_argument("--smoke", action="store_true", help="Run without network calls")
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without network calls"
+        )
 
     def handle(self, *args, **options):
         """Execute the Coda formula scan pipeline. Connects to the Coda API, scans column formula text for pattern matches, and writes results to ``--out``."""
@@ -101,7 +110,9 @@ class Command(BaseCommand):
                 ),
                 encoding="utf-8",
             )
-            self.stdout.write(self.style.SUCCESS(f"scan_coda_formula_columns smoke wrote {out_path}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"scan_coda_formula_columns smoke wrote {out_path}")
+            )
             return
 
         session = build_coda_session()

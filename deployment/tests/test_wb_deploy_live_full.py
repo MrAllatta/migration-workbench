@@ -7,7 +7,6 @@ recording, subprocess call, health polling, and result reporting.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -44,7 +43,10 @@ def _manifest() -> dict:
                 "build": {"dockerfile": "Dockerfile", "context": "."},
                 "runtime": {
                     "internal_port": 8080,
-                    "processes": {"web": "python manage.py runserver", "release": "python manage.py migrate"},
+                    "processes": {
+                        "web": "python manage.py runserver",
+                        "release": "python manage.py migrate",
+                    },
                     "healthcheck_path": "/healthz",
                     "healthcheck_timeout_s": 60,
                 },

@@ -61,14 +61,20 @@ def _detect_header_row(
     for idx in range(scan_limit):
         candidate = rows[idx]
         normalized_candidate = {
-            _normalize_header(_canonicalize_header(cell, alias_lookup)) for cell in candidate if cell
+            _normalize_header(_canonicalize_header(cell, alias_lookup))
+            for cell in candidate
+            if cell
         }
         if required.issubset(normalized_candidate):
             return idx
-    raise ValueError(f"Unable to detect header row containing required headers: {required_headers}")
+    raise ValueError(
+        f"Unable to detect header row containing required headers: {required_headers}"
+    )
 
 
-def iter_bundle_tab_rows(csv_path: str, tab_config: dict) -> Iterator[tuple[int, dict[str, str]]]:
+def iter_bundle_tab_rows(
+    csv_path: str, tab_config: dict
+) -> Iterator[tuple[int, dict[str, str]]]:
     """Yield normalized rows for a bundle tab configuration.
 
     Args:
@@ -99,9 +105,13 @@ def iter_bundle_tab_rows(csv_path: str, tab_config: dict) -> Iterator[tuple[int,
     with open(csv_path, "r", encoding="utf-8", newline="") as handle:
         rows = list(csv.reader(handle))
 
-    header_row_idx = _detect_header_row(rows, required_headers, alias_lookup, max_scan_rows)
+    header_row_idx = _detect_header_row(
+        rows, required_headers, alias_lookup, max_scan_rows
+    )
     header_cells = rows[header_row_idx]
-    canonical_headers = [_canonicalize_header(cell, alias_lookup) for cell in header_cells]
+    canonical_headers = [
+        _canonicalize_header(cell, alias_lookup) for cell in header_cells
+    ]
 
     for row_idx, row in enumerate(rows[header_row_idx + 1 :], start=header_row_idx + 2):
         values_by_header: dict[str, str] = {}

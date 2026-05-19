@@ -27,7 +27,10 @@ class Command(BaseImportCommand):
                 if not name:
                     continue
                 defaults = {
-                    "block_type": (row.get("Block Type") or "field").strip().lower().replace(" ", "_"),
+                    "block_type": (row.get("Block Type") or "field")
+                    .strip()
+                    .lower()
+                    .replace(" ", "_"),
                     "num_beds": self._int(row.get("# of Beds"), 0),
                     "bed_width_feet": self._dec(row.get("Bed Width (feet)"), "0"),
                     "bedfeet_per_bed": self._int(row.get("Bedfeet per Bed"), 0),
@@ -35,7 +38,9 @@ class Command(BaseImportCommand):
                 if self.write_disabled:
                     self.stats["ExampleBlock"]["processed"] += 1
                     continue
-                _, created = ExampleBlock.objects.update_or_create(name=name, defaults=defaults)
+                _, created = ExampleBlock.objects.update_or_create(
+                    name=name, defaults=defaults
+                )
                 key = "created" if created else "updated"
                 self.stats["ExampleBlock"][key] += 1
 
@@ -55,6 +60,8 @@ class Command(BaseImportCommand):
                 if self.write_disabled:
                     self.stats["ExampleCrop"]["processed"] += 1
                     continue
-                _, created = ExampleCrop.objects.update_or_create(name=name, defaults=defaults)
+                _, created = ExampleCrop.objects.update_or_create(
+                    name=name, defaults=defaults
+                )
                 key = "created" if created else "updated"
                 self.stats["ExampleCrop"][key] += 1

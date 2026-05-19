@@ -27,8 +27,14 @@ def test_new_product_google_scaffold_exports_profile_env_vars(tmp_path):
         encoding="utf-8"
     )
 
-    assert "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID" in generated_makefile
-    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS" in generated_makefile
+    assert (
+        "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID"
+        in generated_makefile
+    )
+    assert (
+        "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS"
+        in generated_makefile
+    )
     assert (
         '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"'
         in generated_makefile
@@ -53,7 +59,10 @@ def test_new_product_coda_scaffold_writes_coda_config_and_docs(tmp_path):
         encoding="utf-8"
     )
 
-    assert "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS" in generated_makefile
+    assert (
+        "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS"
+        in generated_makefile
+    )
     assert (
         "`make profile-coda-corpus` reads `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` from `.env`."
     ) in generated_readme
@@ -88,10 +97,15 @@ def test_new_product_does_not_commit_into_existing_repo(tmp_path):
     subprocess.run(
         [
             "git",
-            "-C", str(output_dir),
-            "-c", "user.name=test",
-            "-c", "user.email=test@test.com",
-            "commit", "-m", "baseline",
+            "-C",
+            str(output_dir),
+            "-c",
+            "user.name=test",
+            "-c",
+            "user.email=test@test.com",
+            "commit",
+            "-m",
+            "baseline",
         ],
         check=True,
         capture_output=True,
@@ -139,7 +153,8 @@ def test_check_env_works_with_posix_sh(tmp_path):
 
     result = subprocess.run(
         ["make", "-C", str(output_dir), "check-env"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, (
         f"check-env failed with all vars set:\n{result.stderr}{result.stdout}"
@@ -152,7 +167,8 @@ def test_check_env_works_with_posix_sh(tmp_path):
     )
     result = subprocess.run(
         ["make", "-C", str(output_dir), "check-env"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode != 0
     assert "DRIVE_FOLDER_ID" in result.stderr

@@ -48,7 +48,11 @@ def expand_years_config(config: dict) -> dict:
             tab_copy.pop("worksheet_title_by_year", None)
 
             original_path = tab_copy.get("output_path", "")
-            base = original_path.rsplit(".", 1)[0] if "." in original_path else original_path
+            base = (
+                original_path.rsplit(".", 1)[0]
+                if "." in original_path
+                else original_path
+            )
             ext = original_path.rsplit(".", 1)[1] if "." in original_path else "csv"
             tab_copy["output_path"] = f"{year}/{base}.{ext}"
 
@@ -63,12 +67,17 @@ def expand_years_config(config: dict) -> dict:
 
 class Command(BaseCommand):
     """Fetch provider tabs and normalize them into a bundle"""
+
     help = "Fetch provider tabs and normalize them into a bundle"
 
     def add_arguments(self, parser):
         """Add command-line arguments for pull_bundle."""
-        parser.add_argument("--config", required=True, help="JSON config describing live source tabs")
-        parser.add_argument("--output-dir", required=True, help="Directory for the normalized bundle")
+        parser.add_argument(
+            "--config", required=True, help="JSON config describing live source tabs"
+        )
+        parser.add_argument(
+            "--output-dir", required=True, help="Directory for the normalized bundle"
+        )
         parser.add_argument(
             "--include-structure",
             action="store_true",
@@ -107,10 +116,14 @@ class Command(BaseCommand):
         include_structure = bool(options.get("include_structure"))
         structure_tabs: list[dict] = []
 
-        default_scan_rows = LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"]["max_scan_rows"]
+        default_scan_rows = LIVE_SOURCE_NORMALIZER_CONTRACT["header_detection"][
+            "max_scan_rows"
+        ]
 
         for tab in tabs:
-            worksheet_title = resolve_tab_title_for_year(tab, tab.get("source_bundle_year"))
+            worksheet_title = resolve_tab_title_for_year(
+                tab, tab.get("source_bundle_year")
+            )
             if not worksheet_title:
                 raise CommandError("Each tab entry must include worksheet_title")
 
@@ -126,7 +139,9 @@ class Command(BaseCommand):
                 # second name->id lookup against Drive.
                 tab_with_resolved = dict(tab)
                 if pulled.get("spreadsheet_id"):
-                    tab_with_resolved.setdefault("spreadsheet_id", pulled["spreadsheet_id"])
+                    tab_with_resolved.setdefault(
+                        "spreadsheet_id", pulled["spreadsheet_id"]
+                    )
                 structure_entry = provider.fetch_tab_structure(tab_with_resolved)
                 if structure_entry is not None:
                     structure_tabs.append(structure_entry)
@@ -184,7 +199,9 @@ class Command(BaseCommand):
             )
 
         manifest_path = output_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+        )
         self.stdout.write(self.style.SUCCESS(f"wrote bundle manifest: {manifest_path}"))
 
         if include_structure and structure_tabs:
@@ -198,7 +215,9 @@ class Command(BaseCommand):
             structure_path.write_text(
                 json.dumps(structure, indent=2, sort_keys=True), encoding="utf-8"
             )
-            self.stdout.write(self.style.SUCCESS(f"wrote bundle structure: {structure_path}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"wrote bundle structure: {structure_path}")
+            )
         elif include_structure:
             self.stdout.write(
                 "include-structure requested but no adapter returned structural metadata; skipping structure.json"

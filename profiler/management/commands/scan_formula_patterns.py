@@ -54,17 +54,23 @@ def load_workbooks(config: dict) -> list[tuple[str, str]]:
     return [(item["name"], item["spreadsheet_id"]) for item in workbooks]
 
 
-def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]):
+def scan_workbook(
+    svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]
+):
     """Scan a single workbook for cells matching the given regex patterns. Returns a list of match dicts."""
     sheets_resp = execute_with_retry(
-        svc.spreadsheets().get(spreadsheetId=spreadsheet_id, fields="sheets(properties(title))")
+        svc.spreadsheets().get(
+            spreadsheetId=spreadsheet_id, fields="sheets(properties(title))"
+        )
     )
     sheet_titles = [s["properties"]["title"] for s in sheets_resp.get("sheets", [])]
     matches = []
     for title in sheet_titles:
         escaped_title = title.replace("'", "''")
         values_resp = execute_with_retry(
-            svc.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
+            svc.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
         )
         for row_idx, row in enumerate(values_resp.get("values", []), start=1):
             for col_idx, value in enumerate(row, start=1):
@@ -86,13 +92,18 @@ def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern
 
 class Command(BaseCommand):
     """Scan configured workbooks for formula regex patterns."""
+
     help = "Scan configured workbooks for formula regex patterns"
 
     def add_arguments(self, parser: argparse.ArgumentParser):
         """Add command-line arguments for scan_formula_patterns."""
-        parser.add_argument("--config", required=True, help="JSON config with workbooks and patterns")
+        parser.add_argument(
+            "--config", required=True, help="JSON config with workbooks and patterns"
+        )
         parser.add_argument("--out", required=True, help="Output JSON path")
-        parser.add_argument("--smoke", action="store_true", help="Run without network calls")
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without network calls"
+        )
 
     def handle(self, *args, **options):
         """Execute the formula scan pipeline. Reads workbook and pattern config, scans each workbook cell for pattern matches, and writes results to ``--out``."""
@@ -118,7 +129,9 @@ class Command(BaseCommand):
                 ),
                 encoding="utf-8",
             )
-            self.stdout.write(self.style.SUCCESS(f"scan_formula_patterns smoke wrote {out_path}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"scan_formula_patterns smoke wrote {out_path}")
+            )
             return
 
         service = build_google_service("sheets", "v4", [SHEETS_READONLY_SCOPE])

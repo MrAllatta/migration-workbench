@@ -17,9 +17,7 @@ def _load_yaml(path: Path) -> Any:
     try:
         import yaml  # type: ignore[import-untyped]
     except ImportError as exc:
-        raise CommandError(
-            "PyYAML is required to read schema-contract YAML."
-        ) from exc
+        raise CommandError("PyYAML is required to read schema-contract YAML.") from exc
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
@@ -99,7 +97,9 @@ class Command(BaseCommand):
                 "version": VIEW_MANIFEST_VERSION,
                 "view_count": len(views),
                 "entities_bound": sum(1 for v in views if v.get("entity")),
-                "status_fields_inferred": sum(1 for v in views if v.get("status_field")),
+                "status_fields_inferred": sum(
+                    1 for v in views if v.get("status_field")
+                ),
                 "tabs_hidden_skipped": sum(1 for t in tabs if t.get("hidden")),
             }
             summary_path.write_text(

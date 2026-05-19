@@ -60,6 +60,7 @@ Issues = "https://github.com/MrAllatta/migration-workbench/issues"
 dev = [
   "pytest",
   "pytest-django",
+  "ruff",
   "black",
   "build>=1.2",
   "twine>=5.0",
@@ -79,6 +80,16 @@ include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "exa
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "migration_workbench.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]
+
+# TODO: Fix remaining lint issues in a follow-up and remove these ignores.
+[tool.ruff.lint]
+ignore = [
+    "E402",  # module-level import not at top — common in Django management commands with sys.path manipulation
+    "E731",  # lambda assignment — used for concise default callbacks
+    "E741",  # ambiguous variable name — TODO: rename `l` in test_admin_generator.py
+    "F821",  # undefined name — TODO: fix missing imports in scripts/ and workbook/
+    "F841",  # unused variable — TODO: remove or prefix with _ in tests and import_generator
+]
 
 [tool.interrogate]
 fail-under = 80

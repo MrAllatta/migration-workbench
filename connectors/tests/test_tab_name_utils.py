@@ -1,6 +1,5 @@
 """Tests for tab name sanitization utility."""
 
-import pytest
 from connectors.tab_name_utils import sanitize_tab_name
 
 

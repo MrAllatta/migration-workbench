@@ -133,7 +133,9 @@ def get_last_healthy_release(space: str, environment: str) -> ReleaseRecord | No
         no healthy release exists for this space/environment pair.
     """
     return (
-        ReleaseRecord.objects.filter(space=space, environment=environment, is_healthy=True)
+        ReleaseRecord.objects.filter(
+            space=space, environment=environment, is_healthy=True
+        )
         .order_by("-created_at")
         .first()
     )

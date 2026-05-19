@@ -123,7 +123,9 @@ def formula_skeleton(formula: str) -> str:
 
 
 SHEET_REF_RE = re.compile(r"'([^']+)'!|\b([A-Za-z_][A-Za-z0-9_]*)!")
-IMPORTRANGE_RE = re.compile(r'IMPORTRANGE\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"', re.IGNORECASE)
+IMPORTRANGE_RE = re.compile(
+    r'IMPORTRANGE\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"', re.IGNORECASE
+)
 FUNCTION_RE = re.compile(r"\b([A-Z][A-Z0-9_\.]*)\s*\(")
 
 
@@ -132,7 +134,9 @@ def extract_references(formula: str) -> dict:
     sheet_refs = set()
     for m in SHEET_REF_RE.finditer(formula):
         sheet_refs.add(m.group(1) or m.group(2))
-    import_ranges = [{"spreadsheet": a, "range": b} for a, b in IMPORTRANGE_RE.findall(formula)]
+    import_ranges = [
+        {"spreadsheet": a, "range": b} for a, b in IMPORTRANGE_RE.findall(formula)
+    ]
     functions = sorted({m.group(1) for m in FUNCTION_RE.finditer(formula)})
     return {
         "functions": functions,
@@ -218,7 +222,9 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
             "first_20": focus_cells[:20],
             "unique_kinds": dict(Counter(c["kind"] for c in focus_cells)),
             "unique_formula_skeletons": Counter(
-                formula_skeleton(c["user_entered"]) for c in focus_cells if c["kind"] == "formula"
+                formula_skeleton(c["user_entered"])
+                for c in focus_cells
+                if c["kind"] == "formula"
             ).most_common(),
         }
 
@@ -258,15 +264,26 @@ def render_markdown(summary: dict) -> str:
 
 class Command(BaseCommand):
     """Profile one workbook tab, or list workbook tabs."""
+
     help = "Profile one workbook tab, or list workbook tabs"
 
     def add_arguments(self, parser):
         """Add command-line arguments for profile_tab."""
         parser.add_argument("--spreadsheet-id", help="Spreadsheet id or URL")
-        parser.add_argument("--tab", help="Worksheet tab title. If omitted, list tabs and exit")
-        parser.add_argument("--focus-col", default=None, help="Column letter to trace (e.g. B)")
-        parser.add_argument("--out", default=None, help="Output JSON path; .md summary is written next to it")
-        parser.add_argument("--smoke", action="store_true", help="Run without network calls")
+        parser.add_argument(
+            "--tab", help="Worksheet tab title. If omitted, list tabs and exit"
+        )
+        parser.add_argument(
+            "--focus-col", default=None, help="Column letter to trace (e.g. B)"
+        )
+        parser.add_argument(
+            "--out",
+            default=None,
+            help="Output JSON path; .md summary is written next to it",
+        )
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without network calls"
+        )
 
     def handle(self, *args, **options):
         """Execute the tab profiling pipeline. Connects to Sheets API, fetches grid data, analyzes formulas and structure, and writes a Markdown + JSON profile artifact."""
@@ -295,7 +312,10 @@ class Command(BaseCommand):
         if out:
             out_path = Path(out).resolve()
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps({"raw": payload, "summary": summary}, indent=2, default=str), encoding="utf-8")
+            out_path.write_text(
+                json.dumps({"raw": payload, "summary": summary}, indent=2, default=str),
+                encoding="utf-8",
+            )
             md_path = out_path.with_suffix(".md")
             md_path.write_text(render_markdown(summary), encoding="utf-8")
             self.stdout.write(f"wrote {out_path}")

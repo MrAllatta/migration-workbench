@@ -10,9 +10,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--contract", required=True, help="Path to contract YAML")
-        parser.add_argument("--index", required=True, help="Path to workbook index JSON")
-        parser.add_argument("--out", required=True, help="Output path for source_config.json")
-        parser.add_argument("--provider", default="google_sheets", help="Provider (default: google_sheets)")
+        parser.add_argument(
+            "--index", required=True, help="Path to workbook index JSON"
+        )
+        parser.add_argument(
+            "--out", required=True, help="Output path for source_config.json"
+        )
+        parser.add_argument(
+            "--provider",
+            default="google_sheets",
+            help="Provider (default: google_sheets)",
+        )
 
     def handle(self, *args, **options):
         contract_path = Path(options["contract"])
@@ -34,7 +42,8 @@ class Command(BaseCommand):
         for table in contract.get("tables", []):
             import_cfg = table.get("import_config") or {}
             tab = {
-                "worksheet_title": table.get("bundle_worksheet_title") or table.get("suggested_model_name", ""),
+                "worksheet_title": table.get("bundle_worksheet_title")
+                or table.get("suggested_model_name", ""),
                 "output_path": import_cfg.get("bundle_path") or "",
                 "required_headers": import_cfg.get("required_headers") or [],
             }

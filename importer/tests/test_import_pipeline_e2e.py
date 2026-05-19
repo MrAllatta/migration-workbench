@@ -1,7 +1,6 @@
 """End-to-end tests exercising generate_import -> BaseImportCommand runtime."""
 
 import json
-from pathlib import Path
 
 import pytest
 from django.core.management import call_command
@@ -26,10 +25,7 @@ def fresh_db(db):
 class TestImportPipelineE2E:
     def test_contract_loads_with_import_configs(self):
         contract = load_contract(CONTRACT_PATH)
-        tables_with_import = [
-            t for t in contract["tables"]
-            if t.get("import_config")
-        ]
+        tables_with_import = [t for t in contract["tables"] if t.get("import_config")]
         assert len(tables_with_import) == 3
 
     def test_generated_import_contains_model_methods(self):
@@ -50,7 +46,8 @@ class TestImportPipelineE2E:
     def test_generated_import_contains_field_transforms(self):
         contract = load_contract(CONTRACT_PATH)
         variety_table = next(
-            t for t in contract["tables"]
+            t
+            for t in contract["tables"]
             if t["suggested_model_name"] == "ExampleVariety"
         )
         assert "field_transforms" in variety_table["import_config"]

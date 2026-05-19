@@ -12,7 +12,6 @@ order drift. These are the canonical strings from the project configuration cont
 
 from pathlib import Path
 
-import pytest
 from django.conf import settings
 
 

@@ -32,7 +32,9 @@ _CONTRACT_WITH_ISSUES = {
 }
 
 
-def _run_wb(contract_yaml: str, extra_args: list[str] | None = None) -> subprocess.CompletedProcess:
+def _run_wb(
+    contract_yaml: str, extra_args: list[str] | None = None
+) -> subprocess.CompletedProcess:
     """Run ``wb contract review`` with the given contract YAML and extra flags.
 
     ``--json`` is a top-level flag (before the subcommand), so this helper
@@ -40,7 +42,9 @@ def _run_wb(contract_yaml: str, extra_args: list[str] | None = None) -> subproce
     the subcommand verb.
     """
     tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yml", delete=False,
+        mode="w",
+        suffix=".yml",
+        delete=False,
     )
     try:
         tmp.write(contract_yaml)
@@ -53,10 +57,14 @@ def _run_wb(contract_yaml: str, extra_args: list[str] | None = None) -> subproce
             else:
                 subcommand_flags.append(flag)
         cmd = [
-            sys.executable, "-m", "deployment.wb_cli",
+            sys.executable,
+            "-m",
+            "deployment.wb_cli",
             *global_flags,
-            "contract", "review",
-            "--contract", tmp.name,
+            "contract",
+            "review",
+            "--contract",
+            tmp.name,
             *subcommand_flags,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -98,9 +106,7 @@ def test_contract_review_exit_zero_json_marks_ok_true():
         f"Expected ok=True with --exit-zero --json, got ok={payload.get('ok')}.\n"
         f"Full payload: {payload}"
     )
-    assert payload.get("details"), (
-        f"Expected details to contain issues, got: {payload}"
-    )
+    assert payload.get("details"), f"Expected details to contain issues, got: {payload}"
     assert "(exit-zero)" in payload["message"], (
         f"Expected '(exit-zero)' in message, got: {payload['message']}"
     )

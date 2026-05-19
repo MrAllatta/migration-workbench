@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 import yaml
@@ -11,39 +10,45 @@ from django.core.management import call_command, CommandError
 
 
 def _contract_yaml() -> str:
-    return yaml.safe_dump({
-        "source": {"provider": "google_sheets", "doc_id": "sheet123"},
-        "tables": [
-            {
-                "bundle_worksheet_title": "Crop Planner",
-                "suggested_model_name": "crop_plan_entry",
-                "model_name": "CropPlanEntry",
-                "bundle_output_path": "2025/crop_plan_entry.csv",
-                "columns": [
-                    {"source_column": "Block", "suggested_field_name": "block"},
-                    {"source_column": "Crop", "suggested_field_name": "crop"},
-                ],
-                "import_config": {
-                    "bundle_path": "2025/crop_plan_entry.csv",
-                    "required_headers": ["Block", "Crop"],
-                },
-            }
-        ],
-    })
+    return yaml.safe_dump(
+        {
+            "source": {"provider": "google_sheets", "doc_id": "sheet123"},
+            "tables": [
+                {
+                    "bundle_worksheet_title": "Crop Planner",
+                    "suggested_model_name": "crop_plan_entry",
+                    "model_name": "CropPlanEntry",
+                    "bundle_output_path": "2025/crop_plan_entry.csv",
+                    "columns": [
+                        {"source_column": "Block", "suggested_field_name": "block"},
+                        {"source_column": "Crop", "suggested_field_name": "crop"},
+                    ],
+                    "import_config": {
+                        "bundle_path": "2025/crop_plan_entry.csv",
+                        "required_headers": ["Block", "Crop"],
+                    },
+                }
+            ],
+        }
+    )
 
 
 def _corpus_config_json() -> str:
-    return json.dumps({
-        "provider": "google_sheets",
-        "drive_folder_id": "folder_abc",
-        "workbook_codes": {"201": "CropPlanner"},
-        "years": {
-            "2025": {
-                "folder_pattern": "2025_farm",
-                "workbook_ids": {"201": "1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE"},
-            }
-        },
-    })
+    return json.dumps(
+        {
+            "provider": "google_sheets",
+            "drive_folder_id": "folder_abc",
+            "workbook_codes": {"201": "CropPlanner"},
+            "years": {
+                "2025": {
+                    "folder_pattern": "2025_farm",
+                    "workbook_ids": {
+                        "201": "1QWy4GsP3cpvECVMumj5sjblIwZWfVhQAC73kQhmaqEE"
+                    },
+                }
+            },
+        }
+    )
 
 
 def test_command_generates_yaml(tmp_path):

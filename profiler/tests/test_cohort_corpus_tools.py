@@ -131,7 +131,11 @@ def test_score_tab_without_heuristics_uses_grid_shape_only():
     score, reasons, breakdown = score_tab("Any Name", 1200, 30)
     assert score == 3
     assert set(reasons) == {"medium_grid", "many_rows", "wide_sheet"}
-    assert breakdown["size_bonuses"] == {"medium_grid": 1, "many_rows": 1, "wide_sheet": 1}
+    assert breakdown["size_bonuses"] == {
+        "medium_grid": 1,
+        "many_rows": 1,
+        "wide_sheet": 1,
+    }
 
 
 def test_score_tab_with_weights():
@@ -468,9 +472,7 @@ def test_run_cohort_corpus_stop_before_deep_returns_early(tmp_path: Path):
     mock_fetch_grid.assert_not_called()
     mock_summarize.assert_not_called()
 
-    assert (
-        corpus_out_dir / f"tab_selection_{date_stamp}.json"
-    ).exists()
+    assert (corpus_out_dir / f"tab_selection_{date_stamp}.json").exists()
     assert "deep_coverage" not in outputs
     assert "column_shortlist" not in outputs
     assert "column_selection" not in outputs
@@ -529,7 +531,9 @@ def test_run_cohort_corpus_resume_from_broad_requires_index(tmp_path: Path):
         )
 
 
-def test_run_cohort_corpus_resume_from_broad_and_tab_selection_mutual_exclusion(tmp_path: Path):
+def test_run_cohort_corpus_resume_from_broad_and_tab_selection_mutual_exclusion(
+    tmp_path: Path,
+):
     """Both resume modes together must raise."""
     corpus_out_dir = tmp_path / "corpus_run"
     corpus_out_dir.mkdir(parents=True, exist_ok=True)
@@ -616,15 +620,9 @@ def test_run_cohort_corpus_resume_from_broad_skips_api_calls(tmp_path: Path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch(
-            "profiler.tools.cohort_corpus.list_tabs"
-        ) as mock_list_tabs,
-        patch(
-            "profiler.tools.cohort_corpus.fetch_tab_grid"
-        ) as mock_fetch_grid,
-        patch(
-            "profiler.tools.cohort_corpus.summarize_tab"
-        ) as mock_summarize,
+        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        patch("profiler.tools.cohort_corpus.fetch_tab_grid") as mock_fetch_grid,
+        patch("profiler.tools.cohort_corpus.summarize_tab") as mock_summarize,
     ):
         outputs = run_cohort_corpus(
             drive_service=mock_drive,
@@ -641,20 +639,22 @@ def test_run_cohort_corpus_resume_from_broad_skips_api_calls(tmp_path: Path):
     mock_fetch_grid.assert_not_called()
     mock_summarize.assert_not_called()
 
-    assert (
-        corpus_out_dir / f"tab_selection_{date_stamp}.json"
-    ).exists()
+    assert (corpus_out_dir / f"tab_selection_{date_stamp}.json").exists()
     assert "deep_coverage" not in outputs
 
     tab_selection = json.loads(
-        (corpus_out_dir / f"tab_selection_{date_stamp}.json").read_text(encoding="utf-8")
+        (corpus_out_dir / f"tab_selection_{date_stamp}.json").read_text(
+            encoding="utf-8"
+        )
     )
     approved = tab_selection["approved_tabs"]
     assert "Plan Board" in approved.get("402", [])
     assert "INDEX" not in approved.get("402", [])
 
 
-def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(tmp_path: Path):
+def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(
+    tmp_path: Path,
+):
     """After editing heuristics, resume_from_broad must produce a different tab selection."""
     corpus_out_dir = tmp_path / "corpus_run"
     corpus_out_dir.mkdir(parents=True, exist_ok=True)
@@ -743,9 +743,7 @@ def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(tmp_p
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch(
-            "profiler.tools.cohort_corpus.list_tabs"
-        ) as mock_list_tabs,
+        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
     ):
         outputs = run_cohort_corpus(
             drive_service=mock_drive,
@@ -761,7 +759,9 @@ def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(tmp_p
     mock_list_tabs.assert_not_called()
 
     tab_selection = json.loads(
-        (corpus_out_dir / f"tab_selection_{date_stamp}.json").read_text(encoding="utf-8")
+        (corpus_out_dir / f"tab_selection_{date_stamp}.json").read_text(
+            encoding="utf-8"
+        )
     )
     approved = tab_selection["approved_tabs"]
     assert "Define Shared Terms" in approved.get("503", [])
@@ -848,9 +848,7 @@ def test_run_cohort_corpus_429_aborts_after_max_cooldowns(tmp_path: Path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch(
-            "profiler.tools.cohort_corpus.list_tabs"
-        ) as mock_list_tabs,
+        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
         patch(
             "profiler.tools.cohort_corpus.fetch_tab_grid",
             mock_fetch,
@@ -875,7 +873,9 @@ def test_run_cohort_corpus_429_aborts_after_max_cooldowns(tmp_path: Path):
         )
     )
     abort_entries = [
-        row for row in deep_coverage["results"] if "aborting deep profile" in (row.get("error") or "")
+        row
+        for row in deep_coverage["results"]
+        if "aborting deep profile" in (row.get("error") or "")
     ]
     assert len(abort_entries) == 1
     assert deep_coverage["failure_count"] > 0
@@ -907,7 +907,9 @@ def test_run_cohort_corpus_resume_from_broad_inventory_rows_missing(tmp_path: Pa
 
     broad_path = corpus_out_dir / f"broad_profile_coverage_{date_stamp}.json"
     broad_path.write_text(
-        json.dumps({"run_count": 1, "success_count": 1, "failure_count": 0, "results": []}),
+        json.dumps(
+            {"run_count": 1, "success_count": 1, "failure_count": 0, "results": []}
+        ),
         encoding="utf-8",
     )
 
@@ -925,7 +927,9 @@ def test_run_cohort_corpus_resume_from_broad_inventory_rows_missing(tmp_path: Pa
         )
 
 
-def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(tmp_path: Path):
+def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(
+    tmp_path: Path,
+):
     """resume_from_broad without stop_before_deep proceeds into deep profiling."""
     corpus_out_dir = tmp_path / "corpus_run"
     corpus_out_dir.mkdir(parents=True, exist_ok=True)
@@ -970,9 +974,7 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(tmp_
     corpus_config = {
         "folder_id": "drive-folder-1",
         "in_scope_workbooks": ["402"],
-        "tab_selection_overrides": {
-            "402": {"replace": True, "tabs": ["Plan Board"]}
-        },
+        "tab_selection_overrides": {"402": {"replace": True, "tabs": ["Plan Board"]}},
     }
     mock_drive = MagicMock()
     mock_sheets = MagicMock()
@@ -981,12 +983,22 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(tmp_
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch(
-            "profiler.tools.cohort_corpus.list_tabs"
-        ) as mock_list_tabs,
+        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
         patch(
             "profiler.tools.cohort_corpus.fetch_tab_grid",
-            return_value={"sheets": [{"data": [{"startRow": 0, "rowData": [{"values": [{"formattedValue": "Name"}]}], "startColumn": 0}]}]},
+            return_value={
+                "sheets": [
+                    {
+                        "data": [
+                            {
+                                "startRow": 0,
+                                "rowData": [{"values": [{"formattedValue": "Name"}]}],
+                                "startColumn": 0,
+                            }
+                        ]
+                    }
+                ]
+            },
         ),
         patch(
             "profiler.tools.cohort_corpus.summarize_tab",
@@ -1062,9 +1074,7 @@ def test_score_tab_exclude_pattern_penalizes_match():
         100,
         10,
         tab_score_heuristics={
-            "tab_exclude_patterns": [
-                {"pattern": "\\b\\d{3}\\b", "penalty": -5}
-            ]
+            "tab_exclude_patterns": [{"pattern": "\\b\\d{3}\\b", "penalty": -5}]
         },
     )
     assert score == -5
@@ -1078,9 +1088,7 @@ def test_score_tab_exclude_pattern_no_match():
         100,
         10,
         tab_score_heuristics={
-            "tab_exclude_patterns": [
-                {"pattern": "\\b\\d{3}\\b", "penalty": -5}
-            ]
+            "tab_exclude_patterns": [{"pattern": "\\b\\d{3}\\b", "penalty": -5}]
         },
     )
     assert score == 0
@@ -1097,8 +1105,11 @@ def test_score_tab_expansion_formula_ratio_penalty():
             "expansion_formula_threshold": 0.5,
         },
         column_formula_patterns={
-            "A": "raw", "B": "raw", "C": "expansion_formula",
-            "D": "expansion_formula", "E": "expansion_formula",
+            "A": "raw",
+            "B": "raw",
+            "C": "expansion_formula",
+            "D": "expansion_formula",
+            "E": "expansion_formula",
         },
     )
     # 3 of 5 columns are expansion_formula = 0.6 ratio, exceeding 0.5 threshold
@@ -1119,7 +1130,9 @@ def test_score_tab_expansion_formula_ratio_below_threshold():
             "expansion_formula_threshold": 0.5,
         },
         column_formula_patterns={
-            "A": "raw", "B": "raw", "C": "expansion_formula",
+            "A": "raw",
+            "B": "raw",
+            "C": "expansion_formula",
         },
     )
     # 1 of 3 columns = 0.33 ratio, below 0.5 threshold → no penalty
@@ -1160,8 +1173,12 @@ def test_score_tab_exclude_pattern_multiple_rules():
 class TestColumnProfile:
     def test_dataclass_fields(self):
         cp = ColumnProfile(
-            letter="A", header_slug="product_sku", header_raw="Product SKU",
-            inferred_type="text", formula_pattern="raw", non_empty_cells=10,
+            letter="A",
+            header_slug="product_sku",
+            header_raw="Product SKU",
+            inferred_type="text",
+            formula_pattern="raw",
+            non_empty_cells=10,
         )
         assert cp.letter == "A"
         assert cp.header_slug == "product_sku"
@@ -1172,8 +1189,20 @@ class TestColumnProfile:
         summary = {
             "column_formula_patterns": {"A": "raw", "B": "row_formula"},
             "column_candidates": [
-                {"letter": "A", "header": "Product SKU", "format_type": "text", "unique_count": 50, "total_count": 50},
-                {"letter": "B", "header": "Format", "format_type": "text", "unique_count": 3, "total_count": 50},
+                {
+                    "letter": "A",
+                    "header": "Product SKU",
+                    "format_type": "text",
+                    "unique_count": 50,
+                    "total_count": 50,
+                },
+                {
+                    "letter": "B",
+                    "header": "Format",
+                    "format_type": "text",
+                    "unique_count": 3,
+                    "total_count": 50,
+                },
             ],
         }
         profiles = compute_column_profiles(summary)
@@ -1411,7 +1440,13 @@ class TestEnrichImportKeyCandidates:
 
 
 class TestEnrichEntityGroupings:
-    def _make_col(self, workbook_code="402", tab_title="Plan Board", canonical="farm_id", **overrides):
+    def _make_col(
+        self,
+        workbook_code="402",
+        tab_title="Plan Board",
+        canonical="farm_id",
+        **overrides,
+    ):
         col = {
             "workbook_code": workbook_code,
             "tab_title": tab_title,
@@ -1425,10 +1460,18 @@ class TestEnrichEntityGroupings:
 
     def test_tabs_sharing_headers_get_entity(self):
         cols = [
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="crop_name"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="crop_name"
+            ),
         ]
         entity_map = enrich_entity_groupings(cols)
         assert "Plan A" in entity_map
@@ -1440,8 +1483,12 @@ class TestEnrichEntityGroupings:
 
     def test_tabs_not_sharing_headers_no_entity(self):
         cols = [
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="crop_name"
+            ),
         ]
         entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
@@ -1451,29 +1498,51 @@ class TestEnrichEntityGroupings:
 
     def test_tabs_sharing_one_header_not_enough(self):
         cols = [
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="farm_id"
+            ),
         ]
         entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
 
     def test_different_workbooks_not_grouped(self):
         cols = [
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
-            self._make_col(workbook_code="503", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="503", tab_title="Plan A", canonical="crop_name"),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="crop_name"
+            ),
+            self._make_col(
+                workbook_code="503", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="503", tab_title="Plan A", canonical="crop_name"
+            ),
         ]
         entity_map = enrich_entity_groupings(cols)
         assert entity_map == {}
 
     def test_returns_tab_to_entity_map(self):
         cols = [
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan A", canonical="crop_name"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="farm_id"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="crop_name"),
-            self._make_col(workbook_code="402", tab_title="Plan B", canonical="season_name"),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan A", canonical="crop_name"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="farm_id"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="crop_name"
+            ),
+            self._make_col(
+                workbook_code="402", tab_title="Plan B", canonical="season_name"
+            ),
         ]
         entity_map = enrich_entity_groupings(cols)
         assert isinstance(entity_map, dict)

@@ -1,6 +1,5 @@
 """Tests for the scaffold_workbook_schema management command."""
 
-from pathlib import Path
 from django.core.management import call_command
 
 from workbook.management.commands.scaffold_workbook_schema import (
@@ -31,9 +30,13 @@ def test_to_pascal_case_converts_snake_case():
 def test_scaffold_stores_app_label_in_contract(tmp_path, monkeypatch):
     """scaffold_workbook_schema should store --models-app-label in each table's model_meta."""
     bundle = tmp_path / "bundle.json"
-    bundle.write_text('{"provider": "coda", "doc_url": "...", "doc_id": "x", "source_id": "x", "tabs": [{"worksheet_title": "Test", "output_path": "t.csv", "required_headers": ["A"]}]}')
+    bundle.write_text(
+        '{"provider": "coda", "doc_url": "...", "doc_id": "x", "source_id": "x", "tabs": [{"worksheet_title": "Test", "output_path": "t.csv", "required_headers": ["A"]}]}'
+    )
     table_profile = tmp_path / "profile.json"
-    table_profile.write_text('{"summary": {"doc_name": "D", "table_id": "t", "table_name": "Test", "columns": [{"name": "A", "format_type": "text"}]}, "columns_raw": [], "rows_sample": []}')
+    table_profile.write_text(
+        '{"summary": {"doc_name": "D", "table_id": "t", "table_name": "Test", "columns": [{"name": "A", "format_type": "text"}]}, "columns_raw": [], "rows_sample": []}'
+    )
     out = tmp_path / "contract.yaml"
 
     call_command(
@@ -45,6 +48,7 @@ def test_scaffold_stores_app_label_in_contract(tmp_path, monkeypatch):
     )
 
     import yaml
+
     contract = yaml.safe_load(out.read_text())
     for table in contract.get("tables", []):
         meta = table.get("model_meta", {})
@@ -106,10 +110,13 @@ def test_harden_contract_preserves_existing_bundle_path():
                 "model_name": "SalesChannel",
                 "bundle_worksheet_title": "Sales Channels",
                 "columns": [
-                    {"suggested_field_name": "name", "source_column": "Name",
-                     "django_field_class": "models.CharField",
-                     "django_field_kwargs": {"max_length": 120},
-                     "notes": []}
+                    {
+                        "suggested_field_name": "name",
+                        "source_column": "Name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 120},
+                        "notes": [],
+                    }
                 ],
                 "import_config": {
                     "bundle_path": "reference/sales_channels.csv",
@@ -118,7 +125,10 @@ def test_harden_contract_preserves_existing_bundle_path():
         ]
     }
     _harden_contract(contract)
-    assert contract["tables"][0]["import_config"].get("bundle_path") == "reference/sales_channels.csv"
+    assert (
+        contract["tables"][0]["import_config"].get("bundle_path")
+        == "reference/sales_channels.csv"
+    )
 
 
 def test_harden_contract_derives_bundle_path_when_missing():
@@ -129,17 +139,22 @@ def test_harden_contract_derives_bundle_path_when_missing():
                 "model_name": "Farm",
                 "bundle_worksheet_title": "Farms",
                 "columns": [
-                    {"suggested_field_name": "name", "source_column": "Name",
-                     "django_field_class": "models.CharField",
-                     "django_field_kwargs": {"max_length": 120},
-                     "notes": []}
+                    {
+                        "suggested_field_name": "name",
+                        "source_column": "Name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 120},
+                        "notes": [],
+                    }
                 ],
             }
         ]
     }
     _harden_contract(contract)
     assert "bundle_path" in contract["tables"][0]["import_config"]
-    assert contract["tables"][0]["import_config"]["bundle_path"] == "reference/farms.csv"
+    assert (
+        contract["tables"][0]["import_config"]["bundle_path"] == "reference/farms.csv"
+    )
 
 
 def test_flag_computed_fields_skips_missing_pattern():
@@ -161,10 +176,7 @@ def test_suggest_tab_merges_groups_by_shared_headers():
         "Harvest": {"columns": ["Date", "Weight", "Block"]},
     }
     result = _suggest_tab_merges(tabs)
-    assert any(
-        r["tabs"] == {"Crop Planner", "Crop Plan 501"}
-        for r in result
-    )
+    assert any(r["tabs"] == {"Crop Planner", "Crop Plan 501"} for r in result)
     assert not any("Harvest" in r["tabs"] for r in result)
 
 
@@ -186,9 +198,18 @@ def test_domain_knowledge_merge_overrides_field_types():
             "suggested_model_name": "Season",
             "bundle_worksheet_title": "Crop Planner",
             "columns": [
-                {"suggested_field_name": "name", "django_field_class": "models.TextField"},
-                {"suggested_field_name": "year", "django_field_class": "models.TextField"},
-                {"suggested_field_name": "notes", "django_field_class": "models.TextField"},
+                {
+                    "suggested_field_name": "name",
+                    "django_field_class": "models.TextField",
+                },
+                {
+                    "suggested_field_name": "year",
+                    "django_field_class": "models.TextField",
+                },
+                {
+                    "suggested_field_name": "notes",
+                    "django_field_class": "models.TextField",
+                },
             ],
         }
     ]
@@ -314,9 +335,23 @@ def test_flag_computed_fields_catches_is_computed():
     table = {
         "suggested_model_name": "CropPlan",
         "columns": [
-            {"suggested_field_name": "name", "formula_pattern": None, "is_computed": False},
-            {"suggested_field_name": "total", "formula_pattern": None, "is_computed": True, "source_column": "Total", "django_field_class": "models.FloatField"},
-            {"suggested_field_name": "yield_est", "formula_pattern": "row_formula", "source_column": "Yield Est"},
+            {
+                "suggested_field_name": "name",
+                "formula_pattern": None,
+                "is_computed": False,
+            },
+            {
+                "suggested_field_name": "total",
+                "formula_pattern": None,
+                "is_computed": True,
+                "source_column": "Total",
+                "django_field_class": "models.FloatField",
+            },
+            {
+                "suggested_field_name": "yield_est",
+                "formula_pattern": "row_formula",
+                "source_column": "Yield Est",
+            },
         ],
     }
     _flag_computed_fields(table)

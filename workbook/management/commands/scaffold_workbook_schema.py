@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
@@ -15,8 +14,17 @@ from workbook.codegen.designed_model_detection import (
     find_column_overlap_groups,
     suggest_designed_model,
 )
-from workbook.field_mapping import map_profiler_column_to_django_field, suggested_field_name
-from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year, _compute_bundle_paths, load_json
+from workbook.field_mapping import (
+    map_profiler_column_to_django_field,
+    suggested_field_name,
+)
+from workbook.schema_contract import (
+    build_contract,
+    _compute_fk_resolutions,
+    _suggest_import_keys,
+    _compute_bundle_paths,
+    load_json,
+)
 from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case
 
 
@@ -81,10 +89,12 @@ def _suggest_tab_merges(tabs: dict[str, dict]) -> list[dict]:
             b_headers = set(tabs[tab_names[j]].get("columns", []))
             shared = a_headers & b_headers
             if len(shared) >= 2:
-                candidates.append({
-                    "tabs": {tab_names[i], tab_names[j]},
-                    "shared_headers": sorted(shared),
-                })
+                candidates.append(
+                    {
+                        "tabs": {tab_names[i], tab_names[j]},
+                        "shared_headers": sorted(shared),
+                    }
+                )
     return candidates
 
 
@@ -163,7 +173,11 @@ def _build_cohort_contract(
         # (e.g. "cohort_corpus/deep/202_2023_...json"), but deep_dir
         # points at the deep/ subdirectory already.  Use the filename
         # portion only, since deep/ contains flat filename listings.
-        deep_path = (deep_dir / Path(out_json).name).resolve() if not Path(out_json).is_absolute() else Path(out_json)
+        deep_path = (
+            (deep_dir / Path(out_json).name).resolve()
+            if not Path(out_json).is_absolute()
+            else Path(out_json)
+        )
         if not deep_path.exists():
             continue
         try:
@@ -180,7 +194,7 @@ def _build_cohort_contract(
         if header_index is None:
             continue
         headers_raw = row_lists[header_index]
-        data_rows = row_lists[header_index + 1:]
+        data_rows = row_lists[header_index + 1 :]
 
         summary_col_meta: dict[str, dict[str, Any]] = {}
         for sc in summary.get("columns") or []:
@@ -213,7 +227,9 @@ def _build_cohort_contract(
                     "suggested_entity": enrichment.get("suggested_entity"),
                     "suggested_fk_target": enrichment.get("suggested_fk_target"),
                     "is_computed": enrichment.get("is_computed", False),
-                    "is_import_key_candidate": enrichment.get("is_import_key_candidate", False),
+                    "is_import_key_candidate": enrichment.get(
+                        "is_import_key_candidate", False
+                    ),
                     "cross_tab_group": enrichment.get("cross_tab_group"),
                 }
             )
@@ -337,7 +353,9 @@ def _harden_contract(contract: dict[str, Any]) -> None:
             "unique_on": unique_on,
         }
         model_name = table.get("model_name") or table.get("suggested_model_name", "")
-        table["import_config"]["bundle_path"] = existing_bundle_path or _derive_bundle_path(model_name)
+        table["import_config"]["bundle_path"] = (
+            existing_bundle_path or _derive_bundle_path(model_name)
+        )
         ik = _suggest_import_keys(table.get("columns", []))
         if ik:
             table.setdefault("import_key", {})
@@ -408,7 +426,9 @@ def _merge_domain_knowledge(
             field_name = col.get("suggested_field_name", "")
             if field_name in domain_fields:
                 df = domain_fields[field_name]
-                col["django_field_class"] = df.get("type", col.get("django_field_class"))
+                col["django_field_class"] = df.get(
+                    "type", col.get("django_field_class")
+                )
                 for key, value in df.items():
                     if key != "type":
                         col[key] = value
@@ -419,7 +439,9 @@ def _merge_domain_knowledge(
     for entity_name, entity_def in entities.items():
         for tab in entity_def.get("source_tabs", []):
             if tab not in matched_tabs:
-                warn(f"Entity '{entity_name}' references tab '{tab}' not found in profiler output")
+                warn(
+                    f"Entity '{entity_name}' references tab '{tab}' not found in profiler output"
+                )
 
 
 class Command(BaseCommand):
@@ -516,10 +538,14 @@ class Command(BaseCommand):
         if domain_knowledge_path:
             dk_path = Path(domain_knowledge_path)
             if not dk_path.exists():
-                raise CommandError(f"Domain knowledge file not found: {domain_knowledge_path}")
+                raise CommandError(
+                    f"Domain knowledge file not found: {domain_knowledge_path}"
+                )
             with dk_path.open() as f:
                 domain_knowledge = yaml.safe_load(f) or {}
-            _merge_domain_knowledge(contract.get("tables", []), domain_knowledge, self.stdout.write)
+            _merge_domain_knowledge(
+                contract.get("tables", []), domain_knowledge, self.stdout.write
+            )
 
         text = yaml.safe_dump(
             contract,
@@ -594,9 +620,7 @@ class Command(BaseCommand):
     ) -> dict[str, Any]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))
         if not coverage_files:
-            raise CommandError(
-                f"No deep_profile_coverage_*.json found in {cohort_dir}"
-            )
+            raise CommandError(f"No deep_profile_coverage_*.json found in {cohort_dir}")
         coverage_path = coverage_files[-1]
         coverage_payload = load_json(coverage_path)
         deep_dir = cohort_dir / "deep"

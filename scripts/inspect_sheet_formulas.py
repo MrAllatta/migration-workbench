@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 from collections import Counter
 from urllib.parse import quote
@@ -79,7 +78,7 @@ def fetch_tab_grid(sheets_service, spreadsheet_id: str, tab_title: str) -> dict:
         "formattedValue,userEnteredValue,effectiveValue,note,dataValidation"
         "))))"
     )
-    range_ = f"'{tab_title.replace(chr(39), chr(39)*2)}'"
+    range_ = f"'{tab_title.replace(chr(39), chr(39) * 2)}'"
     safe_range = quote(range_, safe="'")
     response = (
         sheets_service.spreadsheets()
@@ -109,7 +108,9 @@ def _user_entered_repr(ue: dict | None) -> tuple[str, str]:
     return ("empty", "")
 
 
-FORMULA_SKELETON_RE = re.compile(r"'[^']*'!|\b[A-Z]+\d+(?::[A-Z]+\d+)?|\b[A-Z]+:[A-Z]+\b|\b\d+(?:\.\d+)?\b")
+FORMULA_SKELETON_RE = re.compile(
+    r"'[^']*'!|\b[A-Z]+\d+(?::[A-Z]+\d+)?|\b[A-Z]+:[A-Z]+\b|\b\d+(?:\.\d+)?\b"
+)
 
 
 def formula_skeleton(formula: str) -> str:
@@ -124,7 +125,9 @@ def formula_skeleton(formula: str) -> str:
 
 
 SHEET_REF_RE = re.compile(r"'([^']+)'!|\b([A-Za-z_][A-Za-z0-9_]*)!")
-IMPORTRANGE_RE = re.compile(r"IMPORTRANGE\s*\(\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"", re.IGNORECASE)
+IMPORTRANGE_RE = re.compile(
+    r"IMPORTRANGE\s*\(\s*\"([^\"]+)\"\s*,\s*\"([^\"]+)\"", re.IGNORECASE
+)
 FUNCTION_RE = re.compile(r"\b([A-Z][A-Z0-9_\.]*)\s*\(")
 
 
@@ -132,7 +135,9 @@ def extract_references(formula: str) -> dict:
     sheet_refs = set()
     for m in SHEET_REF_RE.finditer(formula):
         sheet_refs.add(m.group(1) or m.group(2))
-    import_ranges = [{"spreadsheet": a, "range": b} for a, b in IMPORTRANGE_RE.findall(formula)]
+    import_ranges = [
+        {"spreadsheet": a, "range": b} for a, b in IMPORTRANGE_RE.findall(formula)
+    ]
     functions = sorted({m.group(1) for m in FUNCTION_RE.finditer(formula)})
     return {
         "functions": functions,
@@ -158,16 +163,18 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
                 formatted = cell.get("formattedValue", "")
                 note = cell.get("note")
                 dv = cell.get("dataValidation")
-                cells.append({
-                    "row": start_row + r_off + 1,
-                    "col": start_col + c_off,
-                    "col_letter": _col_letter(start_col + c_off),
-                    "kind": kind,
-                    "user_entered": text,
-                    "formatted": formatted,
-                    "note": note,
-                    "data_validation": dv,
-                })
+                cells.append(
+                    {
+                        "row": start_row + r_off + 1,
+                        "col": start_col + c_off,
+                        "col_letter": _col_letter(start_col + c_off),
+                        "kind": kind,
+                        "user_entered": text,
+                        "formatted": formatted,
+                        "note": note,
+                        "data_validation": dv,
+                    }
+                )
 
     formulas = [c for c in cells if c["kind"] == "formula"]
 
@@ -196,10 +203,12 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
         if sig in seen_dv_sig:
             continue
         seen_dv_sig.add(sig)
-        dv_rules.append({
-            "example_cell": f"{c['col_letter']}{c['row']}",
-            "rule": dv,
-        })
+        dv_rules.append(
+            {
+                "example_cell": f"{c['col_letter']}{c['row']}",
+                "rule": dv,
+            }
+        )
 
     focus = None
     if focus_col_letter:
@@ -211,10 +220,15 @@ def summarize_tab(tab_payload: dict, focus_col_letter: str | None = None) -> dic
             "first_20": focus_cells[:20],
             "unique_kinds": dict(Counter(c["kind"] for c in focus_cells)),
             "unique_formula_skeletons": Counter(
-                formula_skeleton(c["user_entered"]) for c in focus_cells if c["kind"] == "formula"
+                formula_skeleton(c["user_entered"])
+                for c in focus_cells
+                if c["kind"] == "formula"
             ).most_common(),
             "distinct_data_validation": [
-                {"example_cell": f"{c['col_letter']}{c['row']}", "rule": c["data_validation"]}
+                {
+                    "example_cell": f"{c['col_letter']}{c['row']}",
+                    "rule": c["data_validation"],
+                }
                 for i, c in enumerate(focus_cells)
                 if c.get("data_validation")
                 and json.dumps(c["data_validation"], sort_keys=True)
@@ -249,9 +263,11 @@ def render_markdown(summary: dict) -> str:
     lines.append(f"# {summary['workbook_title']} / {summary['tab_title']}")
     lines.append("")
     g = summary["grid"]
-    lines.append(f"Grid: {g['rows']} rows x {g['cols']} cols  |  "
-                 f"non-empty cells: {summary['cell_count']}  |  "
-                 f"formula cells: {summary['formula_cell_count']}")
+    lines.append(
+        f"Grid: {g['rows']} rows x {g['cols']} cols  |  "
+        f"non-empty cells: {summary['cell_count']}  |  "
+        f"formula cells: {summary['formula_cell_count']}"
+    )
     lines.append("")
     lines.append("## Cross-sheet references (within workbook)")
     for name, n in summary["cross_sheet_refs"]:
@@ -280,7 +296,9 @@ def render_markdown(summary: dict) -> str:
         lines.append(f"## Focus column: {focus['col_letter']} (count={focus['count']})")
         header = focus.get("header")
         if header:
-            lines.append(f"- header: `{header.get('formatted') or header.get('user_entered')}`")
+            lines.append(
+                f"- header: `{header.get('formatted') or header.get('user_entered')}`"
+            )
         lines.append(f"- kinds: {focus['unique_kinds']}")
         if focus["unique_formula_skeletons"]:
             lines.append("- formula skeletons:")
@@ -289,21 +307,33 @@ def render_markdown(summary: dict) -> str:
         if focus["distinct_data_validation"]:
             lines.append("- data validation (column scope):")
             for rule in focus["distinct_data_validation"]:
-                lines.append(f"  - example `{rule['example_cell']}`: `{json.dumps(rule['rule'])}`")
+                lines.append(
+                    f"  - example `{rule['example_cell']}`: `{json.dumps(rule['rule'])}`"
+                )
         lines.append("- first 20 cells:")
         for c in focus["first_20"]:
             display = c.get("formatted") or c.get("user_entered")
             note = f"  (note: {c['note']!r})" if c.get("note") else ""
-            lines.append(f"  - {c['col_letter']}{c['row']}  [{c['kind']}]  {display!r}{note}")
+            lines.append(
+                f"  - {c['col_letter']}{c['row']}  [{c['kind']}]  {display!r}{note}"
+            )
     return "\n".join(lines) + "\n"
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--spreadsheet-id", required=True, help="Spreadsheet id or URL")
-    parser.add_argument("--tab", help="Worksheet (tab) title. If omitted, list tabs and exit.")
-    parser.add_argument("--focus-col", default=None, help="Column letter to trace (e.g. B)")
-    parser.add_argument("--out", default=None, help="Output JSON path; .md summary is also written next to it")
+    parser.add_argument(
+        "--tab", help="Worksheet (tab) title. If omitted, list tabs and exit."
+    )
+    parser.add_argument(
+        "--focus-col", default=None, help="Column letter to trace (e.g. B)"
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output JSON path; .md summary is also written next to it",
+    )
     args = parser.parse_args()
 
     spreadsheet_id = extract_spreadsheet_id(args.spreadsheet_id)
@@ -313,8 +343,10 @@ def main():
     if not args.tab:
         tabs = list_tabs(sheets_service, spreadsheet_id)
         for t in tabs:
-            print(f"[{t['index']:>2}] sheetId={t['sheet_id']:<14} "
-                  f"rows={t['rows']:<6} cols={t['cols']:<4} {t['title']}")
+            print(
+                f"[{t['index']:>2}] sheetId={t['sheet_id']:<14} "
+                f"rows={t['rows']:<6} cols={t['cols']:<4} {t['title']}"
+            )
         return
 
     payload = fetch_tab_grid(sheets_service, spreadsheet_id, args.tab)
@@ -323,7 +355,9 @@ def main():
     if args.out:
         out_path = Path(args.out).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps({"raw": payload, "summary": summary}, indent=2, default=str))
+        out_path.write_text(
+            json.dumps({"raw": payload, "summary": summary}, indent=2, default=str)
+        )
         md_path = out_path.with_suffix(".md")
         md_path.write_text(render_markdown(summary))
         print(f"wrote {out_path}")

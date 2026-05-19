@@ -89,13 +89,13 @@ def _render_view_block(view: dict[str, Any]) -> list[str]:
         )
         lines.append(f"  > {_PLACEHOLDER}")
         lines.append("")
-        lines.append(_question_marker("status_override", tab=title, field=str(status_field)))
+        lines.append(
+            _question_marker("status_override", tab=title, field=str(status_field))
+        )
         lines.append(
             f"- Should the status field for **{title}** be different from **{status_field}**?"
         )
-        lines.append(
-            f"  > {_PLACEHOLDER} (leave blank to keep **{status_field}**)"
-        )
+        lines.append(f"  > {_PLACEHOLDER} (leave blank to keep **{status_field}**)")
         lines.append("")
     return lines
 

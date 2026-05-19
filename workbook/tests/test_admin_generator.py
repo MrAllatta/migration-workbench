@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import yaml
 
@@ -14,10 +13,10 @@ from workbook.codegen.manifest import find_view_for_entity, load_manifest
 # Test fixtures
 # ---------------------------------------------------------------------------
 
+
 def _contract() -> dict:
     """Return a v1.1 contract with Crop + Planting (Planting FK to Crop)."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -36,7 +35,9 @@ def _contract() -> dict:
                         "suggested_field_name": "crop_type",
                         "django_field_class": "models.CharField",
                         "django_field_kwargs": {
-                            "max_length": 100, "blank": True, "default": ""
+                            "max_length": 100,
+                            "blank": True,
+                            "default": "",
                         },
                     },
                 ],
@@ -46,9 +47,7 @@ def _contract() -> dict:
                 "suggested_model_name": "planting",
                 "model_name": "Planting",
                 "bundle_output_path": "year_2025/crop_planner.csv",
-                "model_meta": {
-                    "verbose_name": "Planting", "ordering": ["-plant_date"]
-                },
+                "model_meta": {"verbose_name": "Planting", "ordering": ["-plant_date"]},
                 "fk_resolutions": {"crop": "Crop"},
                 "columns": [
                     {
@@ -70,8 +69,10 @@ def _contract() -> dict:
                         "suggested_field_name": "beds_used",
                         "django_field_class": "models.DecimalField",
                         "django_field_kwargs": {
-                            "max_digits": 6, "decimal_places": 1,
-                            "null": True, "blank": True,
+                            "max_digits": 6,
+                            "decimal_places": 1,
+                            "null": True,
+                            "blank": True,
                         },
                     },
                 ],
@@ -393,7 +394,6 @@ def test_command_warns_on_existing_output(tmp_path):
 def _contract_abstract_user_admin() -> dict:
     """Return a contract with an AbstractUser model and an ``admin:`` block."""
     return {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -413,7 +413,9 @@ def _contract_abstract_user_admin() -> dict:
 
 
 def test_user_model_admin_uses_useradmin_and_is_authoritative():
-    source = render_admin_py(_contract_abstract_user_admin(), manifest=None, app_label="core")
+    source = render_admin_py(
+        _contract_abstract_user_admin(), manifest=None, app_label="core"
+    )
     assert "from django.contrib.auth.admin import UserAdmin as BaseUserAdmin" in source
     assert "class FarmUserAdmin(BaseUserAdmin):" in source
     assert "list_display = ['username', 'email', 'is_active']" in source
@@ -441,15 +443,22 @@ def test_status_field_promoted_in_list_filter():
 def test_status_field_added_to_list_filter_when_not_in_filterable():
     """When manifest has status_field not in filterable_by, it is added and promoted first."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "order",
                 "model_name": "Order",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "total",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
                 ],
             },
         ],
@@ -470,7 +479,11 @@ def test_status_field_added_to_list_filter_when_not_in_filterable():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Orders"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     source = render_admin_py(contract, manifest, app_label="core")
     assert "list_filter = ['status', 'total']" in source
@@ -479,15 +492,22 @@ def test_status_field_added_to_list_filter_when_not_in_filterable():
 def test_admin_class_includes_status_field_comment():
     """When status_field is set, a comment appears above the admin class."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "order",
                 "model_name": "Order",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "total",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
                 ],
             },
         ],
@@ -508,7 +528,11 @@ def test_admin_class_includes_status_field_comment():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Orders"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     source = render_admin_py(contract, manifest, app_label="core")
     assert "# status_field: status" in source
@@ -523,17 +547,32 @@ def test_no_status_field_comment_when_absent():
 def test_manifest_round_trip_in_end_to_end_admin_generation():
     """Verify manifest fields flow through to generated admin output end-to-end."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "order",
                 "model_name": "Order",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"suggested_field_name": "customer", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
-                    {"suggested_field_name": "created_at", "django_field_class": "models.DateTimeField", "django_field_kwargs": {"null": True}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "customer",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "total",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
+                    {
+                        "suggested_field_name": "created_at",
+                        "django_field_class": "models.DateTimeField",
+                        "django_field_kwargs": {"null": True},
+                    },
                 ],
             },
         ],
@@ -554,7 +593,11 @@ def test_manifest_round_trip_in_end_to_end_admin_generation():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Orders"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     source = render_admin_py(contract, manifest, app_label="core")
     assert "list_display" in source
@@ -569,14 +612,17 @@ def test_manifest_round_trip_in_end_to_end_admin_generation():
 def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
     """Manifest status_field referencing a non-existent field is not added to list_filter."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "order",
                 "model_name": "Order",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
                 ],
             },
         ],
@@ -597,7 +643,11 @@ def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Orders"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     source = render_admin_py(contract, manifest, app_label="core")
     assert "nonexistent_field_name" not in source.splitlines()
@@ -612,22 +662,37 @@ def test_status_field_not_injected_into_list_filter_when_not_in_valid_fields():
 def test_fk_field_gets_link_method():
     """FK fields should get a _link display method."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "field_block",
                 "model_name": "FieldBlock",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "block",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "FieldBlock",
+                            "on_delete": "models.PROTECT",
+                            "null": True,
+                        },
+                    },
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
         ],
@@ -661,22 +726,37 @@ def test_fk_field_gets_link_method():
 def test_fk_link_appears_in_list_display_instead_of_raw_fk():
     """list_display should use block_link instead of block."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "field_block",
                 "model_name": "FieldBlock",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "block",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "FieldBlock",
+                            "on_delete": "models.PROTECT",
+                            "null": True,
+                        },
+                    },
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
         ],
@@ -700,9 +780,14 @@ def test_fk_link_appears_in_list_display_instead_of_raw_fk():
         "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
     }
     source = render_admin_py(contract, manifest, app_label="core")
-    assert "list_display = ['crop', 'block_link']" in source or "list_display = ['block_link', 'crop']" in source
+    assert (
+        "list_display = ['crop', 'block_link']" in source
+        or "list_display = ['block_link', 'crop']" in source
+    )
     # Confirm list_display uses block_link, not bare block
-    list_display_line = [l.strip() for l in source.splitlines() if l.strip().startswith("list_display")][0]
+    list_display_line = [
+        l.strip() for l in source.splitlines() if l.strip().startswith("list_display")
+    ][0]
     assert "'block'" not in list_display_line.replace("'block_link'", "")
     _check_compiles(source)
 
@@ -710,14 +795,17 @@ def test_fk_link_appears_in_list_display_instead_of_raw_fk():
 def test_non_fk_fields_not_turned_into_links():
     """Non-FK fields should not get _link methods."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
         ],
@@ -749,14 +837,17 @@ def test_non_fk_fields_not_turned_into_links():
 def test_status_field_comment_emitted_even_when_not_in_contract():
     """The status_field comment is emitted as informational even for non-existent fields."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "order",
                 "model_name": "Order",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
                 ],
             },
         ],
@@ -777,7 +868,11 @@ def test_status_field_comment_emitted_even_when_not_in_contract():
                 "notes": None,
             },
         ],
-        "workflow_hints": {"tab_sequence": ["Orders"], "role_hints": [], "weekly_actions": []},
+        "workflow_hints": {
+            "tab_sequence": ["Orders"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
     }
     source = render_admin_py(contract, manifest, app_label="core")
     assert "# status_field: nonexistent_field_name" in source
@@ -792,16 +887,27 @@ def test_status_field_comment_emitted_even_when_not_in_contract():
 def test_temporal_year_field_in_list_filter():
     """source_bundle_year should appear in list_filter when present."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "source_bundle_year",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"null": True},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
                 ],
             },
         ],
@@ -819,7 +925,10 @@ def test_temporal_year_field_in_list_filter():
                 "computed_fields": [],
                 "filterable_by": ["status"],
                 "status_field": "status",
-                "time_scope": {"year_field": "source_bundle_year", "default_scope": "current_season"},
+                "time_scope": {
+                    "year_field": "source_bundle_year",
+                    "default_scope": "current_season",
+                },
                 "notes": None,
             },
         ],
@@ -833,15 +942,22 @@ def test_temporal_year_field_in_list_filter():
 
 def test_date_hierarchy_for_date_fields():
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "market_entry",
                 "model_name": "MarketEntry",
                 "columns": [
-                    {"suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "distribution_date", "django_field_class": "models.DateField", "django_field_kwargs": {"null": True}},
+                    {
+                        "suggested_field_name": "outlet",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "distribution_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {"null": True},
+                    },
                 ],
             },
         ],
@@ -859,7 +975,10 @@ def test_date_hierarchy_for_date_fields():
                 "computed_fields": [],
                 "filterable_by": [],
                 "status_field": None,
-                "time_scope": {"date_field": "distribution_date", "default_scope": "current_season"},
+                "time_scope": {
+                    "date_field": "distribution_date",
+                    "default_scope": "current_season",
+                },
                 "notes": None,
             },
         ],
@@ -872,15 +991,22 @@ def test_date_hierarchy_for_date_fields():
 
 def test_current_season_queryset_filter():
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "source_bundle_year",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"null": True},
+                    },
                 ],
             },
         ],
@@ -898,7 +1024,10 @@ def test_current_season_queryset_filter():
                 "computed_fields": [],
                 "filterable_by": [],
                 "status_field": None,
-                "time_scope": {"year_field": "source_bundle_year", "default_scope": "current_season"},
+                "time_scope": {
+                    "year_field": "source_bundle_year",
+                    "default_scope": "current_season",
+                },
                 "notes": None,
             },
         ],
@@ -913,15 +1042,22 @@ def test_current_season_queryset_filter():
 
 def test_status_field_generates_admin_actions():
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "field_record",
                 "model_name": "FieldRecord",
                 "columns": [
-                    {"suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"suggested_field_name": "crop_variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "crop_variety",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
         ],
@@ -956,18 +1092,41 @@ def test_status_field_generates_admin_actions():
 def test_editable_fields_become_fields():
     """editable_fields from manifest become the fields attribute."""
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
                 "suggested_model_name": "crop_plan_entry",
                 "model_name": "CropPlanEntry",
                 "columns": [
-                    {"suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock", "on_delete": "models.PROTECT", "null": True}},
-                    {"suggested_field_name": "bed", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"suggested_field_name": "crop", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "location", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "weekly_yield", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                    {
+                        "suggested_field_name": "block",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "FieldBlock",
+                            "on_delete": "models.PROTECT",
+                            "null": True,
+                        },
+                    },
+                    {
+                        "suggested_field_name": "bed",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "location",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "weekly_yield",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
                 ],
             },
         ],

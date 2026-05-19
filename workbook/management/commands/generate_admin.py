@@ -22,7 +22,9 @@ from workbook.codegen.manifest import load_manifest
 
 
 class Command(BaseCommand):
-    help = "Generate a Django admin.py from schema-contract YAML + optional view manifest."
+    help = (
+        "Generate a Django admin.py from schema-contract YAML + optional view manifest."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -109,9 +111,7 @@ class Command(BaseCommand):
         )
         if manifest:
             views = len(manifest.get("views") or [])
-            self.stdout.write(
-                self.style.SUCCESS(f"loaded manifest ({views} view(s))")
-            )
+            self.stdout.write(self.style.SUCCESS(f"loaded manifest ({views} view(s))"))
 
         source = render_admin_py(contract, manifest=manifest, app_label=app_label)
 
@@ -160,11 +160,8 @@ class Command(BaseCommand):
 
         if stub_path:
             from workbook.codegen.stub_writer import ensure_stub
+
             ensure_stub(stub_path, "admin_auto")
 
         line_count = source.count("\n")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"wrote {out_path}  ({line_count} lines)"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"wrote {out_path}  ({line_count} lines)"))

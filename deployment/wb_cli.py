@@ -46,7 +46,11 @@ import sys
 from typing import Any
 import uuid
 
-from deployment.manifest import ManifestValidationError, ensure_manifest_valid, load_manifest
+from deployment.manifest import (
+    ManifestValidationError,
+    ensure_manifest_valid,
+    load_manifest,
+)
 
 
 ERROR_CODES = {
@@ -68,7 +72,9 @@ def _setup_django(settings_module: str | None = None) -> None:
             if backend_dir not in sys.path:
                 sys.path.insert(0, backend_dir)
         else:
-            os.environ.setdefault("DJANGO_SETTINGS_MODULE", "migration_workbench.settings")
+            os.environ.setdefault(
+                "DJANGO_SETTINGS_MODULE", "migration_workbench.settings"
+            )
     import django
 
     django.setup()
@@ -169,7 +175,9 @@ def _contract_review(args: argparse.Namespace) -> int:
 
     print(f"Found {len(issues)} issue(s) in {args.contract}:")
     for issue in issues:
-        location = f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
+        location = (
+            f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
+        )
         print(f"  - {location}: {issue['message']}")
     return 0 if args.exit_zero else 1
 
@@ -232,13 +240,17 @@ def _contract_diff(args: argparse.Namespace) -> int:
             lines.append("  Fields added:")
             for f in md["fields_added"]:
                 kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+                lines.append(
+                    f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})"
+                )
 
         if md.get("fields_removed"):
             lines.append("  Fields removed:")
             for f in md["fields_removed"]:
                 kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+                lines.append(
+                    f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})"
+                )
 
         if md.get("fields_changed"):
             lines.append("  Fields changed:")
@@ -319,7 +331,8 @@ def _contract_safety(args: argparse.Namespace) -> int:
                 "error_code": None,
                 "message": (
                     f"{len(issues)} migration risk(s) found."
-                    if issues else "No migration risks detected."
+                    if issues
+                    else "No migration risks detected."
                 ),
                 "details": issues,
             },
@@ -480,7 +493,9 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
         metadata={
             "manifest_path": str(manifest_path),
             "provider": (space_cfg.get("provider") or {}).get("type"),
-            "app_name_template": (space_cfg.get("provider") or {}).get("app_name_template"),
+            "app_name_template": (space_cfg.get("provider") or {}).get(
+                "app_name_template"
+            ),
             "branch_pattern": env_cfg.get("branch_pattern"),
             "planned_actions": [
                 "resolve_manifest",
@@ -554,7 +569,9 @@ def _deploy_live(args: argparse.Namespace) -> int:
     app_name = app_name_base.replace("{environment}", args.env)
     git_sha = _get_git_sha()
     actor = getpass.getuser()
-    healthcheck_path = (space_cfg.get("runtime") or {}).get("healthcheck_path", "/healthz")
+    healthcheck_path = (space_cfg.get("runtime") or {}).get(
+        "healthcheck_path", "/healthz"
+    )
     health_url = f"https://{app_name}.fly.dev{healthcheck_path}"
 
     release_id = f"live-{uuid.uuid4().hex[:8]}"
@@ -586,7 +603,9 @@ def _deploy_live(args: argparse.Namespace) -> int:
     build_flag = "--local-only" if is_local else "--remote-only"
     deploy_result = subprocess.run(
         ["fly", "deploy", build_flag, "--app", app_name],
-        check=False, capture_output=True, text=True,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     if getattr(args, "verbose", False):
         if deploy_result.stdout:
@@ -598,11 +617,20 @@ def _deploy_live(args: argparse.Namespace) -> int:
         stderr_tail = deploy_result.stderr[-1000:] if deploy_result.stderr else ""
         message = f"fly deploy failed (exit {deploy_result.returncode}):\n{stderr_tail}"
         record_release_event(
-            space=args.space, environment=args.env, release_id=release_id,
-            git_sha=git_sha, actor=actor, outcome="deploy_failed", is_healthy=False,
+            space=args.space,
+            environment=args.env,
+            release_id=release_id,
+            git_sha=git_sha,
+            actor=actor,
+            outcome="deploy_failed",
+            is_healthy=False,
             metadata={
-                "deploy_stderr": deploy_result.stderr[-2000:] if deploy_result.stderr else "",
-                "deploy_stdout": deploy_result.stdout[-2000:] if deploy_result.stdout else "",
+                "deploy_stderr": deploy_result.stderr[-2000:]
+                if deploy_result.stderr
+                else "",
+                "deploy_stdout": deploy_result.stdout[-2000:]
+                if deploy_result.stdout
+                else "",
                 "build_strategy": build_strategy,
             },
             durable_log_path=Path("build/deploy/release-events.jsonl"),
@@ -614,7 +642,9 @@ def _deploy_live(args: argparse.Namespace) -> int:
 
     release_secret_result = subprocess.run(
         ["fly", "secrets", "set", f"RELEASE_ID={release_id}", "--app", app_name],
-        check=False, capture_output=True, text=True,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     if release_secret_result.returncode != 0:
         print(
@@ -628,13 +658,22 @@ def _deploy_live(args: argparse.Namespace) -> int:
     if not healthy:
         machine_list = subprocess.run(
             ["fly", "machine", "list", "--app", app_name, "--json"],
-            check=False, capture_output=True, text=True,
+            check=False,
+            capture_output=True,
+            text=True,
         )
         if machine_list.returncode == 0 and machine_list.stdout:
             try:
                 machines = json.loads(machine_list.stdout)
                 if isinstance(machines, list):
-                    machine_states = [{"id": m.get("id"), "state": m.get("state"), "region": m.get("region")} for m in machines]
+                    machine_states = [
+                        {
+                            "id": m.get("id"),
+                            "state": m.get("state"),
+                            "region": m.get("region"),
+                        }
+                        for m in machines
+                    ]
             except (json.JSONDecodeError, TypeError, AttributeError, KeyError):
                 pass
 
@@ -677,7 +716,11 @@ def _drift_check(args: argparse.Namespace) -> int:
     structural changes and migration risks between the two contracts.
     """
     _setup_django(settings_module=getattr(args, "django_settings", None))
-    from workbook.codegen.contract import diff_contracts, load_contract, migration_safety_checks
+    from workbook.codegen.contract import (
+        diff_contracts,
+        load_contract,
+        migration_safety_checks,
+    )
 
     try:
         old_contract = load_contract(args.baseline)
@@ -724,10 +767,18 @@ def _drift_check(args: argparse.Namespace) -> int:
         danger = [s for s in safety if s["severity"] == "DANGER"]
         warning = [s for s in safety if s["severity"] == "WARNING"]
         for item in danger:
-            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            loc = (
+                f"{item['model']}.{item['field']}"
+                if item.get("field")
+                else item["model"]
+            )
             print(f"  DANGER: {loc}: {item['message']}")
         for item in warning:
-            loc = f"{item['model']}.{item['field']}" if item.get("field") else item["model"]
+            loc = (
+                f"{item['model']}.{item['field']}"
+                if item.get("field")
+                else item["model"]
+            )
             print(f"  WARNING: {loc}: {item['message']}")
 
     return 1  # drift detected
@@ -781,8 +832,12 @@ def build_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: Fully configured parser with all subcommands
         and flags registered.
     """
-    parser = argparse.ArgumentParser(prog="wb", description="Migration workbench deployment CLI")
-    parser.add_argument("--json", action="store_true", help="Return machine-readable JSON output.")
+    parser = argparse.ArgumentParser(
+        prog="wb", description="Migration workbench deployment CLI"
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="Return machine-readable JSON output."
+    )
     parser.add_argument(
         "--manifest",
         default="deploy/spaces.yml",
@@ -797,10 +852,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     contract_cmd = sub.add_parser("contract", help="Schema contract operations")
     contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)
-    review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
-    review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
-    review_cmd.add_argument("--exit-zero", action="store_true", help="Return exit code 0 even when issues are found.")
-    review_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    review_cmd = contract_sub.add_parser(
+        "review", help="Run design-review checklist on a schema contract YAML"
+    )
+    review_cmd.add_argument(
+        "--contract", required=True, help="Path to schema-contract YAML"
+    )
+    review_cmd.add_argument(
+        "--exit-zero",
+        action="store_true",
+        help="Return exit code 0 even when issues are found.",
+    )
+    review_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     review_cmd.set_defaults(func=_contract_review)
 
     diff_cmd = contract_sub.add_parser(
@@ -808,7 +875,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    diff_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    diff_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     diff_cmd.set_defaults(func=_contract_diff)
 
     safety_cmd = contract_sub.add_parser(
@@ -816,7 +887,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     safety_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    safety_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    safety_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     safety_cmd.set_defaults(func=_contract_safety)
 
     validate_cmd = contract_sub.add_parser(
@@ -830,28 +905,47 @@ def build_parser() -> argparse.ArgumentParser:
 
     drift_cmd = sub.add_parser("drift", help="Drift detection operations")
     drift_sub = drift_cmd.add_subparsers(dest="drift_command", required=True)
-    check_cmd = drift_sub.add_parser("check", help="Check for drift between two schema contracts")
-    check_cmd.add_argument("--baseline", required=True, help="Path to baseline (old) contract YAML")
+    check_cmd = drift_sub.add_parser(
+        "check", help="Check for drift between two schema contracts"
+    )
+    check_cmd.add_argument(
+        "--baseline", required=True, help="Path to baseline (old) contract YAML"
+    )
     check_cmd.add_argument("--new", required=True, help="Path to new contract YAML")
-    check_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    check_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     check_cmd.set_defaults(func=_drift_check)
 
     deploy_cmd = sub.add_parser("deploy", help="Deploy operations")
     deploy_cmd.add_argument("space", help="Space name from manifest.")
-    deploy_cmd.add_argument("--env", required=True, help="Environment name (preview or production).")
-    deploy_cmd.add_argument("--dry-run", action="store_true", help="Only plan and record release metadata.")
-    deploy_cmd.add_argument("--live", action="store_true", help="Perform a live deploy with health check.")
+    deploy_cmd.add_argument(
+        "--env", required=True, help="Environment name (preview or production)."
+    )
+    deploy_cmd.add_argument(
+        "--dry-run", action="store_true", help="Only plan and record release metadata."
+    )
+    deploy_cmd.add_argument(
+        "--live", action="store_true", help="Perform a live deploy with health check."
+    )
     deploy_cmd.add_argument(
         "--local",
         action="store_true",
         help="Build locally with Docker instead of using Fly remote builder.",
     )
     deploy_cmd.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Stream fly deploy output and health check logs to stderr.",
     )
-    deploy_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    deploy_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     deploy_cmd.set_defaults(func=_deploy_dry_run)
 
     _build_generate_parser(sub)

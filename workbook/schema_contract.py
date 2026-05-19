@@ -75,34 +75,60 @@ def _compute_fk_resolutions(tables: list[dict]) -> list[dict]:
             for col_name, col_def in source_cols.items():
                 if col_name in other_cols:
                     other_col = other_cols[col_name]
-                    unique_count = other_col.get("unique_count") or other_col.get("non_empty_cells") or 0
-                    total = other_col.get("total_count") or other_col.get("non_empty_cells") or 0
+                    unique_count = (
+                        other_col.get("unique_count")
+                        or other_col.get("non_empty_cells")
+                        or 0
+                    )
+                    total = (
+                        other_col.get("total_count")
+                        or other_col.get("non_empty_cells")
+                        or 0
+                    )
                     if total > 0 and unique_count / total >= 0.8:
-                        field_name = col_def.get("suggested_field_name") or col_name.lower().replace(" ", "_")
-                        target_field = other_col.get("suggested_field_name") or col_name.lower().replace(" ", "_")
-                        fk_candidates.append({
-                            "field": field_name,
-                            "target_model": other_model,
-                            "target_field": target_field,
-                            "confidence": "high" if unique_count == total else "medium",
-                            "source": "column_overlap",
-                        })
+                        field_name = col_def.get(
+                            "suggested_field_name"
+                        ) or col_name.lower().replace(" ", "_")
+                        target_field = other_col.get(
+                            "suggested_field_name"
+                        ) or col_name.lower().replace(" ", "_")
+                        fk_candidates.append(
+                            {
+                                "field": field_name,
+                                "target_model": other_model,
+                                "target_field": target_field,
+                                "confidence": "high"
+                                if unique_count == total
+                                else "medium",
+                                "source": "column_overlap",
+                            }
+                        )
     for table in tables:
         for col in table.get("columns", []):
             for ref in col.get("cross_sheet_refs") or []:
-                ref_name = ref[0] if isinstance(ref, list) else ref.get("sheet_name", "")
+                ref_name = (
+                    ref[0] if isinstance(ref, list) else ref.get("sheet_name", "")
+                )
                 for other_table in tables:
-                    other_model_slug = other_table.get("suggested_model_name", "").lower().replace(" ", "")
+                    other_model_slug = (
+                        other_table.get("suggested_model_name", "")
+                        .lower()
+                        .replace(" ", "")
+                    )
                     ref_slug = ref_name.lower().replace(" ", "")
                     if other_model_slug == ref_slug:
-                        field_name = col.get("suggested_field_name") or (col.get("source_column") or "").lower().replace(" ", "_")
-                        fk_candidates.append({
-                            "field": field_name,
-                            "target_model": other_table["suggested_model_name"],
-                            "target_field": field_name,
-                            "confidence": "medium",
-                            "source": "cross_sheet_formula",
-                        })
+                        field_name = col.get("suggested_field_name") or (
+                            col.get("source_column") or ""
+                        ).lower().replace(" ", "_")
+                        fk_candidates.append(
+                            {
+                                "field": field_name,
+                                "target_model": other_table["suggested_model_name"],
+                                "target_field": field_name,
+                                "confidence": "medium",
+                                "source": "cross_sheet_formula",
+                            }
+                        )
     seen = set()
     unique_fks = []
     for fk in fk_candidates:
@@ -131,7 +157,9 @@ def _suggest_import_keys(columns: list[dict]) -> dict:
         if total_count == 0:
             continue
         ratio = unique_count / total_count
-        is_key_name = any(p in slug for p in _KEY_NAME_PATTERNS) or any(p in source for p in _KEY_NAME_PATTERNS)
+        is_key_name = any(p in slug for p in _KEY_NAME_PATTERNS) or any(
+            p in source for p in _KEY_NAME_PATTERNS
+        )
         if ratio >= 0.9 or (ratio >= 0.5 and is_key_name):
             candidates.append((slug, ratio, is_key_name))
 
@@ -139,7 +167,7 @@ def _suggest_import_keys(columns: list[dict]) -> dict:
     fields = [c[0] for c in candidates[:4]]
     if not fields:
         return {}
-    high_conf = all(c[1] >= 0.9 for c in candidates[:len(fields)])
+    high_conf = all(c[1] >= 0.9 for c in candidates[: len(fields)])
     return {
         "fields": fields,
         "confidence": "high" if high_conf else "medium",
@@ -152,13 +180,18 @@ def _add_source_bundle_year(tables: list[dict], year: int | None = None) -> list
     if year is None:
         return tables
     for table in tables:
-        if not any(c.get("suggested_field_name") == "source_bundle_year" for c in table.get("columns", [])):
-            table["columns"].append({
-                "suggested_field_name": "source_bundle_year",
-                "source_column": "source_bundle_year",
-                "django_field_class": "models.IntegerField",
-                "django_field_kwargs": {"null": True, "blank": True},
-            })
+        if not any(
+            c.get("suggested_field_name") == "source_bundle_year"
+            for c in table.get("columns", [])
+        ):
+            table["columns"].append(
+                {
+                    "suggested_field_name": "source_bundle_year",
+                    "source_column": "source_bundle_year",
+                    "django_field_class": "models.IntegerField",
+                    "django_field_kwargs": {"null": True, "blank": True},
+                }
+            )
         import_cfg = table.setdefault("import_config", {})
         defaults = import_cfg.setdefault("defaults", {})
         if "source_bundle_year" not in defaults:
@@ -169,7 +202,9 @@ def _add_source_bundle_year(tables: list[dict], year: int | None = None) -> list
 def _compute_bundle_paths(tables: list[dict], year: int | None = None) -> list[dict]:
     """Generate import_config.bundle_path from bundle_worksheet_title."""
     for table in tables:
-        title = table.get("bundle_worksheet_title") or table.get("suggested_model_name", "")
+        title = table.get("bundle_worksheet_title") or table.get(
+            "suggested_model_name", ""
+        )
         slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
         import_cfg = table.setdefault("import_config", {})
         if not import_cfg.get("bundle_path"):
@@ -241,7 +276,9 @@ def index_tables_from_doc_profile(doc: dict[str, Any]) -> dict[str, dict[str, An
     return out
 
 
-def index_table_profile(payload: dict[str, Any]) -> tuple[str, dict[str, dict[str, Any]]]:
+def index_table_profile(
+    payload: dict[str, Any],
+) -> tuple[str, dict[str, dict[str, Any]]]:
     """Extract the table name and column index from a ``profile_coda_table`` artifact.
 
     Args:
@@ -357,7 +394,9 @@ def build_contract(
                     "suggested_entity": col.get("suggested_entity"),
                     "suggested_fk_target": col.get("suggested_fk_target"),
                     "is_computed": col.get("is_computed", False),
-                    "is_import_key_candidate": col.get("is_import_key_candidate", False),
+                    "is_import_key_candidate": col.get(
+                        "is_import_key_candidate", False
+                    ),
                     "cross_tab_group": col.get("cross_tab_group"),
                 }
             )
@@ -375,8 +414,16 @@ def build_contract(
 
         # Seed import_config for bundle-backed tables.
         if required:
-            field_names = [c["suggested_field_name"] for c in django_columns if c.get("suggested_field_name")]
-            cmap = {c["suggested_field_name"]: c["source_column"] for c in django_columns if c.get("suggested_field_name")}
+            field_names = [
+                c["suggested_field_name"]
+                for c in django_columns
+                if c.get("suggested_field_name")
+            ]
+            cmap = {
+                c["suggested_field_name"]: c["source_column"]
+                for c in django_columns
+                if c.get("suggested_field_name")
+            }
             first_col = field_names[0] if field_names else None
             entry["import_config"] = {
                 "bundle_path": output_path,

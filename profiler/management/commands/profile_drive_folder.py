@@ -180,6 +180,7 @@ def render_tree(node: dict, *, name: str, heading_level: int = 1) -> list[str]:
 
 class Command(BaseCommand):
     """Enumerate a Drive folder tree and list spreadsheet tabs."""
+
     help = "Enumerate a Drive folder tree and list spreadsheet tabs"
 
     def add_arguments(self, parser):
@@ -190,10 +191,18 @@ class Command(BaseCommand):
             default=None,
             help="Cohort corpus JSON config path; uses folder_id when --folder is omitted",
         )
-        parser.add_argument("--no-tabs", action="store_true", help="Skip spreadsheet tab enumeration")
-        parser.add_argument("--max-depth", type=int, default=None, help="Maximum folder recursion depth")
-        parser.add_argument("--out", default=None, help="Output JSON path (.md sibling is also written)")
-        parser.add_argument("--smoke", action="store_true", help="Run without network calls")
+        parser.add_argument(
+            "--no-tabs", action="store_true", help="Skip spreadsheet tab enumeration"
+        )
+        parser.add_argument(
+            "--max-depth", type=int, default=None, help="Maximum folder recursion depth"
+        )
+        parser.add_argument(
+            "--out", default=None, help="Output JSON path (.md sibling is also written)"
+        )
+        parser.add_argument(
+            "--smoke", action="store_true", help="Run without network calls"
+        )
 
     def handle(self, *args, **options):
         """Execute the drive folder profiling pipeline. Walks the specified folder tree, collecting spreadsheet and tab metadata, and renders a Markdown tree artifact."""
@@ -201,9 +210,13 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("profile_drive_folder smoke ok"))
             return
 
-        folder = options.get("folder") or load_folder_id_from_config(options.get("config"))
+        folder = options.get("folder") or load_folder_id_from_config(
+            options.get("config")
+        )
         if not folder:
-            raise CommandError("--folder or --config (with folder_id) is required unless --smoke is used")
+            raise CommandError(
+                "--folder or --config (with folder_id) is required unless --smoke is used"
+            )
         folder_id = extract_drive_folder_id(folder)
         scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
         drive_service = build_google_service("drive", "v3", scopes)
@@ -219,7 +232,9 @@ class Command(BaseCommand):
             .execute()
         )
         if folder_meta.get("mimeType") != FOLDER_MIME_TYPE:
-            raise CommandError(f"{folder_id} is not a Drive folder (mimeType={folder_meta.get('mimeType')})")
+            raise CommandError(
+                f"{folder_id} is not a Drive folder (mimeType={folder_meta.get('mimeType')})"
+            )
 
         tree = walk_folder(
             drive_service,
@@ -235,12 +250,17 @@ class Command(BaseCommand):
             **tree,
         }
 
-        rendered = "\n".join(render_tree(tree_root, name=tree_root["name"] or folder_id)) + "\n"
+        rendered = (
+            "\n".join(render_tree(tree_root, name=tree_root["name"] or folder_id))
+            + "\n"
+        )
         out = options.get("out")
         if out:
             out_path = Path(out).resolve()
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(tree_root, indent=2, default=str), encoding="utf-8")
+            out_path.write_text(
+                json.dumps(tree_root, indent=2, default=str), encoding="utf-8"
+            )
             md_path = out_path.with_suffix(".md")
             md_path.write_text(rendered, encoding="utf-8")
             self.stdout.write(f"wrote {out_path}")

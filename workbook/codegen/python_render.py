@@ -22,7 +22,7 @@ def render_choices_class(name: str, pairs: list[tuple[str, str]]) -> str:
     ]
     for value, label in pairs:
         key = value.upper().replace(" ", "_")
-        lines.append(f'    {key} = {value!r}, {label!r}')
+        lines.append(f"    {key} = {value!r}, {label!r}")
     lines.append("")
     return "\n".join(lines)
 
@@ -109,7 +109,12 @@ def render_field(
         if to_val is not None:
             if isinstance(to_val, str) and to_val == "self":
                 to_str = '"self"'
-            elif isinstance(to_val, str) and to_val.isidentifier() and rendered_model_names is not None and to_val not in rendered_model_names:
+            elif (
+                isinstance(to_val, str)
+                and to_val.isidentifier()
+                and rendered_model_names is not None
+                and to_val not in rendered_model_names
+            ):
                 to_str = repr(to_val)
             elif isinstance(to_val, str) and to_val.isidentifier():
                 to_str = to_val
@@ -200,10 +205,7 @@ def render_str_method(template: str | None, indent: int = 4) -> str:
     if not template:
         return ""
     pad = " " * indent
-    return (
-        f"{pad}def __str__(self):\n"
-        f'{pad * 2}return f"{template}"\n'
-    )
+    return f'{pad}def __str__(self):\n{pad * 2}return f"{template}"\n'
 
 
 def _render_meta_value(k: str, v: Any, inner: str) -> str:

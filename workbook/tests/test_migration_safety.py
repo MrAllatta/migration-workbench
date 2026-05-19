@@ -15,8 +15,7 @@ def test_field_removed_is_danger():
         "model_diffs": {
             "Crop": {
                 "fields_removed": [
-                    {"name": "legacy_id", "class": "models.IntegerField",
-                     "kwargs": {}},
+                    {"name": "legacy_id", "class": "models.IntegerField", "kwargs": {}},
                 ],
             },
         },
@@ -73,8 +72,10 @@ def test_field_class_changed_is_warning():
     results = migration_safety_checks(diffs)
     assert len(results) >= 1
     warnings = [r for r in results if r["severity"] == MIGRATION_SEVERITY_WARNING]
-    assert any("class" in r["message"].lower() or "type" in r["message"].lower()
-               for r in warnings)
+    assert any(
+        "class" in r["message"].lower() or "type" in r["message"].lower()
+        for r in warnings
+    )
 
 
 def test_max_length_decreased_is_warning():
@@ -129,8 +130,11 @@ def test_non_nullable_field_added_without_default_is_warning():
         "model_diffs": {
             "Crop": {
                 "fields_added": [
-                    {"name": "required_field", "class": "models.CharField",
-                     "kwargs": {"max_length": 100}},
+                    {
+                        "name": "required_field",
+                        "class": "models.CharField",
+                        "kwargs": {"max_length": 100},
+                    },
                 ],
             },
         },
@@ -138,8 +142,10 @@ def test_non_nullable_field_added_without_default_is_warning():
     results = migration_safety_checks(diffs)
     assert len(results) >= 1
     warnings = [r for r in results if r["severity"] == MIGRATION_SEVERITY_WARNING]
-    assert any("null" in r["message"].lower() or "default" in r["message"].lower()
-               for r in warnings)
+    assert any(
+        "null" in r["message"].lower() or "default" in r["message"].lower()
+        for r in warnings
+    )
 
 
 def test_no_diffs_returns_empty():
@@ -163,9 +169,7 @@ def test_contract_safety_cli_text(tmp_path, capsys):
     old_path.write_text("source: {}\ntables: []\n")
     new_path.write_text("source: {}\ntables: []\n")
 
-    args = argparse.Namespace(
-        old=str(old_path), new=str(new_path), json=False
-    )
+    args = argparse.Namespace(old=str(old_path), new=str(new_path), json=False)
     rc = _contract_safety(args)
     assert rc == 0
     captured = capsys.readouterr()
@@ -183,9 +187,7 @@ def test_contract_safety_cli_json(tmp_path, capsys):
     old_path.write_text("source: {}\ntables: []\n")
     new_path.write_text("source: {}\ntables: []\n")
 
-    args = argparse.Namespace(
-        old=str(old_path), new=str(new_path), json=True
-    )
+    args = argparse.Namespace(old=str(old_path), new=str(new_path), json=True)
     rc = _contract_safety(args)
     assert rc == 0
     captured = capsys.readouterr()

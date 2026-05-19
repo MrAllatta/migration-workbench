@@ -1,4 +1,5 @@
 """Tests for workbook/makefile_targets.py shared Makefile target builders."""
+
 from workbook.makefile_targets import (
     MakeContext,
     phonies,
@@ -118,15 +119,21 @@ def test_import_blocks_contains_all_targets():
 def test_import_preflight_uses_import_preflight_script():
     block = import_blocks(MakeContext())
     assert "import_preflight" in block
-    preflight_section = block[block.index("import-preflight:"):]
-    preflight_section = preflight_section[:preflight_section.index("\n\n") if "\n\n" in preflight_section else len(preflight_section)]
+    preflight_section = block[block.index("import-preflight:") :]
+    preflight_section = preflight_section[
+        : preflight_section.index("\n\n")
+        if "\n\n" in preflight_section
+        else len(preflight_section)
+    ]
     assert "import_preflight" in preflight_section
 
 
 def test_import_apply_uses_import_apply_script():
     block = import_blocks(MakeContext())
-    apply_section = block[block.index("import-apply:"):]
-    apply_section = apply_section[:apply_section.index("\n\n") if "\n\n" in apply_section else len(apply_section)]
+    apply_section = block[block.index("import-apply:") :]
+    apply_section = apply_section[
+        : apply_section.index("\n\n") if "\n\n" in apply_section else len(apply_section)
+    ]
     assert "import_apply" in apply_section
 
 
@@ -164,6 +171,7 @@ def test_deploy_blocks_contains_all_deploy_targets():
 def test_generate_view_manifest_appears_exactly_once_in_full_output():
     """Regression: the old template had duplicate generate-view-manifest."""
     from workbook.makefile_targets import full_targets_block
+
     block = full_targets_block(MakeContext())
     count = block.count("generate-view-manifest:")
     assert count == 1, f"Expected exactly 1 generate-view-manifest target, got {count}"
@@ -171,7 +179,13 @@ def test_generate_view_manifest_appears_exactly_once_in_full_output():
 
 def test_codegen_tooling_uses_wb_for_codegen():
     block = codegen_tooling_block(MakeContext())
-    for cmd in ["generate_models", "generate_admin", "generate_import", "scaffold_view_manifest", "generate_pipeline_manifest"]:
+    for cmd in [
+        "generate_models",
+        "generate_admin",
+        "generate_import",
+        "scaffold_view_manifest",
+        "generate_pipeline_manifest",
+    ]:
         assert f"$(MANAGE) {cmd}" not in block
     assert "wb generate models" in block
     assert "wb generate admin" in block
@@ -181,8 +195,16 @@ def test_codegen_tooling_uses_wb_for_codegen():
 
 def test_full_targets_no_manage_codegen():
     from workbook.makefile_targets import full_targets_block
+
     full = full_targets_block(MakeContext())
-    for cmd in ["generate_models", "generate_admin", "generate_import", "scaffold_view_manifest", "generate_pipeline_manifest", "generate_discovery_interview"]:
+    for cmd in [
+        "generate_models",
+        "generate_admin",
+        "generate_import",
+        "scaffold_view_manifest",
+        "generate_pipeline_manifest",
+        "generate_discovery_interview",
+    ]:
         assert f"$(MANAGE) {cmd}" not in full
     assert "wb generate models" in full
     assert "wb generate admin" in full

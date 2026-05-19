@@ -72,7 +72,13 @@ def test_build_coda_table_index_splits_views():
             "doc_id": "doc1",
             "tables": [
                 {"id": "g1", "name": "Base", "type": "table", "rowCount": 10},
-                {"id": "v1", "name": "Filtered", "type": "view", "rowCount": 5, "parentTable": {"id": "g1", "name": "Base"}},
+                {
+                    "id": "v1",
+                    "name": "Filtered",
+                    "type": "view",
+                    "rowCount": 5,
+                    "parentTable": {"id": "g1", "name": "Base"},
+                },
             ],
         }
     ]

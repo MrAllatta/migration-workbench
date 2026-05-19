@@ -10,7 +10,7 @@ from django.core.management.base import CommandError
 
 from connectors.coda import CodaAdapter
 from connectors.google_provider import GoogleSheetsAdapter
-from connectors.google_sheets import SheetsThrottle, default_throttle
+from connectors.google_sheets import default_throttle
 
 
 def build_provider_adapter(config, throttle=None):
@@ -35,4 +35,6 @@ def build_provider_adapter(config, throttle=None):
         return GoogleSheetsAdapter(config, throttle=throttle or default_throttle)
     if provider == "coda":
         return CodaAdapter(config)
-    raise CommandError(f"Unsupported provider '{provider}' (expected google_sheets or coda)")
+    raise CommandError(
+        f"Unsupported provider '{provider}' (expected google_sheets or coda)"
+    )

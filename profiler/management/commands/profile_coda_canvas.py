@@ -13,6 +13,7 @@ from profiler.tools.coda_corpus import build_canvas_artifact_for_doc, write_json
 
 class Command(BaseCommand):
     """Extract plain text from Coda canvas pages (content API) or optional markdown export."""
+
     help = "Extract plain text from Coda canvas pages (content API) or optional markdown export."
 
     def add_arguments(self, parser):

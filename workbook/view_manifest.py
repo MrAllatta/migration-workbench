@@ -123,7 +123,10 @@ def _infer_time_scope(entity: str | None, contract_index: dict) -> dict | None:
                     ts["year_field"] = name
                 elif _WEEK_FIELD_RE.match(name) and klass in ("IntegerField",):
                     ts["week_field"] = name
-                elif _DATE_FIELD_RE.match(name) and klass in ("DateField", "DateTimeField"):
+                elif _DATE_FIELD_RE.match(name) and klass in (
+                    "DateField",
+                    "DateTimeField",
+                ):
                     ts["date_field"] = name
             if ts:
                 ts["default_scope"] = "current_season"
@@ -177,8 +180,14 @@ def _build_view_entry(
 def _build_workflow_hints(tabs: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute ``workflow_hints``: tab sequence + empty operator placeholders."""
     visible = [t for t in tabs if not t.get("hidden")]
-    visible.sort(key=lambda t: (t.get("tab_position") if t.get("tab_position") is not None else 1_000_000))
-    sequence = [str(t.get("worksheet_title") or "") for t in visible if t.get("worksheet_title")]
+    visible.sort(
+        key=lambda t: (
+            t.get("tab_position") if t.get("tab_position") is not None else 1_000_000
+        )
+    )
+    sequence = [
+        str(t.get("worksheet_title") or "") for t in visible if t.get("worksheet_title")
+    ]
     return {
         "tab_sequence": sequence,
         "role_hints": [],

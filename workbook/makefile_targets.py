@@ -32,11 +32,19 @@ class MakeContext:
         python: str | None = None,
         product_kebab: str | None = None,
     ) -> MakeContext:
-        kwargs = {k: v for k, v in {
-            "manage": manage, "contract": contract, "core": core,
-            "bundle_out": bundle_out, "view_manifest": view_manifest,
-            "python": python, "product_kebab": product_kebab,
-        }.items() if v is not None}
+        kwargs = {
+            k: v
+            for k, v in {
+                "manage": manage,
+                "contract": contract,
+                "core": core,
+                "bundle_out": bundle_out,
+                "view_manifest": view_manifest,
+                "python": python,
+                "product_kebab": product_kebab,
+            }.items()
+            if v is not None
+        }
         return replace(self, **kwargs)
 
 
@@ -132,8 +140,7 @@ def generate_import_block(ctx: MakeContext) -> str:
     return (
         "generate-import:\n"
         + _indent(
-            f'wb generate import --contract "{ctx.contract}" '
-            f"--app-label core --force"
+            f'wb generate import --contract "{ctx.contract}" --app-label core --force'
         )
         + "\n"
     )
@@ -152,7 +159,7 @@ def generate_view_manifest_block(ctx: MakeContext) -> str:
             'Run make pull-bundle first."; exit 1)\n'
         )
         + _indent(
-            f'wb generate manifest '
+            f"wb generate manifest "
             f'--structure "{ctx.bundle_out}/structure.json" '
             f'--schema-contract "{ctx.contract}" '
             f'--out "{ctx.view_manifest}" '
@@ -167,8 +174,8 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
         "generate-pipeline-manifest:\n"
         + _indent(
             'wb generate manifest --pipeline --contract "$(CONTRACT)" '
-            '--corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} '
-            '--out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml}'
+            "--corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} "
+            "--out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml}"
         )
         + "\n"
     )
@@ -202,7 +209,7 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
         + "\n\n"
         + "post-generate:\n"
         + _indent(
-            '@test -f scripts/post-generate.sh && bash scripts/post-generate.sh '
+            "@test -f scripts/post-generate.sh && bash scripts/post-generate.sh "
             '|| echo "No scripts/post-generate.sh found"'
         )
         + "\n\n"
@@ -238,7 +245,7 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
         + "\n\n"
         + "drift-check:\n"
         + _indent(
-            f'{ctx.python} -m deployment.wb_cli drift check '
+            f"{ctx.python} -m deployment.wb_cli drift check "
             f'--baseline "{ctx.contract}" --new "{ctx.contract}"'
         )
         + "\n"
@@ -267,7 +274,7 @@ def import_blocks(ctx: MakeContext) -> str:
         + "push-data:\n"
         + _indent(
             "@gzip -c backend/db.sqlite3 | flyctl ssh console -a "
-            f'$${{FLY_APP:-{ctx.product_kebab}-production}} -C '
+            f"$${{FLY_APP:-{ctx.product_kebab}-production}} -C "
             '"gunzip > /data/db.sqlite3" 2>/dev/null '
             '|| echo "push-data: set FLY_APP and ensure flyctl is authenticated"'
         )
@@ -314,11 +321,11 @@ def import_blocks(ctx: MakeContext) -> str:
         + _indent(
             '@test -f "$(VIEW_MANIFEST)" || (echo >&2 '
             '"View manifest not found at $(VIEW_MANIFEST). '
-            "Run make generate-view-manifest first.\"; exit 1)"
+            'Run make generate-view-manifest first."; exit 1)'
         )
         + "\n"
         + _indent(
-            'wb generate discovery-interview '
+            "wb generate discovery-interview "
             '--manifest "$(VIEW_MANIFEST)" '
             "--out build/discovery-interview.md"
         )
@@ -327,19 +334,19 @@ def import_blocks(ctx: MakeContext) -> str:
         + _indent(
             '@test -f "$(VIEW_MANIFEST)" || (echo >&2 '
             '"View manifest not found at $(VIEW_MANIFEST). '
-            "Run make generate-view-manifest first.\"; exit 1)"
+            'Run make generate-view-manifest first."; exit 1)'
         )
         + "\n"
         + _indent(
-            '@test -f build/discovery-interview.md || (echo >&2 '
+            "@test -f build/discovery-interview.md || (echo >&2 "
             '"Discovery interview not found at build/discovery-interview.md. '
-            "Run make generate-discovery-interview first.\"; exit 1)"
+            'Run make generate-discovery-interview first."; exit 1)'
         )
         + "\n"
         + _indent(
-            '$(MANAGE) merge_discovery_notes '
+            "$(MANAGE) merge_discovery_notes "
             '--manifest "$(VIEW_MANIFEST)" '
-            '--interview build/discovery-interview.md '
+            "--interview build/discovery-interview.md "
             '--out "$(VIEW_MANIFEST)" '
             "--summary-out build/discovery-summary.md"
         )
@@ -351,14 +358,14 @@ def profile_blocks(ctx: MakeContext) -> str:
     return (
         "profile-preflight:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_preflight '
+            "DB_ENGINE=sqlite $(MANAGE) profile_preflight "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
             '--config "$${COHORT_CORPUS_CONFIG}"'
         )
         + "\n\n"
         + "profile-drive-folder:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_drive_folder '
+            "DB_ENGINE=sqlite $(MANAGE) profile_drive_folder "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
             '--config "$${COHORT_CORPUS_CONFIG}" '
             '--out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"'
@@ -366,14 +373,14 @@ def profile_blocks(ctx: MakeContext) -> str:
         + "\n\n"
         + "profile-coda-corpus:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus '
+            "DB_ENGINE=sqlite $(MANAGE) profile_coda_corpus "
             '--config "$${CODA_CORPUS_CONFIG:?CODA_CORPUS_CONFIG required}" '
             '--out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"'
         )
         + "\n\n"
         + "profile-cohort-corpus:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus '
+            "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
             '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" '
@@ -384,7 +391,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "Inspect tab_selection_<date>.json, then configure heuristics.\n"
         + "profile-cohort-corpus-phase1:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus '
+            "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
             '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" '
@@ -395,7 +402,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "Iterate on cohort_corpus.json, then re-run.\n"
         + "profile-cohort-corpus-phase2:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus '
+            "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
             '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" '
             '--date-stamp "$(DATE_STAMP)" --resume-from-broad --stop-before-deep'
@@ -407,7 +414,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "expansion_formula_penalty, expansion_formula_threshold, plus token lists.\n"
         + "profile-cohort-corpus-phase3:\n"
         + _indent(
-            'DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus '
+            "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
             '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" '
             '--date-stamp "$(DATE_STAMP)" --resume-from-tab-selection'
@@ -429,13 +436,12 @@ def deploy_blocks(ctx: MakeContext) -> str:
         + "\n\n"
         + "fly-volume:\n"
         + _indent(
-            "flyctl volumes create data --app $(FLY_APP) "
-            "--region ewr --size 1 --yes"
+            "flyctl volumes create data --app $(FLY_APP) --region ewr --size 1 --yes"
         )
         + "\n\n"
         + "fly-secrets:\n"
         + _indent(
-            'flyctl secrets set DJANGO_SECRET_KEY=$$(python3 -c '
+            "flyctl secrets set DJANGO_SECRET_KEY=$$(python3 -c "
             '"import secrets; print(secrets.token_urlsafe(50))") '
             "DJANGO_ALLOWED_HOSTS=$(FLY_APP).fly.dev DJANGO_DEBUG=0"
         )
@@ -453,10 +459,10 @@ def createsuperuser_block(ctx: MakeContext) -> str:
         "createsuperuser:\n"
         + _indent(
             '@if [ -z "$(DJANGO_SUPERUSER_PASSWORD)" ]; then \\\n'
-            '$(MANAGE) createsuperuser; \\\n'
+            "$(MANAGE) createsuperuser; \\\n"
             "else \\\n"
             "DJANGO_SUPERUSER_PASSWORD='$(DJANGO_SUPERUSER_PASSWORD)' \\\n"
-            '$(MANAGE) createsuperuser --noinput '
+            "$(MANAGE) createsuperuser --noinput "
             "--username '$(DJANGO_SUPERUSER_USERNAME)' "
             "--email '$(DJANGO_SUPERUSER_EMAIL)'; \\\n"
             "fi"

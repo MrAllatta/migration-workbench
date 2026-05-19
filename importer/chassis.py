@@ -68,7 +68,9 @@ class ImporterChassisMixin:
             }
         )
 
-    def record_stale_fk(self, model_name, row_number, field_path, missing_label, raw_value):
+    def record_stale_fk(
+        self, model_name, row_number, field_path, missing_label, raw_value
+    ):
         """Record a foreign-key miss and write an error line to stderr.
 
         A "stale FK" means the source data references a related record that
@@ -97,4 +99,6 @@ class ImporterChassisMixin:
         """
         message = f"missing required value for '{field_label}'"
         self.stderr.write(f"    ERROR row {row_number}: {message}")
-        self.record_row_error(model_name, row_number, "missing_required", field_path, message)
+        self.record_row_error(
+            model_name, row_number, "missing_required", field_path, message
+        )

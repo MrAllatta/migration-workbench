@@ -43,7 +43,9 @@ def test_wait_for_healthy_returns_true():
 
     server = _start_server(_HealthyHandler, 18765)
     try:
-        result = wait_for_healthy("http://127.0.0.1:18765/healthz", timeout=5, interval=0.1)
+        result = wait_for_healthy(
+            "http://127.0.0.1:18765/healthz", timeout=5, interval=0.1
+        )
         assert result is True
     finally:
         server.shutdown()
@@ -54,7 +56,9 @@ def test_wait_for_healthy_returns_false_on_timeout():
 
     server = _start_server(_UnhealthyHandler, 18766)
     try:
-        result = wait_for_healthy("http://127.0.0.1:18766/healthz", timeout=0.5, interval=0.1)
+        result = wait_for_healthy(
+            "http://127.0.0.1:18766/healthz", timeout=0.5, interval=0.1
+        )
         assert result is False
     finally:
         server.shutdown()
@@ -63,5 +67,7 @@ def test_wait_for_healthy_returns_false_on_timeout():
 def test_wait_for_healthy_returns_false_on_connection_error():
     from deployment.health import wait_for_healthy
 
-    result = wait_for_healthy("http://127.0.0.1:18767/healthz", timeout=0.5, interval=0.1)
+    result = wait_for_healthy(
+        "http://127.0.0.1:18767/healthz", timeout=0.5, interval=0.1
+    )
     assert result is False

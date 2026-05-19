@@ -34,8 +34,6 @@ import requests
 from django.core.management.base import CommandError
 
 from connectors.coda_source import (
-    analyze_column_values,
-    build_coda_session,
     collect_page_content_items,
     column_has_formula,
     export_page_markdown,
@@ -71,7 +69,11 @@ def enrich_coda_columns(columns: list[dict[str, Any]]) -> None:
         suggested_fk_target = None
         ref_tables = col.get("ref_tables_seen") or evidence.get("ref_tables_seen") or []
         if col.get("is_relation_type") and ref_tables:
-            if isinstance(ref_tables, list) and len(ref_tables) > 0 and isinstance(ref_tables[0], dict):
+            if (
+                isinstance(ref_tables, list)
+                and len(ref_tables) > 0
+                and isinstance(ref_tables[0], dict)
+            ):
                 suggested_fk_target = ref_tables[0].get("tableName", "")
         if suggested_fk_target is None:
             name = col.get("proposed_canonical_field", "")
@@ -94,7 +96,9 @@ def enrich_coda_columns(columns: list[dict[str, Any]]) -> None:
             and non_null_count > 0
             and unique_count / max(non_null_count, 1) >= 0.9
         )
-        col["is_import_key_candidate"] = (is_identifier or high_unique) and not col["is_computed"]
+        col["is_import_key_candidate"] = (is_identifier or high_unique) and not col[
+            "is_computed"
+        ]
 
 
 def make_slug(text: str) -> str:

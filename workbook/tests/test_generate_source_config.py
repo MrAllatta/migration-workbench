@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 from django.core.management import call_command
 
@@ -17,9 +16,15 @@ tables:
       unique_on: [crop]
 """)
     index_path = tmp_path / "in_scope_workbook_index_2024-01-01.json"
-    index_path.write_text(json.dumps({
-        "workbooks": [{"spreadsheet_id": "1abc", "name": "Farm Data 2024", "year": 2024}]
-    }))
+    index_path.write_text(
+        json.dumps(
+            {
+                "workbooks": [
+                    {"spreadsheet_id": "1abc", "name": "Farm Data 2024", "year": 2024}
+                ]
+            }
+        )
+    )
     out_path = tmp_path / "source_config.json"
 
     call_command(

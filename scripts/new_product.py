@@ -18,7 +18,6 @@ from workbook.makefile_targets import (
     MakeContext,
     phonies,
     full_targets_block,
-    deploy_blocks,
 )
 
 PROVIDER_GOOGLE_SHEETS = "google_sheets"
@@ -77,7 +76,9 @@ def _git_init_and_initial_commit(repo: Path) -> None:
     try:
         has_git = _run(("rev-parse", "--git-dir"), check=False).returncode == 0
         if has_git:
-            print(f"skip git commit: {repo} is already a git repository — scaffolded files are uncommitted")
+            print(
+                f"skip git commit: {repo} is already a git repository — scaffolded files are uncommitted"
+            )
             return
 
         init = _run(("init", "-b", "main"))
@@ -413,7 +414,9 @@ PYTHON = $(VENV)/bin/python
 PIP = $(PYTHON) -m pip
 MANAGE = $(PYTHON) backend/manage.py
 
-.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate """ + " ".join(phonies(product_ctx)) + r"""
+.PHONY: venv install install-dev-workbench migrate reset-migrations check validate-contract validate corpus-codegen-report shell bash check-env chassis-gate """
+        + " ".join(phonies(product_ctx))
+        + r"""
 
 venv:
 	python3 -m venv $(VENV)
@@ -469,7 +472,9 @@ check-env:
 	done; \
 	exit $$err
 
-""" + full_targets_block(product_ctx) + r"""
+"""
+        + full_targets_block(product_ctx)
+        + r"""
 chassis-gate:
 	@test -n "$(WORKBENCH)" || (echo >&2 "Set WORKBENCH in .env to your migration-workbench checkout"; exit 1)
 	$(MAKE) -C "$(WORKBENCH)" chassis-gate
@@ -479,7 +484,9 @@ chassis-gate:
 # ---------------------------------------------------------------------------
 
 DOCKER_IMAGE ?= product
-FLY_APP ?=""" + f" {product_kebab}-production" + "\n"
+FLY_APP ?="""
+        + f" {product_kebab}-production"
+        + "\n"
     )
 
 

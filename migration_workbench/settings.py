@@ -115,7 +115,9 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": resolve_sqlite_database_path(BASE_DIR, os.environ.get("SQLITE_PATH")),
+            "NAME": resolve_sqlite_database_path(
+                BASE_DIR, os.environ.get("SQLITE_PATH")
+            ),
         }
     }
 

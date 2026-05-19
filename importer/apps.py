@@ -1,4 +1,5 @@
 """Django app configuration for the importer package."""
+
 from django.apps import AppConfig
 
 

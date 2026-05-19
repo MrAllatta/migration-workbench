@@ -49,11 +49,15 @@ def build_normalized_lookup_index(model, field_name):
     """
     normalized_index = defaultdict(list)
     for obj in model.objects.all().only("id", field_name).order_by("id"):
-        normalized_index[normalize_lookup_value(getattr(obj, field_name))].append(obj.id)
+        normalized_index[normalize_lookup_value(getattr(obj, field_name))].append(
+            obj.id
+        )
     return normalized_index
 
 
-def resolve_fk_by_text(model, field_name, raw_value, label, cache, stdout, style, write_disabled=False):
+def resolve_fk_by_text(
+    model, field_name, raw_value, label, cache, stdout, style, write_disabled=False
+):
     """Resolve a foreign-key reference using exact-then-normalized text matching.
 
     **Pass 1 — exact match**: filters the queryset with the raw cell value

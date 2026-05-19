@@ -100,10 +100,20 @@ def map_profiler_column_to_django_field(col: dict[str, Any]) -> dict[str, Any]:
         }
     elif fmt in ("number", "slider", "percent"):
         field_class = "models.DecimalField"
-        field_kwargs = {"max_digits": 18, "decimal_places": 4, "null": True, "blank": True}
+        field_kwargs = {
+            "max_digits": 18,
+            "decimal_places": 4,
+            "null": True,
+            "blank": True,
+        }
     elif fmt in ("currency",):
         field_class = "models.DecimalField"
-        field_kwargs = {"max_digits": 14, "decimal_places": 2, "null": True, "blank": True}
+        field_kwargs = {
+            "max_digits": 14,
+            "decimal_places": 2,
+            "null": True,
+            "blank": True,
+        }
     elif fmt in ("date",):
         field_class = "models.DateField"
         field_kwargs = {"null": True, "blank": True}
@@ -143,7 +153,9 @@ def map_profiler_column_to_django_field(col: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def merge_bundle_headers(col_meta: dict[str, dict[str, Any]], required_headers: list[str]) -> list[dict[str, Any]]:
+def merge_bundle_headers(
+    col_meta: dict[str, dict[str, Any]], required_headers: list[str]
+) -> list[dict[str, Any]]:
     """Merge bundle required headers with profiler column metadata, required-first.
 
     Columns listed in *required_headers* appear first (in declaration order),

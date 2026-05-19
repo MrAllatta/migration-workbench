@@ -1,4 +1,11 @@
-from workbook.schema_contract import build_contract, _filter_section_headers, _compute_fk_resolutions, _suggest_import_keys, _add_source_bundle_year, _compute_bundle_paths
+from workbook.schema_contract import (
+    build_contract,
+    _filter_section_headers,
+    _compute_fk_resolutions,
+    _suggest_import_keys,
+    _add_source_bundle_year,
+    _compute_bundle_paths,
+)
 from workbook.field_mapping import map_profiler_column_to_django_field
 
 
@@ -126,9 +133,22 @@ def test_contract_scaffold_auto_generates_import_config():
 
 def test_filter_section_headers_removes_all_caps_low_unique():
     columns = [
-        {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
-        {"suggested_field_name": "harvest_info", "source_column": "HARVEST INFO", "django_field_class": "models.TextField", "is_section_header": True},
-        {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField"},
+        {
+            "suggested_field_name": "crop",
+            "source_column": "Crop",
+            "django_field_class": "models.CharField",
+        },
+        {
+            "suggested_field_name": "harvest_info",
+            "source_column": "HARVEST INFO",
+            "django_field_class": "models.TextField",
+            "is_section_header": True,
+        },
+        {
+            "suggested_field_name": "block",
+            "source_column": "Block",
+            "django_field_class": "models.CharField",
+        },
     ]
     result = _filter_section_headers(columns)
     assert len(result) == 2
@@ -138,8 +158,16 @@ def test_filter_section_headers_removes_all_caps_low_unique():
 
 def test_filter_section_headers_keeps_normal_columns():
     columns = [
-        {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
-        {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField"},
+        {
+            "suggested_field_name": "crop",
+            "source_column": "Crop",
+            "django_field_class": "models.CharField",
+        },
+        {
+            "suggested_field_name": "block",
+            "source_column": "Block",
+            "django_field_class": "models.CharField",
+        },
     ]
     result = _filter_section_headers(columns)
     assert len(result) == 2
@@ -147,14 +175,42 @@ def test_filter_section_headers_keeps_normal_columns():
 
 def test_compute_fk_resolutions_from_column_overlap():
     tables = [
-        {"suggested_model_name": "CropPlanner", "model_name": "CropPlanner", "columns": [
-            {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField", "unique_count": 15, "total_count": 50},
-            {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
-        ]},
-        {"suggested_model_name": "FieldBlock", "model_name": "FieldBlock", "columns": [
-            {"suggested_field_name": "block", "source_column": "Block", "django_field_class": "models.CharField", "unique_count": 15, "total_count": 15},
-            {"suggested_field_name": "description", "source_column": "Description", "django_field_class": "models.TextField"},
-        ]},
+        {
+            "suggested_model_name": "CropPlanner",
+            "model_name": "CropPlanner",
+            "columns": [
+                {
+                    "suggested_field_name": "block",
+                    "source_column": "Block",
+                    "django_field_class": "models.CharField",
+                    "unique_count": 15,
+                    "total_count": 50,
+                },
+                {
+                    "suggested_field_name": "crop",
+                    "source_column": "Crop",
+                    "django_field_class": "models.CharField",
+                },
+            ],
+        },
+        {
+            "suggested_model_name": "FieldBlock",
+            "model_name": "FieldBlock",
+            "columns": [
+                {
+                    "suggested_field_name": "block",
+                    "source_column": "Block",
+                    "django_field_class": "models.CharField",
+                    "unique_count": 15,
+                    "total_count": 15,
+                },
+                {
+                    "suggested_field_name": "description",
+                    "source_column": "Description",
+                    "django_field_class": "models.TextField",
+                },
+            ],
+        },
     ]
     fks = _compute_fk_resolutions(tables)
     block_fk = [f for f in fks if f["field"] == "block"]
@@ -165,9 +221,24 @@ def test_compute_fk_resolutions_from_column_overlap():
 
 def test_suggest_import_keys_prefers_unique_name_columns():
     columns = [
-        {"suggested_field_name": "crop", "source_column": "Crop", "unique_count": 20, "total_count": 50},
-        {"suggested_field_name": "block", "source_column": "Block", "unique_count": 15, "total_count": 50},
-        {"suggested_field_name": "product_sku", "source_column": "Product SKU", "unique_count": 50, "total_count": 50},
+        {
+            "suggested_field_name": "crop",
+            "source_column": "Crop",
+            "unique_count": 20,
+            "total_count": 50,
+        },
+        {
+            "suggested_field_name": "block",
+            "source_column": "Block",
+            "unique_count": 15,
+            "total_count": 50,
+        },
+        {
+            "suggested_field_name": "product_sku",
+            "source_column": "Product SKU",
+            "unique_count": 50,
+            "total_count": 50,
+        },
     ]
     result = _suggest_import_keys(columns)
     assert "fields" in result
@@ -176,9 +247,18 @@ def test_suggest_import_keys_prefers_unique_name_columns():
 
 def test_add_source_bundle_year():
     tables = [
-        {"suggested_model_name": "Crop", "model_name": "Crop", "columns": [
-            {"suggested_field_name": "crop", "source_column": "Crop", "django_field_class": "models.CharField"},
-        ], "import_config": {}},
+        {
+            "suggested_model_name": "Crop",
+            "model_name": "Crop",
+            "columns": [
+                {
+                    "suggested_field_name": "crop",
+                    "source_column": "Crop",
+                    "django_field_class": "models.CharField",
+                },
+            ],
+            "import_config": {},
+        },
     ]
     result = _add_source_bundle_year(tables, year=2024)
     assert result[0]["columns"][-1]["suggested_field_name"] == "source_bundle_year"
@@ -186,14 +266,26 @@ def test_add_source_bundle_year():
 
 
 def test_add_source_bundle_year_no_year():
-    tables = [{"suggested_model_name": "empty", "model_name": "Empty", "columns": [], "import_config": {}}]
+    tables = [
+        {
+            "suggested_model_name": "empty",
+            "model_name": "Empty",
+            "columns": [],
+            "import_config": {},
+        }
+    ]
     result = _add_source_bundle_year(tables, year=None)
     assert result == tables
 
 
 def test_compute_bundle_paths_with_year():
     tables = [
-        {"suggested_model_name": "Crop", "model_name": "Crop", "bundle_worksheet_title": "Crop Info", "import_config": {}},
+        {
+            "suggested_model_name": "Crop",
+            "model_name": "Crop",
+            "bundle_worksheet_title": "Crop Info",
+            "import_config": {},
+        },
     ]
     result = _compute_bundle_paths(tables, year=2024)
     assert result[0]["import_config"]["bundle_path"] == "2024/crop_info.csv"
@@ -201,7 +293,12 @@ def test_compute_bundle_paths_with_year():
 
 def test_compute_bundle_paths_without_year():
     tables = [
-        {"suggested_model_name": "Crop", "model_name": "Crop", "bundle_worksheet_title": "Crop Info", "import_config": {}},
+        {
+            "suggested_model_name": "Crop",
+            "model_name": "Crop",
+            "bundle_worksheet_title": "Crop Info",
+            "import_config": {},
+        },
     ]
     result = _compute_bundle_paths(tables, year=None)
     assert result[0]["import_config"]["bundle_path"] == "crop_info.csv"

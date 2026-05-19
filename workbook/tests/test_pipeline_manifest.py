@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 from workbook.pipeline_manifest import build_pipeline_manifest
 
@@ -26,7 +25,11 @@ def _minimal_contract() -> dict:
                     "bundle_path": "{year}/crop_plan_entry.csv",
                     "required_headers": ["Block", "Crop", "Status"],
                     "unique_on": ["block"],
-                    "column_map": {"block": "Block", "crop": "Crop", "status": "Status"},
+                    "column_map": {
+                        "block": "Block",
+                        "crop": "Crop",
+                        "status": "Status",
+                    },
                 },
             }
         ],

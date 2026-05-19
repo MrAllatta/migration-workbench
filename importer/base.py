@@ -34,9 +34,21 @@ from django.db import transaction
 from importer.bundle_reader import iter_bundle_tab_rows
 from importer.chassis import ImporterChassisMixin
 from importer.lookups import resolve_fk_by_text
-from importer.parsing import parse_iso_date, split_on, to_bool, to_decimal, to_decimal_or_none, to_int, to_int_or_none
-from importer.sample_guard import live12_block_message_for_sample_into_dev_sqlite
-from importer.summary import build_escalation_summary, build_failure_signatures, normalized_outcomes, write_summary_json
+from importer.parsing import (
+    parse_iso_date,
+    split_on,
+    to_bool,
+    to_decimal,
+    to_decimal_or_none,
+    to_int,
+    to_int_or_none,
+)
+from importer.summary import (
+    build_escalation_summary,
+    build_failure_signatures,
+    normalized_outcomes,
+    write_summary_json,
+)
 
 
 class BaseImportCommand(ImporterChassisMixin, BaseCommand):
@@ -66,10 +78,20 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         Args:
             parser: :class:`argparse.ArgumentParser` provided by Django.
         """
-        parser.add_argument("data_dir", type=str, help="Directory containing normalized import files")
-        parser.add_argument("--dry-run", action="store_true", help="Parse-only checks with no writes")
-        parser.add_argument("--validate-only", action="store_true", help="Run full flow in rollback transaction")
-        parser.add_argument("--preflight", action="store_true", help="Alias for --validate-only")
+        parser.add_argument(
+            "data_dir", type=str, help="Directory containing normalized import files"
+        )
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Parse-only checks with no writes"
+        )
+        parser.add_argument(
+            "--validate-only",
+            action="store_true",
+            help="Run full flow in rollback transaction",
+        )
+        parser.add_argument(
+            "--preflight", action="store_true", help="Alias for --validate-only"
+        )
         parser.add_argument(
             "--non-atomic-apply",
             action="store_true",
@@ -86,7 +108,9 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
             action="store_true",
             help="Disable per-tier transaction savepoints",
         )
-        parser.add_argument("--summary-json", type=str, help="Write summary artifact to this path")
+        parser.add_argument(
+            "--summary-json", type=str, help="Write summary artifact to this path"
+        )
         parser.add_argument("--verbose", action="store_true", help="Detailed output")
 
     def handle(self, *args, **options):
@@ -124,7 +148,9 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         requested_summary_path = options.get("summary_json")
         self.summary_json_path = self.resolve_summary_json_path(requested_summary_path)
         self.setup_runtime()
-        self.tier_atomic = self.atomic_apply and not options.get("no_tier_atomic", False)
+        self.tier_atomic = self.atomic_apply and not options.get(
+            "no_tier_atomic", False
+        )
 
         if not os.path.isdir(self.data_dir):
             raise ValueError(f"Data directory not found: {self.data_dir}")
@@ -194,9 +220,7 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
                     callback()
             except Exception as exc:
                 self.tier_errors[title] = str(exc)
-                self.stderr.write(
-                    self.style.ERROR(f"  TIER FAILED: {title} — {exc}")
-                )
+                self.stderr.write(self.style.ERROR(f"  TIER FAILED: {title} — {exc}"))
         else:
             callback()
 
@@ -211,7 +235,8 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         total_created = total_updated = total_skipped = total_error = 0
         for model_name in sorted(self.stats.keys()):
             normalized = normalized_outcomes(
-                self.stats[model_name], write_disabled=(self.validate_only or self.dry_run)
+                self.stats[model_name],
+                write_disabled=(self.validate_only or self.dry_run),
             )
             total_created += normalized["created"]
             total_updated += normalized["updated"]

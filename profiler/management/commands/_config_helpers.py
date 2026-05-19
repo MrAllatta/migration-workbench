@@ -45,6 +45,8 @@ def load_folder_id_from_config(config_path_value: str | None) -> str | None:
     if folder_id is None:
         return None
     if not isinstance(folder_id, str) or not folder_id.strip():
-        raise CommandError(f"Config {config_path} has invalid 'folder_id'; expected non-empty string")
+        raise CommandError(
+            f"Config {config_path} has invalid 'folder_id'; expected non-empty string"
+        )
 
     return folder_id

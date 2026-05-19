@@ -87,22 +87,36 @@ def _is_non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _require_mapping(obj: Any, path: str, issues: list[ManifestValidationIssue]) -> dict[str, Any]:
+def _require_mapping(
+    obj: Any, path: str, issues: list[ManifestValidationIssue]
+) -> dict[str, Any]:
     if not isinstance(obj, dict):
         issues.append(ManifestValidationIssue(path, "must be a mapping"))
         return {}
     return obj
 
 
-def _require_string(obj: dict[str, Any], key: str, path: str, issues: list[ManifestValidationIssue]):
+def _require_string(
+    obj: dict[str, Any], key: str, path: str, issues: list[ManifestValidationIssue]
+):
     if not _is_non_empty_string(obj.get(key)):
-        issues.append(ManifestValidationIssue(f"{path}.{key}", "must be a non-empty string"))
+        issues.append(
+            ManifestValidationIssue(f"{path}.{key}", "must be a non-empty string")
+        )
 
 
-def _require_int(obj: dict[str, Any], key: str, path: str, issues: list[ManifestValidationIssue], minimum: int = 1):
+def _require_int(
+    obj: dict[str, Any],
+    key: str,
+    path: str,
+    issues: list[ManifestValidationIssue],
+    minimum: int = 1,
+):
     value = obj.get(key)
     if not isinstance(value, int) or value < minimum:
-        issues.append(ManifestValidationIssue(f"{path}.{key}", f"must be an integer >= {minimum}"))
+        issues.append(
+            ManifestValidationIssue(f"{path}.{key}", f"must be an integer >= {minimum}")
+        )
 
 
 def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
@@ -133,7 +147,9 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
         _require_int(p, "memory_mb", ppath, issues)
         _require_int(p, "volume_gb", ppath, issues)
 
-    defaults = _require_mapping(payload.get("replication_defaults"), "replication_defaults", issues)
+    defaults = _require_mapping(
+        payload.get("replication_defaults"), "replication_defaults", issues
+    )
     _require_string(defaults, "provider", "replication_defaults", issues)
     _require_string(defaults, "bucket_env", "replication_defaults", issues)
     _require_int(defaults, "snapshot_interval_minutes", "replication_defaults", issues)
@@ -141,7 +157,9 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
 
     spaces = _require_mapping(payload.get("spaces"), "spaces", issues)
     if not spaces:
-        issues.append(ManifestValidationIssue("spaces", "must define at least one space"))
+        issues.append(
+            ManifestValidationIssue("spaces", "must define at least one space")
+        )
     for space_name, space in spaces.items():
         spath = f"spaces.{space_name}"
         s = _require_mapping(space, spath, issues)
@@ -149,21 +167,39 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
         _require_string(s, "project", spath, issues)
         profile = s.get("profile")
         if not _is_non_empty_string(profile):
-            issues.append(ManifestValidationIssue(f"{spath}.profile", "must be a non-empty string"))
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.profile", "must be a non-empty string"
+                )
+            )
         elif profile not in profiles:
-            issues.append(ManifestValidationIssue(f"{spath}.profile", f"unknown profile '{profile}'"))
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.profile", f"unknown profile '{profile}'"
+                )
+            )
 
         provider = _require_mapping(s.get("provider"), f"{spath}.provider", issues)
         _require_string(provider, "type", f"{spath}.provider", issues)
         _require_string(provider, "primary_region", f"{spath}.provider", issues)
         regions = provider.get("regions")
-        if not isinstance(regions, list) or not regions or not all(_is_non_empty_string(x) for x in regions):
-            issues.append(ManifestValidationIssue(f"{spath}.provider.regions", "must be a non-empty list of regions"))
+        if (
+            not isinstance(regions, list)
+            or not regions
+            or not all(_is_non_empty_string(x) for x in regions)
+        ):
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.provider.regions", "must be a non-empty list of regions"
+                )
+            )
         _require_string(provider, "app_name_template", f"{spath}.provider", issues)
 
         build = _require_mapping(s.get("build"), f"{spath}.build", issues)
         has_image = _is_non_empty_string(build.get("image"))
-        has_build = _is_non_empty_string(build.get("dockerfile")) and _is_non_empty_string(build.get("context"))
+        has_build = _is_non_empty_string(
+            build.get("dockerfile")
+        ) and _is_non_empty_string(build.get("context"))
         if not has_image and not has_build:
             issues.append(
                 ManifestValidationIssue(
@@ -174,7 +210,9 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
 
         runtime = _require_mapping(s.get("runtime"), f"{spath}.runtime", issues)
         _require_int(runtime, "internal_port", f"{spath}.runtime", issues)
-        processes = _require_mapping(runtime.get("processes"), f"{spath}.runtime.processes", issues)
+        processes = _require_mapping(
+            runtime.get("processes"), f"{spath}.runtime.processes", issues
+        )
         _require_string(processes, "web", f"{spath}.runtime.processes", issues)
         _require_string(processes, "release", f"{spath}.runtime.processes", issues)
         _require_string(runtime, "healthcheck_path", f"{spath}.runtime", issues)
@@ -191,13 +229,25 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
                 )
             )
 
-        replication = _require_mapping(s.get("replication"), f"{spath}.replication", issues)
+        replication = _require_mapping(
+            s.get("replication"), f"{spath}.replication", issues
+        )
         if not isinstance(replication.get("litestream_enabled"), bool):
-            issues.append(ManifestValidationIssue(f"{spath}.replication.litestream_enabled", "must be boolean"))
-        _require_string(replication, "replica_path_template", f"{spath}.replication", issues)
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.replication.litestream_enabled", "must be boolean"
+                )
+            )
+        _require_string(
+            replication, "replica_path_template", f"{spath}.replication", issues
+        )
 
         backup = _require_mapping(s.get("backup"), f"{spath}.backup", issues)
-        checkpoint = _require_mapping(backup.get("predeploy_checkpoint"), f"{spath}.backup.predeploy_checkpoint", issues)
+        checkpoint = _require_mapping(
+            backup.get("predeploy_checkpoint"),
+            f"{spath}.backup.predeploy_checkpoint",
+            issues,
+        )
         if not isinstance(checkpoint.get("required"), bool):
             issues.append(
                 ManifestValidationIssue(
@@ -205,15 +255,25 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
                     "must be boolean",
                 )
             )
-        _require_string(checkpoint, "method", f"{spath}.backup.predeploy_checkpoint", issues)
+        _require_string(
+            checkpoint, "method", f"{spath}.backup.predeploy_checkpoint", issues
+        )
         _require_int(backup, "retention_days", f"{spath}.backup", issues)
 
         secrets = _require_mapping(s.get("secrets"), f"{spath}.secrets", issues)
         required_secrets = secrets.get("required")
         if not isinstance(required_secrets, list) or not required_secrets:
-            issues.append(ManifestValidationIssue(f"{spath}.secrets.required", "must be a non-empty list"))
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.secrets.required", "must be a non-empty list"
+                )
+            )
         elif not all(_is_non_empty_string(item) for item in required_secrets):
-            issues.append(ManifestValidationIssue(f"{spath}.secrets.required", "must contain only non-empty strings"))
+            issues.append(
+                ManifestValidationIssue(
+                    f"{spath}.secrets.required", "must contain only non-empty strings"
+                )
+            )
         else:
             for name in required_secrets:
                 if name == "ALLOWED_HOSTS":
@@ -231,7 +291,9 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
                         )
                     )
 
-        env_contract = _require_mapping(s.get("environment"), f"{spath}.environment", issues)
+        env_contract = _require_mapping(
+            s.get("environment"), f"{spath}.environment", issues
+        )
         required_runtime = env_contract.get("required")
         if not isinstance(required_runtime, list) or not required_runtime:
             issues.append(
@@ -242,7 +304,10 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
             )
         elif not all(_is_non_empty_string(item) for item in required_runtime):
             issues.append(
-                ManifestValidationIssue(f"{spath}.environment.required", "must contain only non-empty strings")
+                ManifestValidationIssue(
+                    f"{spath}.environment.required",
+                    "must contain only non-empty strings",
+                )
             )
         else:
             for name in required_runtime:
@@ -261,13 +326,17 @@ def validate_manifest(payload: dict[str, Any]) -> list[ManifestValidationIssue]:
                     )
                 )
 
-        environments = _require_mapping(s.get("environments"), f"{spath}.environments", issues)
+        environments = _require_mapping(
+            s.get("environments"), f"{spath}.environments", issues
+        )
         for env in ("preview", "production"):
             env_cfg = environments.get(env)
             if env_cfg is None:
                 continue  # missing env is allowed for production-only spaces
             env_cfg = _require_mapping(env_cfg, f"{spath}.environments.{env}", issues)
-            _require_string(env_cfg, "branch_pattern", f"{spath}.environments.{env}", issues)
+            _require_string(
+                env_cfg, "branch_pattern", f"{spath}.environments.{env}", issues
+            )
 
     return issues
 

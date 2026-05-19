@@ -93,7 +93,7 @@ def _check_snapshot(
             exit_code = 1
 
     if exit_code == 0:
-        print(f"all snapshots match")
+        print("all snapshots match")
     return exit_code
 
 

@@ -34,6 +34,7 @@ def _to_snake_case(pascal: str) -> str:
     """Convert PascalCase to snake_case."""
     return re.sub(r"(?<!^)(?=[A-Z])", "_", pascal).lower()
 
+
 _MODEL_CLASSES_WITH_SEARCH = {
     "CharField",
     "TextField",
@@ -113,9 +114,12 @@ def _pick_display_fields(
             return list(explicit)
 
     if view:
-        suggested = (view.get("suggested_display_fields") or
-                     view.get("display_fields") or
-                     view.get("editable_fields") or [])
+        suggested = (
+            view.get("suggested_display_fields")
+            or view.get("display_fields")
+            or view.get("editable_fields")
+            or []
+        )
         if suggested:
             valid = {f["name"] for f in contract_fields}
             return [f for f in suggested if f in valid][:max_count]
@@ -180,9 +184,13 @@ def _pick_filter_fields(
             return result
 
     if view:
-        suggested = (view.get("suggested_filter_fields") or
-                     view.get("filterable_by") or
-                     view.get("status_field") and [view["status_field"]] or [])
+        suggested = (
+            view.get("suggested_filter_fields")
+            or view.get("filterable_by")
+            or view.get("status_field")
+            and [view["status_field"]]
+            or []
+        )
         if suggested:
             valid = {f["name"] for f in contract_fields}
             result = [f for f in suggested if f in valid][:max_count]
@@ -244,8 +252,7 @@ def _pick_readonly_fields(
             return list(explicit)
 
     if view:
-        readonly = (view.get("readonly_fields") or
-                    view.get("computed_fields") or [])
+        readonly = view.get("readonly_fields") or view.get("computed_fields") or []
         if readonly:
             return readonly
 
@@ -345,11 +352,13 @@ def _render_admin_class(
     if status_field:
         lines.append(f"# status_field: {status_field}")
 
-    lines.extend([
-        "",
-        f"@admin.register({model_name})",
-        f"class {model_name}Admin({admin_base_class}):",
-    ])
+    lines.extend(
+        [
+            "",
+            f"@admin.register({model_name})",
+            f"class {model_name}Admin({admin_base_class}):",
+        ]
+    )
 
     # Ensure year_field from time_scope is in filter_fields
     if time_scope and time_scope.get("year_field"):
@@ -401,36 +410,48 @@ def _render_admin_class(
     # get_queryset for current-season default filtering
     if time_scope and time_scope.get("year_field"):
         year_field = time_scope["year_field"]
-        lines.extend([
-            "",
-            "    def get_queryset(self, request):",
-            f"        qs = super().get_queryset(request)",
-            f"        year = request.GET.get('{year_field}__exact')",
-            f"        if not year:",
-            f"            qs = qs.filter({year_field}=timezone.now().year)",
-            f"        return qs",
-        ])
+        lines.extend(
+            [
+                "",
+                "    def get_queryset(self, request):",
+                "        qs = super().get_queryset(request)",
+                f"        year = request.GET.get('{year_field}__exact')",
+                "        if not year:",
+                f"            qs = qs.filter({year_field}=timezone.now().year)",
+                "        return qs",
+            ]
+        )
 
     # Admin action methods from status_values
     if status_values and status_field:
         action_names: list[str] = []
         for value in status_values:
-            slugified = re.sub(r'[^a-z0-9_]+', '_', value.lower()).strip('_')
+            slugified = re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_")
             method_name = f"mark_as_{slugified}"
             action_names.append(method_name)
-            lines.extend([
-                "",
-                f"    @admin.action(description='Mark as {value}')",
-                f"    def {method_name}(self, request, queryset):",
-                f"        queryset.update({status_field}=\"{value}\")",
-            ])
+            lines.extend(
+                [
+                    "",
+                    f"    @admin.action(description='Mark as {value}')",
+                    f"    def {method_name}(self, request, queryset):",
+                    f'        queryset.update({status_field}="{value}")',
+                ]
+            )
         if action_names:
             items = ", ".join(action_names)
             lines.append(f"    actions = [{items}]")
 
     if all(
         not x
-        for x in [display_fields, filter_fields, search_fields, readonly_fields, list_editable_fields, autocomplete_fields_list, inline_classes]
+        for x in [
+            display_fields,
+            filter_fields,
+            search_fields,
+            readonly_fields,
+            list_editable_fields,
+            autocomplete_fields_list,
+            inline_classes,
+        ]
     ):
         has_new_content = (
             (time_scope and time_scope.get("date_field"))
@@ -527,7 +548,12 @@ def render_admin_py(
 
     parts: list[str] = [
         _render_header(app_label),
-        _render_imports(tables, needs_user_admin=needs_user_admin, needs_fk_links=needs_fk_links, needs_timezone=needs_timezone),
+        _render_imports(
+            tables,
+            needs_user_admin=needs_user_admin,
+            needs_fk_links=needs_fk_links,
+            needs_timezone=needs_timezone,
+        ),
     ]
 
     # Collect all inline classes (must be defined before admin classes).
@@ -573,10 +599,22 @@ def render_admin_py(
         time_scope = view.get("time_scope") if view else None
         status_values = view.get("status_values") if view else None
         editable_fields = view.get("editable_fields") if view else None
-        display = _pick_display_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative)
-        filters = _pick_filter_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative, status_field=status_field)
-        search = _pick_search_fields(contract_fields, rev_fks, admin_cfg, authoritative=is_authoritative)
-        readonly = _pick_readonly_fields(view, contract_fields, admin_cfg, authoritative=is_authoritative)
+        display = _pick_display_fields(
+            view, contract_fields, admin_cfg, authoritative=is_authoritative
+        )
+        filters = _pick_filter_fields(
+            view,
+            contract_fields,
+            admin_cfg,
+            authoritative=is_authoritative,
+            status_field=status_field,
+        )
+        search = _pick_search_fields(
+            contract_fields, rev_fks, admin_cfg, authoritative=is_authoritative
+        )
+        readonly = _pick_readonly_fields(
+            view, contract_fields, admin_cfg, authoritative=is_authoritative
+        )
 
         list_editable = admin_cfg.get("list_editable") or []
         if list_editable:

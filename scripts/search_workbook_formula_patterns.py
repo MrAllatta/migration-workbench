@@ -49,16 +49,22 @@ def load_patterns(path: Path) -> list[tuple[str, re.Pattern[str]]]:
     ]
 
 
-def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]):
+def scan_workbook(
+    svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]
+):
     sheets_resp = execute_with_retry(
-        svc.spreadsheets().get(spreadsheetId=spreadsheet_id, fields="sheets(properties(title))")
+        svc.spreadsheets().get(
+            spreadsheetId=spreadsheet_id, fields="sheets(properties(title))"
+        )
     )
     sheet_titles = [s["properties"]["title"] for s in sheets_resp.get("sheets", [])]
     matches = []
     for title in sheet_titles:
         escaped_title = title.replace("'", "''")
         values_resp = execute_with_retry(
-            svc.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
+            svc.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
         )
         for row_idx, row in enumerate(values_resp.get("values", []), start=1):
             for col_idx, value in enumerate(row, start=1):
@@ -80,8 +86,12 @@ def scan_workbook(svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--workbooks", required=True, help="JSON file listing workbooks")
-    parser.add_argument("--patterns", required=True, help="JSON file listing regex patterns")
+    parser.add_argument(
+        "--workbooks", required=True, help="JSON file listing workbooks"
+    )
+    parser.add_argument(
+        "--patterns", required=True, help="JSON file listing regex patterns"
+    )
     parser.add_argument("--out", required=True, help="Output JSON path")
     args = parser.parse_args()
 

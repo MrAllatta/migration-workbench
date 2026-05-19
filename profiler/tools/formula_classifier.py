@@ -8,16 +8,18 @@ from __future__ import annotations
 
 from typing import Any
 
-_EXPANSION_FUNCTIONS: frozenset[str] = frozenset({
-    "ARRAYFORMULA",
-    "QUERY",
-    "FILTER",
-    "SORT",
-    "UNIQUE",
-    "FLATTEN",
-    "SPLIT",
-    "SEQUENCE",
-})
+_EXPANSION_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "ARRAYFORMULA",
+        "QUERY",
+        "FILTER",
+        "SORT",
+        "UNIQUE",
+        "FLATTEN",
+        "SPLIT",
+        "SEQUENCE",
+    }
+)
 
 _EMPTY_RATIO_THRESHOLD = 0.75
 

@@ -24,6 +24,7 @@ from workbook.codegen.contract import (
 
 # -- helpers ----------------------------------------------------------------
 
+
 def _derive_column_map(table: dict[str, Any]) -> dict[str, str]:
     """Derive a column_map from ``columns[].source_column`` -> ``suggested_field_name``."""
     cmap: dict[str, str] = {}
@@ -33,8 +34,6 @@ def _derive_column_map(table: dict[str, Any]) -> dict[str, str]:
         if src and fname:
             cmap[fname] = src
     return cmap
-
-
 
 
 def _field_class_short(raw: str) -> str:
@@ -149,8 +148,8 @@ def _render_required_check(
         parts.append(
             f"{pad}{req_field}_val = row.get({req_field!r}, '').strip()\n"
             f"{pad}if not {req_field}_val:\n"
-            f'{pad * 2}self.record_missing_required('
-            f'{model_name!r}, row_number, {req_field!r}, {human_label!r})\n'
+            f"{pad * 2}self.record_missing_required("
+            f"{model_name!r}, row_number, {req_field!r}, {human_label!r})\n"
             f"{pad * 2}continue"
         )
     return "\n".join(parts)
@@ -173,8 +172,8 @@ def _render_fk_resolution(
     src = f'{pad}{field_name}_val = row.get({field_name!r}, "").strip()'
     check = (
         f"{pad}if not {field_name}_val:\n"
-        f'{pad * 2}self.record_missing_required('
-        f'{model_name!r}, row_number, {field_name!r}, {human_label!r})\n'
+        f"{pad * 2}self.record_missing_required("
+        f"{model_name!r}, row_number, {field_name!r}, {human_label!r})\n"
         f"{pad * 2}continue"
     )
     resolve = (
@@ -183,8 +182,8 @@ def _render_fk_resolution(
     )
     stale = (
         f"{pad}if {field_name} is None:\n"
-        f'{pad * 2}self.record_stale_fk('
-        f'{model_name!r}, row_number, {field_name!r}, {human_label!r}, {field_name}_val)\n'
+        f"{pad * 2}self.record_stale_fk("
+        f"{model_name!r}, row_number, {field_name!r}, {human_label!r}, {field_name}_val)\n"
         f"{pad * 2}continue"
     )
     return f"{src}\n{check}\n{resolve}\n{stale}"
@@ -207,7 +206,7 @@ def _render_field_assignment(
         src = f'raw = row.get({field_name!r}, "")'
         assign = (
             f"{pad}{field_name} = "
-            f'{_parser_method(parser)}(raw) if raw.strip() else None'
+            f"{_parser_method(parser)}(raw) if raw.strip() else None"
         )
         return f"{src}\n{assign}"
     elif parser in ("dec", "int"):
@@ -218,8 +217,7 @@ def _render_field_assignment(
         )
     elif parser == "bool":
         return (
-            f"{pad}{field_name} = "
-            f'{_parser_method(parser)}(row.get({field_name!r}, ""))'
+            f'{pad}{field_name} = {_parser_method(parser)}(row.get({field_name!r}, ""))'
         )
     else:
         return f'{pad}{field_name} = row.get({field_name!r}, "").strip()'
@@ -254,9 +252,7 @@ def _render_value_expression(
     # Multi-source: column_map value is a list of source headers.
     if isinstance(source_entry, list):
         pad = " " * indent
-        parts_expr = ", ".join(
-            f'row.get({h!r}, "").strip()' for h in source_entry
-        )
+        parts_expr = ", ".join(f'row.get({h!r}, "").strip()' for h in source_entry)
         parts_var = f"{field_name}_parts"
         transform = field_transforms.get(field_name)
         if transform:
@@ -268,7 +264,7 @@ def _render_value_expression(
         else:
             code = (
                 f"{pad}{parts_var} = [{parts_expr}]\n"
-                f'{pad}{field_name} = '
+                f"{pad}{field_name} = "
                 f'" ".join(p for p in {parts_var} if p)'
             )
         return (code, field_name)
@@ -329,14 +325,10 @@ def _render_defaults_dict(
         if fname in fk_lookup or fname in unique_on:
             continue
 
-        pre, val = _render_value_expression(
-            fname, field, import_cfg, indent=indent
-        )
+        pre, val = _render_value_expression(fname, field, import_cfg, indent=indent)
         if pre:
             pre_statements.append(pre)
-        dict_entries.append(
-            f"{inner}{fname!r}: self._prepare_{fname}({val}, row),"
-        )
+        dict_entries.append(f"{inner}{fname!r}: self._prepare_{fname}({val}, row),")
 
     parts: list[str] = []
     if pre_statements:
@@ -371,9 +363,7 @@ def _render_unique_assignments(
         if not field:
             continue
 
-        pre, val = _render_value_expression(
-            fname, field, import_cfg, indent=indent
-        )
+        pre, val = _render_value_expression(fname, field, import_cfg, indent=indent)
         if pre:
             parts.append(pre)
         else:
@@ -419,16 +409,13 @@ def _render_import_method(
 
     # read_bundle_tab loop header.
     lines.append(
-        '    for row_number, row in self.read_bundle_tab('
-        f'{bundle_path!r}, tab_config):'
+        f"    for row_number, row in self.read_bundle_tab({bundle_path!r}, tab_config):"
     )
 
     # Required field checks (skip FK fields — they get richer checks below).
     if required:
         lines.append("")
-        lines.append(
-            f"        # Required source column checks."
-        )
+        lines.append("        # Required source column checks.")
         for req_field in required:
             if req_field in fk_lookup:
                 continue
@@ -439,8 +426,8 @@ def _render_import_method(
             )
             lines.append(f"        if not {req_field}_val:")
             lines.append(
-                f'            self.record_missing_required('
-                f'{model_name!r}, row_number, {req_field!r}, {human_label!r})'
+                f"            self.record_missing_required("
+                f"{model_name!r}, row_number, {req_field!r}, {human_label!r})"
             )
             lines.append("            continue")
             lines.append("")
@@ -451,13 +438,11 @@ def _render_import_method(
         target_field = fk_cfg.get("on", "name")
         source_label = source_headers.get(fname, fname)
         human_label = source_label.replace("_", " ").title()
-        lines.append(
-            f'        {fname}_val = row.get({fname!r}, "").strip()'
-        )
+        lines.append(f'        {fname}_val = row.get({fname!r}, "").strip()')
         lines.append(f"        if not {fname}_val:")
         lines.append(
-            f'            self.record_missing_required('
-            f'{model_name!r}, row_number, {fname!r}, {human_label!r})'
+            f"            self.record_missing_required("
+            f"{model_name!r}, row_number, {fname!r}, {human_label!r})"
         )
         lines.append("            continue")
         lines.append(
@@ -466,8 +451,8 @@ def _render_import_method(
         )
         lines.append(f"        if {fname} is None:")
         lines.append(
-            f'            self.record_stale_fk('
-            f'{model_name!r}, row_number, {fname!r}, {human_label!r}, {fname}_val)'
+            f"            self.record_stale_fk("
+            f"{model_name!r}, row_number, {fname!r}, {human_label!r}, {fname}_val)"
         )
         lines.append("            continue")
 
@@ -488,9 +473,7 @@ def _render_import_method(
     # write_disabled guard.
     lines.append("")
     lines.append("        if self.write_disabled:")
-    lines.append(
-        f'            self.stats[{model_name!r}]["processed"] += 1'
-    )
+    lines.append(f'            self.stats[{model_name!r}]["processed"] += 1')
     lines.append("            continue")
 
     # Override hook: _prepare_row.
@@ -498,34 +481,28 @@ def _render_import_method(
     lines.append("")
 
     # Per-row exception catching with IntegrityError discrimination.
-    unique_kwargs = ", ".join(
-        f"{f}={f}" for f in unique_on
-    )
+    unique_kwargs = ", ".join(f"{f}={f}" for f in unique_on)
     lines.append("        try:")
     lines.append(
         f"            obj, created = {model_name}.objects.update_or_create("
         f"{unique_kwargs}, defaults=data)"
     )
     lines.append(
-        f'            self.stats[{model_name!r}]['
+        f"            self.stats[{model_name!r}]["
         f'"created" if created else "updated"] += 1'
     )
     lines.append("            self._before_save(obj, data)")
     lines.append("        except IntegrityError:")
+    lines.append(f'            self.stats[{model_name!r}]["error"] += 1')
     lines.append(
-        f'            self.stats[{model_name!r}]["error"] += 1'
-    )
-    lines.append(
-        f'            self.record_row_error({model_name!r}, row_number, '
+        f"            self.record_row_error({model_name!r}, row_number, "
         f'"unique_violation", "", "IntegrityError: unique constraint violation")'
     )
     lines.append("            continue")
     lines.append("        except Exception as exc:")
+    lines.append(f'            self.stats[{model_name!r}]["error"] += 1')
     lines.append(
-        f'            self.stats[{model_name!r}]["error"] += 1'
-    )
-    lines.append(
-        f'            self.record_row_error({model_name!r}, row_number, '
+        f"            self.record_row_error({model_name!r}, row_number, "
         f'"row_exception", "", str(exc))'
     )
 
@@ -594,7 +571,7 @@ def render_import_py(
             f"# App label: {app_label}\n"
             "# Last generated: see git history\n"
             "\n"
-"from typing import Any\n"
+            "from typing import Any\n"
             "from django.db import IntegrityError\n"
             "from importer.base import BaseImportCommand\n"
             "\n"
@@ -622,27 +599,29 @@ def render_import_py(
     if skipped:
         parts.extend(skipped)
         parts.append("")
-    parts.extend([
-        "from typing import Any",
-        "from django.db import IntegrityError",
-        "from importer.base import BaseImportCommand",
-        f"from {app_label}.models import {', '.join(model_names)}",
-        "",
-        "",
-        f"class {base_class_name}(BaseImportCommand):",
-        f'    help = "Import {app_label} data from normalized bundles."',
-        "",
-        "    # -- Override hooks ---------------------------------------------------",
-        "",
-        "    def _prepare_row(self, data: dict) -> dict:",
-        '        """Hook: transform the defaults dict before update_or_create."""',
-        "        return data",
-        "",
-        "    def _before_save(self, obj, data: dict) -> None:",
-        '        """Hook: called after each update_or_create."""',
-        "        pass",
-        "",
-    ])
+    parts.extend(
+        [
+            "from typing import Any",
+            "from django.db import IntegrityError",
+            "from importer.base import BaseImportCommand",
+            f"from {app_label}.models import {', '.join(model_names)}",
+            "",
+            "",
+            f"class {base_class_name}(BaseImportCommand):",
+            f'    help = "Import {app_label} data from normalized bundles."',
+            "",
+            "    # -- Override hooks ---------------------------------------------------",
+            "",
+            "    def _prepare_row(self, data: dict) -> dict:",
+            '        """Hook: transform the defaults dict before update_or_create."""',
+            "        return data",
+            "",
+            "    def _before_save(self, obj, data: dict) -> None:",
+            '        """Hook: called after each update_or_create."""',
+            "        pass",
+            "",
+        ]
+    )
 
     # Add _prepare_<field> stubs for each model.
     seen_prepare_stubs: set[str] = set()
@@ -650,11 +629,9 @@ def render_import_py(
         for f in get_fields(table):
             fname = f["name"]
             if fname not in seen_prepare_stubs:
+                parts.append(f"    def _prepare_{fname}(self, raw_value, row) -> Any:")
                 parts.append(
-                    f"    def _prepare_{fname}(self, raw_value, row) -> Any:"
-                )
-                parts.append(
-                    f'        """Hook: transform a single raw value before assignment."""'
+                    '        """Hook: transform a single raw value before assignment."""'
                 )
                 parts.append("        return raw_value")
                 parts.append("")
@@ -663,7 +640,9 @@ def render_import_py(
     # _run_import_pipeline with tier calls.
     parts.append("    def _run_import_pipeline(self):")
     for tier, name, _ in candidates:
-        parts.append(f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})')
+        parts.append(
+            f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})'
+        )
     parts.append("")
 
     # Per-model import methods.

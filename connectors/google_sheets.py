@@ -94,7 +94,9 @@ def get_service_account_credentials(scopes=None):
     if not credentials_path:
         if impersonate_service_account:
             # Keep user ADC on cloud-platform only, then mint scoped tokens via SA impersonation.
-            source_credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            source_credentials, _ = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
             return impersonated_credentials.Credentials(
                 source_credentials=source_credentials,
                 target_principal=impersonate_service_account,
@@ -106,7 +108,9 @@ def get_service_account_credentials(scopes=None):
 
     credentials_file = Path(credentials_path).expanduser()
     if not credentials_file.exists():
-        raise ValueError(f"GOOGLE_APPLICATION_CREDENTIALS does not exist: {credentials_file}")
+        raise ValueError(
+            f"GOOGLE_APPLICATION_CREDENTIALS does not exist: {credentials_file}"
+        )
 
     return service_account.Credentials.from_service_account_file(
         credentials_file,
@@ -151,7 +155,9 @@ def list_child_folder_ids(folder_id, drive_service):
     """List child folder IDs immediately under *folder_id* in Drive."""
     ids = []
     page_token = None
-    query = f"'{folder_id}' in parents and mimeType='{FOLDER_MIME_TYPE}' and trashed=false"
+    query = (
+        f"'{folder_id}' in parents and mimeType='{FOLDER_MIME_TYPE}' and trashed=false"
+    )
 
     while True:
         response = (
@@ -173,7 +179,9 @@ def list_child_folder_ids(folder_id, drive_service):
     return ids
 
 
-def find_spreadsheet_by_name_in_folder_tree(drive_service, root_folder_id, spreadsheet_name):
+def find_spreadsheet_by_name_in_folder_tree(
+    drive_service, root_folder_id, spreadsheet_name
+):
     """Breadth-first search for a spreadsheet with exact *spreadsheet_name* under *root_folder_id*."""
     queue = deque([root_folder_id])
     seen_folders = set()
@@ -203,9 +211,13 @@ def find_spreadsheet_by_name_in_folder_tree(drive_service, root_folder_id, sprea
     return matches[0] if matches else None
 
 
-def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descendants=False):
+def resolve_spreadsheet(
+    tab, drive_service=None, folder_id=None, search_descendants=False
+):
     """Resolve a spreadsheet ID from a tab config dict. Tries ``tab.spreadsheet_id`` first, then ``tab.spreadsheet_url``, then folder+name search (optionally recursive)."""
-    spreadsheet_id = extract_spreadsheet_id(tab.get("spreadsheet_id") or tab.get("spreadsheet_url"))
+    spreadsheet_id = extract_spreadsheet_id(
+        tab.get("spreadsheet_id") or tab.get("spreadsheet_url")
+    )
     if spreadsheet_id:
         return {
             "spreadsheet_id": spreadsheet_id,
@@ -220,7 +232,9 @@ def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descenda
         )
 
     if search_descendants:
-        match = find_spreadsheet_by_name_in_folder_tree(drive_service, folder_id, spreadsheet_name)
+        match = find_spreadsheet_by_name_in_folder_tree(
+            drive_service, folder_id, spreadsheet_name
+        )
         if match is None:
             raise ValueError(
                 f"spreadsheet named '{spreadsheet_name}' not found under folder {folder_id} (recursive search)"
@@ -232,9 +246,13 @@ def resolve_spreadsheet(tab, drive_service=None, folder_id=None, search_descenda
             if item.get("name") == spreadsheet_name
         ]
         if not matches:
-            raise ValueError(f"spreadsheet named '{spreadsheet_name}' not found in folder {folder_id}")
+            raise ValueError(
+                f"spreadsheet named '{spreadsheet_name}' not found in folder {folder_id}"
+            )
         if len(matches) > 1:
-            raise ValueError(f"multiple spreadsheets named '{spreadsheet_name}' found in folder {folder_id}")
+            raise ValueError(
+                f"multiple spreadsheets named '{spreadsheet_name}' found in folder {folder_id}"
+            )
 
         match = matches[0]
     return {
@@ -282,7 +300,9 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0
 
 
-def _execute_with_retry(execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_BASE_DELAY):
+def _execute_with_retry(
+    execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_BASE_DELAY
+):
     """Execute a Sheets API request with exponential backoff retry on transient failures."""
     from googleapiclient.errors import HttpError
 
@@ -292,10 +312,12 @@ def _execute_with_retry(execute_fn, max_retries=_MAX_RETRIES, base_delay=_RETRY_
         except HttpError as exc:
             if exc.resp.status != 429 or attempt >= max_retries:
                 raise
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             logger.warning(
                 "429 rate limit hit, retrying in %.1fs (attempt %d/%d)",
-                delay, attempt + 1, max_retries,
+                delay,
+                attempt + 1,
+                max_retries,
             )
             time.sleep(delay)
 
@@ -322,7 +344,9 @@ def fetch_tab_rows(spreadsheet_id, worksheet_title, sheets_service, *, throttle=
     return values
 
 
-def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title, *, throttle=None):
+def fetch_sheet_structure_data(
+    sheets_service, spreadsheet_id, worksheet_title, *, throttle=None
+):
     """Fetch raw structural metadata for one worksheet tab.
 
     Issues a single ``spreadsheets().get()`` call scoped to rows 1-2 of the
@@ -355,6 +379,7 @@ def fetch_sheet_structure_data(sheets_service, spreadsheet_id, worksheet_title, 
         ")))"
         ")"
     )
+
     def _execute():
         return (
             sheets_service.spreadsheets()

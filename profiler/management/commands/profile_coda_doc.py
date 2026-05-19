@@ -78,6 +78,7 @@ def render_doc_tree(
 
 class Command(BaseCommand):
     """Enumerate tables and views in a Coda doc (and optionally column metadata)."""
+
     help = "Enumerate tables and views in a Coda doc (and optionally column metadata)"
 
     def add_arguments(self, parser):

@@ -45,7 +45,11 @@ from django.core.management.base import CommandError
 
 from googleapiclient.errors import HttpError
 
-from connectors.spreadsheet import column_index_to_letter, guess_header_row, raw_sheet_to_row_lists
+from connectors.spreadsheet import (
+    column_index_to_letter,
+    guess_header_row,
+    raw_sheet_to_row_lists,
+)
 from profiler.management.commands.profile_tab import (
     fetch_tab_grid,
     list_tabs,
@@ -88,24 +92,37 @@ def compute_column_profiles(summary: dict, return_patterns_by_slug: bool = False
     raw_patterns = summary.get("column_formula_patterns") or {}
     if isinstance(raw_patterns, dict) and raw_patterns:
         first_key = next(iter(raw_patterns))
-        patterns_by_letter = raw_patterns if not isinstance(raw_patterns[first_key], dict) else {}
+        patterns_by_letter = (
+            raw_patterns if not isinstance(raw_patterns[first_key], dict) else {}
+        )
     else:
         patterns_by_letter = {}
 
     candidates = summary.get("column_candidates") or summary.get("columns") or []
-    total_columns = max(
-        (c.get("total_columns") or c.get("total_count") or len(candidates)) for c in candidates
-    ) if candidates else 0
+    total_columns = (
+        max(
+            (c.get("total_columns") or c.get("total_count") or len(candidates))
+            for c in candidates
+        )
+        if candidates
+        else 0
+    )
 
     profiles = []
     for cand in candidates:
         letter = cand.get("letter") or cand.get("col_letter") or ""
-        header_raw = cand.get("header") or cand.get("header_label") or cand.get("name") or ""
-        header_slug = _slugify_header(header_raw) if header_raw else f"col_{letter.lower()}"
+        header_raw = (
+            cand.get("header") or cand.get("header_label") or cand.get("name") or ""
+        )
+        header_slug = (
+            _slugify_header(header_raw) if header_raw else f"col_{letter.lower()}"
+        )
         pattern = patterns_by_letter.get(letter, "raw")
 
         pattern_truncated = len(pattern) > _TRUNCATE_LENGTH
-        pattern_hash = hashlib.sha256(pattern.encode()).hexdigest()[:8] if pattern else ""
+        pattern_hash = (
+            hashlib.sha256(pattern.encode()).hexdigest()[:8] if pattern else ""
+        )
         if pattern_truncated:
             pattern = pattern[:_TRUNCATE_LENGTH]
 
@@ -126,21 +143,25 @@ def compute_column_profiles(summary: dict, return_patterns_by_slug: bool = False
             inferred_type = "formula"
 
         cross_refs = cand.get("cross_sheet_refs") or []
-        unique_values = cand.get("unique_values_sample") or cand.get("sample_values") or []
+        unique_values = (
+            cand.get("unique_values_sample") or cand.get("sample_values") or []
+        )
 
-        profiles.append(ColumnProfile(
-            letter=letter,
-            header_slug=header_slug,
-            header_raw=header_raw,
-            inferred_type=inferred_type,
-            formula_pattern=pattern,
-            non_empty_cells=total_count,
-            unique_value_sample=unique_values[:5],
-            is_section_header=is_section_header,
-            cross_sheet_refs=cross_refs,
-            pattern_truncated=pattern_truncated,
-            pattern_hash=pattern_hash,
-        ))
+        profiles.append(
+            ColumnProfile(
+                letter=letter,
+                header_slug=header_slug,
+                header_raw=header_raw,
+                inferred_type=inferred_type,
+                formula_pattern=pattern,
+                non_empty_cells=total_count,
+                unique_value_sample=unique_values[:5],
+                is_section_header=is_section_header,
+                cross_sheet_refs=cross_refs,
+                pattern_truncated=pattern_truncated,
+                pattern_hash=pattern_hash,
+            )
+        )
 
     if return_patterns_by_slug:
         return {
@@ -278,9 +299,7 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
     reference_weight = config.get("reference_weight", 3)
     derived_weight = config.get("derived_weight", -4)
     support_weight = config.get("support_weight", -2)
-    reference_combo_weight = config.get(
-        "reference_combo_weight", reference_weight
-    )
+    reference_combo_weight = config.get("reference_combo_weight", reference_weight)
     match_mode = config.get("match_mode", "substring")
     if match_mode not in ("substring", "word"):
         match_mode = "substring"
@@ -299,7 +318,9 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
                 penalty = int(entry.get("penalty", -5))
                 exclude_patterns.append({"pattern": compiled, "penalty": penalty})
             except re.error:
-                logger.warning("Invalid tab_exclude_pattern regex: %r", entry["pattern"])
+                logger.warning(
+                    "Invalid tab_exclude_pattern regex: %r", entry["pattern"]
+                )
     return {
         "operational_tokens": [
             token.lower()
@@ -330,7 +351,9 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
         "match_mode": match_mode,
         "exclude_patterns": exclude_patterns,
         "expansion_formula_penalty": int(config.get("expansion_formula_penalty", 0)),
-        "expansion_formula_threshold": float(config.get("expansion_formula_threshold", 0.5)),
+        "expansion_formula_threshold": float(
+            config.get("expansion_formula_threshold", 0.5)
+        ),
     }
 
 
@@ -346,7 +369,10 @@ def _normalize_column_heuristics(config: dict | None) -> dict:
 
 
 def score_tab(
-    title: str, rows: int, cols: int, *,
+    title: str,
+    rows: int,
+    cols: int,
+    *,
     tab_score_heuristics: dict | None = None,
     column_formula_patterns: dict[str, str] | None = None,
 ) -> tuple[int, list[str], dict]:
@@ -413,9 +439,7 @@ def score_tab(
     for _key, tokens, category, weight, reason in categories:
         if tokens:
             matched = [
-                token
-                for token in tokens
-                if _token_match(token, lowered, match_mode)
+                token for token in tokens if _token_match(token, lowered, match_mode)
             ]
             if matched:
                 score += weight
@@ -433,9 +457,7 @@ def score_tab(
     if combo_tokens:
         combo_weight = heuristics["reference_combo_weight"]
         for combo in combo_tokens:
-            if all(
-                _token_match(token, lowered, match_mode) for token in combo
-            ):
+            if all(_token_match(token, lowered, match_mode) for token in combo):
                 score += combo_weight
                 reasons.append("reference_lookup_tab_name")
                 token_matches.append(
@@ -478,10 +500,12 @@ def score_tab(
     for entry in heuristics.get("exclude_patterns", []):
         if entry["pattern"].search(title):
             exclude_penalties += entry["penalty"]
-            exclude_matches.append({
-                "pattern": entry["pattern"].pattern,
-                "penalty": entry["penalty"],
-            })
+            exclude_matches.append(
+                {
+                    "pattern": entry["pattern"].pattern,
+                    "penalty": entry["penalty"],
+                }
+            )
     if exclude_penalties:
         score += exclude_penalties
         reasons.append("tab_exclude_pattern")
@@ -492,7 +516,8 @@ def score_tab(
         expansion_threshold = heuristics.get("expansion_formula_threshold", 0.5)
         total_cols = len(column_formula_patterns)
         expansion_count = sum(
-            1 for pattern in column_formula_patterns.values()
+            1
+            for pattern in column_formula_patterns.values()
             if pattern == "expansion_formula"
         )
         if total_cols > 0 and (expansion_count / total_cols) >= expansion_threshold:
@@ -593,15 +618,11 @@ def select_tabs_from_inventory(
                 cat = tm.get("category", "unknown")
                 cat_counts[cat] = cat_counts.get(cat, 0) + 1
                 total_token_matches += 1
-            total_size_bonus += sum(
-                bd.get("size_bonuses", {}).values()
-            )
+            total_size_bonus += sum(bd.get("size_bonuses", {}).values())
         breakdown_summary = {
             "total_token_matches": total_token_matches,
             "category_counts": cat_counts,
-            "avg_size_bonus": round(
-                total_size_bonus / len(bucket["breakdowns"]), 2
-            )
+            "avg_size_bonus": round(total_size_bonus / len(bucket["breakdowns"]), 2)
             if bucket["breakdowns"]
             else 0,
         }
@@ -629,7 +650,10 @@ def select_tabs_from_inventory(
 
 
 def auto_select_tabs(
-    tab_shortlist: list[dict], *, per_workbook: int = 3, per_code_overrides: dict[str, int] | None = None
+    tab_shortlist: list[dict],
+    *,
+    per_workbook: int = 3,
+    per_code_overrides: dict[str, int] | None = None,
 ) -> dict[str, list[str]]:
     """Group shortlisted tabs by workbook code, sort by score/occurrences, and pick the top N per workbook. Returns ``{workbook_code: [tab_titles]}``."""
     grouped: dict[str, list[dict]] = defaultdict(list)
@@ -974,8 +998,16 @@ def _render_corpus_summary(
                 and row["tab_title"] == tab_title
                 and row["exit_code"] == 0
             )
-            status = "OK" if successes > 0 and failures == 0 else "FAIL" if failures > 0 else "N/A"
-            lines.append(f"- **{tab_title}** — {status} ({successes} ok, {failures} fail)")
+            status = (
+                "OK"
+                if successes > 0 and failures == 0
+                else "FAIL"
+                if failures > 0
+                else "N/A"
+            )
+            lines.append(
+                f"- **{tab_title}** — {status} ({successes} ok, {failures} fail)"
+            )
         lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -1117,7 +1149,10 @@ def run_cohort_corpus(
         if not isinstance(approved_tabs, dict) or not all(
             isinstance(workbook_code, str)
             and isinstance(selected_tab_titles, list)
-            and all(isinstance(tab_title_entry, str) for tab_title_entry in selected_tab_titles)
+            and all(
+                isinstance(tab_title_entry, str)
+                for tab_title_entry in selected_tab_titles
+            )
             for workbook_code, selected_tab_titles in approved_tabs.items()
         ):
             raise CommandError(
@@ -1150,7 +1185,9 @@ def run_cohort_corpus(
             try:
                 broad_payload = json.loads(broad_path.read_text(encoding="utf-8"))
                 for inventory_row in broad_payload.get("inventory_rows", []):
-                    known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
+                    known_tabs.add(
+                        (inventory_row["spreadsheet_id"], inventory_row["tab_title"])
+                    )
             except (json.JSONDecodeError, KeyError):
                 pass
 
@@ -1295,8 +1332,12 @@ def run_cohort_corpus(
             {
                 "generated_from": index_path.name,
                 "run_count": len(broad_results),
-                "success_count": sum(1 for row in broad_results if row["exit_code"] == 0),
-                "failure_count": sum(1 for row in broad_results if row["exit_code"] != 0),
+                "success_count": sum(
+                    1 for row in broad_results if row["exit_code"] == 0
+                ),
+                "failure_count": sum(
+                    1 for row in broad_results if row["exit_code"] != 0
+                ),
                 "results": broad_results,
                 "inventory_rows": inventory_rows,
             },
@@ -1349,7 +1390,9 @@ def run_cohort_corpus(
     if stop_before_deep:
         return artifacts
 
-    reuse_cached_deep = bool(skip_existing_deep) or bool(config.get("deep_skip_existing"))
+    reuse_cached_deep = bool(skip_existing_deep) or bool(
+        config.get("deep_skip_existing")
+    )
     deep_read_delay_seconds = float(config.get("deep_read_delay_seconds") or 0.5)
 
     deep_results: list[dict] = []
@@ -1379,7 +1422,9 @@ def run_cohort_corpus(
             )
             if reuse_cached_deep and out_path.exists():
                 try:
-                    cached_deep_payload = json.loads(out_path.read_text(encoding="utf-8"))
+                    cached_deep_payload = json.loads(
+                        out_path.read_text(encoding="utf-8")
+                    )
                     cached_grid_payload = cached_deep_payload.get("raw")
                     cached_tab_summary = cached_deep_payload.get("summary")
                 except json.JSONDecodeError:
@@ -1454,7 +1499,10 @@ def run_cohort_corpus(
                     )
                 )
             except Exception as exc:  # noqa: BLE001
-                is_429 = isinstance(exc, HttpError) and getattr(exc.resp, "status", None) == 429
+                is_429 = (
+                    isinstance(exc, HttpError)
+                    and getattr(exc.resp, "status", None) == 429
+                )
                 if is_429:
                     _429_cooldown_count += 1
                     if _429_cooldown_count <= _429_max_cooldowns:
@@ -1525,11 +1573,7 @@ def run_cohort_corpus(
     default_min = 0 if not column_heuristics.get("domain_keyword_tokens") else 4
     min_score = int(config.get("column_min_score", default_min))
     selected_columns = sorted(
-        [
-            row
-            for row in deduped.values()
-            if row["priority_score"] >= min_score
-        ],
+        [row for row in deduped.values() if row["priority_score"] >= min_score],
         key=lambda row: (
             -row["priority_score"],
             row["workbook_code"],

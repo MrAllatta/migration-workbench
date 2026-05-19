@@ -12,6 +12,7 @@ class ReleaseRecord(models.Model):
 
     Used by the ``wb`` CLI to track deploy history and health checks per space/environment.
     """
+
     space = models.CharField(max_length=128)
     environment = models.CharField(max_length=32)
     release_id = models.CharField(max_length=128)

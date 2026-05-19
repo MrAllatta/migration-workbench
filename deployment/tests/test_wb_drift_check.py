@@ -30,7 +30,9 @@ def _contract_with_model(model_name: str = "crop") -> dict:
     }
 
 
-def _run_drift_check(baseline: Path, new: Path, json_output: bool = False) -> subprocess.CompletedProcess:
+def _run_drift_check(
+    baseline: Path, new: Path, json_output: bool = False
+) -> subprocess.CompletedProcess:
     cmd = [sys.executable, "-m", "deployment.wb_cli"]
     if json_output:
         cmd.append("--json")
@@ -48,23 +50,28 @@ def test_drift_check_identical_contracts(tmp_path):
     result = _run_drift_check(baseline, new, json_output=True)
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
-    assert "identical" in payload["message"].lower() or "no drift" in payload["message"].lower()
+    assert (
+        "identical" in payload["message"].lower()
+        or "no drift" in payload["message"].lower()
+    )
 
 
 def test_drift_check_detects_added_model(tmp_path):
     old = _contract_with_model("crop")
     new_data = _contract_with_model("crop")
-    new_data["tables"].append({
-        "suggested_model_name": "variety",
-        "model_name": "Variety",
-        "columns": [
-            {
-                "suggested_field_name": "name",
-                "django_field_class": "models.CharField",
-                "django_field_kwargs": {"max_length": 200},
-            },
-        ],
-    })
+    new_data["tables"].append(
+        {
+            "suggested_model_name": "variety",
+            "model_name": "Variety",
+            "columns": [
+                {
+                    "suggested_field_name": "name",
+                    "django_field_class": "models.CharField",
+                    "django_field_kwargs": {"max_length": 200},
+                },
+            ],
+        }
+    )
     baseline = tmp_path / "baseline.yaml"
     new = tmp_path / "new.yaml"
     baseline.write_text(yaml.dump(old, sort_keys=False), encoding="utf-8")
@@ -79,11 +86,13 @@ def test_drift_check_detects_added_model(tmp_path):
 def test_drift_check_human_readable_output(tmp_path):
     old = _contract_with_model("crop")
     new_data = _contract_with_model("crop")
-    new_data["tables"][0]["columns"].append({
-        "suggested_field_name": "variety",
-        "django_field_class": "models.CharField",
-        "django_field_kwargs": {"max_length": 100},
-    })
+    new_data["tables"][0]["columns"].append(
+        {
+            "suggested_field_name": "variety",
+            "django_field_class": "models.CharField",
+            "django_field_kwargs": {"max_length": 100},
+        }
+    )
     baseline = tmp_path / "baseline.yaml"
     new = tmp_path / "new.yaml"
     baseline.write_text(yaml.dump(old, sort_keys=False), encoding="utf-8")

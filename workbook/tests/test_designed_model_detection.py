@@ -1,6 +1,5 @@
 """Tests for designed_model_detection module."""
 
-import pytest
 from workbook.codegen.designed_model_detection import (
     find_column_overlap_groups,
     suggest_designed_model,
@@ -11,7 +10,8 @@ def test_scaffold_includes_designed_models():
     """scaffold_workbook_schema emits designed models when tabs overlap."""
     from django.core.management import call_command
     from io import StringIO
-    import tempfile, json
+    import tempfile
+    import json
     from pathlib import Path
 
     bundle_config = {
@@ -28,9 +28,7 @@ def test_scaffold_includes_designed_models():
             },
         ]
     }
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False
-    ) as cfg:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as cfg:
         json.dump(bundle_config, cfg)
         cfg_path = cfg.name
     out_path = cfg_path.replace(".json", ".yaml")
@@ -39,18 +37,23 @@ def test_scaffold_includes_designed_models():
         out = StringIO()
         call_command(
             "scaffold_workbook_schema",
-            "--bundle-config", cfg_path,
-            "--out", out_path,
-
+            "--bundle-config",
+            cfg_path,
+            "--out",
+            out_path,
             stdout=out,
         )
         import yaml
+
         with open(out_path) as f:
             contract = yaml.safe_load(f)
         tables = contract.get("tables", [])
         source_aligned = [t for t in tables if t.get("bundle_worksheet_title")]
-        designed = [t for t in tables if t.get("source_tab") is None
-                     and t.get("bundle_worksheet_title") is None]
+        designed = [
+            t
+            for t in tables
+            if t.get("source_tab") is None and t.get("bundle_worksheet_title") is None
+        ]
         assert len(source_aligned) >= 2
         assert len(designed) >= 1
         assert designed[0]["suggested_model_name"] is not None
@@ -86,12 +89,12 @@ class TestFindColumnOverlapGroups:
             min_overlap_ratio=0.5,
         )
         assert any(
-            g for g in result
+            g
+            for g in result
             if set(g["tab_names"]) == {"Spring Planting", "Fall Planting"}
         )
         assert any(
-            g for g in result
-            if set(g["tab_names"]) == {"Spring Planting", "Harvest"}
+            g for g in result if set(g["tab_names"]) == {"Spring Planting", "Harvest"}
         )
 
     def test_suggested_model_structure(self):

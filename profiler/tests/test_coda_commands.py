@@ -26,7 +26,12 @@ def test_scan_coda_formula_columns_smoke_writes_output(tmp_path):
     config_path.write_text(json.dumps(config), encoding="utf-8")
     out_path = tmp_path / "out.json"
 
-    call_command("scan_coda_formula_columns", config=str(config_path), out=str(out_path), smoke=True)
+    call_command(
+        "scan_coda_formula_columns",
+        config=str(config_path),
+        out=str(out_path),
+        smoke=True,
+    )
 
     result = json.loads(out_path.read_text(encoding="utf-8"))
     assert result["mode"] == "smoke"
@@ -86,7 +91,10 @@ def test_profile_coda_table_lists_tables(monkeypatch):
         {"id": "t2", "name": "Beta", "type": "view", "rowCount": 1},
     ]
 
-    with patch("profiler.management.commands.profile_coda_table.list_tables", return_value=fake_tables):
+    with patch(
+        "profiler.management.commands.profile_coda_table.list_tables",
+        return_value=fake_tables,
+    ):
         out = StringIO()
         call_command("profile_coda_table", doc="https://coda.io/d/S_d1", stdout=out)
 

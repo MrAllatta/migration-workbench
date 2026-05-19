@@ -50,9 +50,15 @@ class ExampleVariety(models.Model):
     """A crop variety that may be associated with a farm."""
 
     name = models.CharField(max_length=200, unique=True)
-    crop = models.ForeignKey(ExampleCrop, on_delete=models.CASCADE, related_name="varieties")
+    crop = models.ForeignKey(
+        ExampleCrop, on_delete=models.CASCADE, related_name="varieties"
+    )
     farm = models.ForeignKey(
-        ExampleFarm, on_delete=models.SET_NULL, null=True, blank=True, related_name="varieties"
+        ExampleFarm,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="varieties",
     )
     seed_cost = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     full_description = models.TextField(blank=True, default="")

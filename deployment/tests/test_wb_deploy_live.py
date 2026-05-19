@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 
 import yaml
 
@@ -39,7 +38,10 @@ def _minimal_manifest() -> dict:
                 "build": {"dockerfile": "Dockerfile", "context": "."},
                 "runtime": {
                     "internal_port": 8080,
-                    "processes": {"web": "python manage.py runserver", "release": "python manage.py migrate"},
+                    "processes": {
+                        "web": "python manage.py runserver",
+                        "release": "python manage.py migrate",
+                    },
                     "healthcheck_path": "/healthz",
                     "healthcheck_timeout_s": 60,
                 },
@@ -73,13 +75,25 @@ def _minimal_manifest() -> dict:
 def test_deploy_rejects_neither_dry_run_nor_live(tmp_path):
     """Deploy without --dry-run or --live shows helpful error."""
     manifest_path = tmp_path / "spaces.yml"
-    manifest_path.write_text(yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8")
+    manifest_path.write_text(
+        yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8"
+    )
 
     result = subprocess.run(
-        [sys.executable, "-m", "deployment.wb_cli", "--json",
-         "--manifest", str(manifest_path),
-         "deploy", "test_space", "--env", "preview"],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "deployment.wb_cli",
+            "--json",
+            "--manifest",
+            str(manifest_path),
+            "deploy",
+            "test_space",
+            "--env",
+            "preview",
+        ],
+        capture_output=True,
+        text=True,
     )
     assert result.returncode != 0
     assert "Specify --dry-run" in result.stdout or "Specify --dry-run" in result.stderr
@@ -88,13 +102,26 @@ def test_deploy_rejects_neither_dry_run_nor_live(tmp_path):
 def test_deploy_live_flag_accepted_but_fails_without_fly(tmp_path):
     """Deploy --live is accepted by parser without triggering 'Specify --dry-run' error."""
     manifest_path = tmp_path / "spaces.yml"
-    manifest_path.write_text(yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8")
+    manifest_path.write_text(
+        yaml.dump(_minimal_manifest(), sort_keys=False), encoding="utf-8"
+    )
 
     result = subprocess.run(
-        [sys.executable, "-m", "deployment.wb_cli", "--json",
-         "--manifest", str(manifest_path),
-         "deploy", "test_space", "--env", "preview", "--live"],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-m",
+            "deployment.wb_cli",
+            "--json",
+            "--manifest",
+            str(manifest_path),
+            "deploy",
+            "test_space",
+            "--env",
+            "preview",
+            "--live",
+        ],
+        capture_output=True,
+        text=True,
     )
     # Verify --live is routed differently from bare deploy (no dry-run/live error).
     assert "Specify --dry-run" not in result.stdout

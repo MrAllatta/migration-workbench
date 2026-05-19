@@ -154,7 +154,6 @@ def test_build_view_manifest_filterable_from_validation():
 def test_build_view_manifest_binds_entity_from_contract():
     structure = _orders_structure()
     schema_contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -163,8 +162,14 @@ def test_build_view_manifest_binds_entity_from_contract():
                 "model_name": "Orders",
                 "bundle_output_path": "data/orders.csv",
                 "columns": [
-                    {"source_column": "Order ID", "suggested_field_name": "order_id_pk"},
-                    {"source_column": "Customer", "suggested_field_name": "customer_name"},
+                    {
+                        "source_column": "Order ID",
+                        "suggested_field_name": "order_id_pk",
+                    },
+                    {
+                        "source_column": "Customer",
+                        "suggested_field_name": "customer_name",
+                    },
                     {"source_column": "Status", "suggested_field_name": "status"},
                     {"source_column": "Total", "suggested_field_name": "total_amount"},
                 ],
@@ -205,15 +210,26 @@ def test_build_view_manifest_infers_time_scope_from_year_and_week():
                 "tab_position": 0,
                 "hidden": False,
                 "columns": [
-                    {"header_label": "Block", "is_formula": False, "data_validation_type": None},
-                    {"header_label": "Plan Field Week", "is_formula": False, "data_validation_type": None},
-                    {"header_label": "Source Bundle Year", "is_formula": False, "data_validation_type": None},
+                    {
+                        "header_label": "Block",
+                        "is_formula": False,
+                        "data_validation_type": None,
+                    },
+                    {
+                        "header_label": "Plan Field Week",
+                        "is_formula": False,
+                        "data_validation_type": None,
+                    },
+                    {
+                        "header_label": "Source Bundle Year",
+                        "is_formula": False,
+                        "data_validation_type": None,
+                    },
                 ],
             }
         ],
     }
     schema_contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -222,9 +238,24 @@ def test_build_view_manifest_infers_time_scope_from_year_and_week():
                 "model_name": "CropPlan",
                 "bundle_output_path": "data/crop_plans.csv",
                 "columns": [
-                    {"source_column": "Block", "suggested_field_name": "block", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "FieldBlock"}},
-                    {"source_column": "Plan Field Week", "suggested_field_name": "plan_field_week", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
-                    {"source_column": "Source Bundle Year", "suggested_field_name": "source_bundle_year", "django_field_class": "models.IntegerField", "django_field_kwargs": {"null": True}},
+                    {
+                        "source_column": "Block",
+                        "suggested_field_name": "block",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {"to": "FieldBlock"},
+                    },
+                    {
+                        "source_column": "Plan Field Week",
+                        "suggested_field_name": "plan_field_week",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"null": True},
+                    },
+                    {
+                        "source_column": "Source Bundle Year",
+                        "suggested_field_name": "source_bundle_year",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"null": True},
+                    },
                 ],
             }
         ],
@@ -249,14 +280,21 @@ def test_build_view_manifest_time_scope_with_date_field():
                 "tab_position": 0,
                 "hidden": False,
                 "columns": [
-                    {"header_label": "Outlet", "is_formula": False, "data_validation_type": None},
-                    {"header_label": "Distribution Date", "is_formula": False, "data_validation_type": None},
+                    {
+                        "header_label": "Outlet",
+                        "is_formula": False,
+                        "data_validation_type": None,
+                    },
+                    {
+                        "header_label": "Distribution Date",
+                        "is_formula": False,
+                        "data_validation_type": None,
+                    },
                 ],
             }
         ],
     }
     schema_contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -265,8 +303,18 @@ def test_build_view_manifest_time_scope_with_date_field():
                 "model_name": "MarketEntry",
                 "bundle_output_path": "data/market.csv",
                 "columns": [
-                    {"source_column": "Outlet", "suggested_field_name": "outlet", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"source_column": "Distribution Date", "suggested_field_name": "distribution_date", "django_field_class": "models.DateField", "django_field_kwargs": {"null": True}},
+                    {
+                        "source_column": "Outlet",
+                        "suggested_field_name": "outlet",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "source_column": "Distribution Date",
+                        "suggested_field_name": "distribution_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {"null": True},
+                    },
                 ],
             }
         ],
@@ -289,7 +337,6 @@ def test_build_view_manifest_status_values_with_column_profiles():
     """When column_profiles provides distinct values, status_values is populated."""
     structure = _orders_structure()
     schema_contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {
@@ -298,10 +345,30 @@ def test_build_view_manifest_status_values_with_column_profiles():
                 "model_name": "Orders",
                 "bundle_output_path": "data/orders.csv",
                 "columns": [
-                    {"source_column": "Order ID", "suggested_field_name": "order_id", "django_field_class": "models.IntegerField", "django_field_kwargs": {}},
-                    {"source_column": "Customer", "suggested_field_name": "customer", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"source_column": "Status", "suggested_field_name": "status", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 50}},
-                    {"source_column": "Total", "suggested_field_name": "total", "django_field_class": "models.DecimalField", "django_field_kwargs": {"max_digits": 10, "decimal_places": 2}},
+                    {
+                        "source_column": "Order ID",
+                        "suggested_field_name": "order_id",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {},
+                    },
+                    {
+                        "source_column": "Customer",
+                        "suggested_field_name": "customer",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "source_column": "Status",
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "source_column": "Total",
+                        "suggested_field_name": "total",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
                 ],
             }
         ],
@@ -340,7 +407,6 @@ def test_scaffold_view_manifest_command_writes_yaml(tmp_path):
 
     contract_path = tmp_path / "schema-contract.yaml"
     contract = {
-
         "source": {"provider": "google_sheets"},
         "tables": [
             {

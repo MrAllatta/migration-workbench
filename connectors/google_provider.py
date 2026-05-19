@@ -94,7 +94,9 @@ def shape_sheet_structure(response: dict, worksheet_title: str) -> dict | None:
         # Fall back to the header cell's validation when the sample row is empty;
         # validation rules typically apply to the whole column so this still
         # surfaces dropdowns even on otherwise-blank sheets.
-        dv_type = _data_validation_type(sample_cell) or _data_validation_type(header_cell)
+        dv_type = _data_validation_type(sample_cell) or _data_validation_type(
+            header_cell
+        )
         columns.append(
             {
                 "index": idx,
@@ -145,6 +147,7 @@ def shape_sheet_structure(response: dict, worksheet_title: str) -> dict | None:
 
 class GoogleSheetsAdapter(ProviderAdapter):
     """Google Sheets provider adapter for the profiler/importer pipeline."""
+
     def __init__(self, config: dict, throttle: SheetsThrottle | None = None):
         """Initialize the adapter from a source config dict. Optionally accepts a ``SheetsThrottle`` instance for API rate limiting."""
         self.throttle = throttle or default_throttle
@@ -153,8 +156,12 @@ class GoogleSheetsAdapter(ProviderAdapter):
         )
         self.drive_service = None
         if self.folder_id:
-            self.drive_service = build_google_service("drive", "v3", [DRIVE_READONLY_SCOPE])
-        self.sheets_service = build_google_service("sheets", "v4", [SHEETS_READONLY_SCOPE])
+            self.drive_service = build_google_service(
+                "drive", "v3", [DRIVE_READONLY_SCOPE]
+            )
+        self.sheets_service = build_google_service(
+            "sheets", "v4", [SHEETS_READONLY_SCOPE]
+        )
 
     def fetch_tab_rows(self, tab_config: dict) -> dict:
         """Fetch rows from a Google Sheets tab identified by *tab_config*. Resolves the spreadsheet by ID, URL, or folder search, then fetches and normalizes rows."""

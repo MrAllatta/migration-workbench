@@ -29,7 +29,10 @@ def test_profile_tab_lists_tabs():
         def spreadsheets(self):
             return FakeSpreadsheets()
 
-    with patch("profiler.management.commands.profile_tab.build_google_service", return_value=FakeService()):
+    with patch(
+        "profiler.management.commands.profile_tab.build_google_service",
+        return_value=FakeService(),
+    ):
         out = StringIO()
         call_command("profile_tab", spreadsheet_id="abc123", stdout=out)
 
@@ -56,8 +59,16 @@ def test_profile_tab_writes_out_files(tmp_path):
                                 "rowData": [
                                     {
                                         "values": [
-                                            {"userEnteredValue": {"stringValue": "Header"}},
-                                            {"userEnteredValue": {"stringValue": "Val"}},
+                                            {
+                                                "userEnteredValue": {
+                                                    "stringValue": "Header"
+                                                }
+                                            },
+                                            {
+                                                "userEnteredValue": {
+                                                    "stringValue": "Val"
+                                                }
+                                            },
                                         ]
                                     }
                                 ],
@@ -76,8 +87,13 @@ def test_profile_tab_writes_out_files(tmp_path):
             return FakeSpreadsheets()
 
     out_path = tmp_path / "tab_profile.json"
-    with patch("profiler.management.commands.profile_tab.build_google_service", return_value=FakeService()):
-        call_command("profile_tab", spreadsheet_id="abc123", tab="Tab A", out=str(out_path))
+    with patch(
+        "profiler.management.commands.profile_tab.build_google_service",
+        return_value=FakeService(),
+    ):
+        call_command(
+            "profile_tab", spreadsheet_id="abc123", tab="Tab A", out=str(out_path)
+        )
 
     assert out_path.exists()
     assert out_path.with_suffix(".md").exists()
@@ -94,7 +110,9 @@ def test_scan_formula_patterns_smoke_writes_output(tmp_path):
     config_path.write_text(json.dumps(config), encoding="utf-8")
     out_path = tmp_path / "scan_results.json"
 
-    call_command("scan_formula_patterns", config=str(config_path), out=str(out_path), smoke=True)
+    call_command(
+        "scan_formula_patterns", config=str(config_path), out=str(out_path), smoke=True
+    )
 
     result = json.loads(out_path.read_text(encoding="utf-8"))
     assert result["mode"] == "smoke"
@@ -186,7 +204,9 @@ def test_profile_drive_folder_reads_folder_id_from_config(tmp_path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder",
             return_value={
-                "folders": [{"id": "child-folder-1", "name": "Nested Folder", "truncated": True}],
+                "folders": [
+                    {"id": "child-folder-1", "name": "Nested Folder", "truncated": True}
+                ],
                 "spreadsheets": [
                     {
                         "id": "sheet-123",
@@ -200,7 +220,12 @@ def test_profile_drive_folder_reads_folder_id_from_config(tmp_path):
         ),
     ):
         stdout_buffer = StringIO()
-        call_command("profile_drive_folder", config=str(config_path), no_tabs=True, stdout=stdout_buffer)
+        call_command(
+            "profile_drive_folder",
+            config=str(config_path),
+            no_tabs=True,
+            stdout=stdout_buffer,
+        )
 
     rendered = stdout_buffer.getvalue()
     assert "# Folder: Corpus Root" in rendered

@@ -24,7 +24,13 @@ def test_migration_workbench_secrets_frozen_contract():
 def test_validate_manifest_rejects_legacy_allowed_hosts_secret_name():
     payload = {
         "version": 1,
-        "profiles": {"tiny": {"cpu": {"cores": 1, "type": "shared"}, "memory_mb": 256, "volume_gb": 5}},
+        "profiles": {
+            "tiny": {
+                "cpu": {"cores": 1, "type": "shared"},
+                "memory_mb": 256,
+                "volume_gb": 5,
+            }
+        },
         "replication_defaults": {
             "provider": "s3",
             "bucket_env": "LITESTREAM_BUCKET",
@@ -45,14 +51,26 @@ def test_validate_manifest_rejects_legacy_allowed_hosts_secret_name():
                 "build": {"dockerfile": "Dockerfile", "context": ".", "image": None},
                 "runtime": {
                     "internal_port": 8080,
-                    "processes": {"web": "gunicorn app.wsgi:application", "release": "python manage.py migrate"},
+                    "processes": {
+                        "web": "gunicorn app.wsgi:application",
+                        "release": "python manage.py migrate",
+                    },
                     "healthcheck_path": "/healthz",
                     "healthcheck_timeout_s": 60,
                 },
-                "storage": {"sqlite_path": "/data/db.sqlite3", "media_path": "/data/media"},
-                "replication": {"litestream_enabled": True, "replica_path_template": "bad/{env}"},
+                "storage": {
+                    "sqlite_path": "/data/db.sqlite3",
+                    "media_path": "/data/media",
+                },
+                "replication": {
+                    "litestream_enabled": True,
+                    "replica_path_template": "bad/{env}",
+                },
                 "backup": {
-                    "predeploy_checkpoint": {"required": True, "method": "litestream_snapshot"},
+                    "predeploy_checkpoint": {
+                        "required": True,
+                        "method": "litestream_snapshot",
+                    },
                     "retention_days": 7,
                 },
                 "environment": {"required": ["SQLITE_PATH"]},
@@ -75,13 +93,22 @@ def test_validate_manifest_rejects_legacy_allowed_hosts_secret_name():
     }
 
     issues = validate_manifest(payload)
-    assert any("DJANGO_ALLOWED_HOSTS" in issue.message and "ALLOWED_HOSTS" in issue.message for issue in issues)
+    assert any(
+        "DJANGO_ALLOWED_HOSTS" in issue.message and "ALLOWED_HOSTS" in issue.message
+        for issue in issues
+    )
 
 
 def test_validate_manifest_rejects_storage_volume_override():
     payload = {
         "version": 1,
-        "profiles": {"tiny": {"cpu": {"cores": 1, "type": "shared"}, "memory_mb": 256, "volume_gb": 5}},
+        "profiles": {
+            "tiny": {
+                "cpu": {"cores": 1, "type": "shared"},
+                "memory_mb": 256,
+                "volume_gb": 5,
+            }
+        },
         "replication_defaults": {
             "provider": "s3",
             "bucket_env": "LITESTREAM_BUCKET",
@@ -102,14 +129,27 @@ def test_validate_manifest_rejects_storage_volume_override():
                 "build": {"dockerfile": "Dockerfile", "context": ".", "image": None},
                 "runtime": {
                     "internal_port": 8080,
-                    "processes": {"web": "gunicorn app.wsgi:application", "release": "python manage.py migrate"},
+                    "processes": {
+                        "web": "gunicorn app.wsgi:application",
+                        "release": "python manage.py migrate",
+                    },
                     "healthcheck_path": "/healthz",
                     "healthcheck_timeout_s": 60,
                 },
-                "storage": {"sqlite_path": "/data/db.sqlite3", "media_path": "/data/media", "volume_gb": 10},
-                "replication": {"litestream_enabled": True, "replica_path_template": "demo/{env}"},
+                "storage": {
+                    "sqlite_path": "/data/db.sqlite3",
+                    "media_path": "/data/media",
+                    "volume_gb": 10,
+                },
+                "replication": {
+                    "litestream_enabled": True,
+                    "replica_path_template": "demo/{env}",
+                },
                 "backup": {
-                    "predeploy_checkpoint": {"required": True, "method": "litestream_snapshot"},
+                    "predeploy_checkpoint": {
+                        "required": True,
+                        "method": "litestream_snapshot",
+                    },
                     "retention_days": 7,
                 },
                 "environment": {"required": ["SQLITE_PATH"]},
@@ -129,7 +169,13 @@ def test_validate_manifest_rejects_storage_volume_override():
 def _minimal_valid_manifest() -> dict:
     return {
         "version": 1,
-        "profiles": {"tiny": {"cpu": {"cores": 1, "type": "shared"}, "memory_mb": 256, "volume_gb": 5}},
+        "profiles": {
+            "tiny": {
+                "cpu": {"cores": 1, "type": "shared"},
+                "memory_mb": 256,
+                "volume_gb": 5,
+            }
+        },
         "replication_defaults": {
             "provider": "s3",
             "bucket_env": "LITESTREAM_BUCKET",
@@ -150,14 +196,26 @@ def _minimal_valid_manifest() -> dict:
                 "build": {"dockerfile": "Dockerfile", "context": ".", "image": None},
                 "runtime": {
                     "internal_port": 8080,
-                    "processes": {"web": "gunicorn app.wsgi:application", "release": "python manage.py migrate"},
+                    "processes": {
+                        "web": "gunicorn app.wsgi:application",
+                        "release": "python manage.py migrate",
+                    },
                     "healthcheck_path": "/healthz",
                     "healthcheck_timeout_s": 60,
                 },
-                "storage": {"sqlite_path": "/data/db.sqlite3", "media_path": "/data/media"},
-                "replication": {"litestream_enabled": True, "replica_path_template": "test/{env}"},
+                "storage": {
+                    "sqlite_path": "/data/db.sqlite3",
+                    "media_path": "/data/media",
+                },
+                "replication": {
+                    "litestream_enabled": True,
+                    "replica_path_template": "test/{env}",
+                },
                 "backup": {
-                    "predeploy_checkpoint": {"required": True, "method": "litestream_snapshot"},
+                    "predeploy_checkpoint": {
+                        "required": True,
+                        "method": "litestream_snapshot",
+                    },
                     "retention_days": 7,
                 },
                 "environment": {"required": ["SQLITE_PATH"]},

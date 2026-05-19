@@ -267,7 +267,13 @@ class _StubAdapter(ProviderAdapter):
         self.calls.append(f"rows:{tab_config['worksheet_title']}")
         return {
             "rows": [
-                ["Block", "Block Type", "# of Beds", "Bed Width (feet)", "Bedfeet per Bed"],
+                [
+                    "Block",
+                    "Block Type",
+                    "# of Beds",
+                    "Bed Width (feet)",
+                    "Bedfeet per Bed",
+                ],
                 ["Field 1", "Field", "1", "3", "100"],
             ],
             "spreadsheet_id": "stub-doc",

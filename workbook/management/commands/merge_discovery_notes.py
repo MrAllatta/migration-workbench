@@ -47,7 +47,9 @@ class Command(BaseCommand):
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise CommandError("PyYAML is required to read/write manifest YAML.") from exc
+            raise CommandError(
+                "PyYAML is required to read/write manifest YAML."
+            ) from exc
 
         manifest_path = Path(options["manifest"]).resolve()
         if not manifest_path.is_file():

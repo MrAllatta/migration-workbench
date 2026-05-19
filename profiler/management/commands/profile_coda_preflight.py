@@ -16,6 +16,7 @@ from connectors.coda_source import (
 
 class Command(BaseCommand):
     """Validate Coda API token and optional doc access (read-only)."""
+
     help = "Validate Coda API token and optional doc access (read-only)."
 
     def add_arguments(self, parser):

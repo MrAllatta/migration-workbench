@@ -1,4 +1,7 @@
-from profiler.management.commands.pull_bundle import resolve_tab_title_for_year, expand_years_config
+from profiler.management.commands.pull_bundle import (
+    resolve_tab_title_for_year,
+    expand_years_config,
+)
 
 
 class TestResolveTabTitleForYear:
@@ -9,7 +12,10 @@ class TestResolveTabTitleForYear:
     def test_uses_year_specific_title(self):
         tab = {
             "worksheet_title": "Products 302 + 602",
-            "worksheet_title_by_year": {"2023": "Products", "2024": "Products 302 + 602"},
+            "worksheet_title_by_year": {
+                "2023": "Products",
+                "2024": "Products 302 + 602",
+            },
         }
         assert resolve_tab_title_for_year(tab, 2023) == "Products"
         assert resolve_tab_title_for_year(tab, 2024) == "Products 302 + 602"
@@ -51,7 +57,11 @@ class TestExpandYearsConfig:
                 "2024": {"spreadsheet_id": "1def", "source_bundle_year": 2024},
             },
             "tabs": [
-                {"worksheet_title": "Products", "output_path": "products.csv", "required_headers": ["Name"]},
+                {
+                    "worksheet_title": "Products",
+                    "output_path": "products.csv",
+                    "required_headers": ["Name"],
+                },
             ],
         }
         result = expand_years_config(config)
@@ -68,7 +78,11 @@ class TestExpandYearsConfig:
                 "2023": {"spreadsheet_id": "1abc", "source_bundle_year": 2023},
             },
             "tabs": [
-                {"worksheet_title": "Products", "output_path": "products.csv", "required_headers": ["Name"]},
+                {
+                    "worksheet_title": "Products",
+                    "output_path": "products.csv",
+                    "required_headers": ["Name"],
+                },
             ],
         }
         result = expand_years_config(config)
@@ -82,7 +96,11 @@ class TestExpandYearsConfig:
                 "2023": {"spreadsheet_id": "1abc", "source_bundle_year": 2023},
             },
             "tabs": [
-                {"worksheet_title": "Products", "output_path": "products.csv", "required_headers": ["Name"]},
+                {
+                    "worksheet_title": "Products",
+                    "output_path": "products.csv",
+                    "required_headers": ["Name"],
+                },
             ],
         }
         result = expand_years_config(config)
