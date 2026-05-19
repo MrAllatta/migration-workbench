@@ -25,6 +25,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from profiler.tools.enrichment_utils import _to_pascal_case
 from workbook.field_mapping import (
     map_profiler_column_to_django_field,
     merge_bundle_headers,
@@ -363,9 +364,11 @@ def build_contract(
 
         django_columns = _filter_section_headers(django_columns)
 
+        snake_model = model_name_from_output_path(output_path)
         entry: dict[str, Any] = {
             "bundle_worksheet_title": title,
-            "suggested_model_name": model_name_from_output_path(output_path),
+            "suggested_model_name": snake_model,
+            "model_name": _to_pascal_case(snake_model),
             "bundle_output_path": output_path,
             "columns": django_columns,
         }

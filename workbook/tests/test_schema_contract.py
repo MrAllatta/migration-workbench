@@ -205,3 +205,21 @@ def test_compute_bundle_paths_without_year():
     ]
     result = _compute_bundle_paths(tables, year=None)
     assert result[0]["import_config"]["bundle_path"] == "crop_info.csv"
+
+
+def test_build_contract_adds_model_name():
+    config = {
+        "source": "test",
+        "tabs": [
+            {
+                "worksheet_title": "Sales Channel",
+                "output_path": "reference/sales_channels.csv",
+                "required_headers": ["Name"],
+            }
+        ],
+    }
+    contract = build_contract(config)
+    assert len(contract["tables"]) == 1
+    table = contract["tables"][0]
+    assert "model_name" in table
+    assert table["model_name"] == "SalesChannels"
