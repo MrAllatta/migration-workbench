@@ -249,6 +249,26 @@ been pulled yet). Known gaps:
 - **Deploy smoke test:** full-path integration tests for `_deploy_live()` with
   mocked fly CLI and real HTTP health endpoint.
 
+### 0.9.1 — Makefile dedup & doc coverage (shipped 2026-05-17)
+
+- **Makefile target deduplication:** shared `workbook/makefile_targets.py` module replaces inline Makefile template in product scaffold.
+- **Documentation coverage:** docstrings and module docs for connectors, profiler, deployment, and workbook; `docs/INDEX.md`.
+- **Pipeline manifest wiring:** `generate-pipeline-manifest` wired into `generate-all` Makefile target.
+
+### 0.9.2 — Rich profiling & beta architecture (shipped 2026-05-18)
+
+- **Profiler enrichment functions:** computed fields, FK candidates, import keys, and entity groupings for Google Sheets and Coda sources.
+- **Cohort/Coda enrichment propagation:** enrichment fields flow through scaffold contract (`suggested_entity`, `suggested_fk_target`, `is_computed`, `is_import_key_candidate`, `cross_tab_group`).
+- **Import key candidates from enrichment:** scaffold uses enrichment metadata to propose `unique_on` instead of defaulting to first column.
+- **Domain knowledge flag:** `scaffold_workbook_schema --domain-knowledge` and example YAML for entity-aware contract generation.
+- **`model_name` required:** explicit PascalCase model name on every contract table; no derivation from `suggested_model_name`.
+- **`*_auto.py` output convention:** generated code writes to `models_auto.py` / `admin_auto.py` with stub re-export files; hand edits are preserved.
+- **Unified `wb` CLI:** `wb generate {models,admin,import,manifest}` and `wb validate contract` subcommands.
+- **Contract admin authoritative:** `generate_admin` treats contract `admin:` blocks as source of truth; view manifest is enrichment only.
+- **`bundle_path` auto-derive:** scaffold always derives import config path from model name.
+- **`validate_contract` management command:** standalone contract validation without code generation.
+- **Clean error on missing `bundle_path`:** actionable guidance instead of raw traceback.
+
 ## Longer-term (post-v1.0)
 
 ### Provider interface extraction

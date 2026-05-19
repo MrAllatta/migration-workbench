@@ -199,6 +199,31 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.9.2
+
+- **Rich profiling enrichment:** profiler enrichment functions for computed fields, FK candidates, import keys, and entity groupings (`profiler/tools/enrichment_utils.py`).
+- **Coda column enrichment:** `enrich_coda_columns` addsProfiler-column metadata for Coda sources.
+- **Cohort corpus enrichment propagation:** enrichment fields flow through scaffold contract generation (`suggested_entity`, `suggested_fk_target`, `is_computed`, `is_import_key_candidate`, `cross_tab_group`).
+- **Import key candidates from enrichment:** scaffold uses `is_import_key_candidate` to propose `unique_on` fields instead of always defaulting to the first column.
+- **Domain knowledge flag:** `scaffold_workbook_schema --domain-knowledge` loads entity-aware heuristics for contract generation.
+- **Scaffold polish:** createsuperuser Make target with env var support, admin URL redirect, sentinel marker in models.py template, PascalCase passthrough in `_to_pascal_case`.
+- **Makefile target deduplication:** shared `workbook/makefile_targets.py` module replaces inline Makefile template in `scripts/new_product.py`.
+- **Unified `wb` CLI:** `wb generate {models,admin,import,manifest}` and `wb validate contract` subcommands; Makefile targets use `wb` instead of `$(MANAGE)`.
+- **`*_auto.py` output convention:** `generate_models` writes `models_auto.py` with stub `models.py` re-export; `generate_admin` writes `admin_auto.py` with stub `admin.py`. Hand-edited files are never overwritten.
+- **`model_name` required:** every contract table must have an explicit `model_name` field; `get_model_name()` is a direct accessor, no derivation.
+- **Contract admin blocks authoritative:** `generate_admin` uses contract `admin:` blocks as-is; view manifest is enrichment only.
+- **`bundle_path` auto-derive:** scaffold always derives `import_config.bundle_path` from model name.
+- **`validate_contract` management command:** standalone contract validation without code generation.
+- **Clean error on missing `bundle_path`:** import generation gives actionable guidance instead of raw traceback.
+- **`--domain-knowledge` example YAML:** `domain-knowledge.example.yaml` shipped with scaffold output.
+
+### 0.9.1
+
+- **Makefile target deduplication:** shared `workbook/makefile_targets.py` module replaces inline Makefile template in product scaffold.
+- **Documentation coverage:** docstrings and module docs for connectors, profiler, deployment, and workbook.
+- **Documentation index:** `docs/INDEX.md` with cross-references.
+- **Pipeline manifest wiring:** `generate-pipeline-manifest` wired into `generate-all` Makefile target.
+
 ### 0.9.0
 
 - **Live deploy with health gate:** `wb deploy <space> --env <env> --live` performs a real Fly deploy, polls `/healthz`, and records release events. Outcome taxonomy: `deploy_start`, `deploy_failed`, `deploy_succeeded_healthy`, `deploy_succeeded_unhealthy`.

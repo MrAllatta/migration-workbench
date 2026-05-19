@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 **Status:** Draft
-**Applies to:** migration-workbench v0.9.1 → v1.0.0-beta
+**Applies to:** migration-workbench v0.9.2 → v1.0.0-beta
 
 ## Overview
 
