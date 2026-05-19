@@ -353,6 +353,11 @@ def build_contract(
                     "django_field_class": hint["django_field_class"],
                     "django_field_kwargs": hint["django_field_kwargs"],
                     "notes": hint.get("notes") or [],
+                    "suggested_entity": col.get("suggested_entity"),
+                    "suggested_fk_target": col.get("suggested_fk_target"),
+                    "is_computed": col.get("is_computed", False),
+                    "is_import_key_candidate": col.get("is_import_key_candidate", False),
+                    "cross_tab_group": col.get("cross_tab_group"),
                 }
             )
 

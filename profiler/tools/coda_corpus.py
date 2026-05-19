@@ -51,6 +51,50 @@ from connectors.coda_source import (
     rows_to_grid,
 )
 from profiler.management.commands.profile_coda_table import summarize_coda_table
+from profiler.tools.enrichment_utils import (
+    _IDENTIFIER_NAMES,
+    _IDENTIFIER_SUFFIXES,
+    _to_pascal_case,
+)
+
+
+def enrich_coda_columns(columns: list[dict[str, Any]]) -> None:
+    """Add is_computed, suggested_fk_target, and is_import_key_candidate enrichment fields to Coda column dicts in-place."""
+    for col in columns:
+        evidence = col.get("evidence") or {}
+        null_rate = evidence.get("null_rate")
+        unique_count = evidence.get("unique_count_sample") or 0
+        non_null_count = evidence.get("non_null_count") or 0
+
+        col["is_computed"] = bool(col.get("has_formula", False))
+
+        suggested_fk_target = None
+        ref_tables = col.get("ref_tables_seen") or evidence.get("ref_tables_seen") or []
+        if col.get("is_relation_type") and ref_tables:
+            if isinstance(ref_tables, list) and len(ref_tables) > 0 and isinstance(ref_tables[0], dict):
+                suggested_fk_target = ref_tables[0].get("tableName", "")
+        if suggested_fk_target is None:
+            name = col.get("proposed_canonical_field", "")
+            if name.endswith("_id"):
+                prefix = name[:-3]
+                suggested_fk_target = _to_pascal_case(prefix)
+        col["suggested_fk_target"] = suggested_fk_target
+
+        name = col.get("proposed_canonical_field", "")
+        is_identifier = False
+        for suffix in _IDENTIFIER_SUFFIXES:
+            if name.endswith(suffix):
+                is_identifier = True
+                break
+        if name in _IDENTIFIER_NAMES:
+            is_identifier = True
+        high_unique = (
+            isinstance(null_rate, (int, float))
+            and null_rate < 0.05
+            and non_null_count > 0
+            and unique_count / max(non_null_count, 1) >= 0.9
+        )
+        col["is_import_key_candidate"] = (is_identifier or high_unique) and not col["is_computed"]
 
 
 def make_slug(text: str) -> str:
@@ -328,6 +372,9 @@ def derive_column_candidates(
             score += 1
             reasons.append("formula_column")
         canonical = re.sub(r"[^a-z0-9]+", "_", lowered).strip("_")
+        data_row_count = summary.get("data_row_count") or 0
+        null_rate = col.get("null_rate") or 0
+        non_null_count = max(int(data_row_count * (1 - null_rate)), 0)
         candidates.append(
             {
                 "doc_name": doc_name,
@@ -341,7 +388,10 @@ def derive_column_candidates(
                     "unique_count_sample": col.get("unique_count_sample"),
                     "format_type": col.get("format_type"),
                     "ref_tables_seen": col.get("ref_tables_seen"),
+                    "non_null_count": non_null_count,
                 },
+                "has_formula": bool(col.get("has_formula")),
+                "is_relation_type": bool(col.get("is_relation_type")),
             }
         )
     return candidates
@@ -858,6 +908,8 @@ def run_coda_corpus(
             "results": deep_results,
         },
     )
+
+    enrich_coda_columns(candidate_columns)
 
     relationship_path = out_dir / f"coda_relationship_summary_{date_stamp}.json"
     write_json(

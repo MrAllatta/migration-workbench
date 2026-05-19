@@ -52,6 +52,13 @@ from profiler.management.commands.profile_tab import (
     summarize_tab,
 )
 
+from profiler.tools.enrichment_utils import (
+    _ENTITY_KEYWORDS,
+    _IDENTIFIER_NAMES,
+    _IDENTIFIER_SUFFIXES,
+    _to_pascal_case,
+)
+
 logger = logging.getLogger(__name__)
 
 _TRUNCATE_LENGTH = 200
@@ -812,6 +819,89 @@ def derive_column_candidates(
     return candidates
 
 
+def enrich_computed_fields(columns: list[dict]) -> None:
+    computed_patterns = {"row_formula", "expansion_formula"}
+    for col in columns:
+        evidence = col.get("evidence") or {}
+        pattern = evidence.get("formula_pattern")
+        col["is_computed"] = pattern in computed_patterns
+
+
+def enrich_fk_candidates(columns: list[dict], entity_names: set[str]) -> None:
+    for col in columns:
+        name = col.get("proposed_canonical_field", "")
+        evidence = col.get("evidence") or {}
+        target = None
+        if name.endswith("_id"):
+            prefix = name[:-3]
+            target = _to_pascal_case(prefix)
+        elif name.lower() in _ENTITY_KEYWORDS:
+            target = _to_pascal_case(name)
+        elif evidence.get("cross_sheet_refs"):
+            target = _to_pascal_case(name)
+        if target is not None:
+            if entity_names and target not in entity_names:
+                target = None
+        col["suggested_fk_target"] = target
+
+
+def enrich_import_key_candidates(columns: list[dict]) -> None:
+    for col in columns:
+        name = col.get("proposed_canonical_field", "")
+        is_identifier = False
+        for suffix in _IDENTIFIER_SUFFIXES:
+            if name.endswith(suffix):
+                is_identifier = True
+                break
+        if name in _IDENTIFIER_NAMES:
+            is_identifier = True
+        is_computed = col.get("is_computed", False)
+        col["is_import_key_candidate"] = is_identifier and not is_computed
+
+
+def enrich_entity_groupings(
+    columns: list[dict],
+) -> dict[str, str]:
+    tab_headers: dict[tuple[str, str], set[str]] = {}
+    for col in columns:
+        key = (col.get("workbook_code", ""), col.get("tab_title", ""))
+        tab_headers.setdefault(key, set()).add(col.get("proposed_canonical_field", ""))
+    tabs_by_wb: dict[str, list[tuple[str, set[str]]]] = {}
+    for (wb_code, tab_title), headers in tab_headers.items():
+        tabs_by_wb.setdefault(wb_code, []).append((tab_title, headers))
+    entity_map: dict[str, str] = {}
+    group_counter = 0
+    for wb_code, tab_list in tabs_by_wb.items():
+        if len(tab_list) < 2:
+            continue
+        assigned: dict[str, str] = {}
+        for i, (title_a, headers_a) in enumerate(tab_list):
+            if title_a in assigned:
+                continue
+            for j, (title_b, headers_b) in enumerate(tab_list):
+                if j <= i:
+                    continue
+                if title_b in assigned:
+                    continue
+                if len(headers_a & headers_b) >= 2:
+                    if title_a not in assigned:
+                        group_name = f"{wb_code}_entity_{group_counter}"
+                        group_counter += 1
+                        assigned[title_a] = group_name
+                    assigned[title_b] = assigned[title_a]
+        for tab_title, entity_name in assigned.items():
+            entity_map[tab_title] = entity_name
+    for col in columns:
+        entity_name = entity_map.get(col.get("tab_title", ""))
+        if entity_name is not None:
+            col["suggested_entity"] = entity_name
+            col["cross_tab_group"] = entity_name
+        else:
+            col["suggested_entity"] = None
+            col["cross_tab_group"] = None
+    return entity_map
+
+
 def write_json(path: Path, payload: dict):
     """Create parent directories if needed and write *payload* as pretty-printed JSON to *path*."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1415,6 +1505,11 @@ def run_cohort_corpus(
             "results": deep_results,
         },
     )
+
+    enrich_computed_fields(candidate_columns)
+    enrich_fk_candidates(candidate_columns, set())
+    enrich_import_key_candidates(candidate_columns)
+    enrich_entity_groupings(candidate_columns)
 
     deduped: dict[tuple[str, str, str], dict] = {}
     for candidate in candidate_columns:
