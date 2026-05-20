@@ -130,41 +130,17 @@ def deduplicate_index_records(
 ) -> list[dict]:
     """Filter index records for Phase 3 deep profiling.
 
-    1. Remove records for archived years.
-    2. For each ``(workbook_code, tab_title)`` in *approved_tabs* that appears
-       across multiple years and is **not** a dedup exception, keep only the
-       latest year's record.
+    Removes records for archived years. Tab-level deduplication
+    (latest-year-per-tab and exceptions) is handled in the
+    deep-profiling loop where tab_title is in scope.
 
     When *domain_context* is ``None``, returns *index_records* unchanged.
     """
     if domain_context is None:
         return list(index_records)
 
-    # Step 1: remove archived years
-    filtered = [
+    return [
         rec
         for rec in index_records
         if not domain_context.is_archived_year(rec.get("year"))
     ]
-
-    # Step 2: group by workbook_code, deduplicate tabs across years
-    grouped: dict[str, list[dict]] = defaultdict(list)
-    for rec in filtered:
-        grouped[rec["workbook_code"]].append(rec)
-
-    result: list[dict] = []
-    for workbook_code, wb_records in grouped.items():
-        tab_titles = approved_tabs.get(workbook_code, [])
-        for tab_title in tab_titles:
-            if domain_context.is_deduplication_exception(tab_title):
-                result.extend(rec for rec in wb_records if rec.get("spreadsheet_id"))
-            else:
-                latest = max(
-                    (rec for rec in wb_records),
-                    key=lambda r: r.get("year") or 0,
-                    default=None,
-                )
-                if latest is not None:
-                    result.append(latest)
-
-    return result

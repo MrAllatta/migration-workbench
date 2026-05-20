@@ -75,7 +75,7 @@ def test_merge_vocabulary_no_context():
     assert merge_vocabulary(heuristics, None) == heuristics
 
 
-def test_deduplicate_index_records_latest_year():
+def test_deduplicate_index_records_filters_archived():
     ctx = DomainContext(
         year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
         deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
@@ -88,27 +88,8 @@ def test_deduplicate_index_records_latest_year():
     ]
     approved = {"402": ["Crop Planner"]}
     filtered = deduplicate_index_records(records, approved, ctx)
-    assert len(filtered) == 1
-    assert filtered[0]["year"] == 2026
-    assert filtered[0]["spreadsheet_id"] == "s4"
-
-
-def test_deduplicate_index_records_exception():
-    """Dedup exception tab keeps all profile years."""
-    ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025], archived=[], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(
-            strategy="latest_year",
-            exceptions=[{"tab_title": "Sales Actuals", "reason": "Changes yearly"}],
-        ),
-    )
-    records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
-    ]
-    approved = {"402": ["Sales Actuals"]}
-    filtered = deduplicate_index_records(records, approved, ctx)
     assert len(filtered) == 2
+    assert {r["year"] for r in filtered} == {2025, 2026}
 
 
 def test_deduplicate_index_records_archived_filter():
