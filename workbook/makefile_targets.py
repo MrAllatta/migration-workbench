@@ -82,6 +82,10 @@ def phonies(ctx: MakeContext) -> list[str]:
         "profile-cohort-corpus-phase1",
         "profile-cohort-corpus-phase2",
         "profile-cohort-corpus-phase3",
+        "draft-domain-context",
+        "validate-domain-context",
+        "extract-workbook-codes",
+        "orient",
         "docker-build",
         "fly-launch",
         "fly-volume",
@@ -485,6 +489,43 @@ def createsuperuser_block(ctx: MakeContext) -> str:
     )
 
 
+def draft_domain_context_block(ctx: MakeContext) -> str:
+    return (
+        "draft-domain-context:\n"
+        + _indent(
+            '$(MANAGE) draft_domain_context '
+            '--drive-tree "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}" '
+            '--out config/domain_context.yaml'
+        )
+        + "\n\n"
+    )
+
+
+def validate_domain_context_block(ctx: MakeContext) -> str:
+    return (
+        "validate-domain-context:\n"
+        + _indent('$(MANAGE) validate_domain_context --config config/domain_context.yaml')
+        + "\n\n"
+    )
+
+
+def extract_workbook_codes_block(ctx: MakeContext) -> str:
+    return (
+        "extract-workbook-codes:\n"
+        + _indent(
+            '$(MANAGE) extract_workbook_codes '
+            '--drive-tree "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}" '
+            '--config config/cohort_corpus.json '
+            '--update-config'
+        )
+        + "\n\n"
+    )
+
+
+def orient_block(ctx: MakeContext) -> str:
+    return "orient: validate-domain-context profile-drive-folder extract-workbook-codes\n\n"
+
+
 def full_targets_block(ctx: MakeContext) -> str:
     """Return all shared target blocks concatenated into one Makefile section."""
     parts = [
@@ -492,6 +533,10 @@ def full_targets_block(ctx: MakeContext) -> str:
         "\n",
         codegen_tooling_block(ctx),
         "\n",
+        draft_domain_context_block(ctx),
+        validate_domain_context_block(ctx),
+        extract_workbook_codes_block(ctx),
+        orient_block(ctx),
         generate_models_block(ctx),
         generate_admin_block(ctx),
         generate_import_block(ctx),

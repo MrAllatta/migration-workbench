@@ -604,15 +604,26 @@ Profiling follows a **4-phase workflow** to avoid expensive API calls until heur
 
 #### Phase 0 — Orient
 
-Before running Phase 1, populate `config/domain_context.yaml`:
+Run these commands in order. Each is safe to re-run.
 
-1. **Read raw notes** in `data/raw_notes/` — extract entity names, relationships, and temporal scope.
-2. **Inspect drive tree** from `make profile-drive-folder` — identify workbook codes and year distribution.
-3. **Set year_scope** — mark active years (profile in full), archived years (skip), and forward years.
-4. **Populate vocabulary** — list domain words for operational, reference, support, and derived tabs.
-5. **Add glossary** entries for abbreviations (e.g., `qty: quantity`).
-6. **Review deduplication** — by default, tabs appearing across multiple years are profiled only for the latest year.
-   Add exceptions for tabs that change meaning across years (e.g., Sales Actuals).
+1. **Draft domain context** (optional seed from drive tree):
+   ```bash
+   make draft-domain-context
+   ```
+2. **Edit** `config/domain_context.yaml` — set year scope, vocabulary, glossary.
+3. **Validate** the domain context file:
+   ```bash
+   make validate-domain-context
+   ```
+4. **Profile the drive folder**:
+   ```bash
+   make profile-drive-folder
+   ```
+5. **Extract workbook codes** into `config/cohort_corpus.json`:
+   ```bash
+   make extract-workbook-codes
+   ```
+6. Review `config/cohort_corpus.json` — adjust heuristics before Phase 1.
 
 #### Phase 1 — Discovery + tab selection
 
