@@ -8,10 +8,13 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
 
 install:
 	$(PIP) install -e ".[dev]"
+
+preflight:
+	$(PYTHON) scripts/preflight.py
 
 migrate:
 	$(MANAGE) makemigrations
@@ -50,7 +53,7 @@ CONTRACT ?= build/schema-contract.yaml
 OUT ?= build/out.py
 
 validate-contract:
-	wb validate contract --contract "$(CONTRACT)"
+	wb validate contract --contract "$(CONTRACT)" $(if $(STRICT),--strict)
 
 diff-generated:
 	wb generate models --contract $(CONTRACT) --out $(OUT) --diff
