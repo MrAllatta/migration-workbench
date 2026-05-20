@@ -805,6 +805,7 @@ def derive_column_candidates(
     tab_title: str,
     payload: dict,
     column_score_heuristics: dict | None = None,
+    domain_context: DomainContext | None = None,
 ) -> list[dict]:
     """Extract column headers from a raw sheet payload and score each by domain keywords and formula density. Returns a list of candidate dicts with canonical field name proposals."""
     summary = payload.get("summary", {})
@@ -834,6 +835,10 @@ def derive_column_candidates(
     candidates: list[dict] = []
     for col_letter, header in headers[:40]:
         lowered = header.lower()
+        if domain_context is not None and domain_context.glossary:
+            header_expanded = glossary_expand(lowered, domain_context.glossary)
+            if header_expanded:
+                lowered = lowered + " " + " ".join(header_expanded)
         score = 0
         reasons: list[str] = []
         if domain_keyword_tokens and any(

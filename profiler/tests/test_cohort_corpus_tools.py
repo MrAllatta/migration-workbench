@@ -1631,6 +1631,33 @@ def test_select_tabs_duplicate_years_annotation():
     assert entry.get("duplicate_years") == [2023]
 
 
+def test_derive_column_candidates_glossary():
+    ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
+    payload = {
+        "summary": {"formula_cell_count": 0, "functions_used": [], "column_formula_patterns": {}},
+        "raw": {
+            "sheets": [{
+                "data": [{
+                    "startRow": 0,
+                    "rowData": [
+                        {"values": [{"formattedValue": "Qty"}, {"formattedValue": "Item"}, {"formattedValue": "Price"}, {"formattedValue": "Date"}]},
+                        {"values": [{"formattedValue": "5"}, {"formattedValue": "Apple"}, {"formattedValue": "1.00"}, {"formattedValue": "2025-01-01"}]},
+                    ],
+                }],
+            }],
+        },
+    }
+    candidates = derive_column_candidates(
+        workbook_code="402", year=2025, spreadsheet_id="s1", tab_title="Test",
+        payload=payload,
+        column_score_heuristics={"domain_keyword_tokens": ["quantity"]},
+        domain_context=ctx,
+    )
+    qty_candidates = [c for c in candidates if c["column_header"] == "Qty"]
+    assert len(qty_candidates) == 1
+    assert "domain_keyword" in qty_candidates[0]["priority_reasons"]
+
+
 def test_select_tabs_no_domain_context_unchanged():
     """Without domain_context, legacy behavior: old coverage bonus, no duplicate_years."""
     index_records = [
