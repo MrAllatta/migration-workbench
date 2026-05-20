@@ -157,10 +157,7 @@ def deduplicate_index_records(
         tab_titles = approved_tabs.get(workbook_code, [])
         for tab_title in tab_titles:
             if domain_context.is_deduplication_exception(tab_title):
-                result.extend(
-                    rec for rec in wb_records
-                    if rec.get("spreadsheet_id")
-                )
+                result.extend(rec for rec in wb_records if rec.get("spreadsheet_id"))
             else:
                 latest = max(
                     (rec for rec in wb_records),

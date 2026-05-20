@@ -618,8 +618,8 @@ def select_tabs_from_inventory(
     for bucket in aggregate.values():
         avg_score = sum(bucket["scores"]) / len(bucket["scores"])
         if domain_context is not None:
-            active_or_forward = (
-                set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+            active_or_forward = set(domain_context.year_scope.active) | set(
+                domain_context.year_scope.forward
             )
             bonus_years = len(bucket["years"] & active_or_forward)
             coverage_bonus = 1 if bonus_years >= 2 else 0
@@ -669,7 +669,9 @@ def select_tabs_from_inventory(
         for entry in selected:
             years = entry.get("years", [])
             if len(years) > 1:
-                active_or_forward = set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+                active_or_forward = set(domain_context.year_scope.active) | set(
+                    domain_context.year_scope.forward
+                )
                 non_active = sorted(y for y in years if y not in active_or_forward)
                 if non_active:
                     entry["duplicate_years"] = non_active
@@ -1273,7 +1275,9 @@ def run_cohort_corpus(
             "candidate_count": len(tab_shortlist),
         }
         if domain_context is not None:
-            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(
+                lambda: defaultdict(int)
+            )
             for row in tab_shortlist:
                 for yr in row.get("years", []):
                     by_wb_by_year[row["workbook_code"]][str(yr)] = (
@@ -1282,9 +1286,7 @@ def run_cohort_corpus(
             selection_summary["by_workbook_by_year"] = {
                 wb: dict(years) for wb, years in by_wb_by_year.items()
             }
-            dup_total = sum(
-                len(r.get("duplicate_years", [])) for r in tab_shortlist
-            )
+            dup_total = sum(len(r.get("duplicate_years", [])) for r in tab_shortlist)
             if dup_total:
                 selection_summary["deduplication_note"] = (
                     f"{dup_total} structural duplicates collapsed via latest_year strategy"
@@ -1421,7 +1423,9 @@ def run_cohort_corpus(
             "candidate_count": len(tab_shortlist),
         }
         if domain_context is not None:
-            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(
+                lambda: defaultdict(int)
+            )
             for row in tab_shortlist:
                 for yr in row.get("years", []):
                     by_wb_by_year[row["workbook_code"]][str(yr)] = (
@@ -1430,9 +1434,7 @@ def run_cohort_corpus(
             selection_summary["by_workbook_by_year"] = {
                 wb: dict(years) for wb, years in by_wb_by_year.items()
             }
-            dup_total = sum(
-                len(r.get("duplicate_years", [])) for r in tab_shortlist
-            )
+            dup_total = sum(len(r.get("duplicate_years", [])) for r in tab_shortlist)
             if dup_total:
                 selection_summary["deduplication_note"] = (
                     f"{dup_total} structural duplicates collapsed via latest_year strategy"
@@ -1500,7 +1502,9 @@ def run_cohort_corpus(
     _429_cooldown_count = 0
     _429_abort = False
 
-    index_records = deduplicate_index_records(index_records, approved_tabs, domain_context)
+    index_records = deduplicate_index_records(
+        index_records, approved_tabs, domain_context
+    )
 
     for record in index_records:
         if _429_abort:

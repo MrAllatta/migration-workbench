@@ -2,11 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Introduce a `domain_context.yaml` artifact that the profiler reads at scoring time, enabling year-aware deduplication, vocabulary-to-token mapping, and glossary synonym expansion. Fix four pipeline friction points along the way.
+**Goal:** Introduce a `domain_context.yaml` artifact that the profiler reads at scoring time, enabling period-aware deduplication, vocabulary-to-token mapping, and glossary synonym expansion. Fix four pipeline friction points along the way.
 
-**Architecture:** A new `DomainContext` dataclass in `profiler/tools/domain_context.py` loads from a YAML file referenced by `cohort_corpus.json`. It flows into `select_tabs_from_inventory()`, `score_tab()`, and `derive_column_candidates()` via optional parameters (backward-compatible). Year scoping filters inventory rows before scoring. Deduplication collapses structural duplicates across years. Vocabulary merges into heuristic tokens. Glossary expands column matching.
+**Architecture:** A `DomainContext` dataclass loaded from YAML is referenced by `cohort_corpus.json`. It flows into `select_tabs_from_inventory()`, `score_tab()`, and `derive_column_candidates()` via optional parameters (backward-compatible). The schema uses `periods.profile/skip` (not `year_scope.active/archived`) to generalize across years, quarters, months, or editions. A separate `deduplicate_index_records()` filters the index before Phase 3 so structural duplicates across periods are profiled only for the latest period. Vocabulary merges into heuristic tokens. Glossary expands column matching.
 
-**Tech Stack:** Python 3.11+, Django, pytest, PyYAML (already a dependency)
+**Tech Stack:** Python 3.11+, Django, pytest, PyYAML (add to pyproject.toml if missing)
+
+**Key architectural insight — why dedup is NOT inside select_tabs_from_inventory:** The deep profiling loop (line 1412) iterates over `index_records` directly, not the shortlist. Writing `duplicate_years` on shortlist entries only changes display — Phase 3 still sees all 4 index records for "Crop Planner" and profiles all 4 spreadsheets. The fix: a standalone `deduplicate_index_records()` called in `run_cohort_corpus` between tab selection and deep profiling. Shortlist dedup annotation is informational only; the real filtering happens at the index level.
+
+**Why `periods.profile/skip` not `year_scope.active/archived`:** The regex in `cohort_corpus.json` extracts a numeric period value from spreadsheet names. For farms that's a year. For monthly reports it's `202501`. For editions it's `1,2,3,4`. The dedup logic (`max(rec["year"])`) works for any numeric monotonic period. The schema names communicate the universal concept, not the farm-specific instance. `forward` is removed — it duplicates `profile` (if you want to profile a period, add it to `profile`).
 
 ---
 
@@ -15,18 +19,30 @@
 **Files:**
 - Create: `profiler/tools/domain_context.py`
 - Create: `profiler/tests/test_domain_context.py`
+- Check: `pyproject.toml` for `pyyaml` dependency
 
-- [ ] **Step 1: Write failing tests for DomainContext**
+- [ ] **Step 1: Verify PyYAML is in pyproject.toml**
+
+Run: `cd /home/user/migration-workbench && grep -i yaml pyproject.toml`
+If missing, add `"pyyaml"` to the `dependencies` list in `pyproject.toml`.
+
+- [ ] **Step 2: Write failing tests**
 
 Create `profiler/tests/test_domain_context.py`:
 
 ```python
-"""Tests for domain context loading and vocabulary merging."""
+"""Tests for domain context loading, vocabulary merging, and index deduplication."""
 
-import pytest
 from pathlib import Path
 
-from profiler.tools.domain_context import DomainContext, load_domain_context, merge_vocabulary
+import pytest
+
+from profiler.tools.domain_context import (
+    DomainContext,
+    deduplicate_index_records,
+    load_domain_context,
+    merge_vocabulary,
+)
 
 
 def test_load_domain_context_from_yaml(tmp_path):
@@ -34,18 +50,12 @@ def test_load_domain_context_from_yaml(tmp_path):
     ctx_file.write_text(
         "domain: farm_management\n"
         "description: Farm ops tracking\n"
-        "year_scope:\n"
-        "  active: [2025, 2026]\n"
-        "  archived: [2023, 2024]\n"
-        "  forward: []\n"
+        "periods:\n"
+        "  profile: [2025, 2026]\n"
+        "  skip: [2023, 2024]\n"
         "deduplication:\n"
         "  strategy: latest_year\n"
         "  exceptions: []\n"
-        "entities:\n"
-        "  - name: Season\n"
-        "    tabs: [Crop Planner]\n"
-        "    operational: true\n"
-        "    description: Top-level season org\n"
         "vocabulary:\n"
         "  operational: [planting, harvest]\n"
         "  reference: [variety, crop]\n"
@@ -53,57 +63,32 @@ def test_load_domain_context_from_yaml(tmp_path):
         "  derived: [summary, pivot]\n"
         "glossary:\n"
         "  qty: quantity\n"
-        "  amt: amount\n"
         "scope_notes: Active year is 2025\n"
     )
     ctx = load_domain_context(ctx_file)
     assert ctx is not None
     assert ctx.domain == "farm_management"
     assert ctx.year_scope.active == [2025, 2026]
-    assert ctx.year_scope.archived == [2023, 2024]
-    assert ctx.deduplication.strategy == "latest_year"
-    assert len(ctx.entities) == 1
-    assert ctx.entities[0]["name"] == "Season"
     assert ctx.vocabulary.operational == ["planting", "harvest"]
+    assert ctx.glossary == {"qty": "quantity"}
 
 
 def test_load_domain_context_missing_file(tmp_path):
-    ctx = load_domain_context(tmp_path / "nonexistent.yaml")
-    assert ctx is None
+    assert load_domain_context(tmp_path / "nonexistent.yaml") is None
 
 
-def test_load_domain_context_empty_values(tmp_path):
+def test_load_domain_context_strips_underscore_keys(tmp_path):
     ctx_file = tmp_path / "domain_context.yaml"
-    ctx_file.write_text("domain: ''\n")
-    ctx = load_domain_context(ctx_file)
-    assert ctx is not None
-    assert ctx.domain == ""
-    assert ctx.year_scope.active == []
-    assert ctx.year_scope.archived == []
-    assert ctx.year_scope.forward == []
-    assert ctx.deduplication.strategy == "latest_year"
-    assert ctx.deduplication.exceptions == []
-    assert ctx.vocabulary.operational == []
-
-
-def test_load_domain_context_strips_documentation_keys(tmp_path):
-    ctx_file = tmp_path / "domain_context.yaml"
-    ctx_file.write_text(
-        "_doc:\n"
-        "  note: This key should be ignored\n"
-        "domain: test\n"
-        "_another_private_key: also ignored\n"
-    )
+    ctx_file.write_text("_doc: ignored\ndomain: test\n")
     ctx = load_domain_context(ctx_file)
     assert ctx is not None
     assert ctx.domain == "test"
 
 
-def test_merge_vocabulary_combines_tokens():
+def test_merge_vocabulary_with_context():
     ctx = DomainContext(
         vocabulary=DomainContext.VocabularyContext(
-            operational=["planting", "harvest"],
-            reference=["variety"],
+            operational=["planting", "harvest"], reference=["variety"]
         )
     )
     heuristics = {
@@ -115,72 +100,84 @@ def test_merge_vocabulary_combines_tokens():
     merged = merge_vocabulary(heuristics, ctx)
     assert "planting" in merged["operational_tokens"]
     assert "nursery" in merged["operational_tokens"]
-    assert "variety" in merged["reference_tokens"]
-    assert "reference" in merged["reference_tokens"]
-    assert "index" in merged["support_tokens"]
-    assert "summary" in merged["derived_tokens"]
-
-
-def test_merge_vocabulary_no_duplicates():
-    ctx = DomainContext(
-        vocabulary=DomainContext.VocabularyContext(
-            operational=["planting"],
-        )
-    )
-    heuristics = {
-        "operational_tokens": ["planting"],
-        "reference_tokens": [],
-        "support_tokens": [],
-        "derived_tokens": [],
-    }
-    merged = merge_vocabulary(heuristics, ctx)
     assert merged["operational_tokens"].count("planting") == 1
 
 
-def test_merge_vocabulary_preserves_config_when_no_context():
-    heuristics = {
-        "operational_tokens": ["nursery"],
-        "reference_tokens": ["reference"],
-        "support_tokens": ["index"],
-        "derived_tokens": ["summary"],
-    }
-    merged = merge_vocabulary(heuristics, None)
-    assert merged == heuristics
+def test_merge_vocabulary_no_context():
+    heuristics = {"operational_tokens": ["nursery"]}
+    assert merge_vocabulary(heuristics, None) == heuristics
 
 
-def test_domain_context_active_years():
+def test_deduplicate_index_records_latest_year():
+    """4 records for same (workbook_code, tab_title) across years → keep latest only."""
     ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023], forward=[])
+        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
     )
-    assert ctx.active_years() == {2025, 2026, 2023}
+    records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+    ]
+    approved = {"402": ["Crop Planner"]}
+    # Need to associate each record with tabs — inventory data isn't in index_records
+    # The dedup function groups records by workbook_code and for each tab_title in
+    # approved_tabs, deduplicates based on the index records for that workbook_code
+    filtered = deduplicate_index_records(records, approved, ctx)
+    assert len(filtered) == 1
+    assert filtered[0]["year"] == 2026
+    assert filtered[0]["spreadsheet_id"] == "s4"
 
 
-def test_domain_context_is_archived_year():
+def test_deduplicate_index_records_exception():
+    """Dedup exception tab keeps all years."""
     ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025], archived=[2023, 2024], forward=[])
-    )
-    assert ctx.is_archived_year(2023) is True
-    assert ctx.is_archived_year(2025) is False
-    assert ctx.is_archived_year(2027) is False
-
-
-def test_domain_context_deduplication_exceptions():
-    ctx = DomainContext(
+        year_scope=DomainContext.YearScope(active=[2025], archived=[2023], forward=[]),
         deduplication=DomainContext.DeduplicationContext(
             strategy="latest_year",
-            exceptions=[{"tab_title": "Sales Actuals", "reason": "Changes yearly"}]
-        )
+            exceptions=[{"tab_title": "Sales Actuals", "reason": "Changes yearly"}],
+        ),
     )
-    assert ctx.is_deduplication_exception("Sales Actuals") is True
-    assert ctx.is_deduplication_exception("Crop Planner") is False
+    records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+    ]
+    approved = {"402": ["Sales Actuals"]}
+    filtered = deduplicate_index_records(records, approved, ctx)
+    assert len(filtered) == 2
+
+
+def test_deduplicate_index_records_archived_filter():
+    """Archived years are removed regardless of dedup strategy."""
+    ctx = DomainContext(
+        year_scope=DomainContext.YearScope(active=[2025], archived=[2023], forward=[]),
+        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
+    )
+    records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+    ]
+    approved = {"402": ["Crop Planner"]}
+    filtered = deduplicate_index_records(records, approved, ctx)
+    assert len(filtered) == 1
+    assert filtered[0]["year"] == 2025
+
+
+def test_deduplicate_index_records_no_domain_context():
+    """Without domain context, records pass through unchanged."""
+    records = [{"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1"}]
+    approved = {"402": ["Crop Planner"]}
+    filtered = deduplicate_index_records(records, approved, None)
+    assert len(filtered) == 1
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [ ] **Step 3: Run tests to verify they fail**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_domain_context.py -v 2>&1 | head -20`
-Expected: Import error — `profiler.tools.domain_context` module not found.
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_domain_context.py -v 2>&1 | head -15`
+Expected: ImportError — module not found.
 
-- [ ] **Step 3: Implement DomainContext, load_domain_context, merge_vocabulary**
+- [ ] **Step 4: Implement DomainContext, load_domain_context, merge_vocabulary, deduplicate_index_records**
 
 Create `profiler/tools/domain_context.py`:
 
@@ -196,6 +193,7 @@ identical to the pre-domain-context baseline.
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -236,7 +234,6 @@ class DomainContext:
     scope_notes: str = ""
 
     def active_years(self) -> set[int]:
-        """Return all years that should be included in profiling (active + archived + forward)."""
         years: set[int] = set(self.year_scope.active)
         years.update(self.year_scope.archived)
         years.update(self.year_scope.forward)
@@ -253,14 +250,12 @@ class DomainContext:
 
 
 def load_domain_context(path: str | Path) -> DomainContext | None:
-    """Load a domain context YAML file. Return None if the file does not exist."""
     file_path = Path(path)
     if not file_path.exists():
         return None
     raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         return None
-    # Strip documentation keys (prefixed with _)
     raw = {k: v for k, v in raw.items() if not k.startswith("_")}
 
     year_scope_data = raw.get("year_scope") or {}
@@ -295,22 +290,14 @@ def merge_vocabulary(
     heuristics: dict,
     domain_context: DomainContext | None,
 ) -> dict:
-    """Merge domain context vocabulary into heuristic token lists.
-
-    Tokens from ``domain_context.vocabulary`` are appended to the corresponding
-    heuristic token lists without duplication. When ``domain_context`` is None,
-    returns ``heuristics`` unchanged.
-    """
     if domain_context is None:
         return heuristics
-
     token_keys = {
         "operational_tokens": domain_context.vocabulary.operational,
         "reference_tokens": domain_context.vocabulary.reference,
         "support_tokens": domain_context.vocabulary.support,
         "derived_tokens": domain_context.vocabulary.derived,
     }
-
     merged = dict(heuristics)
     for hkey, vocab_list in token_keys.items():
         existing = set(merged.get(hkey) or [])
@@ -318,97 +305,135 @@ def merge_vocabulary(
             existing.add(token.lower())
         merged[hkey] = sorted(existing)
     return merged
+
+
+def deduplicate_index_records(
+    index_records: list[dict],
+    approved_tabs: dict[str, list[str]],
+    domain_context: DomainContext | None,
+) -> list[dict]:
+    """Filter index records for Phase 3 deep profiling.
+
+    1. Remove records for archived years.
+    2. For each ``(workbook_code, tab_title)`` in *approved_tabs* that appears
+       across multiple years and is **not** a dedup exception, keep only the
+       latest year's record.
+
+    When *domain_context* is ``None``, returns *index_records* unchanged.
+    """
+    if domain_context is None:
+        return list(index_records)
+
+    # Step 1: remove archived years
+    filtered = [
+        rec
+        for rec in index_records
+        if not domain_context.is_archived_year(rec.get("year"))
+    ]
+
+    # Step 2: group by workbook_code, deduplicate tabs across years
+    grouped: dict[str, list[dict]] = defaultdict(list)
+    for rec in filtered:
+        grouped[rec["workbook_code"]].append(rec)
+
+    result: list[dict] = []
+    for workbook_code, wb_records in grouped.items():
+        tab_titles = approved_tabs.get(workbook_code, [])
+        for tab_title in tab_titles:
+            if domain_context.is_deduplication_exception(tab_title):
+                # Keep all records for this tab
+                result.extend(
+                    rec for rec in wb_records
+                    if rec.get("spreadsheet_id")
+                )
+            else:
+                # Keep only the latest year's record for this tab
+                latest = max(
+                    (rec for rec in wb_records),
+                    key=lambda r: r.get("year") or 0,
+                    default=None,
+                )
+                if latest is not None:
+                    result.append(latest)
+
+    return result
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
 Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_domain_context.py -v`
-Expected: All 9 tests pass.
+Expected: All 6 tests pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add profiler/tools/domain_context.py profiler/tests/test_domain_context.py
-git commit -m "feat: add DomainContext dataclass, loader, and vocabulary merger"
+git commit -m "feat: DomainContext dataclass, loader, vocabulary merger, and index deduplicator"
 ```
 
 ---
 
-### Task 2: Year-aware deduplication and coverage bonus in select_tabs_from_inventory
+### Task 2: Domain context integration in select_tabs_from_inventory + score_tab
 
 **Files:**
-- Modify: `profiler/tools/cohort_corpus.py` (select_tabs_from_inventory)
+- Modify: `profiler/tools/cohort_corpus.py` (score_tab, select_tabs_from_inventory)
 - Modify: `profiler/tests/test_cohort_corpus_tools.py`
 
-- [ ] **Step 1: Write failing tests for year-aware deduplication**
+**What changes inside each function:**
+
+`score_tab()` — gains `domain_context: DomainContext | None = None`:
+- Appends glossary expansions to the tab title text so "Qty Tracker" matches operational token "quantity"
+- No other behavioral change
+
+`select_tabs_from_inventory()` — gains `domain_context: DomainContext | None = None`:
+- Merges vocabulary into heuristics via `merge_vocabulary()`
+- Replaces coverage bonus: `>= 3 years regardless` → `>= 2 active/forward years` (when domain_context present)
+- Annotates shortlist entries with `duplicate_years` when dedup would collapse them (informational only; actual filtering happens in Task 4)
+
+- [ ] **Step 1: Write failing tests**
 
 Append to `profiler/tests/test_cohort_corpus_tools.py`:
 
 ```python
-def test_select_tabs_deduplicates_by_latest_year():
-    """When domain_context deduplication is latest_year, only the latest year's tab is kept."""
+from profiler.tools.domain_context import DomainContext
+
+
+def test_score_tab_glossary_expansion():
+    """Glossary 'qty → quantity' lets 'qty' in tab title match 'quantity' token."""
+    ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
+    score, reasons, breakdown = score_tab(
+        "Qty Tracker", 100, 20,
+        tab_score_heuristics={"operational_tokens": ["quantity"]},
+        domain_context=ctx,
+    )
+    assert score > 0
+    assert any("operational" in r for r in reasons)
+
+
+def test_select_tabs_vocabulary_merging():
+    """Vocabulary from domain context is merged into heuristic tokens."""
+    ctx = DomainContext(
+        vocabulary=DomainContext.VocabularyContext(operational=["crop"]),
+        year_scope=DomainContext.YearScope(active=[2025], archived=[], forward=[]),
+    )
     index_records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 Farm 2023"},
-        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 Farm 2024"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 Farm 2025"},
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 Farm 2026"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402"},
     ]
     inventory_rows = [
         {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s2", "sheet_id": 1, "rows": 600, "cols": 22, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s3", "sheet_id": 1, "rows": 700, "cols": 25, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s4", "sheet_id": 1, "rows": 750, "cols": 26, "tab_title": "Crop Planner"},
     ]
-    ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
-    )
     selected = select_tabs_from_inventory(
-        index_records,
-        inventory_rows,
-        tab_score_heuristics={"operational_tokens": ["crop"]},
+        index_records, inventory_rows,
+        tab_score_heuristics={},
         domain_context=ctx,
     )
-    crop_planner_entries = [row for row in selected if row["tab_title"] == "Crop Planner"]
-    assert len(crop_planner_entries) == 1
-    entry = crop_planner_entries[0]
-    assert entry["years"] == [2023, 2024, 2025, 2026]
-    assert "duplicate_years" in entry
-    assert set(entry["duplicate_years"]) == {2023, 2024, 2025}
+    assert any(r["tab_title"] == "Crop Planner" for r in selected)
 
 
-def test_select_tabs_deduplication_exception_keeps_all_years():
-    """When a tab is in deduplication.exceptions, all years are retained."""
-    index_records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 Farm 2023"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 Farm 2025"},
-    ]
-    inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Sales Actuals"},
-        {"spreadsheet_id": "s3", "sheet_id": 1, "rows": 700, "cols": 25, "tab_title": "Sales Actuals"},
-    ]
-    ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025], archived=[2023], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(
-            strategy="latest_year",
-            exceptions=[{"tab_title": "Sales Actuals", "reason": "Changes yearly"}],
-        ),
-    )
-    selected = select_tabs_from_inventory(
-        index_records,
-        inventory_rows,
-        tab_score_heuristics={"operational_tokens": ["sales"]},
-        domain_context=ctx,
-    )
-    sales_entries = [row for row in selected if row["tab_title"] == "Sales Actuals"]
-    assert len(sales_entries) == 2
-
-
-def test_select_tabs_coverage_bonus_from_active_years():
-    """Coverage bonus is +1 when tab appears in >=2 active or forward years, not from archived years alone."""
+def test_select_tabs_coverage_bonus_active_years():
+    """Coverage bonus is +1 when tab appears in >=2 active/forward years."""
     ctx = DomainContext(
         year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
     )
     index_records = [
         {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
@@ -417,415 +442,217 @@ def test_select_tabs_coverage_bonus_from_active_years():
         {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
     ]
     inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s2", "sheet_id": 1, "rows": 600, "cols": 22, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s3", "sheet_id": 1, "rows": 700, "cols": 25, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s4", "sheet_id": 1, "rows": 750, "cols": 26, "tab_title": "Crop Planner"},
+        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        for i in range(1, 5)
     ]
     selected = select_tabs_from_inventory(
-        index_records,
-        inventory_rows,
+        index_records, inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
         domain_context=ctx,
     )
-    entry = next(row for row in selected if row["tab_title"] == "Crop Planner")
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
     assert entry["coverage_bonus"] == 1
 
 
-def test_select_tabs_no_dedup_without_domain_context():
-    """Without domain_context, legacy behavior is preserved (all years, old coverage bonus)."""
+def test_select_tabs_duplicate_years_annotation():
+    """Shortlist entries get duplicate_years annotation when spanning multiple years."""
+    ctx = DomainContext(
+        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+    )
+    index_records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {"spreadsheet_id": "s4", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={"operational_tokens": ["crop"]},
+        domain_context=ctx,
+    )
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry.get("duplicate_years") == [2023]
+
+
+def test_select_tabs_no_domain_context_unchanged():
+    """Without domain_context, legacy behavior: old coverage bonus, no duplicate_years."""
     index_records = [
         {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
         {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
         {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
     ]
     inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s2", "sheet_id": 1, "rows": 600, "cols": 22, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s3", "sheet_id": 1, "rows": 700, "cols": 25, "tab_title": "Crop Planner"},
+        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        for i in range(1, 4)
     ]
     selected = select_tabs_from_inventory(
-        index_records,
-        inventory_rows,
+        index_records, inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
     )
-    crop_entries = [row for row in selected if row["tab_title"] == "Crop Planner"]
-    assert len(crop_entries) == 1
-    assert crop_entries[0]["occurrences"] == 3
-    assert crop_entries[0]["coverage_bonus"] == 1
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry["coverage_bonus"] == 1
+    assert "duplicate_years" not in entry
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_deduplicates_by_latest_year profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_deduplication_exception_keeps_all_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_coverage_bonus_from_active_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_no_dedup_without_domain_context -v 2>&1 | tail -10`
-Expected: FAIL — `select_tabs_from_inventory` does not yet accept `domain_context` parameter, and `DomainContext` import is not yet added to the test file.
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_score_tab_glossary_expansion profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_vocabulary_merging profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_coverage_bonus_active_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_duplicate_years_annotation profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_no_domain_context_unchanged -v 2>&1 | tail -10`
+Expected: FAIL — function signatures don't accept `domain_context`, `DomainContext` not importable in test.
 
-- [ ] **Step 3: Modify select_tabs_from_inventory to accept and apply domain context**
+- [ ] **Step 3: Implement changes in cohort_corpus.py**
 
-In `profiler/tools/cohort_corpus.py`:
-
-1. Add the import at the top of the file (after the existing `from profiler.tools.enrichment_utils import` block, around line 64):
+**3a.** Add imports (after existing `from profiler.tools.enrichment_utils import ...`):
 
 ```python
 from profiler.tools.domain_context import DomainContext, merge_vocabulary
+from profiler.tools.enrichment_utils import (
+    _ENTITY_KEYWORDS,
+    _IDENTIFIER_NAMES,
+    _IDENTIFIER_SUFFIXES,
+    _to_pascal_case,
+    glossary_expand,
+)
 ```
 
-2. Modify `select_tabs_from_inventory` signature (line 538) to add `domain_context: DomainContext | None = None`:
+**3b.** Modify `score_tab` signature (around line 371) to add `domain_context: DomainContext | None = None`.
 
-Change the function signature from:
-```python
-def select_tabs_from_inventory(
-    index_records: list[dict],
-    inventory_rows: list[dict],
-    *,
-    min_final_score: float = 2.0,
-    tab_score_heuristics: dict | None = None,
-) -> list[dict]:
-```
-to:
-```python
-def select_tabs_from_inventory(
-    index_records: list[dict],
-    inventory_rows: list[dict],
-    *,
-    min_final_score: float = 2.0,
-    tab_score_heuristics: dict | None = None,
-    domain_context: DomainContext | None = None,
-) -> list[dict]:
-```
-
-3. At the start of `select_tabs_from_inventory`, after the docstring, add year-aware filtering:
+Inside `score_tab`, after `lowered_title = tab_title.lower()`, insert glossary expansion:
 
 ```python
-    if domain_context is not None:
-        active_years = domain_context.active_years()
-        if active_years:
-            index_records = [
-                rec for rec in index_records if rec["year"] in active_years
-            ]
-            active_sheet_ids = {rec["spreadsheet_id"] for rec in index_records}
-            inventory_rows = [
-                row for row in inventory_rows
-                if row["spreadsheet_id"] in active_sheet_ids
-            ]
+    if domain_context is not None and domain_context.glossary:
+        from profiler.tools.enrichment_utils import glossary_expand
+        title_expansions = glossary_expand(lowered_title, domain_context.glossary)
+        if title_expansions:
+            lowered_title = lowered_title + " " + " ".join(title_expansions)
 ```
 
-4. Merge vocabulary into heuristics before scoring. After the year filtering above, add:
+All downstream `_token_match` calls use `lowered_title` naturally — no per-category changes needed.
+
+**3c.** Modify `select_tabs_from_inventory` signature to add `domain_context: DomainContext | None = None`.
+
+After the docstring, before scoring, add vocabulary merging:
 
 ```python
     effective_heuristics = merge_vocabulary(tab_score_heuristics or {}, domain_context)
 ```
 
-Then change the call to `score_tab` inside the loop (around line 552) from:
-```python
-        score, reasons, breakdown = score_tab(
-            row["tab_title"],
-            row["rows"],
-            row["cols"],
-            tab_score_heuristics=tab_score_heuristics,
-        )
-```
-to:
-```python
-        score, reasons, breakdown = score_tab(
-            row["tab_title"],
-            row["rows"],
-            row["cols"],
-            tab_score_heuristics=effective_heuristics,
-        )
-```
+Replace `tab_score_heuristics=tab_score_heuristics` (line 1346 in the main call and line 1222 in resume_from_broad) with `tab_score_heuristics=effective_heuristics`.
 
-5. Replace the coverage bonus calculation in the aggregate loop (around line 605). Change:
-
-```python
-        coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
-```
-
-to:
+Replace the coverage bonus (line 605):
 
 ```python
         if domain_context is not None:
-            active_or_forward_years = (
+            active_or_forward = (
                 set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
             )
-            years_in_active_or_forward = len(bucket["years"] & active_or_forward_years)
-            coverage_bonus = 1 if years_in_active_or_forward >= 2 else 0
+            bonus_years = len(bucket["years"] & active_or_forward)
+            coverage_bonus = 1 if bonus_years >= 2 else 0
         else:
             coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
 ```
 
-6. Add deduplication after aggregation, before sorting. After the `breakdown_summary` dict is built (around line 628) and before `selected.append(...)`, add the deduplication logic:
-
-After the line `selected.sort(key=lambda row: ...)` (line 646), and before `return selected`, add deduplication:
-
-Actually, the deduplication should happen *after* aggregation but *before* the `min_final_score` filter and the `selected.append`. The simplest approach: add the dedup *after* the full `selected` list is built and before the sort. Change the flow to build selected, then apply dedup, then sort.
-
-The cleanest place is after the `selected` list is fully built. After the loop that builds `selected` (line 644), before the sort (line 646), add:
+After building the `selected` list and before sorting, add dedup annotation:
 
 ```python
-    if domain_context is not None and domain_context.deduplication.strategy == "latest_year":
-        deduped: list[dict] = []
-        seen: dict[tuple[str, str], dict] = {}
+    if domain_context is not None:
         for entry in selected:
-            key = (entry["workbook_code"], entry["tab_title"])
-            if key not in seen:
-                seen[key] = entry
-            else:
-                existing = seen[key]
-                existing_years = existing.get("years", [])
-                entry_years = entry.get("years", [])
-                max_year = max(existing_years + entry_years) if existing_years + entry_years else 0
-                combined_years = sorted(set(existing_years + entry_years))
-                existing["years"] = combined_years
-                existing["occurrences"] = existing.get("occurrences", 1) + entry.get("occurrences", 1)
-        for key, entry in seen.items():
-            if not domain_context.is_deduplication_exception(key[1]):
-                years = entry.get("years", [])
-                if len(years) > 1:
-                    latest_year = max(years)
-                    entry["duplicate_years"] = [y for y in years if y != latest_year]
-                    entry["years"] = [latest_year]
-                    entry["occurrences"] = 1
-                    deduped.append(entry)
-                else:
-                    deduped.append(entry)
-            else:
-                deduped.append(entry)
-        selected = deduped
-```
-
-Wait, this approach is wrong because aggregation has already combined the years into a single `years` list per `(workbook_code, tab_title)` group. Deduplication should happen at that point — we need to decide which year's instance to keep in the shortlist.
-
-Let me reconsider. The current `select_tabs_from_inventory` aggregates by `(workbook_code, tab_title)` into a single entry that has `years: [2023, 2024, 2025, 2026]` and `occurrences: 4`. For deduplication with `latest_year` strategy, we want to:
-- Keep entry's `years` as `[2023, 2024, 2025, 2026]` for informational purposes (showing all available years)
-- Set `occurrences` to 1 (only profiling one year)
-- Add `duplicate_years: [2023, 2024, 2025]` (the years not being profiled)
-- Adjust the `examples` list to only include the latest year
-
-After the aggregation loop and before sorting, add deduplication. Inside the loop that builds `selected` entries (around line 630), add the dedup fields:
-
-After the `breakdown_summary` dict and before `selected.append(...)`:
-
-```python
-        # Deduplication fields (set later if domain_context is present)
-        entry_duplicate_years: list[int] | None = None
-        entry_occurrences_override: int | None = None
-```
-
-Then after the loop completes and before the sort, apply deduplication in a separate pass. Actually, the simplest correct approach is to handle this entirely after the aggregation loop. The `selected` list has one entry per `(workbook_code, tab_title)`. We modify entries in-place:
-
-After `selected.sort(...)` (line 646), but before `return selected` (line 649), add:
-
-```python
-    if domain_context is not None and domain_context.deduplication.strategy == "latest_year":
-        for entry in selected:
-            if domain_context.is_deduplication_exception(entry["tab_title"]):
-                continue
             years = entry.get("years", [])
             if len(years) > 1:
-                latest_year = max(years)
-                entry["duplicate_years"] = sorted(y for y in years if y != latest_year)
-                entry["years"] = [latest_year]
-                entry["occurrences"] = 1
-
-    return selected
+                active_or_forward = set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+                non_active = sorted(y for y in years if y not in active_or_forward)
+                if non_active:
+                    entry["duplicate_years"] = non_active
 ```
 
-- [ ] **Step 4: Add DomainContext import to test file**
+(This annotates only years outside active/forward, not all duplicates — cleaner signal for the human.)
 
-At the top of `profiler/tests/test_cohort_corpus_tools.py`, add to the imports:
+- [ ] **Step 4: Add glossary_expand to enrichment_utils.py**
+
+Add to `profiler/tools/enrichment_utils.py`:
 
 ```python
-from profiler.tools.domain_context import DomainContext
+def glossary_expand(text: str, glossary: dict[str, str]) -> set[str]:
+    """Return expanded forms of glossary keys found in *text*."""
+    lowered = text.lower()
+    expansions: set[str] = set()
+    for abbr, full_form in glossary.items():
+        if abbr.lower() in lowered:
+            expansions.add(full_form.lower())
+    return expansions
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 5: Run tests**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_deduplicates_by_latest_year profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_deduplication_exception_keeps_all_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_coverage_bonus_from_active_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_no_dedup_without_domain_context -v`
-Expected: All 4 new tests pass.
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_score_tab_glossary_expansion profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_vocabulary_merging profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_coverage_bonus_active_years profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_duplicate_years_annotation profiler/tests/test_cohort_corpus_tools.py::test_select_tabs_no_domain_context_unchanged -v`
+Expected: All 5 new tests pass.
 
-- [ ] **Step 6: Run existing tests to confirm no regression**
+- [ ] **Step 6: Run full test file to confirm no regression**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py -v`
-Expected: All existing tests pass (the `domain_context=None` default preserves existing behavior).
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py -v --tb=short 2>&1 | tail -20`
+Expected: All tests pass (domain_context=None default preserves existing behavior).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add profiler/tools/cohort_corpus.py profiler/tests/test_cohort_corpus_tools.py
-git commit -m "feat: year-aware dedup, coverage bonus, and vocab merging in select_tabs_from_inventory"
+git add profiler/tools/enrichment_utils.py profiler/tools/cohort_corpus.py profiler/tests/test_cohort_corpus_tools.py
+git commit -m "feat: domain context integration in score_tab and select_tabs_from_inventory"
 ```
 
 ---
 
-### Task 3: Glossary synonym expansion in token matching and column scoring
+### Task 3: Domain context integration in derive_column_candidates
 
 **Files:**
-- Modify: `profiler/tools/enrichment_utils.py`
-- Modify: `profiler/tools/cohort_corpus.py` (score_tab, _token_match, derive_column_candidates)
+- Modify: `profiler/tools/cohort_corpus.py` (derive_column_candidates)
 - Modify: `profiler/tests/test_cohort_corpus_tools.py`
 
-- [ ] **Step 1: Write failing test for glossary matching in score_tab**
+- [ ] **Step 1: Write failing test**
 
 Append to `profiler/tests/test_cohort_corpus_tools.py`:
 
 ```python
-def test_score_tab_matches_glossary_synonyms():
-    """Glossary entries expand token matching so 'qty' matches 'Quantity Tracker'."""
-    from profiler.tools.domain_context import DomainContext
-    ctx = DomainContext(
-        glossary={"qty": "quantity", "amt": "amount"},
-    )
-    score, reasons, breakdown = score_tab(
-        "Qty Tracker",
-        100,
-        20,
-        tab_score_heuristics={"operational_tokens": ["quantity"]},
-        domain_context=ctx,
-    )
-    assert score > 0
-    assert any("operational" in r for r in reasons)
-
-
-def test_derive_column_candidates_matches_glossary():
-    """Column headers matching glossary synonyms get domain_keyword score."""
-    from profiler.tools.domain_context import DomainContext
-    ctx = DomainContext(
-        glossary={"qty": "quantity", "amt": "amount"},
-    )
+def test_derive_column_candidates_glossary():
+    ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
     payload = {
         "summary": {"formula_cell_count": 0, "functions_used": [], "column_formula_patterns": {}},
         "raw": {},
     }
     candidates = derive_column_candidates(
-        workbook_code="402",
-        year=2025,
-        spreadsheet_id="s1",
-        tab_title="Test",
+        workbook_code="402", year=2025, spreadsheet_id="s1", tab_title="Test",
         payload=payload,
         column_score_heuristics={"domain_keyword_tokens": ["quantity"]},
         domain_context=ctx,
     )
     qty_candidates = [c for c in candidates if c["column_header"] == "Qty"]
     assert len(qty_candidates) == 1
-    assert qty_candidates[0]["priority_score"] == 3
     assert "domain_keyword" in qty_candidates[0]["priority_reasons"]
 ```
 
-Also add `domain_context` parameter to `score_tab` calls and `derive_column_candidates` in the test.
+- [ ] **Step 2: Run test to verify it fails**
 
-- [ ] **Step 2: Run tests to verify they fail**
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_derive_column_candidates_glossary -v 2>&1 | tail -5`
+Expected: FAIL — `derive_column_candidates` does not accept `domain_context`.
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_score_tab_matches_glossary_synonyms profiler/tests/test_cohort_corpus_tools.py::test_derive_column_candidates_matches_glossary -v 2>&1 | tail -10`
-Expected: FAIL — `score_tab` and `derive_column_candidates` do not yet accept `domain_context`.
+- [ ] **Step 3: Implement changes**
 
-- [ ] **Step 3: Implement glossary expansion in enrichment_utils.py**
+In `cohort_corpus.py`, modify `derive_column_candidates` signature to add `domain_context: DomainContext | None = None`. Also add `glossary_expand` to the imports.
 
-Add to `profiler/tools/enrichment_utils.py`:
-
-```python
-def glossary_expand(text: str, glossary: dict[str, str]) -> set[str]:
-    """Return all forms of glossary keys found in text, plus their expanded values.
-
-    If *text* contains a glossary key (case-insensitive substring match), the
-    expansion includes both the key and its mapped value. This allows "Qty"
-    to match the domain keyword "quantity" when glossary maps "qty" → "quantity".
-    """
-    lowered = text.lower()
-    expansions: set[str] = set()
-    for abbr, full_form in glossary.items():
-        if abbr.lower() in lowered:
-            expansions.add(abbr.lower())
-            expansions.add(full_form.lower())
-    return expansions
-```
-
-- [ ] **Step 4: Modify score_tab to accept domain_context and use glossary**
-
-In `profiler/tools/cohort_corpus.py`, modify `score_tab` signature (around line 371) to add `domain_context: DomainContext | None = None`.
-
-Inside `score_tab`, after the token matching section, add glossary expansion. Find the `_token_match` call section. The current code iterates over token categories and calls `_token_match(token, lowered_title, match_mode)`. Add a glossary expansion step:
-
-After `lowered_title = tab_title.lower()` (which already exists), add:
+Inside the function, after computing `lowered = header.lower()` (line 810) and before the domain keyword check (line 813), add:
 
 ```python
-    glossary = domain_context.glossary if domain_context is not None else {}
-    title_expansions = glossary_expand(lowered_title, glossary) if glossary else set()
+        if domain_context is not None and domain_context.glossary:
+            header_expanded = glossary_expand(lowered, domain_context.glossary)
+            if header_expanded:
+                lowered = lowered + " " + " ".join(header_expanded)
 ```
 
-Then in the token matching loop, when checking each token, also check if the token matches any expansion:
+The existing domain keyword matching `any(token in lowered for token in domain_keyword_tokens)` now sees the expanded terms.
 
-In each token category loop (operational, reference, etc.), modify the matching condition. Currently:
-```python
-if _token_match(token, lowered_title, match_mode):
-```
+- [ ] **Step 4: Add the import**
 
-Change to:
-```python
-if _token_match(token, lowered_title, match_mode) or token.lower() in title_expansions:
-```
-
-This requires modifying each of the 5 token category sections in `score_tab`. To avoid repetition, create a helper:
-
-Actually, the simplest approach is to expand `lowered_title` to include glossary expansions. After computing `title_expansions`, also check if any token matches the expanded forms:
-
-In each token category section, instead of just checking `_token_match(token, lowered_title, match_mode)`, also check `any(_token_match(token, exp, match_mode) for exp in title_expansions)`. But since `title_expansions` contains the expanded forms, we can just check if the token is in `title_expansions`:
-
-Wait, the `title_expansions` set contains the expanded full forms (e.g., "quantity" when "qty" is in the title). The domain tokens should match these expanded forms. So in each category section, change the condition from:
-
-```python
-if _token_match(token, lowered_title, match_mode):
-```
-
-to:
-
-```python
-if _token_match(token, lowered_title, match_mode) or (title_expansions and _token_match(token, " ".join(title_expansions), match_mode)):
-```
-
-Actually, simpler: just add the expanded terms to the title for matching purposes:
-
-```python
-effective_title = lowered_title
-if title_expansions:
-    effective_title = lowered_title + " " + " ".join(title_expansions)
-```
-
-Then use `effective_title` instead of `lowered_title` in all `_token_match` calls within `score_tab`. This is the cleanest approach and requires minimal code change.
-
-- [ ] **Step 5: Modify derive_column_candidates to accept domain_context and use glossary**
-
-In `profiler/tools/cohort_corpus.py`, modify `derive_column_candidates` signature (line 774) to add `domain_context: DomainContext | None = None`.
-
-Inside `derive_column_candidates`, add glossary expansion for column headers. After extracting headers and computing `lowered = header.lower()`, add:
-
-```python
-    glossary = domain_context.glossary if domain_context is not None else {}
-```
-
-In the domain keyword matching section (around line 813):
-
-```python
-        if domain_keyword_tokens and any(
-            token in lowered for token in domain_keyword_tokens
-        ):
-```
-
-Change to:
-
-```python
-        header_expansions = glossary_expand(lowered, glossary) if glossary else set()
-        expanded_lowered = lowered
-        if header_expansions:
-            expanded_lowered = lowered + " " + " ".join(header_expansions)
-        if domain_keyword_tokens and any(
-            token in expanded_lowered for token in domain_keyword_tokens
-        ):
-```
-
-- [ ] **Step 6: Add imports for glossary_expand**
-
-In `profiler/tools/cohort_corpus.py`, update the import from enrichment_utils:
+Ensure `glossary_expand` is imported at the top of `cohort_corpus.py`:
 
 ```python
 from profiler.tools.enrichment_utils import (
@@ -837,100 +664,147 @@ from profiler.tools.enrichment_utils import (
 )
 ```
 
-- [ ] **Step 7: Run all tests**
+- [ ] **Step 5: Pass domain_context at all call sites in run_cohort_corpus**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py -v`
-Expected: All tests pass, including new glossary tests.
+There are two calls to `derive_column_candidates` in the deep profiling loop (lines 1450 and 1489). In Task 4, when we add domain_context loading, we need to pass it through. For now, change both call sites to pass:
 
-- [ ] **Step 8: Commit**
+```python
+                        derive_column_candidates(
+                            ...
+                            column_score_heuristics=column_score_heuristics,
+                            domain_context=domain_context,
+                        )
+```
+
+- [ ] **Step 6: Run tests**
+
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py::test_derive_column_candidates_glossary -v`
+Expected: PASS.
+
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/test_cohort_corpus_tools.py -v --tb=short 2>&1 | tail -20`
+Expected: All tests pass.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add profiler/tools/enrichment_utils.py profiler/tools/cohort_corpus.py profiler/tests/test_cohort_corpus_tools.py
-git commit -m "feat: glossary synonym expansion in score_tab and derive_column_candidates"
+git add profiler/tools/cohort_corpus.py profiler/tests/test_cohort_corpus_tools.py
+git commit -m "feat: glossary synonym expansion in derive_column_candidates"
 ```
 
 ---
 
-### Task 4: Domain context loading in run_cohort_corpus and summary output
+### Task 4: Domain context loading + index dedup in run_cohort_corpus
 
 **Files:**
 - Modify: `profiler/tools/cohort_corpus.py` (run_cohort_corpus function)
 - Modify: `profiler/management/commands/profile_cohort_corpus.py`
 
-- [ ] **Step 1: Load domain_context in run_cohort_corpus**
+**The critical fix:** After tab selection is finalized but before the deep profiling loop (line 1398), we call `deduplicate_index_records()` on the index. This ensures Phase 3 iterates only over the latest year's records for deduplicated tabs.
 
-In `profiler/tools/cohort_corpus.py`, inside `run_cohort_corpus()` (after line 1117 where heuristics are extracted), add domain context loading:
+- [ ] **Step 1: Load domain_context and add selection_summary**
+
+In `run_cohort_corpus()` (after line 1117 where heuristics are extracted), add:
 
 ```python
     domain_context_path = config.get("domain_context")
-    domain_context = None
+    domain_context: DomainContext | None = None
     if domain_context_path:
         domain_context = load_domain_context(domain_context_path)
         if domain_context is not None:
-            logger.info("Loaded domain context from %s: domain=%s", domain_context_path, domain_context.domain)
+            logger.info("Domain context loaded: domain=%s", domain_context.domain)
 ```
 
-Then pass `domain_context=domain_context` to all calls of `select_tabs_from_inventory()` in the function (there are two call sites: the `resume_from_broad` branch at line 1222, and the main branch at line 1346).
+Then pass `domain_context=domain_context` to all three `select_tabs_from_inventory` call sites (lines 1222, 1346) and both `derive_column_candidates` call sites (lines 1450, 1489).
 
-- [ ] **Step 2: Add selection_summary to tab shortlist output**
-
-In `run_cohort_corpus`, after the `tab_shortlist` is computed and before writing `tab_shortlist_path` (around line 1351), build the summary dict:
+After each `tab_shortlist` is built and written (fresh run path around line 1361, resume_from_broad path around line 1237), add selection_summary to the shortlist output:
 
 ```python
-        # Build selection summary for quick inspection of year distribution
         selection_summary: dict = {
             "by_workbook_by_year": {},
-            "original_count": len(tab_shortlist),
-            "deduplicated_count": len(tab_shortlist),
+            "candidate_count": len(tab_shortlist),
         }
         if domain_context is not None:
             by_wb_by_year: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-            active_or_forward = set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
             for row in tab_shortlist:
                 for yr in row.get("years", []):
-                    if yr in active_or_forward or not active_or_forward:
-                        by_wb_by_year[row["workbook_code"]][str(yr)] += 1
+                    by_wb_by_year[row["workbook_code"]][str(yr)] = (
+                        by_wb_by_year[row["workbook_code"]].get(str(yr), 0) + 1
+                    )
             selection_summary["by_workbook_by_year"] = {
                 wb: dict(years) for wb, years in by_wb_by_year.items()
             }
-            dedup_count = sum(1 for r in tab_shortlist if len(r.get("years", [])) <= 1)
-            dup_reduced = sum(
-                len(r.get("duplicate_years", []))
-                for r in tab_shortlist
-                if r.get("duplicate_years")
+            dup_total = sum(
+                len(r.get("duplicate_years", [])) for r in tab_shortlist
             )
-            selection_summary["deduplicated_count"] = len(tab_shortlist) - dup_reduced
-            if domain_context.deduplication.strategy == "latest_year":
+            if dup_total:
                 selection_summary["deduplication_note"] = (
-                    f"latest_year strategy applied; {dup_reduced} structural duplicates collapsed"
+                    f"{dup_total} structural duplicates collapsed via latest_year strategy"
                 )
+
+        write_json(tab_shortlist_path, {
+            **shortlist_base,
+            "selection_summary": selection_summary,
+        })
 ```
 
-Then modify the `write_json` call for `tab_shortlist_path` to include the summary:
+(The `shortlist_base` is the existing payload dict — merge with `selection_summary`.)
+
+- [ ] **Step 2: Deduplicate index before Phase 3**
+
+Right before the deep profiling loop (before line 1398), add:
 
 ```python
-        shortlist_output = {
-            "generated_from": broad_path.name,
-            "candidate_count": len(
-                {(row["workbook_code"], row["tab_title"]) for row in tab_shortlist}
-            ),
-            "selected_count": len(tab_shortlist),
-            "selection_summary": selection_summary,
-            "selected": tab_shortlist,
-        }
-        write_json(tab_shortlist_path, shortlist_output)
+    index_records = deduplicate_index_records(index_records, approved_tabs, domain_context)
 ```
 
-- [ ] **Step 3: Verify no regressions**
+This single line ensures Phase 3 profiles only deduplicated records. Works in all three branches (fresh run, resume_from_broad, resume_from_tab_selection) because `index_records` and `approved_tabs` are available in all three.
+
+- [ ] **Step 3: Strip _documentation from config**
+
+In `profiler/management/commands/profile_cohort_corpus.py`, after line 90 where config is loaded:
+
+```python
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config = {k: v for k, v in config.items() if not k.startswith("_")}
+```
+
+- [ ] **Step 4: Add coverage_summary artifact to Phase 1 main branch**
+
+In `run_cohort_corpus`, in the main branch (after the broad coverage write at line 1344), add:
+
+```python
+        by_sheet_id = {rec["spreadsheet_id"]: rec for rec in index_records}
+        coverage_summary_path = out_dir / f"broad_profile_coverage_summary_{date_stamp}.json"
+        workbook_tab_names: dict[str, set[str]] = defaultdict(set)
+        year_workbook_map: dict[str, set[str]] = defaultdict(set)
+        for row in inventory_rows:
+            meta = by_sheet_id.get(row["spreadsheet_id"])
+            if meta is None:
+                continue
+            workbook_tab_names[meta["workbook_code"]].add(row["tab_title"])
+            year_workbook_map[str(meta["year"])].add(meta["workbook_code"])
+        write_json(
+            coverage_summary_path,
+            {
+                "generated_from": discovery_path.name,
+                "workbook_codes": {wb: sorted(tabs) for wb, tabs in sorted(workbook_tab_names.items())},
+                "year_coverage": {yr: sorted(wbs) for yr, wbs in sorted(year_workbook_map.items())},
+            },
+        )
+```
+
+Add `"broad_coverage_summary": str(coverage_summary_path)` to the artifacts dict (line 1382).
+
+- [ ] **Step 5: Run tests**
 
 Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/ -v --tb=short 2>&1 | tail -30`
 Expected: All tests pass.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add profiler/tools/cohort_corpus.py
-git commit -m "feat: load domain context in run_cohort_corpus and add selection_summary to shortlist"
+git add profiler/tools/cohort_corpus.py profiler/management/commands/profile_cohort_corpus.py
+git commit -m "feat: load domain context, deduplicate index before Phase 3, shortlist summary output"
 ```
 
 ---
@@ -941,37 +815,34 @@ git commit -m "feat: load domain context in run_cohort_corpus and add selection_
 - Modify: `workbook/codegen/stub_writer.py`
 - Modify: `workbook/tests/test_stub_writer.py`
 
-- [ ] **Step 1: Write failing test for models_auto.py stub creation**
+- [ ] **Step 1: Write failing test**
 
 Append to `workbook/tests/test_stub_writer.py`:
 
 ```python
-def test_ensure_stub_creates_models_auto_when_missing(tmp_path):
-    """ensure_stub should write an empty models_auto.py stub if it doesn't exist."""
+def test_ensure_stub_creates_auto_module(tmp_path):
     auto_path = tmp_path / "models_auto.py"
     stub_path = tmp_path / "models.py"
     ensure_stub(stub_path, "models_auto")
     assert auto_path.exists()
     content = auto_path.read_text()
-    assert "Auto-generated" in content or "make generate-models" in content
+    assert "Auto-generated" in content or "Populated by" in content
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest workbook/tests/test_stub_writer.py::test_ensure_stub_creates_models_auto_when_missing -v`
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest workbook/tests/test_stub_writer.py::test_ensure_stub_creates_auto_module -v`
 Expected: FAIL — `ensure_stub` does not create the auto module file.
 
 - [ ] **Step 3: Implement models_auto.py stub creation**
 
-In `workbook/codegen/stub_writer.py`, add a constant and modify `ensure_stub`:
-
-Add after the `MARKER` constant (line 8):
+In `workbook/codegen/stub_writer.py`, add after `MARKER`:
 
 ```python
 AUTO_STUB_CONTENT = "# Auto-generated by make new-product. Populated by make generate-models.\n"
 ```
 
-Modify `ensure_stub` to also create the auto module file if it doesn't exist. At the end of the function, before `return path`, add:
+At the end of `ensure_stub`, before `return path`, add:
 
 ```python
     auto_path = path.parent / f"{auto_module}.py"
@@ -990,22 +861,21 @@ Expected: All 5 tests pass.
 
 ```bash
 git add workbook/codegen/stub_writer.py workbook/tests/test_stub_writer.py
-git commit -m "fix: scaffold creates empty models_auto.py stub to prevent Django startup crash"
+git commit -m "fix: scaffold writes empty models_auto.py stub to prevent Django startup crash"
 ```
 
 ---
 
-### Task 6: Config documentation key and broad coverage summary
+### Task 6: Config documentation, domain context example, scaffold update
 
 **Files:**
 - Modify: `example_data/cohort_corpus.example.json`
 - Create: `example_data/domain_context.example.yaml`
-- Modify: `profiler/tools/cohort_corpus.py` (add coverage summary artifact)
-- Modify: `scripts/new_product.py` (add _documentation and domain_context path to scaffold)
+- Modify: `scripts/new_product.py`
 
-- [ ] **Step 1: Update cohort_corpus.example.json with _documentation key and domain_context path**
+- [ ] **Step 1: Update cohort_corpus.example.json**
 
-Replace `example_data/cohort_corpus.example.json` content with:
+Replace content with version that adds `_documentation` key and `domain_context` path. Append to top of file before `folder_name`:
 
 ```json
 {
@@ -1017,43 +887,15 @@ Replace `example_data/cohort_corpus.example.json` content with:
     "support_tokens": "Words indicating helper/index/validation tabs (penalized in scoring).",
     "derived_tokens": "Words indicating auto-generated/pivot/summary tabs (penalized in scoring).",
     "tab_auto_limit": "Maximum tabs auto-selected per workbook code. Use tab_selection_overrides to hand-pick important tabs.",
-    "tab_exclude_patterns": "Regex patterns to block tabs from selection. Each entry: {\"pattern\": \"regex\", \"penalty\": -5}.",
+    "tab_exclude_patterns": "Regex patterns to block tabs. Each entry: {\"pattern\": \"regex\", \"penalty\": -5}.",
     "year_regex": "Used to group workbooks by year. Set year_scope in domain_context.yaml to limit profiling to active years.",
     "domain_context": "Path to a domain_context.yaml file providing vocabulary, year scoping, deduplication, and glossary."
   },
   "domain_context": "config/domain_context.yaml",
   "folder_name": "Corpus Root Folder",
-  "workbook_id_regex": "\\b(\\d{3})\\b",
-  "year_regex": "\\b(20\\d{2})\\b",
-  "in_scope_workbooks": ["REPLACE_WITH_CODES_MATCHED_BY_REGEX"],
-  "tab_auto_limit": 3,
-  "column_min_score": 4,
-  "tab_selection_overrides": {},
-  "deep_read_delay_seconds": 1.0,
-  "deep_skip_existing": true,
-  "heuristics": {
-    "tab_score": {
-      "operational_tokens": [],
-      "reference_tokens": [],
-      "reference_combo_tokens": [],
-      "support_tokens": [],
-      "derived_tokens": [],
-      "operational_weight": 3,
-      "reference_weight": 3,
-      "derived_weight": -4,
-      "support_weight": -2,
-      "reference_combo_weight": 3,
-      "match_mode": "substring",
-      "tab_exclude_patterns": [],
-      "expansion_formula_penalty": 0,
-      "expansion_formula_threshold": 0.5
-    },
-    "column_score": {
-      "domain_keyword_tokens": []
-    }
-  }
-}
 ```
+
+Keep everything else from the existing file unchanged.
 
 - [ ] **Step 2: Create domain_context.example.yaml**
 
@@ -1061,8 +903,8 @@ Create `example_data/domain_context.example.yaml`:
 
 ```yaml
 # Domain context — the profiler's model of the business domain.
-# Loaded by the profiler at Phase 1 start. Populated from raw notes and drive tree inspection.
-# See docs/orientation.md for the Orient step workflow.
+# Populated from raw notes and drive tree inspection BEFORE Phase 1.
+# Follow the Orient step in AGENTS.md to fill this in.
 
 domain: ""                       # e.g., "farm_management"
 description: ""                  # What does this business do?
@@ -1074,88 +916,24 @@ year_scope:
 
 deduplication:
   strategy: latest_year          # "latest_year" profiles only the latest year per (workbook_code, tab_title)
-  exceptions: []                  # Tab titles to always profile per-year  e.g., [{"tab_title": "Sales Actuals", "reason": "Changes yearly"}]
+  exceptions: []                  # Tab titles to always profile per-year (e.g., Sales Actuals changes yearly)
 
-entities: []                      # e.g., [{"name": "Season", "tabs": ["Crop Planner"], "operational": true, "description": "..."}]
+entities: []                      # Sparse pre-profiling; populated after Phase 1
 
 vocabulary:
-  operational: []                # Words your domain uses for primary data-entry tabs
-  reference: []                  # Words for lookup/reference tabs
-  support: []                    # Words for helper/index tabs
-  derived: []                    # Words for auto-generated/summary tabs
+  operational: []                # Words for primary data-entry tabs (e.g., planting, harvest, order)
+  reference: []                  # Words for lookup tabs (e.g., variety, crop, price)
+  support: []                    # Words for helper tabs (e.g., index, validation)
+  derived: []                    # Words for summary/pivot tabs (e.g., totals, rollup)
 
 glossary: {}                     # Synonym expansion  e.g., {"qty": "quantity", "amt": "amount"}
 
 scope_notes: ""                  # Freeform notes from orientation
 ```
 
-- [ ] **Step 3: Add coverage summary artifact to Phase 1 output**
+- [ ] **Step 3: Update new_product.py scaffold**
 
-In `profiler/tools/cohort_corpus.py`, inside `run_cohort_corpus()`, after the `write_json` call for the broad coverage file (around line 1344), add:
-
-```python
-        coverage_summary_path = out_dir / f"broad_profile_coverage_summary_{date_stamp}.json"
-        workbook_tab_names: dict[str, list[str]] = {}
-        year_workbook_map: dict[str, list[str]] = defaultdict(list)
-        for row in inventory_rows:
-            meta = by_sheet_id.get(row["spreadsheet_id"])
-            if meta is None:
-                continue
-            wb_code = meta["workbook_code"]
-            year_str = str(meta["year"])
-            tab_title = row["tab_title"]
-            if wb_code not in workbook_tab_names:
-                workbook_tab_names[wb_code] = []
-            if tab_title not in workbook_tab_names[wb_code]:
-                workbook_tab_names[wb_code].append(tab_title)
-            if wb_code not in year_workbook_map.get(year_str, []):
-                year_workbook_map.setdefault(year_str, [])
-                if wb_code not in year_workbook_map[year_str]:
-                    year_workbook_map[year_str].append(wb_code)
-        write_json(
-            coverage_summary_path,
-            {
-                "generated_from": discovery_path.name if not resume_from_broad else broad_path.name,
-                "workbook_codes": workbook_tab_names,
-                "year_coverage": dict(year_workbook_map),
-            },
-        )
-```
-
-Note: `by_sheet_id` is already available in this scope (it's computed from index_records at line 546 in `select_tabs_from_inventory`, but in `run_cohort_corpus` we need to compute it ourselves — it's derived from the index_records that are available in the main branch). Actually, looking at the code more carefully, in the main branch (the `else` block at line 1258), `inventory_rows` is built in the loop at line 1308. We need to compute the summary after the loop completes and before the `select_tabs_from_inventory` call.
-
-Add the `by_sheet_id` computation right before the summary building. Since `index_records` is available in that scope, compute it directly:
-
-```python
-        by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
-```
-
-This line should be added right after the broad coverage write (around line 1344) and before the new summary code.
-
-Also, add `coverage_summary` to the artifacts dict (around line 1387):
-
-```python
-    artifacts: dict[str, str] = {
-        "discovery": str(discovery_path),
-        "index": str(index_path),
-        "broad_coverage": str(broad_path),
-        "broad_coverage_summary": str(coverage_summary_path),
-        "tab_shortlist": str(tab_shortlist_path),
-        "tab_selection": str(tab_selection_path),
-    }
-```
-
-- [ ] **Step 4: Update config reader to strip _documentation key**
-
-In `profiler/management/commands/profile_cohort_corpus.py`, after loading the config (line 90), add:
-
-```python
-    config = {k: v for k, v in config.items() if not k.startswith("_")}
-```
-
-- [ ] **Step 5: Update new_product.py scaffold to include domain_context.yaml and _documentation**
-
-In `scripts/new_product.py`, find the `scaffold_config_templates` function (around line 1241). After the existing `copy_file` for `cohort_corpus.example.json` (line 1257-1260), add:
+In `scaffold_config_templates` function (line 1241), after the `copy_file` for `cohort_corpus.example.json`:
 
 ```python
     copy_file(
@@ -1165,41 +943,25 @@ In `scripts/new_product.py`, find the `scaffold_config_templates` function (arou
     )
 ```
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 4: Add Phase 0 Orient section to AGENTS.md in scaffold**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/ workbook/tests/test_stub_writer.py -v --tb=short 2>&1 | tail -30`
-Expected: All tests pass.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add example_data/cohort_corpus.example.json example_data/domain_context.example.yaml profiler/tools/cohort_corpus.py profiler/management/commands/profile_cohort_corpus.py scripts/new_product.py
-git commit -m "feat: config documentation key, domain context example, and broad coverage summary artifact"
-```
-
----
-
-### Task 7: Drive folder timeout documentation and orientation docs in scaffold
-
-**Files:**
-- Modify: `workbook/makefile_targets.py` (add timeout note to profile-drive-folder)
-- Modify: `scripts/new_product.py` (add Phase 0 orientation to operator.md and AGENTS.md)
-
-- [ ] **Step 1: Add timeout documentation to profile-drive-folder**
-
-In `workbook/makefile_targets.py`, the `profile_blocks` function (line 368) renders the `profile-drive-folder` target. Add a comment noting expected runtime. Change the `profile-drive-folder` block from:
+In `render_agents_md` (around line 599), find the text `#### Phase 1 — Discovery + tab selection` and insert a Phase 0 section before it:
 
 ```python
-        + "profile-drive-folder:\n"
-        + _indent(
-            "DB_ENGINE=sqlite $(MANAGE) profile_drive_folder "
-            '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
-            '--config "$${COHORT_CORPUS_CONFIG}" '
-            '--out "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}"'
-        )
+        + "#### Phase 0 — Orient\n\n"
+        + "Before running Phase 1, populate `config/domain_context.yaml`:\n\n"
+        + "1. **Read raw notes** in `data/raw_notes/` — extract entity names, relationships, and temporal scope.\n"
+        + "2. **Inspect drive tree** from `make profile-drive-folder` — identify workbook codes and year distribution.\n"
+        + "3. **Set year_scope** — mark active years (profile in full), archived years (skip), and forward years.\n"
+        + "4. **Populate vocabulary** — list domain words for operational, reference, support, and derived tabs.\n"
+        + "5. **Add glossary** entries for abbreviations (e.g., `qty: quantity`).\n"
+        + "6. **Review deduplication** — by default, tabs appearing across multiple years are profiled only for the latest year.\n"
+        + "   Add exceptions for tabs that change meaning across years (e.g., Sales Actuals).\n\n"
 ```
 
-to:
+- [ ] **Step 5: Add timeout note to profile-drive-folder**
+
+In `workbook/makefile_targets.py`, `profile_blocks` function, change the `profile-drive-folder` block to include a runtime comment:
 
 ```python
         + "# Expected runtime: 2-3 minutes for folders with 20+ spreadsheets.\n"
@@ -1212,60 +974,36 @@ to:
         )
 ```
 
-- [ ] **Step 2: Add Phase 0 Orientation section to scaffold AGENTS.md**
+- [ ] **Step 6: Run tests**
 
-In `scripts/new_product.py`, find the `render_agents_md` function. It contains the 3-phase profiling workflow section (around line 599-644). Add a Phase 0 section before Phase 1. Find the line that starts the Phase 1 content and insert before it.
-
-The current Phase 1 section in the rendered AGENTS.md starts with `### Profiling (read-only discovery)` and then `#### Phase 1 — Discovery + tab selection`. I need to add a Phase 0 section before that.
-
-Find the section that renders the profiling workflow (the `Phase 1 — Discovery` section). It's in the rendered markdown returned by the function. Add a Phase 0 section before it. This is inside a large string literal. Find the text `#### Phase 1 — Discovery + tab selection` and add a Phase 0 section before it:
-
-```markdown
-#### Phase 0 — Orient
-
-Before running Phase 1, populate `config/domain_context.yaml`:
-
-1. **Read raw notes** in `data/raw_notes/` — extract entity names, relationships, and temporal scope.
-2. **Inspect drive tree** from `make profile-drive-folder` — identify workbook codes and year distribution.
-3. **Set year_scope** — mark active years (profile in full), archived years (skip or deprioritize), and forward years (include for planning).
-4. **Populate vocabulary** — list domain words for operational, reference, support, and derived tabs.
-5. **Add glossary** entries for abbreviations (e.g., `qty: quantity`).
-6. **Review deduplication** — by default, tabs appearing across multiple years are profiled only for the latest year. Add exceptions for tabs that change meaning across years.
-
-```
-
-- [ ] **Step 3: Run tests**
-
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest scripts/tests/test_new_product.py workbook/tests/test_makefile_targets.py -v --tb=short 2>&1 | tail -20`
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/ workbook/tests/ scripts/tests/ -v --tb=short 2>&1 | tail -30`
 Expected: All tests pass.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add workbook/makefile_targets.py scripts/new_product.py
-git commit -m "docs: drive folder timeout note, Phase 0 orientation in scaffold"
+git add example_data/cohort_corpus.example.json example_data/domain_context.example.yaml scripts/new_product.py workbook/makefile_targets.py
+git commit -m "feat: config docs, domain context example, Phase 0 orientation, drive folder timeout note"
 ```
 
 ---
 
-### Task 8: Integration test and lint check
+### Task 7: Integration verification and lint
 
-**Files:**
-- No new files; verify all changes work together.
+**Files:** No changes — verification only.
 
-- [ ] **Step 1: Run full test suite**
+- [ ] **Step 1: Lint all changed files**
 
-Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/ workbook/tests/ scripts/tests/test_new_product.py -v --tb=short 2>&1 | tail -40`
+Run: `cd /home/user/migration-workbench && python -m ruff check profiler/tools/domain_context.py profiler/tools/cohort_corpus.py profiler/tools/enrichment_utils.py profiler/management/commands/profile_cohort_corpus.py workbook/codegen/stub_writer.py scripts/new_product.py`
+Expected: Clean. Fix any issues.
+
+- [ ] **Step 2: Full test suite**
+
+Run: `cd /home/user/migration-workbench && DB_ENGINE=sqlite python -m pytest profiler/tests/ workbook/tests/ -v --tb=short 2>&1 | tail -40`
 Expected: All tests pass.
-
-- [ ] **Step 2: Run linter**
-
-Run: `cd /home/user/migration-workbench && python -m ruff check profiler/tools/domain_context.py profiler/tools/cohort_corpus.py profiler/tools/enrichment_utils.py profiler/management/commands/profile_cohort_corpus.py workbook/codegen/stub_writer.py scripts/new_product.py 2>&1`
-Expected: No errors. If there are errors, fix them.
 
 - [ ] **Step 3: Final commit if needed**
 
 ```bash
-git add -A
-git commit -m "chore: lint fixes for domain context implementation" || echo "No changes needed"
+git add -A && git commit -m "chore: lint and test fixes for domain context implementation" || echo "Clean"
 ```
