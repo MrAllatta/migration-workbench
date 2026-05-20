@@ -59,6 +59,7 @@ from profiler.management.commands.profile_tab import (
 from profiler.tools.domain_context import (
     DomainContext,
     deduplicate_index_records,
+    has_meaningful_vocabulary,
     load_domain_context,
     merge_vocabulary,
 )
@@ -1164,6 +1165,14 @@ def run_cohort_corpus(
         domain_context = load_domain_context(domain_context_path)
         if domain_context is not None:
             logger.info("Domain context loaded: domain=%s", domain_context.domain)
+
+        if not has_meaningful_vocabulary(domain_context):
+            raise CommandError(
+                "Profiler cannot proceed with empty vocabulary. "
+                "FAIL[PROFILER_EMPTY_VOCABULARY]: Domain context vocabulary is empty. "
+                "Action: Populate vocabulary.operational / vocabulary.reference "
+                "in domain_context.yaml and re-run phase 1."
+            )
 
     discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
     index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"
