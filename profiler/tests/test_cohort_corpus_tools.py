@@ -1734,7 +1734,7 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
 
     domain_ctx_path = tmp_path / "domain_context.yaml"
     domain_ctx_path.write_text(
-        "year_scope:\n  active: [2026]\n  archived: [2024]\n",
+        "domain: test\nyear_scope:\n  active: [2026]\n  archived: [2024]\nvocabulary:\n  operational: [plan]\n",
         encoding="utf-8",
     )
     corpus_config = {
