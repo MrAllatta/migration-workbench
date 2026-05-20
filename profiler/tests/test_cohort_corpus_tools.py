@@ -1678,6 +1678,24 @@ def test_select_tabs_no_domain_context_unchanged():
     assert "duplicate_years" not in entry
 
 
+def test_select_tabs_legacy_coverage_bonus_two_years():
+    """Legacy mode (no domain context) awards coverage bonus at >=2 years."""
+    index_records = [
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2025"},
+        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2026"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {"spreadsheet_id": "s2", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={"operational_tokens": ["crop"]},
+    )
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry["coverage_bonus"] == 1
+
+
 def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
     """Deep loop should skip non-latest years when domain context is active."""
     corpus_out_dir = tmp_path / "corpus_run"

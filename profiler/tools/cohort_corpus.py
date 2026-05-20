@@ -624,7 +624,7 @@ def select_tabs_from_inventory(
             bonus_years = len(bucket["years"] & active_or_forward)
             coverage_bonus = 1 if bonus_years >= 2 else 0
         else:
-            coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
+            coverage_bonus = 1 if len(bucket["years"]) >= 2 else 0
         final_score = avg_score + coverage_bonus
         confidence = (
             "high" if final_score >= 3 else "medium" if final_score >= 2 else "low"
