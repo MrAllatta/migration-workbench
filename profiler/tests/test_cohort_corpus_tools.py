@@ -17,6 +17,7 @@ from profiler.tools.cohort_corpus import (
     enrich_entity_groupings,
     enrich_fk_candidates,
     enrich_import_key_candidates,
+    derive_column_candidates,
     run_cohort_corpus,
     score_tab,
     select_tabs_from_inventory,
@@ -1547,3 +1548,104 @@ class TestEnrichEntityGroupings:
         entity_map = enrich_entity_groupings(cols)
         assert isinstance(entity_map, dict)
         assert all(isinstance(v, str) for v in entity_map.values())
+
+
+from profiler.tools.domain_context import DomainContext
+
+
+def test_score_tab_glossary_expansion():
+    """Glossary 'qty → quantity' lets 'qty' in tab title match 'quantity' token."""
+    ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
+    score, reasons, breakdown = score_tab(
+        "Qty Tracker", 100, 20,
+        tab_score_heuristics={"operational_tokens": ["quantity"]},
+        domain_context=ctx,
+    )
+    assert score > 0
+    assert any("operational" in r for r in reasons)
+
+
+def test_select_tabs_vocabulary_merging():
+    """Vocabulary from domain context is merged into heuristic tokens."""
+    ctx = DomainContext(
+        vocabulary=DomainContext.VocabularyContext(operational=["crop"]),
+        year_scope=DomainContext.YearScope(active=[2025], archived=[], forward=[]),
+    )
+    index_records = [
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={},
+        domain_context=ctx,
+    )
+    assert any(r["tab_title"] == "Crop Planner" for r in selected)
+
+
+def test_select_tabs_coverage_bonus_active_years():
+    """Coverage bonus is +1 when tab appears in >=2 active/forward years."""
+    ctx = DomainContext(
+        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+    )
+    index_records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        for i in range(1, 5)
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={"operational_tokens": ["crop"]},
+        domain_context=ctx,
+    )
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry["coverage_bonus"] == 1
+
+
+def test_select_tabs_duplicate_years_annotation():
+    """Shortlist entries get duplicate_years annotation when spanning multiple years."""
+    ctx = DomainContext(
+        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+    )
+    index_records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {"spreadsheet_id": "s4", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={"operational_tokens": ["crop"]},
+        domain_context=ctx,
+    )
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry.get("duplicate_years") == [2023]
+
+
+def test_select_tabs_no_domain_context_unchanged():
+    """Without domain_context, legacy behavior: old coverage bonus, no duplicate_years."""
+    index_records = [
+        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
+        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
+        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+    ]
+    inventory_rows = [
+        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        for i in range(1, 4)
+    ]
+    selected = select_tabs_from_inventory(
+        index_records, inventory_rows,
+        tab_score_heuristics={"operational_tokens": ["crop"]},
+    )
+    entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
+    assert entry["coverage_bonus"] == 1
+    assert "duplicate_years" not in entry

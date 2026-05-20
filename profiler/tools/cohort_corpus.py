@@ -56,11 +56,13 @@ from profiler.management.commands.profile_tab import (
     summarize_tab,
 )
 
+from profiler.tools.domain_context import DomainContext, merge_vocabulary
 from profiler.tools.enrichment_utils import (
     _ENTITY_KEYWORDS,
     _IDENTIFIER_NAMES,
     _IDENTIFIER_SUFFIXES,
     _to_pascal_case,
+    glossary_expand,
 )
 
 logger = logging.getLogger(__name__)
@@ -375,6 +377,7 @@ def score_tab(
     *,
     tab_score_heuristics: dict | None = None,
     column_formula_patterns: dict[str, str] | None = None,
+    domain_context: DomainContext | None = None,
 ) -> tuple[int, list[str], dict]:
     """Score a single tab by its title and dimensions.
 
@@ -398,6 +401,10 @@ def score_tab(
         penalty is applied.
     """
     lowered = title.lower()
+    if domain_context is not None and domain_context.glossary:
+        title_expansions = glossary_expand(lowered, domain_context.glossary)
+        if title_expansions:
+            lowered = lowered + " " + " ".join(title_expansions)
     score = 0
     reasons: list[str] = []
     token_matches: list[dict] = []
@@ -541,8 +548,10 @@ def select_tabs_from_inventory(
     *,
     min_final_score: float = 2.0,
     tab_score_heuristics: dict | None = None,
+    domain_context: DomainContext | None = None,
 ) -> list[dict]:
     """Score, aggregate across years, and filter inventory tabs by final score. Applies coverage bonus for tabs appearing in 3+ years. Returns a sorted shortlist."""
+    effective_heuristics = merge_vocabulary(tab_score_heuristics or {}, domain_context)
     by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
     scored: list[dict] = []
     for row in inventory_rows:
@@ -553,7 +562,8 @@ def select_tabs_from_inventory(
             row["tab_title"],
             row["rows"],
             row["cols"],
-            tab_score_heuristics=tab_score_heuristics,
+            tab_score_heuristics=effective_heuristics,
+            domain_context=domain_context,
         )
         scored.append(
             {
@@ -602,7 +612,14 @@ def select_tabs_from_inventory(
     selected: list[dict] = []
     for bucket in aggregate.values():
         avg_score = sum(bucket["scores"]) / len(bucket["scores"])
-        coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
+        if domain_context is not None:
+            active_or_forward = (
+                set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+            )
+            bonus_years = len(bucket["years"] & active_or_forward)
+            coverage_bonus = 1 if bonus_years >= 2 else 0
+        else:
+            coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
         final_score = avg_score + coverage_bonus
         confidence = (
             "high" if final_score >= 3 else "medium" if final_score >= 2 else "low"
@@ -643,6 +660,15 @@ def select_tabs_from_inventory(
                 "breakdown_summary": breakdown_summary,
             }
         )
+    if domain_context is not None:
+        for entry in selected:
+            years = entry.get("years", [])
+            if len(years) > 1:
+                active_or_forward = set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+                non_active = sorted(y for y in years if y not in active_or_forward)
+                if non_active:
+                    entry["duplicate_years"] = non_active
+
     selected.sort(
         key=lambda row: (-row["final_score"], row["workbook_code"], row["tab_title"])
     )

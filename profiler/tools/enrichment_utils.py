@@ -16,3 +16,13 @@ def _to_pascal_case(raw: str) -> str:
     if "_" not in raw and "-" not in raw and any(c.isupper() for c in raw[1:]):
         return raw
     return "".join(p.capitalize() for p in raw.replace("-", "_").split("_"))
+
+
+def glossary_expand(text: str, glossary: dict[str, str]) -> set[str]:
+    """Return expanded forms of glossary keys found in *text*."""
+    lowered = text.lower()
+    expansions: set[str] = set()
+    for abbr, full_form in glossary.items():
+        if abbr.lower() in lowered:
+            expansions.add(full_form.lower())
+    return expansions
