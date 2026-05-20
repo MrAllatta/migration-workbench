@@ -11,6 +11,8 @@ DOMAIN_CONTEXT_PATH = Path("config/domain_context.yaml")
 FAIL_MESSAGES = {
     "PREFLIGHT_VENV_MISSING": "Virtual environment .venv directory not found",
     "PREFLIGHT_WB_NOT_FOUND": "wb CLI not found on PATH or at .venv/bin/wb",
+    "PREFLIGHT_CONFIG_MISSING": "config/domain_context.yaml not found",
+    "PREFLIGHT_CONFIG_EMPTY": "config/domain_context.yaml is empty YAML",
     "PREFLIGHT_DOMAIN_EMPTY": "config/domain_context.yaml has empty 'domain' field",
     "PREFLIGHT_YEAR_SCOPE_EMPTY": "config/domain_context.yaml has empty 'year_scope.active' list",
     "PREFLIGHT_VOCABULARY_EMPTY": "config/domain_context.yaml has no operational or reference vocabulary",
@@ -35,7 +37,7 @@ def check_wb():
 
 def check_domain_context():
     if not DOMAIN_CONTEXT_PATH.exists():
-        print(f"FAIL[PREFLIGHT_DOMAIN_EMPTY]: config/domain_context.yaml not found")
+        print(f"FAIL[PREFLIGHT_CONFIG_MISSING]: {FAIL_MESSAGES['PREFLIGHT_CONFIG_MISSING']}")
         print("  → Action: Create config/domain_context.yaml with required fields")
         sys.exit(1)
 
@@ -43,12 +45,12 @@ def check_domain_context():
         with open(DOMAIN_CONTEXT_PATH) as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError:
-        print("FAIL[PREFLIGHT_DOMAIN_EMPTY]: config/domain_context.yaml is invalid YAML")
+        print(f"FAIL[PREFLIGHT_CONFIG_EMPTY]: {FAIL_MESSAGES['PREFLIGHT_CONFIG_EMPTY']}")
         print("  → Action: Fix YAML syntax in config/domain_context.yaml")
         sys.exit(1)
 
     if not data:
-        print(f"FAIL[PREFLIGHT_DOMAIN_EMPTY]: config/domain_context.yaml is empty")
+        print(f"FAIL[PREFLIGHT_CONFIG_EMPTY]: {FAIL_MESSAGES['PREFLIGHT_CONFIG_EMPTY']}")
         print("  → Action: Add non-empty 'domain' field to config/domain_context.yaml")
         sys.exit(1)
 

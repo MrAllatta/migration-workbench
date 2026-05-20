@@ -70,25 +70,34 @@ class TestCheckDomainContext(unittest.TestCase):
     def test_config_missing_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=False):
-                with self.assertRaises(SystemExit) as cm:
-                    preflight.check_domain_context()
-                self.assertEqual(cm.exception.code, 1)
+                with patch("sys.stdout") as mock_stdout:
+                    with self.assertRaises(SystemExit) as cm:
+                        preflight.check_domain_context()
+                    self.assertEqual(cm.exception.code, 1)
+                output = mock_stdout.write.call_args_list[0][0][0]
+                self.assertIn("PREFLIGHT_CONFIG_MISSING", output)
 
     def test_config_empty_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=True):
                 with patch("builtins.open", mock_open(read_data="")):
-                    with self.assertRaises(SystemExit) as cm:
-                        preflight.check_domain_context()
-                    self.assertEqual(cm.exception.code, 1)
+                    with patch("sys.stdout") as mock_stdout:
+                        with self.assertRaises(SystemExit) as cm:
+                            preflight.check_domain_context()
+                        self.assertEqual(cm.exception.code, 1)
+                    output = mock_stdout.write.call_args_list[0][0][0]
+                    self.assertIn("PREFLIGHT_CONFIG_EMPTY", output)
 
     def test_domain_empty_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=True):
                 with patch("builtins.open", mock_open(read_data="domain: ''")):
-                    with self.assertRaises(SystemExit) as cm:
-                        preflight.check_domain_context()
-                    self.assertEqual(cm.exception.code, 1)
+                    with patch("sys.stdout") as mock_stdout:
+                        with self.assertRaises(SystemExit) as cm:
+                            preflight.check_domain_context()
+                        self.assertEqual(cm.exception.code, 1)
+                    output = mock_stdout.write.call_args_list[0][0][0]
+                    self.assertIn("PREFLIGHT_DOMAIN_EMPTY", output)
 
     def test_year_scope_empty_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
