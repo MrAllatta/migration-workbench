@@ -10,6 +10,9 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _merge_domain_knowledge,
     _harden_contract,
     _infer_format_type_from_samples,
+    _check_null_model_names,
+    _check_pivot_tables,
+    _check_invalid_identifiers,
 )
 from workbook.schema_contract import build_contract
 
@@ -404,3 +407,36 @@ def test_infer_format_type_mixed_fallback():
     """Mixed content with no clear pattern falls back to 'text'."""
     assert _infer_format_type_from_samples(["hello", "42", "TRUE"]) == "text"
     assert _infer_format_type_from_samples(["hello world"]) == "text"
+
+
+def test_check_null_model_names_finds_empty():
+    tables = [{"bundle_worksheet_title": "Final Report", "model_name": ""}]
+    errors = _check_null_model_names(tables)
+    assert len(errors) == 1
+    assert "SCAFFOLD_NULL_MODEL_NAME" in errors[0]
+
+
+def test_check_pivot_table_detects_numeric_headers():
+    table = {
+        "bundle_worksheet_title": "Irrigation",
+        "columns": [
+            {"source_column": "1"},
+            {"source_column": "6"},
+            {"source_column": "7"},
+            {"source_column": "Total"},
+        ],
+    }
+    errors = _check_pivot_tables(table)
+    assert len(errors) == 1
+    assert "SCAFFOLD_PIVOT_TABLE" in errors[0]
+
+
+def test_check_invalid_identifier_detects_digit_prefix():
+    table = {
+        "bundle_worksheet_title": "Unit",
+        "model_name": "Unit",
+        "columns": [{"suggested_field_name": "201_unit"}],
+    }
+    errors = _check_invalid_identifiers(table)
+    assert any("201_unit" in e for e in errors)
+    assert any("SCAFFOLD_INVALID_IDENTIFIER" in e for e in errors)

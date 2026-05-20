@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import keyword
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -17,6 +18,7 @@ from workbook.codegen.designed_model_detection import (
     suggest_designed_model,
 )
 from workbook.field_mapping import (
+    is_valid_python_identifier,
     map_profiler_column_to_django_field,
     suggested_field_name,
 )
@@ -145,6 +147,63 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
             tables.append(suggested)
 
     return tables
+
+
+def _check_null_model_names(tables: list[dict]) -> list[str]:
+    """Return error messages for tables with empty model_name."""
+    errors: list[str] = []
+    for table in tables:
+        model_name = str(table.get("model_name", "")).strip()
+        if not model_name:
+            tab_title = table.get("bundle_worksheet_title", "?")
+            errors.append(
+                f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name\n'
+                "  → Action: Deduplicate the tab across year workbooks or set a unique suggested_model_name\n"
+                f"  (Table: {tab_title}, Field: model_name)"
+            )
+    return errors
+
+
+def _check_pivot_tables(table: dict) -> list[str]:
+    """Return error messages if the table looks like a pivot table."""
+    errors: list[str] = []
+    columns = table.get("columns", [])
+    if not columns:
+        return errors
+    headers = [col.get("source_column", "").strip() for col in columns]
+    numeric_headers = [h for h in headers if h.isdigit()]
+    if len(numeric_headers) / len(headers) > 0.5:
+        tab_title = table.get("bundle_worksheet_title", "?")
+        numeric_list = ", ".join(numeric_headers[:10])
+        errors.append(
+            f'FAIL[SCAFFOLD_PIVOT_TABLE]: Tab "{tab_title}" appears to be a pivot table '
+            f"(numeric headers: {numeric_list})\n"
+            "  → Action: Add it to vocabulary.derived or exclude it from the corpus config.\n"
+            f"  (Table: {tab_title})"
+        )
+    return errors
+
+
+def _check_invalid_identifiers(table: dict) -> list[str]:
+    """Return error messages for invalid field or model names."""
+    errors: list[str] = []
+    model_name = str(table.get("model_name", "")).strip()
+    tab_title = table.get("bundle_worksheet_title", "?")
+    if model_name and not is_valid_python_identifier(model_name):
+        errors.append(
+            f'FAIL[SCAFFOLD_INVALID_IDENTIFIER]: model_name "{model_name}" is not a valid Python identifier\n'
+            "  → Action: Rename the source tab or set an explicit suggested_model_name.\n"
+            f"  (Table: {tab_title}, Field: model_name)"
+        )
+    for col in table.get("columns", []):
+        field_name = col.get("suggested_field_name", "")
+        if field_name and not is_valid_python_identifier(field_name):
+            errors.append(
+                f'FAIL[SCAFFOLD_INVALID_IDENTIFIER]: Field name "{field_name}" is not a valid Python identifier\n'
+                "  → Action: Rename the source column header or add a column alias in the bundle config.\n"
+                f"  (Table: {tab_title}, Field: {field_name})"
+            )
+    return errors
 
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$")
@@ -293,6 +352,14 @@ def _build_cohort_contract(
     for table in tables:
         _flag_fk_columns(table.get("columns", []))
         _flag_computed_fields(table)
+
+    errors: list[str] = []
+    errors.extend(_check_null_model_names(tables))
+    for table in tables:
+        errors.extend(_check_pivot_tables(table))
+        errors.extend(_check_invalid_identifiers(table))
+    if errors:
+        raise CommandError("\n".join(errors))
 
     tab_headers = {}
     for table in tables:
@@ -643,6 +710,13 @@ class Command(BaseCommand):
         for table in tables:
             _flag_fk_columns(table.get("columns", []))
             _flag_computed_fields(table)
+        errors: list[str] = []
+        errors.extend(_check_null_model_names(tables))
+        for table in tables:
+            errors.extend(_check_pivot_tables(table))
+            errors.extend(_check_invalid_identifiers(table))
+        if errors:
+            raise CommandError("\n".join(errors))
         tab_headers = {}
         for tab in bundle_config.get("tabs", []):
             title = tab.get("worksheet_title", "")
