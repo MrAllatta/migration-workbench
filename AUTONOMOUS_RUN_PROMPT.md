@@ -6,27 +6,21 @@
 
 ---
 
-## Pre-Flight
+## Phase 0: Pre-Flight
 
 ```bash
-# Verify environment is configured
-make check-env || { echo "ERROR: .env not configured"; exit 1; }
-
-# Verify Django can start (check for models_auto.py stub)
-cd backend && .venv/bin/python manage.py check || { echo "ERROR: Django check failed — is models_auto.py missing?"; exit 1; }
-cd ..
+# Gate: If any check fails, the script prints a FAIL[<id>] message and exits.
+# Action: Follow the printed instructions and re-run this phase.
+make install          # idempotent; creates venv if missing
+scripts/preflight.py  # checks venv, wb CLI, and domain_context.yaml population
 ```
 
 ---
 
-## State Machine: Run Next Phase
-
-Execute the following checks and run the appropriate command for each phase:
-
-### Phase 0: Orient (if domain_context.yaml exists)
+## Phase 1: Orient (if domain_context.yaml exists)
 
 ```bash
-# Validate domain context
+# Gate: validate-domain-context fails if the YAML is malformed.
 make validate-domain-context DOMAIN_CONTEXT=config/domain_context.yaml
 
 # If no drive tree yet, draft it (Makefile reads DRIVE_FOLDER_ID from .env;
@@ -39,9 +33,14 @@ fi
 make extract-workbook-codes DRIVE_TREE=data/profile_snapshots/drive_tree.json COHORT_CORPUS_CONFIG=config/cohort_corpus.json
 ```
 
-### Phase 1-3: Profiling (if cohort_corpus.json configured)
+---
+
+## Phase 2: Profiling (if cohort_corpus.json configured)
 
 ```bash
+# Gate: If domain vocabulary is empty, phase 1 fails with FAIL[PROFILER_EMPTY_VOCABULARY].
+# Action: Populate vocabulary.operational / vocabulary.reference in domain_context.yaml.
+
 # Run Phase 1: discovery + tab selection
 make profile-cohort-corpus-phase1
 
@@ -52,9 +51,17 @@ make profile-cohort-corpus-phase2
 make profile-cohort-corpus-phase3
 ```
 
-### Phase: Schema Contract (if profiler output exists)
+---
+
+## Phase 3: Schema Contract (if profiler output exists)
 
 ```bash
+# Gate: scaffold_workbook_schema fails if it detects:
+#   - duplicate tabs producing empty model_name  (FAIL[SCAFFOLD_NULL_MODEL_NAME])
+#   - pivot tables with numeric column headers    (FAIL[SCAFFOLD_PIVOT_TABLE])
+#   - invalid Python identifiers in field names   (FAIL[SCAFFOLD_INVALID_IDENTIFIER])
+# Action: Exclude bad tabs from the corpus config or fix source headers.
+
 # If config/contract.yaml doesn't exist, scaffold from profiler output
 if [ ! -f config/contract.yaml ]; then
     python manage.py scaffold_workbook_schema \
@@ -63,27 +70,36 @@ if [ ! -f config/contract.yaml ]; then
         --out config/contract.yaml
 fi
 
-# Validate contract
-make validate-contract CONTRACT=config/contract.yaml
+# Gate: validate-contract --strict fails on duplicate models or bad identifiers.
+# Action: Edit config/contract.yaml to fix the listed issues.
+make validate-contract CONTRACT=config/contract.yaml STRICT=1
 ```
 
-### Phase: Code Generation (if contract exists)
+---
+
+## Phase 4: Code Generation (if contract passes strict validation)
 
 ```bash
-# Generate models, admin, import
+# scaffold_workbook_schema produces the contract YAML.
+# make generate-models reads the contract and writes models_auto.py.
+# The contract is the single source of truth; no stub is required.
 make generate-models CONTRACT=config/contract.yaml OUT=backend/apps/core/models_auto.py
 make generate-admin CONTRACT=config/contract.yaml OUT=backend/apps/core/admin_auto.py
 make generate-import CONTRACT=config/contract.yaml OUT=backend/apps/core/imports.py
 ```
 
-### Phase: Migration (if generated code exists)
+---
+
+## Phase 5: Migration (if generated code exists)
 
 ```bash
 make migrate
 make check
 ```
 
-### Phase: View Manifest (if bundle exists)
+---
+
+## Phase 6: View Manifest (if bundle exists)
 
 ```bash
 # Pull bundle if not exists
@@ -95,7 +111,9 @@ fi
 make generate-view-manifest CONTRACT=config/contract.yaml
 ```
 
-### Phase: Import
+---
+
+## Phase 7: Import
 
 ```bash
 # Preflight (validate-only)
