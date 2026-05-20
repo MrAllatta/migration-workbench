@@ -9,6 +9,7 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _suggest_tab_merges,
     _merge_domain_knowledge,
     _harden_contract,
+    _infer_format_type_from_samples,
 )
 from workbook.schema_contract import build_contract
 
@@ -362,3 +363,44 @@ def test_flag_computed_fields_catches_is_computed():
     computed = table.get("computed_fields", {})
     assert "total" in computed
     assert "yield_est" in computed
+
+
+def test_infer_format_type_empty_input():
+    """Empty list of sample values returns 'text'."""
+    assert _infer_format_type_from_samples([]) == "text"
+
+
+def test_infer_format_type_all_empty_strings():
+    """List of only empty strings returns 'text'."""
+    assert _infer_format_type_from_samples(["", "", ""]) == "text"
+
+
+def test_infer_format_type_boolean():
+    """Values matching boolean patterns return 'checkbox'."""
+    assert _infer_format_type_from_samples(["TRUE", "FALSE", "Yes", "No"]) == "checkbox"
+    assert _infer_format_type_from_samples(["yes", "no", "1", "0"]) == "checkbox"
+
+
+def test_infer_format_type_dates():
+    """ISO date strings return 'date'."""
+    assert (
+        _infer_format_type_from_samples(["2024-01-15", "2025-03-20", "2026-11-01"])
+        == "date"
+    )
+    assert (
+        _infer_format_type_from_samples(["2024-01-15 09:30", "2025-03-20 14:00", ""])
+        == "date"
+    )
+
+
+def test_infer_format_type_numbers():
+    """Numeric strings (with optional $, %, commas) return 'number'."""
+    assert _infer_format_type_from_samples(["42", "3.14"]) == "number"
+    assert _infer_format_type_from_samples(["$12.50", "1,000", "50%"]) == "number"
+    assert _infer_format_type_from_samples(["42", "3.14", "", "1", "5"]) == "number"
+
+
+def test_infer_format_type_mixed_fallback():
+    """Mixed content with no clear pattern falls back to 'text'."""
+    assert _infer_format_type_from_samples(["hello", "42", "TRUE"]) == "text"
+    assert _infer_format_type_from_samples(["hello world"]) == "text"
