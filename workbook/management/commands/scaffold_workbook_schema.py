@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
@@ -143,6 +145,43 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
             tables.append(suggested)
 
     return tables
+
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$")
+_BOOL_VALUES = {"TRUE", "FALSE", "Yes", "No", "yes", "no", "1", "0"}
+
+
+def _infer_format_type_from_samples(sample_values: list[str]) -> str:
+    """Infer a profiler format_type from raw cell string values.
+
+    Conservative heuristic: defaults to ``"text"`` when ambiguous so that no
+    column is mis-typed.  Returns one of ``"text"``, ``"number"``,
+    ``"date"``, or ``"checkbox"``.
+    """
+    non_empty = [v for v in sample_values if v.strip()]
+    if not non_empty:
+        return "text"
+
+    if all(v.strip() in _BOOL_VALUES for v in non_empty):
+        return "checkbox"
+
+    date_matches = sum(1 for v in non_empty if _DATE_RE.match(v.strip()))
+    if date_matches / len(non_empty) >= 0.8:
+        return "date"
+
+    def _is_number(value: str) -> bool:
+        cleaned = value.strip().lstrip("$").rstrip("%").replace(",", "")
+        try:
+            Decimal(cleaned)
+            return True
+        except InvalidOperation:
+            return False
+
+    number_matches = sum(1 for v in non_empty if _is_number(v))
+    if number_matches / len(non_empty) >= 0.8:
+        return "number"
+
+    return "text"
 
 
 def _build_cohort_contract(
