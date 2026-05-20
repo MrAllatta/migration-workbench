@@ -22,6 +22,7 @@ Nullability is promoted to non-null when the column's ``null_rate`` is ``0``
 
 from __future__ import annotations
 
+import keyword
 from typing import Any
 
 
@@ -49,6 +50,12 @@ def suggested_field_name(source_column: str) -> str:
         'crop_variety_2024'
     """
     return _slugify_header(source_column)
+
+
+def is_valid_python_identifier(name: str) -> bool:
+    """Return True if *name* is a valid Python identifier and not a reserved keyword."""
+    s = str(name)
+    return s.isidentifier() and not keyword.iskeyword(s)
 
 
 def map_profiler_column_to_django_field(col: dict[str, Any]) -> dict[str, Any]:
