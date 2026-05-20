@@ -24,6 +24,12 @@ what to build next, what to fix, and what to defer.
 4. **Every gap found in a product repo is a workbench fix.** No
    vendoring, no monkey-patching. If farm needed it, the workbench
    should provide it.
+5. **State ownership over artifact scattering.** Pipeline state
+   should live in a single domain model object, not scattered across
+   date-stamped JSON files. The DomainModel is the profiler's memory.
+6. **Extraction over configuration.** The profiler extracts domain
+   signals (workflow, archetype, roles) from the data. The human
+   reviews and overrides, not authors from scratch.
 
 ## Immediate (next release, 0.2.x)
 
@@ -269,20 +275,111 @@ been pulled yet). Known gaps:
 - **`validate_contract` management command:** standalone contract validation without code generation.
 - **Clean error on missing `bundle_path`:** actionable guidance instead of raw traceback.
 
+## Beta Gate (shipping now)
+
+The beta criterion is "no-friction pipeline on full real product."
+The first autonomous run revealed friction in three areas that are
+being addressed as the final beta milestone:
+
+### Domain Context Artifact
+
+A `domain_context.yaml` that the profiler reads at scoring time,
+providing period-aware structural deduplication, vocabulary-to-token
+mapping, and glossary synonym expansion. This eliminates the
+worst source of pipeline friction: structural duplicates profiled
+4x across years, and blind heuristic authoring before any data
+is seen.
+
+See `docs/superpowers/specs/2026-05-19-domain-context-artifact-design.md`
+for the design and `docs/superpowers/plans/2026-05-19-domain-context-artifact.md`
+for the implementation plan.
+
+### Pipeline friction fixes
+
+- Empty `models_auto.py` stub on scaffold (Django starts cleanly before codegen)
+- Config documentation key in `cohort_corpus.json`
+- Phase 1 coverage overview artifact
+- Drive folder timeout documentation
+
+## Post-Beta Goal 1: DomainModel Orchestration
+
+The pipeline's orchestration layer (`run_cohort_corpus`, 600+ lines
+with three resume-mode branches) scatters state across date-stamped JSON
+artifacts. Phase boundaries are files. Human override is JSON editing.
+Domain intelligence injection (see domain context artifact above) adds
+more artifacts to this pattern.
+
+### DomainModel
+
+A single `DomainModel` object that is the profiler's runtime state.
+Created empty or loaded from one YAML file. Its methods are pipeline
+phases. It serializes at checkpoint gates. The human reviews and
+edits ONE file between phases — no more scattered JSON artifacts.
+
+The domain context artifact schema (`periods`, `vocabulary`, `glossary`,
+`deduplication`) is designed as the DomainModel's serialization format.
+When DomainModel ships, the artifact is promoted from "input file"
+to "the model itself."
+
+See `docs/superpowers/specs/2026-05-20-domain-model-orchestration-and-frontend-manifest.md`
+for the meta spec. A detailed orchestration spec spins off from it.
+
+## Post-Beta Goal 2: Frontend Manifest Extraction
+
+The profiler currently extracts what the data IS (schema contract) and
+how it imports (bundle config). It does not extract how the data is
+USED — the interaction contract.
+
+### Profiler-to-UI signals
+
+The profiler already has the sensors for interaction signals but
+doesn't surface them as a contract:
+
+- **Workflow sequence:** cross-sheet formula references encode
+  upstream → downstream tab dependencies. A directed graph of which
+  tabs feed which produces navigation and import order.
+- **UI archetype classification:** formula-density, data-validation
+  presence, row/column dimensions, and section headers reveal whether
+  a tab is a form, a list, or a dashboard.
+- **Role boundaries:** tabs with data-validation columns → data entry.
+  Tabs with high formula density → review. Cross-references → data
+  flows between roles.
+
+### Enriched view manifest
+
+These signals feed into the existing view manifest format (archetypes,
+workflow positions, role hints, form field widgets, KPI sections).
+The discovery interview seeds from them. Admin generation consumes
+them immediately. Frontend codegen (React/Django templates) consumes
+them in the next evolution.
+
+Sub-specs spin off from the meta spec:
+- Workflow sequence extraction
+- UI archetype classification
+- Frontend manifest enrichment
+
 ## Longer-term (post-v1.0)
 
-### Provider interface extraction
+### Provider interface hardening
 
-The farm exercise used Google Sheets exclusively. The provider interface
-(connectors) is shared between Sheets and Coda adapters, but the profiler
-and importer still have provider-specific code paths. After a second
-provider is stable on Fly:
+The provider interface (connectors) is shared between Sheets and Coda
+adapters, but the profiler and importer still have provider-specific
+code paths. The DomainModel's provider-agnostic design creates the
+natural integration point:
 
-- **Abstract provider interface** — common base class for profiling,
-  pulling, and auth.
-- **Plugin system** — third-party providers can register without forking.
-- **Profile format unification** — profiler artifacts should be
-  provider-agnostic (column types, row counts, formula detection).
+- DomainModel as provider-agnostic carrier for all three contracts
+- Coda-specific signals (`is_relation_type`, `ref_tables_seen`)
+  augment shared column profile fields
+- Plugin system for third-party providers
+
+### Frontend codegen from manifest
+
+With an enriched view manifest carrying archetypes, workflow positions,
+and role hints, frontend codegen becomes possible:
+- List views with filters from `filterable_by`
+- Form views with widgets from `data_validation_type`
+- Dashboard views with KPI sections from formula analysis
+- Navigation structure from workflow dependency graph
 
 ### Multi-model transactions and idempotency
 
@@ -304,11 +401,21 @@ SQLite. Real concurrent access patterns may reveal:
 - Performance of FK resolution queries at 100k+ row imports
 - Connection pooling for parallel import tiers
 
+## Future ideas (not gated)
+
+- **Management interface on the workbench Fly app** — A hosted runtime
+  exposing the profiling → scaffold → contract loop as a web or API
+  service, so operators can profile sources, review enrichment candidates,
+  and author contracts without a local checkout. Products remain
+  independent Fly deployments with their own data; the workbench
+  helps author and manage the contracts that drive them.
+
 ## Non-goals (explicitly deferred)
 
 - **GUI for contract authoring.** The YAML is the interface. Visual
   tooling would lock us into a narrow workflow before the contract
-  format stabilizes.
+  format stabilizes. (See "Management interface" above — a hosted
+  runtime is distinct from a GUI editor.)
 - **Real-time sync back to source.** Migration-workbench is a one-way
   pipeline (source → Django). Bidirectional sync requires conflict
   resolution, change tracking, and a fundamentally different architecture.
@@ -337,14 +444,13 @@ or wished for during the farm implementation:
 | View manifest / discovery pipeline not exercised | 0.9.x end-to-end testing, deploy smoke test |
 | 114 test suite passed but no snapshot tests | Snapshot testing for generated output |
 
-## v1.0 Criteria Status
+## v1.0 / Beta Criteria Status
 
 | Criteria | Status |
 |---|---|
-| 1. End-to-end pipeline exercised on real corpus | ✅ Met (farm exercise) |
-| 2. Schema design loop completed | ✅ Met (phases 1–10 exercised in 0.8.x–0.9.x) |
+| 1. No-friction pipeline on full real product | ⚠️ Domain context artifact and friction fixes in progress; next autonomous run will validate |
+| 2. Healthy backups documented and exercised | ❌ Not started |
 | 3. Production deployment live on Fly.io with real data | ⚠️ Code ready (0.9.x), live deploy pending |
-| 4. PyPI release with all gaps patched | ❌ Not started |
 
 ## Tracking
 
