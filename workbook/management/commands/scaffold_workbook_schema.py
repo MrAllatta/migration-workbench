@@ -144,6 +144,8 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
                 suggested_name=merged_name,
             )
             suggested["_meta"] = {"generated_by": "designed_model_detection"}
+            if "model_name" not in suggested:
+                suggested["model_name"] = _to_pascal_case(suggested.get("suggested_model_name", merged_name))
             tables.append(suggested)
 
     return tables
@@ -155,7 +157,7 @@ def _check_null_model_names(tables: list[dict]) -> list[str]:
     for table in tables:
         model_name = str(table.get("model_name", "")).strip()
         if not model_name:
-            tab_title = table.get("bundle_worksheet_title", "?")
+            tab_title = table.get("bundle_worksheet_title") or table.get("suggested_model_name", "?")
             errors.append(
                 f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name\n'
                 "  → Action: Deduplicate the tab across year workbooks or set a unique suggested_model_name\n"
