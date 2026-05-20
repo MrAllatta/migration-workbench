@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from workbook.codegen.python_render import to_python_identifier
+from workbook.codegen.python_render import render_field, render_computed_property, to_python_identifier
 
 
 @pytest.mark.parametrize("input,expected", [
@@ -42,3 +42,58 @@ def test_python_keywords_get_underscore_suffix(keyword):
     result = to_python_identifier(keyword)
     assert result.endswith("_")
     assert result.isidentifier()
+
+
+def test_render_field_sanitizes_name_and_looks_up_kwargs_by_sanitized_name():
+    result = render_field(
+        name="1",
+        field_class="models.CharField",
+        kwargs={
+            "max_length": 100,
+            "null": True,
+        },
+    )
+    assert "f_1 = models.CharField" in result
+    assert "max_length=100" in result
+
+    result2 = render_field(
+        name="yield",
+        field_class="models.CharField",
+        kwargs={
+            "max_length": 50,
+        },
+    )
+    assert "yield_ = models.CharField" in result2
+    assert "max_length=50" in result2
+
+
+def test_render_field_remaps_non_identifier_kwargs():
+    result = render_field(
+        name="my_field",
+        field_class="models.CharField",
+        kwargs={
+            "max_length": 50,
+        },
+    )
+    assert "my_field = models.CharField" in result
+
+
+def test_render_field_fk_forward_reference():
+    result = render_field(
+        name="owner",
+        field_class="models.ForeignKey",
+        kwargs={
+            "to": "Person",
+            "on_delete": "models.CASCADE",
+        },
+        rendered_model_names={"Person", "Organization"},
+    )
+    assert "owner = models.ForeignKey(Person, on_delete=models.CASCADE)" in result
+
+
+def test_render_computed_property_sanitizes_name():
+    result = render_computed_property(name="201_value", return_type="int")
+    assert "def f_201_value(self) -> int:" in result
+
+    result2 = render_computed_property(name="class")
+    assert "def class_(self):" in result2

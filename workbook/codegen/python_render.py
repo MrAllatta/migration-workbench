@@ -140,7 +140,8 @@ def render_field(
     Args:
         name: Field name (e.g. ``"crop"``).
         field_class: Fully-qualified Django field class (e.g. ``"models.ForeignKey"``).
-        kwargs: Keyword arguments for the field constructor.
+        kwargs: Keyword arguments for the field constructor, keyed by sanitized
+            Python identifier (e.g. ``"f_1"`` not ``"1"``).
         indent: Spaces of indentation (default 4).
         enum_names: Set of known enum type names (passed to *render_field_kwargs*).
         model_name: The Django model class name (for enum references).
@@ -153,9 +154,15 @@ def render_field(
             name = models.CharField(max_length=200, unique=True)
     """
     pad = " " * indent
+    safe_name = to_python_identifier(name)
+
+    remapped_kwargs: dict[str, Any] = {}
+    for k, v in kwargs.items():
+        remapped_key = to_python_identifier(str(k)) if not str(k).isidentifier() else k
+        remapped_kwargs[remapped_key] = v
 
     if field_class == "models.ForeignKey":
-        remaining = dict(kwargs)
+        remaining = dict(remapped_kwargs)
         to_val = remaining.pop("to", None)
         kw_str = render_field_kwargs(remaining, enum_names, model_name)
         if to_val is not None:
@@ -176,11 +183,11 @@ def render_field(
         else:
             body = kw_str
     else:
-        body = render_field_kwargs(kwargs, enum_names, model_name)
+        body = render_field_kwargs(remapped_kwargs, enum_names, model_name)
 
     if body:
-        return f"{pad}{name} = {field_class}({body})"
-    return f"{pad}{name} = {field_class}()"
+        return f"{pad}{safe_name} = {field_class}({body})"
+    return f"{pad}{safe_name} = {field_class}()"
 
 
 def render_import_block(
@@ -228,12 +235,13 @@ def render_computed_property(
         Property method source block.
     """
     pad = " " * indent
+    safe_name = to_python_identifier(name)
     lines: list[str] = []
     lines.append(f"{pad}@property")
     if return_type:
-        lines.append(f"{pad}def {name}(self) -> {return_type}:")
+        lines.append(f"{pad}def {safe_name}(self) -> {return_type}:")
     else:
-        lines.append(f"{pad}def {name}(self):")
+        lines.append(f"{pad}def {safe_name}(self):")
     if expression:
         for line in expression.strip().split("\n"):
             lines.append(f"{pad * 2}{line}")
