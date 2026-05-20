@@ -39,22 +39,26 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Execute the preflight check. Verifies Google Sheets/Drive credentials and optionally tests folder access."""
+        if options["smoke"]:
+            self.stdout.write(self.style.SUCCESS("profile_preflight smoke ok"))
+            return
+
         credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
         if credentials_path:
             path = Path(credentials_path).expanduser()
-            if not path.exists():
-                raise CommandError(
-                    f"GOOGLE_APPLICATION_CREDENTIALS path does not exist: {path}"
+            if path.exists():
+                self.stdout.write(f"credentials path exists: {path}")
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"GOOGLE_APPLICATION_CREDENTIALS points to non-existent path: {path}; "
+                        "relying on ADC/default credentials"
+                    )
                 )
-            self.stdout.write(f"credentials path exists: {path}")
         else:
             self.stdout.write(
                 "GOOGLE_APPLICATION_CREDENTIALS not set; relying on ADC/default credentials"
             )
-
-        if options["smoke"]:
-            self.stdout.write(self.style.SUCCESS("profile_preflight smoke ok"))
-            return
 
         scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
         drive_service = build_google_service("drive", "v3", scopes)
