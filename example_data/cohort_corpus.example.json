@@ -1,4 +1,17 @@
 {
+  "_documentation": {
+    "in_scope_workbooks": "Run 'make profile-drive-folder' first, then extract workbook codes from the drive tree output that match workbook_id_regex.",
+    "operational_tokens": "Words from your domain that indicate primary data-entry tabs. Consider the operational loop in your raw notes.",
+    "reference_tokens": "Words indicating lookup/reference tabs (variety lists, crop codes, etc.).",
+    "reference_combo_tokens": "Lists of words that must all appear for a reference combo match.",
+    "support_tokens": "Words indicating helper/index/validation tabs (penalized in scoring).",
+    "derived_tokens": "Words indicating auto-generated/pivot/summary tabs (penalized in scoring).",
+    "tab_auto_limit": "Maximum tabs auto-selected per workbook code. Use tab_selection_overrides to hand-pick important tabs.",
+    "tab_exclude_patterns": "Regex patterns to block tabs. Each entry: {\"pattern\": \"regex\", \"penalty\": -5}.",
+    "year_regex": "Used to group workbooks by year. Set year_scope in domain_context.yaml to limit profiling to active years.",
+    "domain_context": "Path to a domain_context.yaml file providing vocabulary, year scoping, deduplication, and glossary."
+  },
+  "domain_context": "config/domain_context.yaml",
   "folder_name": "Corpus Root Folder",
   "workbook_id_regex": "\\b(\\d{3})\\b",
   "year_regex": "\\b(20\\d{2})\\b",

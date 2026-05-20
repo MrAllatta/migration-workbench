@@ -600,7 +600,19 @@ Run after setting up `.env`. These commands inspect source data and produce arti
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
 
-Profiling follows a **3-phase workflow** to avoid expensive API calls until heuristic tuning is complete:
+Profiling follows a **4-phase workflow** to avoid expensive API calls until heuristic tuning is complete:
+
+#### Phase 0 — Orient
+
+Before running Phase 1, populate `config/domain_context.yaml`:
+
+1. **Read raw notes** in `data/raw_notes/` — extract entity names, relationships, and temporal scope.
+2. **Inspect drive tree** from `make profile-drive-folder` — identify workbook codes and year distribution.
+3. **Set year_scope** — mark active years (profile in full), archived years (skip), and forward years.
+4. **Populate vocabulary** — list domain words for operational, reference, support, and derived tabs.
+5. **Add glossary** entries for abbreviations (e.g., `qty: quantity`).
+6. **Review deduplication** — by default, tabs appearing across multiple years are profiled only for the latest year.
+   Add exceptions for tabs that change meaning across years (e.g., Sales Actuals).
 
 #### Phase 1 — Discovery + tab selection
 
@@ -1257,6 +1269,11 @@ def scaffold_config_templates(
     copy_file(
         script_dir.parent / "example_data" / "cohort_corpus.example.json",
         output_dir / "config" / "cohort_corpus.json",
+        force=force,
+    )
+    copy_file(
+        script_dir.parent / "example_data" / "domain_context.example.yaml",
+        output_dir / "config" / "domain_context.yaml",
         force=force,
     )
 
