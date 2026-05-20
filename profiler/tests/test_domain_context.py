@@ -7,6 +7,7 @@ import pytest
 from profiler.tools.domain_context import (
     DomainContext,
     deduplicate_index_records,
+    has_meaningful_vocabulary,
     load_domain_context,
     merge_vocabulary,
 )
@@ -112,3 +113,24 @@ def test_deduplicate_index_records_no_domain_context():
     approved = {"402": ["Crop Planner"]}
     filtered = deduplicate_index_records(records, approved, None)
     assert len(filtered) == 1
+
+
+def test_has_meaningful_vocabulary_empty():
+    ctx = DomainContext()
+    assert not has_meaningful_vocabulary(ctx)
+
+
+def test_has_meaningful_vocabulary_with_operational():
+    ctx = DomainContext()
+    ctx.vocabulary.operational = ["crop"]
+    assert has_meaningful_vocabulary(ctx)
+
+
+def test_has_meaningful_vocabulary_with_reference():
+    ctx = DomainContext()
+    ctx.vocabulary.reference = ["variety"]
+    assert has_meaningful_vocabulary(ctx)
+
+
+def test_has_meaningful_vocabulary_none():
+    assert not has_meaningful_vocabulary(None)

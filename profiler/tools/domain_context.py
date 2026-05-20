@@ -144,3 +144,11 @@ def deduplicate_index_records(
         for rec in index_records
         if not domain_context.is_archived_year(rec.get("year"))
     ]
+
+
+def has_meaningful_vocabulary(domain_context: DomainContext | None) -> bool:
+    if domain_context is None:
+        return False
+    return bool(
+        domain_context.vocabulary.operational or domain_context.vocabulary.reference
+    )
