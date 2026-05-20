@@ -405,11 +405,11 @@ def score_tab(
         include ``"expansion_formula_ratio"`` when the expansion-formula
         penalty is applied.
     """
-    lowered = title.lower()
+    match_texts = {title.lower()}
     if domain_context is not None and domain_context.glossary:
-        title_expansions = glossary_expand(lowered, domain_context.glossary)
+        title_expansions = glossary_expand(title.lower(), domain_context.glossary)
         if title_expansions:
-            lowered = lowered + " " + " ".join(title_expansions)
+            match_texts.update(title_expansions)
     score = 0
     reasons: list[str] = []
     token_matches: list[dict] = []
@@ -450,9 +450,10 @@ def score_tab(
     ]
     for _key, tokens, category, weight, reason in categories:
         if tokens:
-            matched = [
-                token for token in tokens if _token_match(token, lowered, match_mode)
-            ]
+            matched = []
+            for token in tokens:
+                if any(_token_match(token, text, match_mode) for text in match_texts):
+                    matched.append(token)
             if matched:
                 score += weight
                 reasons.append(reason)
@@ -469,7 +470,10 @@ def score_tab(
     if combo_tokens:
         combo_weight = heuristics["reference_combo_weight"]
         for combo in combo_tokens:
-            if all(_token_match(token, lowered, match_mode) for token in combo):
+            if all(
+                any(_token_match(token, text, match_mode) for text in match_texts)
+                for token in combo
+            ):
                 score += combo_weight
                 reasons.append("reference_lookup_tab_name")
                 token_matches.append(
