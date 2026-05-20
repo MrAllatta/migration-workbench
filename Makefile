@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus validate-domain-context draft-domain-context manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -142,6 +142,14 @@ profile-cohort-corpus:
 
 profile-coda-canvas:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke
+
+validate-domain-context:
+	@test -n "$(DOMAIN_CONTEXT)" || (echo "Usage: make validate-domain-context DOMAIN_CONTEXT=path/to/domain_context.yaml"; exit 1)
+	DB_ENGINE=sqlite $(MANAGE) validate_domain_context --config "$(DOMAIN_CONTEXT)"
+
+draft-domain-context:
+	@test -n "$(DRIVE_TREE)" || (echo "Usage: make draft-domain-context DRIVE_TREE=path/to/drive_tree.json"; exit 1)
+	DB_ENGINE=sqlite $(MANAGE) draft_domain_context --drive-tree "$(DRIVE_TREE)" $(if $(OUT),--out "$(OUT)")
 
 chassis-gate:
 	mkdir -p build/_out
