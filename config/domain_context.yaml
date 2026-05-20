@@ -1,0 +1,6 @@
+domain: test
+year_scope:
+  active: [2024]
+vocabulary:
+  operational:
+    - order

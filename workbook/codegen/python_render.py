@@ -7,6 +7,15 @@ import keyword
 import re
 from typing import Any
 
+_codegen_warnings: list[str] = []
+
+
+def get_and_clear_codegen_warnings() -> list[str]:
+    """Return and clear accumulated codegen warnings."""
+    warnings = list(_codegen_warnings)
+    _codegen_warnings.clear()
+    return warnings
+
 
 def to_python_identifier(name: str) -> str:
     """Convert an arbitrary string to a valid Python identifier.
@@ -155,6 +164,13 @@ def render_field(
     """
     pad = " " * indent
     safe_name = to_python_identifier(name)
+
+    if safe_name != name:
+        _codegen_warnings.append(
+            f"WARNING[GEN_SANITIZED_FIELD]: Field '{name}' sanitized to '{safe_name}' "
+            f"in model '{model_name or '?'}'\n"
+            "  → Action: Fix the source column name in the contract and re-generate."
+        )
 
     remapped_kwargs: dict[str, Any] = {}
     for k, v in kwargs.items():

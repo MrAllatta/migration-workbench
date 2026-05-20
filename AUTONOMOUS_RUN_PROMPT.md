@@ -29,9 +29,10 @@ Execute the following checks and run the appropriate command for each phase:
 # Validate domain context
 make validate-domain-context DOMAIN_CONTEXT=config/domain_context.yaml
 
-# If no drive tree yet, draft it (requires DRIVE_FOLDER_ID in .env)
+# If no drive tree yet, draft it (Makefile reads DRIVE_FOLDER_ID from .env;
+# if missing, the target fails with a clear error.)
 if [ ! -f data/profile_snapshots/drive_tree.json ]; then
-    make profile-drive-folder DRIVE_FOLDER_ID=$DRIVE_FOLDER_ID
+    make profile-drive-folder
 fi
 
 # Extract workbook codes

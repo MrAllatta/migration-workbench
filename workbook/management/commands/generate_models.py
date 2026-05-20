@@ -96,7 +96,9 @@ class Command(BaseCommand):
             )
         )
 
-        source = render_models_py(contract, app_label=app_label)
+        source, warnings = render_models_py(contract, app_label=app_label)
+        for w in warnings:
+            self.stdout.write(self.style.WARNING(w))
 
         if show_diff:
             if out_path.exists():

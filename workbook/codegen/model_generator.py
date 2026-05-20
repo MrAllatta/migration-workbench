@@ -28,6 +28,7 @@ from workbook.codegen.contract import (
     get_str_template,
 )
 from workbook.codegen.python_render import (
+    get_and_clear_codegen_warnings,
     render_choices_class,
     render_computed_property,
     render_field,
@@ -42,7 +43,7 @@ def render_model(
     app_label: str,
     enum_names: set[str] | None = None,
     rendered_model_names: set[str] | None = None,
-) -> str:
+) -> tuple[str, list[str]]:
     """Render a single Django model class as source text.
 
     Args:
@@ -127,10 +128,10 @@ def render_model(
             lines.append(f"    {line}")
         lines.append("")
 
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", get_and_clear_codegen_warnings()
 
 
-def render_models_py(contract: dict[str, Any], app_label: str = "core") -> str:
+def render_models_py(contract: dict[str, Any], app_label: str = "core") -> tuple[str, list[str]]:
     """Render a complete ``models.py`` file from a schema contract.
 
     Args:
@@ -168,15 +169,16 @@ def render_models_py(contract: dict[str, Any], app_label: str = "core") -> str:
     for table in tables:
         rendered_model_names.add(get_model_name(table))
 
+    all_warnings: list[str] = []
     for table in tables:
-        parts.append(
-            render_model(
-                table,
-                app_label,
-                enum_names=set(enums.keys()),
-                rendered_model_names=rendered_model_names,
-            )
+        part, warnings = render_model(
+            table,
+            app_label,
+            enum_names=set(enums.keys()),
+            rendered_model_names=rendered_model_names,
         )
+        parts.append(part)
+        all_warnings.extend(warnings)
 
     parts.append("")
-    return "\n".join(parts)
+    return "\n".join(parts), all_warnings
