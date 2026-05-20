@@ -3,7 +3,59 @@
 from __future__ import annotations
 
 import json
+import keyword
+import re
 from typing import Any
+
+
+def to_python_identifier(name: str) -> str:
+    """Convert an arbitrary string to a valid Python identifier.
+
+    Rules:
+    1. If valid identifier and is a Python keyword: lowercase and append '_'.
+    2. If valid identifier, not a keyword:
+       - Strip dunder wrapper: ``__foo__`` -> ``foo``.
+       - Strip leading underscore (convention for private/protected fields).
+       - Lowercase the result.
+    3. Otherwise: replace invalid chars, collapse underscores,
+       strip leading/trailing underscores, lowercase.
+    4. Prepend 'f_' if empty or starts with a digit.
+    5. Append '_' if it is a Python keyword.
+
+    Examples:
+        "1"          -> "f_1"
+        "201_unit"   -> "f_201_unit"
+        "yield"      -> "yield_"
+        "Column #1"  -> "column_1"
+        "Field.name" -> "field_name"
+        "unit-price" -> "unit_price"
+        "_hidden"    -> "hidden"
+        "Yield"      -> "yield"
+        "__dunder__" -> "dunder"
+        "_1_2_3_"    -> "f_1_2_3_"
+    """
+    s = str(name)
+
+    if s.isidentifier():
+        if keyword.iskeyword(s):
+            return s.lower() + "_"
+        s = re.sub(r"^__(.+?)__$", r"\1", s)
+        s = s.lower()
+        if s.startswith("_"):
+            s = s[1:]
+    else:
+        s = re.sub(r"[^a-zA-Z0-9_]", "_", s)
+        s = re.sub(r"_+", "_", s)
+        s = s.strip("_")
+        s = s.lower()
+
+    if not s or s[0].isdigit():
+        s = f"f_{s}" if s else "f_"
+
+    if keyword.iskeyword(s):
+        s = f"{s}_"
+
+    return s
 
 
 def render_choices_class(name: str, pairs: list[tuple[str, str]]) -> str:
