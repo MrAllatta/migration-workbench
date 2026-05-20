@@ -34,6 +34,15 @@ def test_stub_updates_import_line(tmp_path):
     assert "class Custom: pass" in content
 
 
+def test_ensure_stub_creates_auto_module(tmp_path):
+    auto_path = tmp_path / "models_auto.py"
+    stub_path = tmp_path / "models.py"
+    ensure_stub(stub_path, "models_auto")
+    assert auto_path.exists()
+    content = auto_path.read_text()
+    assert "Auto-generated" in content or "Populated by" in content
+
+
 def test_stub_handles_no_marker(tmp_path):
     stub = tmp_path / "models.py"
     stub.write_text("from .old_module import *")
