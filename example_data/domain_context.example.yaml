@@ -1,0 +1,27 @@
+# Domain context — the profiler's model of the business domain.
+# Populated from raw notes and drive tree inspection BEFORE Phase 1.
+# Follow the Orient step in AGENTS.md to fill this in.
+
+domain: ""                       # e.g., "farm_management"
+description: ""                  # What does this business do?
+
+year_scope:
+  active: []                     # Years to profile in full  e.g., [2025, 2026]
+  archived: []                   # Years to skip/deprioritize  e.g., [2023, 2024]
+  forward: []                    # Future years for forward-looking tabs  e.g., [2026]
+
+deduplication:
+  strategy: latest_year          # "latest_year" profiles only the latest year per (workbook_code, tab_title)
+  exceptions: []                  # Tab titles to always profile per-year (e.g., Sales Actuals changes yearly)
+
+entities: []                      # Sparse pre-profiling; populated after Phase 1
+
+vocabulary:
+  operational: []                # Words for primary data-entry tabs (e.g., planting, harvest, order)
+  reference: []                  # Words for lookup tabs (e.g., variety, crop, price)
+  support: []                    # Words for helper tabs (e.g., index, validation)
+  derived: []                    # Words for summary/pivot tabs (e.g., totals, rollup)
+
+glossary: {}                     # Synonym expansion  e.g., {"qty": "quantity", "amt": "amount"}
+
+scope_notes: ""                  # Freeform notes from orientation

@@ -375,6 +375,7 @@ def profile_blocks(ctx: MakeContext) -> str:
             '--config "$${COHORT_CORPUS_CONFIG}"'
         )
         + "\n\n"
+        + "# Expected runtime: 2-3 minutes for folders with 20+ spreadsheets.\n"
         + "profile-drive-folder:\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_drive_folder "
