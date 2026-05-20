@@ -1256,6 +1256,8 @@ def run_cohort_corpus(
                 f"{broad_path} is missing 'inventory_rows' list. "
                 "Re-run discovery without resume flags to regenerate in the new format."
             )
+        for inventory_row in inventory_rows:
+            known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
         try:
             workbook_index_payload = json.loads(index_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
@@ -1412,6 +1414,9 @@ def run_cohort_corpus(
             },
         )
 
+        for inventory_row in inventory_rows:
+            known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
+
         tab_shortlist = select_tabs_from_inventory(
             index_records,
             inventory_rows,
@@ -1506,12 +1511,40 @@ def run_cohort_corpus(
         index_records, approved_tabs, domain_context
     )
 
+    latest_year_by_workbook: dict[str, int] = {}
+    for rec in index_records:
+        wb = rec["workbook_code"]
+        yr = rec.get("year") or 0
+        if yr > latest_year_by_workbook.get(wb, 0):
+            latest_year_by_workbook[wb] = yr
+
+    dedup_trace: dict[str, dict] = {}
+
     for record in index_records:
         if _429_abort:
             break
-        for tab_title in approved_tabs.get(record["workbook_code"], []):
+        wb = record["workbook_code"]
+        yr = record.get("year") or 0
+        for tab_title in approved_tabs.get(wb, []):
             if known_tabs and (record["spreadsheet_id"], tab_title) not in known_tabs:
                 continue
+            if domain_context is not None:
+                is_exception = domain_context.is_deduplication_exception(tab_title)
+                if not is_exception and yr != latest_year_by_workbook.get(wb, 0):
+                    continue
+                trace_entry = dedup_trace.setdefault(
+                    wb,
+                    {
+                        "latest_year": latest_year_by_workbook.get(wb),
+                        "profiled_all_years": [],
+                        "profiled_latest_only": [],
+                    },
+                )
+                target_list = (
+                    "profiled_all_years" if is_exception else "profiled_latest_only"
+                )
+                if tab_title not in trace_entry[target_list]:
+                    trace_entry[target_list].append(tab_title)
             tab_hash = hashlib.sha1(tab_title.encode()).hexdigest()[:8]
             out_path = (
                 deep_dir
@@ -1650,6 +1683,7 @@ def run_cohort_corpus(
             "success_count": sum(1 for row in deep_results if row["exit_code"] == 0),
             "failure_count": sum(1 for row in deep_results if row["exit_code"] != 0),
             "results": deep_results,
+            "dedup_trace": dedup_trace,
         },
     )
 

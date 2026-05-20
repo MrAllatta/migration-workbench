@@ -1659,7 +1659,7 @@ def test_derive_column_candidates_glossary():
 
 
 def test_select_tabs_no_domain_context_unchanged():
-    """Without domain_context, legacy behavior: old coverage bonus, no duplicate_years."""
+    """Without domain_context, legacy behavior: coverage bonus, no duplicate_years."""
     index_records = [
         {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
         {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
@@ -1676,3 +1676,78 @@ def test_select_tabs_no_domain_context_unchanged():
     entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
     assert entry["coverage_bonus"] == 1
     assert "duplicate_years" not in entry
+
+
+def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
+    """Deep loop should skip non-latest years when domain context is active."""
+    corpus_out_dir = tmp_path / "corpus_run"
+    corpus_out_dir.mkdir(parents=True, exist_ok=True)
+    date_stamp = "2026-05-20"
+
+    workbook_index_payload = {
+        "generated_from": f"drive_discovery_{date_stamp}.json",
+        "record_count": 2,
+        "records": [
+            {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2024"},
+            {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2026"},
+        ],
+    }
+    index_path = corpus_out_dir / f"in_scope_workbook_index_{date_stamp}.json"
+    index_path.write_text(json.dumps(workbook_index_payload), encoding="utf-8")
+
+    broad_payload = {
+        "run_count": 2,
+        "success_count": 2,
+        "failure_count": 0,
+        "results": [],
+        "inventory_rows": [
+            {"spreadsheet_id": "s1", "sheet_id": 0, "rows": 100, "cols": 10, "tab_title": "Plan Board"},
+            {"spreadsheet_id": "s2", "sheet_id": 0, "rows": 100, "cols": 10, "tab_title": "Plan Board"},
+        ],
+    }
+    broad_path = corpus_out_dir / f"broad_profile_coverage_{date_stamp}.json"
+    broad_path.write_text(json.dumps(broad_payload), encoding="utf-8")
+
+    selection_path = corpus_out_dir / f"tab_selection_{date_stamp}.json"
+    selection_path.write_text(
+        json.dumps({"approved_tabs": {"402": ["Plan Board"]}}),
+        encoding="utf-8",
+    )
+
+    domain_ctx_path = tmp_path / "domain_context.yaml"
+    domain_ctx_path.write_text(
+        "year_scope:\n  active: [2026]\n  archived: [2024]\n",
+        encoding="utf-8",
+    )
+    corpus_config = {
+        "folder_id": "drive-folder-1",
+        "in_scope_workbooks": ["402"],
+        "domain_context": str(domain_ctx_path),
+    }
+    mock_drive = MagicMock()
+    mock_sheets = MagicMock()
+
+    with (
+        patch("profiler.management.commands.profile_drive_folder.walk_folder") as mock_walk,
+        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        patch("profiler.tools.cohort_corpus.fetch_tab_grid", return_value={"sheets": []}),
+        patch("profiler.tools.cohort_corpus.summarize_tab", return_value={"formula_cell_count": 0}),
+    ):
+        outputs = run_cohort_corpus(
+            drive_service=mock_drive,
+            sheets_service=mock_sheets,
+            config=corpus_config,
+            out_dir=corpus_out_dir,
+            date_stamp=date_stamp,
+            resume_from_tab_selection=True,
+        )
+
+    mock_walk.assert_not_called()
+    mock_list_tabs.assert_not_called()
+
+    deep_coverage = json.loads(
+        (corpus_out_dir / f"deep_profile_coverage_{date_stamp}.json").read_text(encoding="utf-8")
+    )
+    assert deep_coverage["success_count"] == 1
+    assert "dedup_trace" in deep_coverage
+    assert deep_coverage["dedup_trace"]["402"]["profiled_latest_only"] == ["Plan Board"]
