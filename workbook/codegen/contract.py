@@ -988,3 +988,59 @@ def _diff_meta(
         if v_old != v_new:
             result[key] = {"old": v_old, "new": v_new}
     return result if result else None
+
+
+def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
+    """Run strict validation checks and return a list of error messages.
+
+    Checks:
+    - No model_name is null or empty.
+    - Every suggested_field_name is a valid Python identifier and not a keyword.
+    - No duplicate model_name values exist across tables.
+    - No suggested_field_name starts with a digit.
+    """
+    import keyword
+
+    errors: list[str] = []
+    tables = list(contract.get("tables") or [])
+    model_names: list[str] = []
+
+    for table in tables:
+        model_name = str(table.get("model_name", "")).strip()
+        if not model_name:
+            label = table.get("suggested_model_name", "?")
+            errors.append(
+                f"FAIL[VALIDATE_NULL_MODEL]: Table '{label}' has empty model_name"
+            )
+            continue
+        model_names.append(model_name)
+
+    seen_model_names: set[str] = set()
+    for mn in model_names:
+        if mn in seen_model_names:
+            errors.append(
+                f'FAIL[VALIDATE_DUPLICATE_MODEL]: Duplicate model_name "{mn}" (2+ tables)'
+                "\n  → Action: Merge the duplicate tables or give them distinct model_name values."
+            )
+        seen_model_names.add(mn)
+
+    for table in tables:
+        model_name = str(table.get("model_name", "")).strip()
+        for col in table.get("columns", []):
+            field_name = col.get("suggested_field_name", "")
+            if not field_name:
+                continue
+            if not str(field_name).isidentifier() or keyword.iskeyword(str(field_name)):
+                errors.append(
+                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
+                    f"is not a valid Python identifier\n"
+                    "  → Action: Rename the source column in the contract."
+                )
+            elif str(field_name)[0].isdigit():
+                errors.append(
+                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
+                    f"starts with a digit\n"
+                    "  → Action: Rename the source column in the contract."
+                )
+
+    return errors

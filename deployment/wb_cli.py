@@ -366,8 +366,11 @@ def _contract_validate(args: argparse.Namespace) -> int:
     from django.core.management import call_command
     from workbook.management.commands.validate_contract import Command
 
+    kwargs = {"contract": args.contract}
+    if getattr(args, "strict", False):
+        kwargs["strict"] = True
     try:
-        call_command(Command, contract=args.contract)
+        call_command(Command, **kwargs)
         return 0
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else 1
@@ -900,6 +903,7 @@ def build_parser() -> argparse.ArgumentParser:
     validate_cmd.add_argument("--contract", required=True)
     validate_cmd.add_argument("--json", action="store_true")
     validate_cmd.add_argument("--exit-zero", action="store_true")
+    validate_cmd.add_argument("--strict", action="store_true")
     validate_cmd.add_argument("--django-settings", default=None)
     validate_cmd.set_defaults(func=_contract_validate)
 

@@ -25,6 +25,11 @@ class Command(BaseCommand):
             required=True,
             help="Path to schema-contract YAML (e.g. build/schema-contract.yaml)",
         )
+        parser.add_argument(
+            "--strict",
+            action="store_true",
+            help="Enable strict mode: enforce valid Python identifiers and no duplicate model names",
+        )
 
     def handle(self, *args, **options):
         """Load and validate a schema contract, writing warnings to stdout."""
@@ -38,6 +43,14 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
 
         warnings = validate_contract_tables(contract)
+
+        if options["strict"]:
+            from workbook.codegen.contract import strict_validate_contract
+            strict_errors = strict_validate_contract(contract)
+            for err in strict_errors:
+                self.stdout.write(self.style.ERROR(err))
+            if strict_errors:
+                raise CommandError(f"Strict validation failed with {len(strict_errors)} error(s).")
 
         if not warnings:
             count = len(contract.get("tables", []))
