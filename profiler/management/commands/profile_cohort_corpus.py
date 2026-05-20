@@ -88,6 +88,7 @@ class Command(BaseCommand):
         if not config_path.exists():
             raise CommandError(f"Config not found: {config_path}")
         config = json.loads(config_path.read_text(encoding="utf-8"))
+        config = {k: v for k, v in config.items() if not k.startswith("_")}
 
         out_dir = Path(options["out_dir"]).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)

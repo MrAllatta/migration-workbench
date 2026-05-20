@@ -56,11 +56,18 @@ from profiler.management.commands.profile_tab import (
     summarize_tab,
 )
 
+from profiler.tools.domain_context import (
+    DomainContext,
+    deduplicate_index_records,
+    load_domain_context,
+    merge_vocabulary,
+)
 from profiler.tools.enrichment_utils import (
     _ENTITY_KEYWORDS,
     _IDENTIFIER_NAMES,
     _IDENTIFIER_SUFFIXES,
     _to_pascal_case,
+    glossary_expand,
 )
 
 logger = logging.getLogger(__name__)
@@ -375,6 +382,7 @@ def score_tab(
     *,
     tab_score_heuristics: dict | None = None,
     column_formula_patterns: dict[str, str] | None = None,
+    domain_context: DomainContext | None = None,
 ) -> tuple[int, list[str], dict]:
     """Score a single tab by its title and dimensions.
 
@@ -398,6 +406,10 @@ def score_tab(
         penalty is applied.
     """
     lowered = title.lower()
+    if domain_context is not None and domain_context.glossary:
+        title_expansions = glossary_expand(lowered, domain_context.glossary)
+        if title_expansions:
+            lowered = lowered + " " + " ".join(title_expansions)
     score = 0
     reasons: list[str] = []
     token_matches: list[dict] = []
@@ -541,8 +553,10 @@ def select_tabs_from_inventory(
     *,
     min_final_score: float = 2.0,
     tab_score_heuristics: dict | None = None,
+    domain_context: DomainContext | None = None,
 ) -> list[dict]:
     """Score, aggregate across years, and filter inventory tabs by final score. Applies coverage bonus for tabs appearing in 3+ years. Returns a sorted shortlist."""
+    effective_heuristics = merge_vocabulary(tab_score_heuristics or {}, domain_context)
     by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
     scored: list[dict] = []
     for row in inventory_rows:
@@ -553,7 +567,8 @@ def select_tabs_from_inventory(
             row["tab_title"],
             row["rows"],
             row["cols"],
-            tab_score_heuristics=tab_score_heuristics,
+            tab_score_heuristics=effective_heuristics,
+            domain_context=domain_context,
         )
         scored.append(
             {
@@ -602,7 +617,14 @@ def select_tabs_from_inventory(
     selected: list[dict] = []
     for bucket in aggregate.values():
         avg_score = sum(bucket["scores"]) / len(bucket["scores"])
-        coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
+        if domain_context is not None:
+            active_or_forward = (
+                set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+            )
+            bonus_years = len(bucket["years"] & active_or_forward)
+            coverage_bonus = 1 if bonus_years >= 2 else 0
+        else:
+            coverage_bonus = 1 if len(bucket["years"]) >= 3 else 0
         final_score = avg_score + coverage_bonus
         confidence = (
             "high" if final_score >= 3 else "medium" if final_score >= 2 else "low"
@@ -643,6 +665,15 @@ def select_tabs_from_inventory(
                 "breakdown_summary": breakdown_summary,
             }
         )
+    if domain_context is not None:
+        for entry in selected:
+            years = entry.get("years", [])
+            if len(years) > 1:
+                active_or_forward = set(domain_context.year_scope.active) | set(domain_context.year_scope.forward)
+                non_active = sorted(y for y in years if y not in active_or_forward)
+                if non_active:
+                    entry["duplicate_years"] = non_active
+
     selected.sort(
         key=lambda row: (-row["final_score"], row["workbook_code"], row["tab_title"])
     )
@@ -779,6 +810,7 @@ def derive_column_candidates(
     tab_title: str,
     payload: dict,
     column_score_heuristics: dict | None = None,
+    domain_context: DomainContext | None = None,
 ) -> list[dict]:
     """Extract column headers from a raw sheet payload and score each by domain keywords and formula density. Returns a list of candidate dicts with canonical field name proposals."""
     summary = payload.get("summary", {})
@@ -808,6 +840,10 @@ def derive_column_candidates(
     candidates: list[dict] = []
     for col_letter, header in headers[:40]:
         lowered = header.lower()
+        if domain_context is not None and domain_context.glossary:
+            header_expanded = glossary_expand(lowered, domain_context.glossary)
+            if header_expanded:
+                lowered = lowered + " " + " ".join(header_expanded)
         score = 0
         reasons: list[str] = []
         if domain_keyword_tokens and any(
@@ -1116,6 +1152,13 @@ def run_cohort_corpus(
     tab_score_heuristics = heuristics_config.get("tab_score") or {}
     column_score_heuristics = heuristics_config.get("column_score") or {}
 
+    domain_context_path = config.get("domain_context")
+    domain_context: DomainContext | None = None
+    if domain_context_path:
+        domain_context = load_domain_context(domain_context_path)
+        if domain_context is not None:
+            logger.info("Domain context loaded: domain=%s", domain_context.domain)
+
     discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
     index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"
     broad_path = out_dir / f"broad_profile_coverage_{date_stamp}.json"
@@ -1223,7 +1266,30 @@ def run_cohort_corpus(
             index_records,
             inventory_rows,
             tab_score_heuristics=tab_score_heuristics,
+            domain_context=domain_context,
         )
+        selection_summary: dict = {
+            "by_workbook_by_year": {},
+            "candidate_count": len(tab_shortlist),
+        }
+        if domain_context is not None:
+            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            for row in tab_shortlist:
+                for yr in row.get("years", []):
+                    by_wb_by_year[row["workbook_code"]][str(yr)] = (
+                        by_wb_by_year[row["workbook_code"]].get(str(yr), 0) + 1
+                    )
+            selection_summary["by_workbook_by_year"] = {
+                wb: dict(years) for wb, years in by_wb_by_year.items()
+            }
+            dup_total = sum(
+                len(r.get("duplicate_years", [])) for r in tab_shortlist
+            )
+            if dup_total:
+                selection_summary["deduplication_note"] = (
+                    f"{dup_total} structural duplicates collapsed via latest_year strategy"
+                )
+
         write_json(
             tab_shortlist_path,
             {
@@ -1233,6 +1299,7 @@ def run_cohort_corpus(
                 ),
                 "selected_count": len(tab_shortlist),
                 "selected": tab_shortlist,
+                "selection_summary": selection_summary,
             },
         )
 
@@ -1347,7 +1414,30 @@ def run_cohort_corpus(
             index_records,
             inventory_rows,
             tab_score_heuristics=tab_score_heuristics,
+            domain_context=domain_context,
         )
+        selection_summary: dict = {
+            "by_workbook_by_year": {},
+            "candidate_count": len(tab_shortlist),
+        }
+        if domain_context is not None:
+            by_wb_by_year: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+            for row in tab_shortlist:
+                for yr in row.get("years", []):
+                    by_wb_by_year[row["workbook_code"]][str(yr)] = (
+                        by_wb_by_year[row["workbook_code"]].get(str(yr), 0) + 1
+                    )
+            selection_summary["by_workbook_by_year"] = {
+                wb: dict(years) for wb, years in by_wb_by_year.items()
+            }
+            dup_total = sum(
+                len(r.get("duplicate_years", [])) for r in tab_shortlist
+            )
+            if dup_total:
+                selection_summary["deduplication_note"] = (
+                    f"{dup_total} structural duplicates collapsed via latest_year strategy"
+                )
+
         write_json(
             tab_shortlist_path,
             {
@@ -1357,6 +1447,7 @@ def run_cohort_corpus(
                 ),
                 "selected_count": len(tab_shortlist),
                 "selected": tab_shortlist,
+                "selection_summary": selection_summary,
             },
         )
 
@@ -1409,6 +1500,8 @@ def run_cohort_corpus(
     _429_cooldown_count = 0
     _429_abort = False
 
+    index_records = deduplicate_index_records(index_records, approved_tabs, domain_context)
+
     for record in index_records:
         if _429_abort:
             break
@@ -1457,6 +1550,7 @@ def run_cohort_corpus(
                                 "summary": summary_for_candidates,
                             },
                             column_score_heuristics=column_score_heuristics,
+                            domain_context=domain_context,
                         )
                     )
                     continue
@@ -1496,6 +1590,7 @@ def run_cohort_corpus(
                             "summary": summary_for_candidates,
                         },
                         column_score_heuristics=column_score_heuristics,
+                        domain_context=domain_context,
                     )
                 )
             except Exception as exc:  # noqa: BLE001
