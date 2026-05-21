@@ -754,8 +754,13 @@ def apply_tab_selection_overrides(
             )
         unknown = set(entry.keys()) - TAB_SELECTION_OVERRIDE_KEYS
         if unknown:
-            raise CommandError(
-                f"tab_selection_overrides[{workbook_code!r}] has unknown keys: {sorted(unknown)}"
+            from workbench.exceptions import command_error
+
+            raise command_error(
+                f"tab_selection_overrides[{workbook_code!r}] has unknown keys: {sorted(unknown)}.",
+                valid_values=sorted(TAB_SELECTION_OVERRIDE_KEYS),
+                action=f"Replace the key(s) {sorted(unknown)} with valid keys.",
+                check_id="PROFILER-OVERRIDE-001",
             )
 
         if entry.get("replace"):
@@ -1140,7 +1145,13 @@ def run_cohort_corpus(
 
     in_scope_codes = set(config.get("in_scope_workbooks") or [])
     if not in_scope_codes:
-        raise CommandError("Config must include non-empty 'in_scope_workbooks'")
+        from workbench.exceptions import command_error
+
+        raise command_error(
+            "Config must include non-empty 'in_scope_workbooks'.",
+            action="Add 'in_scope_workbooks': ['101', '201'] to the corpus config.",
+            check_id="PROFILER-CONFIG-001",
+        )
 
     if resume_from_tab_selection and resume_from_broad:
         raise CommandError(
@@ -1148,7 +1159,13 @@ def run_cohort_corpus(
             "they are mutually exclusive."
         )
     if not resume_from_tab_selection and not resume_from_broad and not folder_id:
-        raise CommandError("folder_id is required when not in a resume mode")
+        from workbench.exceptions import command_error
+
+        raise command_error(
+            "folder_id is required when not in a resume mode.",
+            action="Pass --folder or set DRIVE_FOLDER_ID in .env.",
+            check_id="PROFILER-CONFIG-002",
+        )
 
     workbook_id_re = _corpus_regex_from_config(
         config, "workbook_id_regex", DEFAULT_WORKBOOK_ID_PATTERN

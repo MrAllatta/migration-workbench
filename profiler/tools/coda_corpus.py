@@ -228,8 +228,13 @@ def apply_table_selection_overrides(
             )
         unknown = set(entry.keys()) - TABLE_SELECTION_OVERRIDE_KEYS
         if unknown:
-            raise CommandError(
-                f"table_selection_overrides[{doc_name!r}] has unknown keys: {sorted(unknown)}"
+            from workbench.exceptions import command_error
+
+            raise command_error(
+                f"table_selection_overrides[{doc_name!r}] has unknown keys: {sorted(unknown)}.",
+                valid_values=sorted(TABLE_SELECTION_OVERRIDE_KEYS),
+                action=f"Replace the key(s) {sorted(unknown)} with valid keys.",
+                check_id="PROFILER-CODA-001",
             )
 
         if entry.get("replace"):
@@ -413,7 +418,13 @@ def load_coda_docs_from_config(
     """Resolve each doc entry in the corpus config to a ``(display_name, doc_id)`` pair. Raises ``CommandError`` if any entry lacks a resolvable doc ID."""
     docs = config.get("docs") or []
     if not docs:
-        raise CommandError("Config must include a non-empty 'docs' list")
+        from workbench.exceptions import command_error
+
+        raise command_error(
+            "Config must include a non-empty 'docs' list.",
+            action="Add 'docs': [{'name': 'My Doc', 'doc_id': '...'}] to the corpus config.",
+            check_id="PROFILER-CODA-002",
+        )
     resolved: list[tuple[str, str]] = []
     for item in docs:
         name = str(item.get("name") or "doc")

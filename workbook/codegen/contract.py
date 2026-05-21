@@ -42,9 +42,21 @@ def _make_contract_loader(base_path: str | Path) -> type:
     def _load_included_yaml(loader: ContractLoader, target: Path) -> Any:
         if target == loader._contract_path or target in loader._include_stack:
             cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
-            raise ValueError(f"cyclic include detected: {cycle}")
+            from workbench.exceptions import UserFacingError
+
+            raise UserFacingError(
+                f"cyclic include detected: {cycle}",
+                action="Remove the circular !include reference in the contract YAML.",
+                check_id="WORKBOOK-CONTRACT-001",
+            )
         if not target.is_file():
-            raise ValueError(f"include file not found: {target}")
+            from workbench.exceptions import UserFacingError
+
+            raise UserFacingError(
+                f"include file not found: {target}",
+                action="Create the missing file or correct the !include path in the contract YAML.",
+                check_id="WORKBOOK-CONTRACT-002",
+            )
         loader._include_stack.append(target)
         try:
             text = target.read_text(encoding="utf-8")

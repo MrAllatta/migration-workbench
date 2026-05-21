@@ -153,7 +153,13 @@ class BaseImportCommand(ImporterChassisMixin, BaseCommand):
         )
 
         if not os.path.isdir(self.data_dir):
-            raise ValueError(f"Data directory not found: {self.data_dir}")
+            from workbench.exceptions import UserFacingError
+
+            raise UserFacingError(
+                f"Data directory not found: {self.data_dir}",
+                action="Create the directory or pass the correct --data-dir path.",
+                check_id="IMPORTER-SETUP-001",
+            )
 
         try:
             if self.validate_only:

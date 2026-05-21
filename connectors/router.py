@@ -35,6 +35,11 @@ def build_provider_adapter(config, throttle=None):
         return GoogleSheetsAdapter(config, throttle=throttle or default_throttle)
     if provider == "coda":
         return CodaAdapter(config)
-    raise CommandError(
-        f"Unsupported provider '{provider}' (expected google_sheets or coda)"
+    from workbench.exceptions import command_error
+
+    raise command_error(
+        f"Unsupported provider '{provider}'.",
+        valid_values=["google_sheets", "coda"],
+        action="Set 'provider' to 'google_sheets' or 'coda' in the bundle config.",
+        check_id="CONNECTOR-ROUTER-001",
     )
