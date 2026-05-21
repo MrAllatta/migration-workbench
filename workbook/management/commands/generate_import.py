@@ -147,12 +147,13 @@ class Command(BaseCommand):
         for w in warnings:
             self.stdout.write(self.style.WARNING(f"validation: {w}"))
 
+        version = contract.get("version", "1.0") if contract else "1.0"
         tables_with_import = [
             t for t in (contract.get("tables") or []) if t.get("import_config")
         ]
         self.stdout.write(
             self.style.SUCCESS(
-                f"loaded contract v{contract['version']} "
+                f"loaded contract v{version} "
                 f"({len(tables_with_import)} table(s) with import_config)"
             )
         )

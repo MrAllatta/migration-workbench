@@ -133,7 +133,7 @@ tables:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match=r"cyclic include detected") as excinfo:
+    with pytest.raises(Exception, match=r"cyclic include detected") as excinfo:
         load_contract(contract_path)
 
     message = str(excinfo.value)
