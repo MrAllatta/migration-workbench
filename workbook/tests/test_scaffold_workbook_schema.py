@@ -13,6 +13,7 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _check_null_model_names,
     _check_pivot_tables,
     _check_invalid_identifiers,
+    _validate_tables_for_scaffold,
 )
 from workbook.schema_contract import build_contract
 
@@ -440,3 +441,49 @@ def test_check_invalid_identifier_detects_digit_prefix():
     errors = _check_invalid_identifiers(table)
     assert any("201_unit" in e for e in errors)
     assert any("SCAFFOLD_INVALID_IDENTIFIER" in e for e in errors)
+
+
+def test_validate_tables_rejects_pivot_when_continue_on_error():
+    tables = [
+        {
+            "bundle_worksheet_title": "Irrigation",
+            "model_name": "Irrigation",
+            "columns": [
+                {"source_column": "1", "suggested_field_name": "1"},
+                {"source_column": "2", "suggested_field_name": "2"},
+                {"source_column": "3", "suggested_field_name": "3"},
+            ],
+        }
+    ]
+    valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=True)
+    assert len(valid) == 0
+    assert len(collector.rejected) == 1
+    assert collector.rejected[0].check_id == "SCAFFOLD_PIVOT_TABLE"
+
+
+def test_validate_tables_keeps_valid_and_rejects_invalid():
+    tables = [
+        {"bundle_worksheet_title": "Good", "model_name": "Good", "columns": []},
+        {
+            "bundle_worksheet_title": "Irrigation",
+            "model_name": "Irrigation",
+            "columns": [
+                {"source_column": "1", "suggested_field_name": "1"},
+                {"source_column": "2", "suggested_field_name": "2"},
+                {"source_column": "3", "suggested_field_name": "3"},
+            ],
+        },
+    ]
+    valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=True)
+    assert len(valid) == 1
+    assert valid[0]["model_name"] == "Good"
+    assert len(collector.rejected) == 1
+
+
+def test_validate_tables_skips_designed_models():
+    tables = [
+        {"source_tab": None, "bundle_worksheet_title": None, "model_name": "DesignedModel", "columns": []},
+    ]
+    valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=True)
+    assert len(valid) == 1
+    assert collector.is_empty()

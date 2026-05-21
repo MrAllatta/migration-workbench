@@ -13,6 +13,7 @@ from typing import Any
 from django.core.management.base import BaseCommand, CommandError
 
 from connectors.spreadsheet import guess_header_row, raw_sheet_to_row_lists
+from workbook.partial_output import PartialOutputCollector
 from workbook.codegen.designed_model_detection import (
     find_column_overlap_groups,
     suggest_designed_model,
@@ -151,6 +152,66 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
     return tables
 
 
+def _validate_tables_for_scaffold(
+    tables: list[dict[str, Any]], continue_on_error: bool = False
+) -> tuple[list[dict[str, Any]], PartialOutputCollector]:
+    collector = PartialOutputCollector()
+    valid_tables: list[dict[str, Any]] = []
+
+    for table in tables:
+        if table.get("source_tab") is None and not table.get("bundle_worksheet_title"):
+            valid_tables.append(table)
+            continue
+
+        model_name = str(table.get("model_name", "")).strip()
+        if not model_name:
+            if continue_on_error:
+                collector.add(
+                    table,
+                    check_id="SCAFFOLD_NULL_MODEL_NAME",
+                    message=f"Tab {table.get('bundle_worksheet_title', '?')!r} produced empty model_name",
+                    action="Deduplicate the tab across year workbooks or set a unique suggested_model_name",
+                )
+                continue
+            else:
+                tab_title = table.get("bundle_worksheet_title") or table.get(
+                    "suggested_model_name", "?"
+                )
+                raise CommandError(
+                    f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name'
+                )
+
+        pivot_errors = _check_pivot_tables(table)
+        if pivot_errors:
+            if continue_on_error:
+                collector.add(
+                    table,
+                    check_id="SCAFFOLD_PIVOT_TABLE",
+                    message=pivot_errors[0].split(":", 1)[1].strip(),
+                    action="Add to vocabulary.derived or exclude from corpus config",
+                )
+                continue
+            else:
+                raise CommandError(pivot_errors[0])
+
+        id_errors = _check_invalid_identifiers(table)
+        if id_errors:
+            if continue_on_error:
+                collector.add(
+                    table,
+                    check_id="SCAFFOLD_INVALID_IDENTIFIER",
+                    message=id_errors[0].split(":", 1)[1].strip(),
+                    action="Rename the source column header or add a column alias in the bundle config",
+                )
+                continue
+            else:
+                raise CommandError(id_errors[0])
+
+        valid_tables.append(table)
+
+    return valid_tables, collector
+
+
 def _check_null_model_names(tables: list[dict]) -> list[str]:
     """Return error messages for tables with empty model_name."""
     errors: list[str] = []
@@ -250,7 +311,8 @@ def _build_cohort_contract(
     coverage_payload: dict,
     *,
     hardened: bool = False,
-) -> dict[str, Any]:
+    continue_on_error: bool = False,
+) -> tuple[dict[str, Any], PartialOutputCollector]:
     """Build a schema contract from a cohort corpus ``deep_profile_coverage`` payload.
 
     Args:
@@ -355,13 +417,7 @@ def _build_cohort_contract(
         _flag_fk_columns(table.get("columns", []))
         _flag_computed_fields(table)
 
-    errors: list[str] = []
-    errors.extend(_check_null_model_names(tables))
-    for table in tables:
-        errors.extend(_check_pivot_tables(table))
-        errors.extend(_check_invalid_identifiers(table))
-    if errors:
-        raise CommandError("\n".join(errors))
+    tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error)
 
     tab_headers = {}
     for table in tables:
@@ -384,7 +440,7 @@ def _build_cohort_contract(
         contract["_merge_candidates"] = merge_candidates
     if hardened:
         _harden_contract(contract)
-    return contract
+    return contract, collector
 
 
 def _raw_to_row_lists(raw: dict) -> list[list[str]]:
@@ -610,6 +666,12 @@ class Command(BaseCommand):
             default=None,
             help="Path to a domain-knowledge YAML file with entity definitions",
         )
+        parser.add_argument(
+            "--continue-on-error",
+            action="store_true",
+            default=False,
+            help="Collect validation errors and write partial contract YAML",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out"]).resolve()
@@ -624,14 +686,16 @@ class Command(BaseCommand):
 
         cohort_dir = options.get("cohort_corpus_out_dir")
         bundle_config_path = options.get("bundle_config")
+        continue_on_error = bool(options.get("continue_on_error", False))
 
         if cohort_dir:
-            contract = self._handle_cohort_corpus(
+            contract, collector = self._handle_cohort_corpus(
                 Path(cohort_dir).resolve(),
                 hardened=bool(options.get("hardened")),
+                continue_on_error=continue_on_error,
             )
         elif bundle_config_path:
-            contract = self._handle_bundle_config(options)
+            contract, collector = self._handle_bundle_config(options)
         else:
             raise CommandError(
                 "Either --bundle-config or --cohort-corpus-out-dir is required."
@@ -664,6 +728,12 @@ class Command(BaseCommand):
         out_path.write_text(text, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote {out_path}"))
 
+        if not collector.is_empty():
+            rejection_path = out_path.parent / "schema-contract-rejected.yaml"
+            collector.write_rejection_file(rejection_path)
+            self.stdout.write(self.style.WARNING(collector.summary()))
+            self.stdout.write(self.style.WARNING(f"Rejections written to: {rejection_path}"))
+
         stub_out = options.get("models_stub_out")
         if stub_out:
             stub_path = Path(stub_out).resolve()
@@ -674,7 +744,7 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS(f"wrote {stub_path}"))
 
-    def _handle_bundle_config(self, options: dict[str, Any]) -> dict[str, Any]:
+    def _handle_bundle_config(self, options: dict[str, Any]) -> tuple[dict[str, Any], PartialOutputCollector]:
         bundle_path = Path(options["bundle_config"]).resolve()
         if not bundle_path.is_file():
             raise CommandError(f"bundle-config not found: {bundle_path}")
@@ -712,13 +782,11 @@ class Command(BaseCommand):
         for table in tables:
             _flag_fk_columns(table.get("columns", []))
             _flag_computed_fields(table)
-        errors: list[str] = []
-        errors.extend(_check_null_model_names(tables))
-        for table in tables:
-            errors.extend(_check_pivot_tables(table))
-            errors.extend(_check_invalid_identifiers(table))
-        if errors:
-            raise CommandError("\n".join(errors))
+
+        continue_on_error = bool(options.get("continue_on_error", False))
+        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error)
+        contract["tables"] = tables
+
         tab_headers = {}
         for tab in bundle_config.get("tabs", []):
             title = tab.get("worksheet_title", "")
@@ -728,11 +796,11 @@ class Command(BaseCommand):
         merge_candidates = _suggest_tab_merges(tab_headers)
         if merge_candidates:
             contract["_merge_candidates"] = merge_candidates
-        return contract
+        return contract, collector
 
     def _handle_cohort_corpus(
-        self, cohort_dir: Path, *, hardened: bool
-    ) -> dict[str, Any]:
+        self, cohort_dir: Path, *, hardened: bool, continue_on_error: bool = False
+    ) -> tuple[dict[str, Any], PartialOutputCollector]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))
         if not coverage_files:
             raise CommandError(f"No deep_profile_coverage_*.json found in {cohort_dir}")
@@ -743,9 +811,10 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Expected a deep/ subdirectory inside {cohort_dir}; none found"
             )
-        contract = _build_cohort_contract(
+        contract, collector = _build_cohort_contract(
             deep_dir,
             coverage_payload,
             hardened=hardened,
+            continue_on_error=continue_on_error,
         )
-        return contract
+        return contract, collector
