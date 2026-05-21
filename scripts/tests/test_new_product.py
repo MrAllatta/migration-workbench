@@ -1,6 +1,12 @@
 """Tests for the new_product scaffold generator."""
 
-from scripts.new_product import render_makefile, render_models_py, render_env_example
+from scripts.new_product import (
+    PROVIDER_CODA,
+    PROVIDER_GOOGLE_SHEETS,
+    render_makefile,
+    render_models_py,
+    render_env_example,
+)
 
 
 def test_makefile_has_validate_contract_target():
@@ -99,6 +105,18 @@ def test_domain_knowledge_example_yaml_includes_entities():
     assert "import_key:" in content
     assert "fk_to:" in content
     assert "ForeignKey" in content
+
+
+def test_check_env_coda_checks_coda_api_token():
+    """Coda scaffold check-env must require CODA_API_TOKEN, not Google vars."""
+    content = render_makefile("test-product", PROVIDER_CODA)
+    check_env_section = content[content.index("check-env:") : content.index("check-env:") + 300]
+    assert "CODA_API_TOKEN" in check_env_section
+    assert "DRIVE_FOLDER_ID" not in check_env_section
+    assert "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT" not in check_env_section
+    export_section = content[content.index("export WORKBENCH") : content.index("export WORKBENCH") + 200]
+    assert "CODA_CORPUS_CONFIG" in export_section
+    assert "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT" not in export_section
 
 
 def test_scaffold_includes_domain_knowledge_example():

@@ -28,13 +28,9 @@ def test_new_product_google_scaffold_exports_profile_env_vars(tmp_path):
     )
 
     assert (
-        "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID"
-        in generated_makefile
-    )
-    assert (
         "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS"
-        in generated_makefile
-    )
+        not in generated_makefile
+    ), "Google Sheets scaffold should not export Coda-specific vars"
     assert (
         '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}"'
         in generated_makefile
@@ -142,7 +138,7 @@ def test_check_env_regression_no_bashism(tmp_path):
 
 
 def test_check_env_works_with_posix_sh(tmp_path):
-    """make check-env must pass/fail correctly under /bin/sh (dash)."""
+    """make check-env must pass/fail correctly for Google Sheets under /bin/sh (dash)."""
     output_dir = _run_new_product(tmp_path, "posix-check-env")
     env_file = output_dir / ".env"
     env_file.write_text(
@@ -172,6 +168,37 @@ def test_check_env_works_with_posix_sh(tmp_path):
     )
     assert result.returncode != 0
     assert "DRIVE_FOLDER_ID" in result.stderr
+
+
+def test_check_env_coda_works_with_posix_sh(tmp_path):
+    """make check-env must pass/fail correctly for Coda under /bin/sh (dash)."""
+    output_dir = _run_new_product(tmp_path, "coda-check-env", "--coda")
+    env_file = output_dir / ".env"
+    env_file.write_text(
+        "WORKBENCH=/tmp\n"
+        "CODA_API_TOKEN=test-token\n"
+    )
+
+    result = subprocess.run(
+        ["make", "-C", str(output_dir), "check-env"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"check-env failed with all Coda vars set:\n{result.stderr}{result.stdout}"
+    )
+
+    env_file.write_text(
+        "WORKBENCH=/tmp\n"
+        "CODA_API_TOKEN=\n"
+    )
+    result = subprocess.run(
+        ["make", "-C", str(output_dir), "check-env"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "CODA_API_TOKEN" in result.stderr
 
 
 def test_generated_makefile_has_generate_pipeline_manifest_target(tmp_path):
