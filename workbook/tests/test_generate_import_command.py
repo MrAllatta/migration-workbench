@@ -3,6 +3,7 @@
 from django.core.management import call_command
 from django.core.management.base import CommandError
 import pytest
+import yaml
 
 
 CONTRACT_WITH_APP_LABEL = """\
@@ -127,3 +128,21 @@ tables:
     out = tmp_path / "import_test.py"
     with pytest.raises(CommandError, match="bundle_path"):
         call_command("generate_import", contract=str(contract), out=str(out))
+
+
+def test_generate_import_continue_on_error_skips_invalid(tmp_path, monkeypatch):
+    from django.core.management import call_command
+    contract = tmp_path / "contract.yaml"
+    contract.write_text(
+        yaml.safe_dump({
+            "version": "1.0",
+            "tables": [
+                {"model_name": "Valid", "import_config": {"bundle_path": "test.csv"}, "columns": [{"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}}]},
+                {"model_name": "", "import_config": {"bundle_path": "test.csv"}, "columns": []},
+            ],
+        })
+    )
+    out = tmp_path / "import.py"
+    call_command("generate_import", contract=str(contract), out=str(out), force=True, continue_on_error=True)
+    source = out.read_text()
+    assert "Valid" in source
