@@ -153,7 +153,7 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
 
 
 def _validate_tables_for_scaffold(
-    tables: list[dict[str, Any]], continue_on_error: bool = False
+    tables: list[dict[str, Any]], continue_on_error: bool = False, pivot_detection_threshold: float = 0.5
 ) -> tuple[list[dict[str, Any]], PartialOutputCollector]:
     collector = PartialOutputCollector()
     valid_tables: list[dict[str, Any]] = []
@@ -181,7 +181,7 @@ def _validate_tables_for_scaffold(
                     f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name'
                 )
 
-        pivot_errors = _check_pivot_tables(table)
+        pivot_errors = _check_pivot_tables(table, pivot_detection_threshold=pivot_detection_threshold)
         if pivot_errors:
             if continue_on_error:
                 collector.add(
@@ -227,7 +227,7 @@ def _check_null_model_names(tables: list[dict]) -> list[str]:
     return errors
 
 
-def _check_pivot_tables(table: dict) -> list[str]:
+def _check_pivot_tables(table: dict, *, pivot_detection_threshold: float = 0.5) -> list[str]:
     """Return error messages if the table looks like a pivot table."""
     errors: list[str] = []
     columns = table.get("columns", [])
@@ -235,7 +235,7 @@ def _check_pivot_tables(table: dict) -> list[str]:
         return errors
     headers = [col.get("source_column", "").strip() for col in columns]
     numeric_headers = [h for h in headers if h.isdigit()]
-    if len(numeric_headers) / len(headers) > 0.5:
+    if len(numeric_headers) / len(headers) > pivot_detection_threshold:
         tab_title = table.get("bundle_worksheet_title", "?")
         numeric_list = ", ".join(numeric_headers[:10])
         errors.append(
@@ -312,6 +312,7 @@ def _build_cohort_contract(
     *,
     hardened: bool = False,
     continue_on_error: bool = False,
+    pivot_detection_threshold: float = 0.5,
 ) -> tuple[dict[str, Any], PartialOutputCollector]:
     """Build a schema contract from a cohort corpus ``deep_profile_coverage`` payload.
 
@@ -784,7 +785,7 @@ class Command(BaseCommand):
             _flag_computed_fields(table)
 
         continue_on_error = bool(options.get("continue_on_error", False))
-        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error)
+        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error, pivot_detection_threshold=0.5)
         contract["tables"] = tables
 
         tab_headers = {}
@@ -811,10 +812,12 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Expected a deep/ subdirectory inside {cohort_dir}; none found"
             )
+        pivot_threshold = float(coverage_payload.get("pivot_detection_threshold", 0.5))
         contract, collector = _build_cohort_contract(
             deep_dir,
             coverage_payload,
             hardened=hardened,
             continue_on_error=continue_on_error,
+            pivot_detection_threshold=pivot_threshold,
         )
         return contract, collector

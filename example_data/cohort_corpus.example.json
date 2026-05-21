@@ -26,6 +26,7 @@
     },
     "pivot_detection_threshold": "Ratio of numeric column headers that triggers pivot-table rejection in scaffold_workbook_schema. Set to 1.0 or null to disable."
   },
+  "pivot_detection_threshold": 0.5,
   "domain_context": "config/domain_context.yaml",
   "folder_name": "Corpus Root Folder",
   "workbook_id_regex": "\\b(\\d{3})\\b",

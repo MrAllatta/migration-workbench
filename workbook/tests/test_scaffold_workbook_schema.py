@@ -480,6 +480,20 @@ def test_validate_tables_keeps_valid_and_rejects_invalid():
     assert len(collector.rejected) == 1
 
 
+def test_check_pivot_tables_respects_threshold():
+    from workbook.management.commands.scaffold_workbook_schema import _check_pivot_tables
+    table = {
+        "bundle_worksheet_title": "Test",
+        "columns": [
+            {"source_column": "1"},
+            {"source_column": "2"},
+            {"source_column": "Name"},
+        ],
+    }
+    assert len(_check_pivot_tables(table, pivot_detection_threshold=0.5)) == 1
+    assert len(_check_pivot_tables(table, pivot_detection_threshold=0.9)) == 0
+
+
 def test_validate_tables_skips_designed_models():
     tables = [
         {"source_tab": None, "bundle_worksheet_title": None, "model_name": "DesignedModel", "columns": []},
