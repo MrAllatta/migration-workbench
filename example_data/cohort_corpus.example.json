@@ -9,7 +9,22 @@
     "tab_auto_limit": "Maximum tabs auto-selected per workbook code. Use tab_selection_overrides to hand-pick important tabs.",
     "tab_exclude_patterns": "Regex patterns to block tabs. Each entry: {\"pattern\": \"regex\", \"penalty\": -5}.",
     "year_regex": "Used to group workbooks by year. Set year_scope in domain_context.yaml to limit profiling to active years.",
-    "domain_context": "Path to a domain_context.yaml file providing vocabulary, year scoping, deduplication, and glossary."
+    "domain_context": "Path to a domain_context.yaml file providing vocabulary, year scoping, deduplication, and glossary.",
+    "tab_selection_overrides": {
+      "replace": "When true, replaces the auto-selected tabs with the explicitly listed tabs. When false (default), adds or removes tabs relative to auto-selection.",
+      "tabs": "List of tab names to include. Matched against workbook tab names (case-insensitive prefix). Use exact names or prefix fragments.",
+      "add": "Tab names to add on top of auto-selection. Only applied when replace is false.",
+      "remove": "Tab names to remove from auto-selection. Only applied when replace is false.",
+      "common_mistakes": {
+        "include": [
+          "Using replace: true when you only want to add a tab — set add instead.",
+          "Listing tabs not actually present in the workbook — check exact names from Phase 1 output.",
+          "Forgetting that replace: true wipes auto-selection entirely; add and remove are ignored.",
+          "Mismatching workbook codes in in_scope_workbooks — override targets tabs in the wrong workbook."
+        ]
+      }
+    },
+    "pivot_detection_threshold": "Ratio of numeric column headers that triggers pivot-table rejection in scaffold_workbook_schema. Set to 1.0 or null to disable."
   },
   "domain_context": "config/domain_context.yaml",
   "folder_name": "Corpus Root Folder",

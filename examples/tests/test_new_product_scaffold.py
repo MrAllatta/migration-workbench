@@ -191,6 +191,23 @@ def test_generate_all_includes_pipeline_manifest(tmp_path):
     )
 
 
+def test_cohort_corpus_config_has_documentation_for_tab_overrides(tmp_path):
+    """Generated cohort_corpus.json must document tab_selection_overrides schema."""
+    output_dir = _run_new_product(tmp_path, "doc-tab-override")
+    config_path = output_dir / "config" / "cohort_corpus.json"
+    import json
+
+    with config_path.open() as fh:
+        doc = json.load(fh)
+
+    docs = doc.get("_documentation", {})
+    assert "tab_selection_overrides" in docs, (
+        f"Missing tab_selection_overrides in _documentation. Keys present: {list(docs.keys())}"
+    )
+    assert "common_mistakes" in docs["tab_selection_overrides"]
+    assert "include" in docs["tab_selection_overrides"]["common_mistakes"]
+
+
 def test_generated_makefile_has_import_preflight_and_apply(tmp_path):
     output_dir = _run_new_product(tmp_path, "import-test")
     makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
