@@ -1153,3 +1153,21 @@ def test_editable_fields_become_fields():
     assert "readonly_fields = ['location', 'weekly_yield']" in source
     assert "fields = ['block', 'bed', 'crop']" in source
     _check_compiles(source)
+
+
+def test_generate_admin_continue_on_error_skips_invalid(tmp_path, monkeypatch):
+    from django.core.management import call_command
+    contract = tmp_path / "contract.yaml"
+    contract.write_text(
+        yaml.safe_dump({
+            "version": "1.0",
+            "tables": [
+                {"model_name": "Valid", "columns": [{"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}}]},
+                {"model_name": "", "columns": []},
+            ],
+        })
+    )
+    out = tmp_path / "admin.py"
+    call_command("generate_admin", contract=str(contract), out=str(out), force=True, continue_on_error=True)
+    source = out.read_text()
+    assert "Valid" in source

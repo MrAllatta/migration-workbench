@@ -13,11 +13,13 @@ from __future__ import annotations
 import difflib
 import sys
 from pathlib import Path
+from typing import Any
 
+import yaml
 from django.core.management.base import BaseCommand, CommandError
 
 from workbook.codegen.admin_generator import render_admin_py
-from workbook.codegen.contract import load_contract, validate_contract_tables
+from workbook.codegen.contract import validate_contract_tables
 from workbook.codegen.manifest import load_manifest
 
 
@@ -58,6 +60,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Show diff against current output instead of overwriting",
         )
+        parser.add_argument(
+            "--continue-on-error",
+            action="store_true",
+            default=False,
+            help="Skip invalid tables and generate admin for valid ones",
+        )
 
     def handle(self, *args, **options):
         """Load contract and manifest, render admin.py, and write to disk."""
@@ -75,10 +83,8 @@ class Command(BaseCommand):
             except ValueError as exc:
                 raise CommandError(str(exc)) from exc
 
-        try:
-            contract = load_contract(str(contract_path))
-        except ValueError as exc:
-            raise CommandError(str(exc)) from exc
+        continue_on_error = options.get("continue_on_error", False)
+        contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
 
         app_label = options["app_label"]
         if app_label is None:
@@ -100,6 +106,38 @@ class Command(BaseCommand):
             stub_path = app_dir / "admin.py"
         force = options["force"]
         show_diff = options["diff"]
+
+        if continue_on_error and contract.get("tables"):
+            from workbook.codegen.contract import strict_validate_contract
+            validation_errors = strict_validate_contract(contract)
+            if validation_errors:
+                valid_model_names = set()
+                invalid_model_names = set()
+                for table in contract.get("tables", []):
+                    model_name = table.get("model_name", "")
+                    if any(model_name in err for err in validation_errors):
+                        invalid_model_names.add(model_name)
+                    else:
+                        valid_model_names.add(model_name)
+                clean_contract = dict(contract)
+                clean_contract["tables"] = [
+                    t for t in contract["tables"]
+                    if t.get("model_name") in valid_model_names
+                ]
+                from workbook.partial_output import PartialOutputCollector
+                collector = PartialOutputCollector()
+                for model_name in invalid_model_names:
+                    collector.add(
+                        {"model_name": model_name},
+                        check_id="GENERATE_ADMIN_INVALID_TABLE",
+                        message=f"Table {model_name!r} failed strict validation",
+                        action="Fix model_name or field identifiers in the contract",
+                    )
+                contract = clean_contract
+                if not collector.is_empty():
+                    rejection_path = out_path.parent / "schema-contract-rejected.yaml"
+                    collector.write_rejection_file(rejection_path)
+                    self.stdout.write(self.style.WARNING(collector.summary()))
 
         warnings = validate_contract_tables(contract)
         for w in warnings:
