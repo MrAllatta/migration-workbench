@@ -87,23 +87,19 @@ def _make_contract_loader(base_path: str | Path) -> type:
     return ContractLoader
 
 
-def load_contract(path: str | Path) -> dict[str, Any]:
-    """Load a schema-contract YAML, validate, and return a normalised dict.
+def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
+    """Load a schema-contract YAML and return a normalised dict without validation.
 
-    Supports the ``!include`` and ``!include_list`` YAML tags for composing
-    contracts from multiple files (paths are resolved relative to the
-    including file's directory).
+    Handles YAML loading with ``!include``/``!include_list`` support,
+    default key injection, table-list validation, and recursive flattening
+    of nested table entries.
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
 
     Returns:
-        Normalised contract dict with ``"source"`` and ``"tables"`` keys
-        guaranteed present.
-
-    Raises:
-        CommandError (via caller) or ``ValueError`` if the file is missing,
-        unparseable or includes a cyclic reference.
+        Normalised contract dict with ``"version"``, ``"source"``, and
+        ``"tables"`` keys guaranteed present.
     """
     import yaml
 
@@ -138,8 +134,34 @@ def load_contract(path: str | Path) -> dict[str, Any]:
 
     raw["tables"] = _walk_table_entries(tables)
 
-    _validate_contract_v2(raw)
     return raw
+
+
+def load_contract(path: str | Path) -> dict[str, Any]:
+    """Load and strictly validate a contract YAML.
+
+    Loads the contract via :func:`load_contract_unvalidated` and then runs
+    :func:`strict_validate_contract`.  Raises ``ValueError`` (or
+    ``UserFacingError`` for include problems) if validation fails.
+
+    Args:
+        path: Filesystem path to a ``.yaml`` / ``.yml`` file.
+
+    Returns:
+        Normalised contract dict with ``"version"``, ``"source"``, and
+        ``"tables"`` keys guaranteed present.
+    """
+    contract = load_contract_unvalidated(path)
+    results = strict_validate_contract(contract)
+    if results:
+        lines = [f"  {r.check_id}: {r.message}" for r in results]
+        if any(r.action for r in results):
+            lines.append("Suggested actions:")
+            for r in results:
+                if r.action:
+                    lines.append(f"  - {r.action}")
+        raise ValueError("Contract validation failed:\n" + "\n".join(lines))
+    return contract
 
 
 def _validate_contract_v2(contract: dict[str, Any]) -> None:
