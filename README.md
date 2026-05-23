@@ -132,40 +132,56 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 ## Status and roadmap
 
-**Stable on 0.x today**
+**0.0.x — Component assembly (current, v0.0.9)**
 
-- Profiler (Google Sheets / Drive + Coda), importer chassis, workbook scaffolder.
-- `wb manifest lint`, `wb deploy --dry-run` / `--live`, PyPI trusted publishing.
-- Self-hosted Fly path: Litestream + shared Tigris bucket, `fly.toml` / `fly.preview.toml`, entrypoint migrations.
+All pipeline stages exist in isolation: profiler, schema contract system, codegen,
+import runtime, view manifest, discovery interview, deployment CLI. Each works on
+its own. The full end-to-end chain has not yet been exercised on real product data.
 
-**In flight**
+- Google Sheets profiler: Phase 0–3 corpus pipeline with domain context integration, tab scoring, column enrichment, computed field and FK candidate detection.
+- Coda profiler: doc enumeration, table profiling, formula scanning, canvas extraction, relationship map.
+- Schema contract: YAML format with columns, model_meta, extra_fields, computed
+  fields, FK resolutions, hooks, import_config, admin blocks. Validate, diff, and
+  migration-safety check it.
+- Codegen: `generate_models`, `generate_admin`, `generate_import` produce Django
+  `*_auto.py` files with stub re-exports. `--continue-on-error`, `--diff`, identifier
+  sanitization, `PartialOutputCollector` for resilience.
+- Import runtime: `BaseImportCommand` with tier system, atomic savepoints, FK
+  resolution, bundle reader, error recording, summary JSON.
+- View manifest + discovery: scaffold view manifest from structure artifact,
+  generate interview questionnaire, merge operator answers.
+- `wb` CLI: `manifest lint`, `deploy --dry-run`/`--live`, `contract {review,diff,safety,validate}`,
+  `drift check`, `generate {models,admin,import,manifest}`.
+- Deployment: Fly.io deploy with health gate polling, release store (DB + JSONL),
+  manifest validation, deploy smoke tests.
+- Build system: shared `makefile_targets.py` module, preflight gate, product scaffold.
+- Documentation: full doc map, 80% docstring coverage, CI/CD with `chassis-gate`.
 
-- Align default Git branch with Deploy workflow (`main` vs `master`).
-- Production Deploy workflow green end-to-end after secrets and Fly bootstrap.
+**0.1.0 sprint — Pipeline proven**
 
-**Next**
+Next milestone: one product repo (farm) through the full end-to-end pipeline.
+Not a demo — the whole machine turns on real data.
 
-- Full end-to-end Deploy workflow green (secrets and Fly bootstrap).
-- Backup/restore drill documented and exercised for the workbench space.
-- Google auth runbook evolution toward WIF ([docs/google-auth.md](docs/google-auth.md)).
-- Scaffold-delivered CI/CD templates for client product repos.
-- Cross-reference tab detection via workbook code patterns (`\b\d{3}\b`) in tab scoring heuristics, penalizing derived tabs from other workbooks (Issue [#1](https://github.com/MrAllatta/migration-workbench/issues/1)).
+1. **Close broken connections** — fix `wb generate manifest` import path bug,
+   build multi-year import loop (import command iterates year directories),
+   validate contract→pipeline_manifest→pull_bundle→import coupling.
 
-**Later**
+2. **Farm execution** — profile farm corpus, scaffold and harden contract, generate
+   code, pull historical bundles, import all years, generate view manifest, conduct
+   discovery interview, deploy to Fly.io with health check passing.
 
-- Provider interface extraction after a second space is stable on Fly.
-- Postgres mode where concurrent writes demand it.
-- Management interface on the workbench Fly app exposing the profiling → contract loop as a hosted service. Products remain independent deployments; the workbench helps author and manage the contracts that drive them.
+3. **Gate** — pipeline runs from scratch in <30 min with one documented command
+   sequence, generated code compiles without manual edits, import creates expected
+   rows across all years, deploy passes health check.
 
-### v1.0 / beta criteria
+0.1.0 is the beta. Everything after is a pipeline capability.
 
-The pipeline is exercised toward v1.0 via a **product test repo** (farm). v1.0 is reached when:
+**0.2.0+ — Pipeline capabilities**
 
-1. **No-friction pipeline on a full real product** — The full pipeline (profile → scaffold → contract → codegen → deploy) runs on a real product repo without manual workarounds, copy-paste steps, or undocumented incantations.
-2. **Healthy backups** — Backup/restore is documented, exercised, and verified for the workbench space. Operators can create a checkpoint, restore it, and confirm data integrity.
-3. **Production deployment live** — A scaffolded product is deployed to Fly.io with real imported data, health-check passing.
-
-When the above criteria are met, a PyPI release (v1.0.0) is cut. Version 1.0 is the beta.
+- DomainModel orchestration (replace scattered JSON artifacts with a single state object)
+- School tooling + FERPA boundary (generalize beyond farm to schools with AppsScript)
+- Frontend manifest extraction (workflow sequence, UI archetype classification from profiler signals)
+- Provider interface extraction, multi-tenant, Postgres at scale
 
 Semantic versioning applies; `**0.x`** may ship breaking changes — pin ranges in product repos.
 
