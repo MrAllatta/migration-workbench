@@ -54,12 +54,6 @@ class Command(BaseCommand):
             action="store_true",
             help="Show diff against current output instead of overwriting",
         )
-        parser.add_argument(
-            "--continue-on-error",
-            action="store_true",
-            default=False,
-            help="Skip invalid tables and generate models for valid ones",
-        )
 
     def handle(self, *args, **options):
         contract_path = Path(options["contract"]).resolve()

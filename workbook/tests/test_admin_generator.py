@@ -1157,7 +1157,7 @@ def test_editable_fields_become_fields():
     _check_compiles(source)
 
 
-def test_generate_admin_continue_on_error_skips_invalid(tmp_path, monkeypatch):
+def test_generate_admin_skips_invalid_tables(tmp_path, monkeypatch):
     from django.core.management import call_command
     contract = tmp_path / "contract.yaml"
     contract.write_text(
@@ -1170,6 +1170,6 @@ def test_generate_admin_continue_on_error_skips_invalid(tmp_path, monkeypatch):
         })
     )
     out = tmp_path / "admin.py"
-    call_command("generate_admin", contract=str(contract), out=str(out), force=True, continue_on_error=True)
+    call_command("generate_admin", contract=str(contract), out=str(out), force=True)
     source = out.read_text()
     assert "Valid" in source

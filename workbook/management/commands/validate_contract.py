@@ -18,27 +18,18 @@ from workbook.codegen.contract import (
     strict_validate_contract,
     validate_contract_tables,
 )
-from workbook.codegen.validation_pipeline import (
-    GlobalValidationError,
-    partition_contract_on_validation,
-    ValidationResult,
-)
+from workbook.codegen.validation_pipeline import ValidationResult
 
 
 class Command(BaseCommand):
     help = "Validate a schema-contract YAML without generating code."
 
     def add_arguments(self, parser):
-        """Add --contract argument."""
+        """Add --contract and --dump-json arguments."""
         parser.add_argument(
             "--contract",
             required=True,
             help="Path to schema-contract YAML (e.g. build/schema-contract.yaml)",
-        )
-        parser.add_argument(
-            "--strict",
-            action="store_true",
-            help="Enable strict mode: enforce valid Python identifiers and no duplicate model names",
         )
         parser.add_argument(
             "--dump-json",
@@ -69,31 +60,21 @@ class Command(BaseCommand):
 
         results = strict_validate_contract(contract)
 
-        if options["strict"]:
-            try:
-                contract, _collector = partition_contract_on_validation(
-                    contract, results, out_path=contract_path,
-                )
-            except GlobalValidationError as exc:
-                if options["dump_json"]:
-                    payload = {
-                        "ok": False,
-                        "errors": [
-                            {
-                                "model_name": None,
-                                "check_id": exc.check_id or "WORKBOOK-CONTRACT-GLOBAL",
-                                "severity": "error",
-                                "message": str(exc),
-                                "action": exc.action or "Fix the contract structure and re-run",
-                            }
-                        ],
-                    }
-                    self.stdout.write(json.dumps(payload, indent=2))
-                else:
-                    self.stdout.write(
-                        self.style.ERROR(f"Global validation error: {exc}")
-                    )
-                raise CommandError(str(exc)) from exc
+        global_errors = [
+            r for r in results if r.model_name is None and r.severity == "error"
+        ]
+        if global_errors:
+            from workbench.exceptions import UserFacingError
+
+            lines = [f"  {r.check_id}: {r.message}" for r in global_errors]
+            raise CommandError(
+                "Contract has structural errors that cannot be skipped:\n"
+                + "\n".join(lines)
+            ) from UserFacingError(
+                "Contract has structural errors",
+                action="Fix the contract structure and re-run",
+                check_id="WORKBOOK-CONTRACT-GLOBAL",
+            )
 
         table_warnings = validate_contract_tables(contract)
 

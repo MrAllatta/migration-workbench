@@ -189,27 +189,6 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     return contract
 
 
-def _validate_contract_v2(contract: dict[str, Any]) -> None:
-    """Check v2.0 contract requirements.  Raises UserFacingError on violation."""
-    from workbench.exceptions import UserFacingError
-
-    for table in contract.get("tables", []):
-        label = table.get("suggested_model_name", "?")
-        if "model_name" not in table:
-            raise UserFacingError(
-                f"Table '{label}' is missing required field 'model_name'",
-                action="Add a 'model_name' field to the table entry.",
-                check_id="WORKBOOK-CONTRACT-008",
-            )
-        mn = str(table["model_name"]).strip()
-        if not mn:
-            raise UserFacingError(
-                f"Table '{label}' has empty 'model_name'",
-                action="Set a non-empty 'model_name' for the table.",
-                check_id="WORKBOOK-CONTRACT-009",
-            )
-
-
 def get_model_name(table: dict[str, Any]) -> str:
     """Return the PascalCase Django model class name from *table*.
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -63,7 +65,7 @@ def partition_contract_on_validation(
             the rejection file name so parallel/sequential commands do not collide.
 
     Returns:
-        A tuple of (clean_contract, collector). The clean_contract is a shallow
+        A tuple of (clean_contract, collector). The clean_contract is a deep
         copy with only valid tables retained. The collector contains rejections
         for every dropped table.
 
@@ -94,7 +96,7 @@ def partition_contract_on_validation(
         t for t in original_tables if t.get("model_name") not in error_model_names
     ]
 
-    clean_contract = dict(contract)
+    clean_contract = copy.deepcopy(contract)
     clean_contract["tables"] = clean_tables
 
     table_by_model_name: dict[str, dict[str, Any]] = {}

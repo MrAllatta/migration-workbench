@@ -57,7 +57,7 @@ def test_generate_models_cli_app_label_overrides_contract(tmp_path):
     assert 'db_table = "override_Widget"' in source
 
 
-def test_generate_models_continue_on_error_skips_invalid(tmp_path, monkeypatch):
+def test_generate_models_skips_invalid_tables(tmp_path, monkeypatch):
     contract = tmp_path / "contract.yaml"
     contract.write_text(
         yaml.safe_dump({
@@ -69,7 +69,7 @@ def test_generate_models_continue_on_error_skips_invalid(tmp_path, monkeypatch):
         })
     )
     out = tmp_path / "models.py"
-    call_command("generate_models", contract=str(contract), out=str(out), force=True, continue_on_error=True)
+    call_command("generate_models", contract=str(contract), out=str(out), force=True)
     source = out.read_text()
     assert "class Valid" in source
     import re
