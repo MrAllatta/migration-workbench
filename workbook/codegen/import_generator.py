@@ -13,6 +13,7 @@ Usage::
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 from workbook.codegen.contract import (
     assign_import_tiers,
@@ -104,7 +105,7 @@ def _render_resolve_years(indent: int = 4) -> str:
         f"{pad}    if self.years:",
         f"{pad}        return sorted(self.years)",
         f"{pad}    discovered = []",
-        f"{pad}    for entry in self.data_dir.iterdir():",
+        f"{pad}    for entry in Path(self.data_dir).iterdir():",
         f'{pad}        match = re.match(r"^year_(\\d{{4}})$", entry.name)',
         f"{pad}        if match and entry.is_dir():",
         f"{pad}            discovered.append(int(match.group(1)))",
@@ -126,8 +127,7 @@ def _render_resolve_path(indent: int = 4) -> str:
         "",
         f"{pad}def _resolve_path(self, path_template: str, year: int):",
         f'{pad}    """Substitute {{year}} in a path template."""',
-        f"{pad}    from pathlib import Path",
-        f'{pad}    return Path(path_template.format_map({{"year": year}}))',
+        f'{pad}    return path_template.format_map({{"year": year}})',
     ]
     return "\n".join(lines)
 
@@ -695,6 +695,7 @@ def render_import_py(
     ]
     if year_aware:
         import_lines.insert(0, "import re")
+        import_lines.insert(1, "from pathlib import Path")
     import_lines.append("")
     parts.extend(import_lines)
 
