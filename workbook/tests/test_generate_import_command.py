@@ -146,3 +146,78 @@ def test_generate_import_continue_on_error_skips_invalid(tmp_path, monkeypatch):
     call_command("generate_import", contract=str(contract), out=str(out), force=True, continue_on_error=True)
     source = out.read_text()
     assert "Valid" in source
+
+
+def test_generate_import_year_aware_contract(tmp_path):
+    """When contract has {year} in bundle_path, generated command includes year-loop."""
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        yaml.safe_dump({
+            "version": "1.3",
+            "tables": [
+                {
+                    "model_name": "Crop",
+                    "columns": [
+                        {
+                            "suggested_field_name": "name",
+                            "django_field_class": "models.CharField",
+                            "django_field_kwargs": {"max_length": 200},
+                        },
+                    ],
+                    "import_config": {
+                        "bundle_path": "{year}/crops.csv",
+                        "unique_on": ["name"],
+                    },
+                },
+            ],
+        })
+    )
+    out_path = tmp_path / "import_core.py"
+    call_command(
+        "generate_import",
+        contract=str(contract_path),
+        out=str(out_path),
+        force=True,
+    )
+    source = out_path.read_text()
+    assert "_resolve_years" in source
+    assert "_resolve_path" in source
+    assert "_run_year" in source
+    assert "--year" in source
+
+
+def test_generate_import_static_bundle_path_unchanged(tmp_path):
+    """When contract has static bundle_path, generated command matches existing format."""
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        yaml.safe_dump({
+            "version": "1.3",
+            "tables": [
+                {
+                    "model_name": "Crop",
+                    "columns": [
+                        {
+                            "suggested_field_name": "name",
+                            "django_field_class": "models.CharField",
+                            "django_field_kwargs": {"max_length": 200},
+                        },
+                    ],
+                    "import_config": {
+                        "bundle_path": "crops.csv",
+                        "unique_on": ["name"],
+                    },
+                },
+            ],
+        })
+    )
+    out_path = tmp_path / "import_core.py"
+    call_command(
+        "generate_import",
+        contract=str(contract_path),
+        out=str(out_path),
+        force=True,
+    )
+    source = out_path.read_text()
+    assert "_resolve_years" not in source
+    assert "_run_year" not in source
+    assert "read_bundle_tab('crops.csv'" in source
