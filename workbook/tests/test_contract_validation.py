@@ -65,7 +65,7 @@ tables:
     columns: []
 """)
 
-    with pytest.raises(CommandError, match="model_name"):
+    with pytest.raises(CommandError, match="validation error"):
         call_command("validate_contract", contract=str(contract))
 
 

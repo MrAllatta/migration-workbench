@@ -24,7 +24,7 @@ def load_manifest(path: str | Path) -> dict[str, Any]:
         ``"workflow_hints"`` keys guaranteed present.
 
     Raises:
-        ValueError: if the file is unparseable, missing, or has an
+        UserFacingError: if the file is unparseable, missing, or has an
             unsupported version.
     """
     import yaml
@@ -32,12 +32,24 @@ def load_manifest(path: str | Path) -> dict[str, Any]:
     src = Path(path).read_text(encoding="utf-8")
     raw: dict[str, Any] = yaml.safe_load(src)
     if not isinstance(raw, dict):
-        raise ValueError("view manifest must be a YAML mapping")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            "View manifest must be a YAML mapping",
+            action="Check that the manifest file is valid YAML with a top-level mapping.",
+            check_id="WORKBOOK-MANIFEST-001",
+        )
 
     version = str(raw.get("version") or "")
     expected = "view-manifest-draft-1"
     if version != expected:
-        raise ValueError(f"unsupported view manifest version: {version!r}")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            f"Unsupported view manifest version: {version!r}",
+            action=f"Set 'version' to {expected!r} in the manifest file.",
+            check_id="WORKBOOK-MANIFEST-002",
+        )
 
     raw.setdefault("views", [])
     raw.setdefault("workflow_hints", {})

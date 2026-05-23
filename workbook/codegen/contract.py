@@ -11,6 +11,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from workbook.codegen.validation_pipeline import ValidationResult
+
 
 def _make_contract_loader(base_path: str | Path) -> type:
     """Return a ``SafeLoader`` subclass supporting ``!include`` and ``!include_list``.
@@ -74,9 +76,13 @@ def _make_contract_loader(base_path: str | Path) -> type:
         target = _resolve_include_target(loader, path_str)
         included = _load_included_yaml(loader, target)
         if not isinstance(included, list):
+            from workbench.exceptions import UserFacingError
+
             included_type_name = type(included).__name__
-            raise ValueError(
-                f"include_list expects a YAML list (got {included_type_name}) in {target}"
+            raise UserFacingError(
+                f"!include_list target must be a YAML list (got {included_type_name}) in {target}",
+                action="Ensure the included file contains a YAML list (a sequence starting with '-').",
+                check_id="WORKBOOK-CONTRACT-003",
             )
         return included
 
@@ -85,23 +91,19 @@ def _make_contract_loader(base_path: str | Path) -> type:
     return ContractLoader
 
 
-def load_contract(path: str | Path) -> dict[str, Any]:
-    """Load a schema-contract YAML, validate, and return a normalised dict.
+def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
+    """Load a schema-contract YAML and return a normalised dict without validation.
 
-    Supports the ``!include`` and ``!include_list`` YAML tags for composing
-    contracts from multiple files (paths are resolved relative to the
-    including file's directory).
+    Handles YAML loading with ``!include``/``!include_list`` support,
+    default key injection, table-list validation, and recursive flattening
+    of nested table entries.
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
 
     Returns:
-        Normalised contract dict with ``"source"`` and ``"tables"`` keys
-        guaranteed present.
-
-    Raises:
-        CommandError (via caller) or ``ValueError`` if the file is missing,
-        unparseable or includes a cyclic reference.
+        Normalised contract dict with ``"version"``, ``"source"``, and
+        ``"tables"`` keys guaranteed present.
     """
     import yaml
 
@@ -109,7 +111,13 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     loader_cls = _make_contract_loader(path)
     raw: dict[str, Any] = yaml.load(src, Loader=loader_cls)
     if not isinstance(raw, dict):
-        raise ValueError("schema contract must be a YAML mapping")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            "Schema contract must be a YAML mapping",
+            action="Check that the contract file is valid YAML with a top-level mapping (not a list).",
+            check_id="WORKBOOK-CONTRACT-004",
+        )
 
     raw.setdefault("version", "")
     raw.setdefault("source", {})
@@ -117,7 +125,13 @@ def load_contract(path: str | Path) -> dict[str, Any]:
 
     tables = raw.get("tables")
     if not isinstance(tables, list):
-        raise ValueError("schema contract tables must be a YAML list")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            "Schema contract 'tables' must be a YAML list",
+            action="Ensure the 'tables' key in your contract contains a list of table mappings.",
+            check_id="WORKBOOK-CONTRACT-005",
+        )
 
     def _walk_table_entries(table_entries: list[Any]) -> list[dict[str, Any]]:
         flattened: list[dict[str, Any]] = []
@@ -126,29 +140,53 @@ def load_contract(path: str | Path) -> dict[str, Any]:
                 flattened.extend(_walk_table_entries(entry))
                 continue
             if not isinstance(entry, dict):
+                from workbench.exceptions import UserFacingError
+
                 entry_type_name = type(entry).__name__
-                raise ValueError(
-                    "schema contract tables entries must be mappings "
-                    f"(got {entry_type_name})"
+                raise UserFacingError(
+                    f"Schema contract table entries must be mappings (got {entry_type_name})",
+                    action="Each entry in the 'tables' list must be a mapping (key-value pairs). Check for stray scalar or list entries.",
+                    check_id="WORKBOOK-CONTRACT-006",
                 )
             flattened.append(entry)
         return flattened
 
     raw["tables"] = _walk_table_entries(tables)
 
-    _validate_contract_v2(raw)
     return raw
 
 
-def _validate_contract_v2(contract: dict[str, Any]) -> None:
-    """Check v2.0 contract requirements.  Raises ValueError on violation."""
-    for table in contract.get("tables", []):
-        label = table.get("suggested_model_name", "?")
-        if "model_name" not in table:
-            raise ValueError(f"Table '{label}' is missing required field 'model_name'")
-        mn = str(table["model_name"]).strip()
-        if not mn:
-            raise ValueError(f"Table '{label}' has empty 'model_name'")
+def load_contract(path: str | Path) -> dict[str, Any]:
+    """Load and strictly validate a contract YAML.
+
+    Loads the contract via :func:`load_contract_unvalidated` and then runs
+    :func:`strict_validate_contract`.  Raises ``UserFacingError`` if
+    validation fails.
+
+    Args:
+        path: Filesystem path to a ``.yaml`` / ``.yml`` file.
+
+    Returns:
+        Normalised contract dict with ``"version"``, ``"source"``, and
+        ``"tables"`` keys guaranteed present.
+    """
+    contract = load_contract_unvalidated(path)
+    from workbench.exceptions import UserFacingError
+
+    results = strict_validate_contract(contract)
+    if results:
+        lines = [f"  {r.check_id}: {r.message}" for r in results]
+        if any(r.action for r in results):
+            lines.append("Suggested actions:")
+            for r in results:
+                if r.action:
+                    lines.append(f"  - {r.action}")
+        raise UserFacingError(
+            "Contract validation failed:\n" + "\n".join(lines),
+            action="Fix the reported issues in the contract and re-run.",
+            check_id="WORKBOOK-CONTRACT-007",
+        )
+    return contract
 
 
 def get_model_name(table: dict[str, Any]) -> str:
@@ -1002,8 +1040,8 @@ def _diff_meta(
     return result if result else None
 
 
-def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
-    """Run strict validation checks and return a list of error messages.
+def strict_validate_contract(contract: dict[str, Any]) -> list[ValidationResult]:
+    """Run strict validation checks and return structured results.
 
     Checks:
     - No model_name is null or empty.
@@ -1013,16 +1051,21 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
     """
     import keyword
 
-    errors: list[str] = []
+    results: list[ValidationResult] = []
     tables = list(contract.get("tables") or [])
     model_names: list[str] = []
 
     for table in tables:
         model_name = str(table.get("model_name", "")).strip()
         if not model_name:
-            label = table.get("suggested_model_name", "?")
-            errors.append(
-                f"FAIL[VALIDATE_NULL_MODEL]: Table '{label}' has empty model_name"
+            label = table.get("suggested_model_name") or table.get("bundle_worksheet_title", "?")
+            results.append(
+                ValidationResult(
+                    model_name=model_name or "_UNNAMED",
+                    check_id="WORKBOOK-CONTRACT-NULL-MODEL",
+                    message=f"Table '{label}' has empty model_name",
+                    action="Set a unique model_name or add suggested_model_name to the contract",
+                )
             )
             continue
         model_names.append(model_name)
@@ -1030,9 +1073,13 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
     seen_model_names: set[str] = set()
     for mn in model_names:
         if mn in seen_model_names:
-            errors.append(
-                f'FAIL[VALIDATE_DUPLICATE_MODEL]: Duplicate model_name "{mn}" (2+ tables)'
-                "\n  → Action: Merge the duplicate tables or give them distinct model_name values."
+            results.append(
+                ValidationResult(
+                    model_name=mn,
+                    check_id="WORKBOOK-CONTRACT-DUPLICATE-MODEL",
+                    message=f'Duplicate model_name "{mn}" (2+ tables)',
+                    action="Rename one of the duplicate tables or merge them",
+                )
             )
         seen_model_names.add(mn)
 
@@ -1043,16 +1090,22 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
             if not field_name:
                 continue
             if not str(field_name).isidentifier() or keyword.iskeyword(str(field_name)):
-                errors.append(
-                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
-                    f"is not a valid Python identifier\n"
-                    "  → Action: Rename the source column in the contract."
+                results.append(
+                    ValidationResult(
+                        model_name=model_name or None,
+                        check_id="WORKBOOK-CONTRACT-INVALID-FIELD-NAME",
+                        message=f'Field "{field_name}" in model "{model_name}" is not a valid Python identifier',
+                        action="Rename the source column in the contract",
+                    )
                 )
             elif str(field_name)[0].isdigit():
-                errors.append(
-                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
-                    f"starts with a digit\n"
-                    "  → Action: Rename the source column in the contract."
+                results.append(
+                    ValidationResult(
+                        model_name=model_name or None,
+                        check_id="WORKBOOK-CONTRACT-INVALID-FIELD-NAME",
+                        message=f'Field "{field_name}" in model "{model_name}" starts with a digit',
+                        action="Rename the source column in the contract",
+                    )
                 )
 
-    return errors
+    return results

@@ -136,7 +136,7 @@ def _contract_review(args: argparse.Namespace) -> int:
 
     try:
         contract = load_contract(args.contract)
-    except ValueError as exc:
+    except Exception as exc:
         return _render_output(
             {
                 "ok": False,
@@ -189,7 +189,7 @@ def _contract_diff(args: argparse.Namespace) -> int:
     try:
         old_contract = load_contract(args.old)
         new_contract = load_contract(args.new)
-    except ValueError as exc:
+    except Exception as exc:
         return _render_output(
             {
                 "ok": False,
@@ -311,11 +311,11 @@ def _contract_safety(args: argparse.Namespace) -> int:
     try:
         old_contract = load_contract(args.old)
         new_contract = load_contract(args.new)
-    except ValueError as exc:
+    except Exception as exc:
         return _render_output(
             {
                 "ok": False,
-                "error_code": ERROR_CODES["unexpected"],
+                "error_code": ERROR_CODES["drift_check"],
                 "message": str(exc),
             },
             args.json,
@@ -729,14 +729,14 @@ def _drift_check(args: argparse.Namespace) -> int:
 
     try:
         old_contract = load_contract(args.baseline)
-    except ValueError as exc:
+    except Exception as exc:
         return _render_output(
             {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
             args.json,
         )
     try:
         new_contract = load_contract(args.new)
-    except ValueError as exc:
+    except Exception as exc:
         return _render_output(
             {"ok": False, "error_code": ERROR_CODES["unexpected"], "message": str(exc)},
             args.json,

@@ -130,7 +130,7 @@ tables:
         call_command("generate_import", contract=str(contract), out=str(out))
 
 
-def test_generate_import_continue_on_error_skips_invalid(tmp_path, monkeypatch):
+def test_generate_import_skips_invalid_tables(tmp_path, monkeypatch):
     from django.core.management import call_command
     contract = tmp_path / "contract.yaml"
     contract.write_text(
@@ -143,7 +143,7 @@ def test_generate_import_continue_on_error_skips_invalid(tmp_path, monkeypatch):
         })
     )
     out = tmp_path / "import.py"
-    call_command("generate_import", contract=str(contract), out=str(out), force=True, continue_on_error=True)
+    call_command("generate_import", contract=str(contract), out=str(out), force=True)
     source = out.read_text()
     assert "Valid" in source
 
