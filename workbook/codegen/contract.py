@@ -11,6 +11,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from workbook.codegen.validation_pipeline import ValidationResult
+
 
 def _make_contract_loader(base_path: str | Path) -> type:
     """Return a ``SafeLoader`` subclass supporting ``!include`` and ``!include_list``.
@@ -1002,8 +1004,8 @@ def _diff_meta(
     return result if result else None
 
 
-def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
-    """Run strict validation checks and return a list of error messages.
+def strict_validate_contract(contract: dict[str, Any]) -> list[ValidationResult]:
+    """Run strict validation checks and return structured results.
 
     Checks:
     - No model_name is null or empty.
@@ -1013,16 +1015,21 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
     """
     import keyword
 
-    errors: list[str] = []
+    results: list[ValidationResult] = []
     tables = list(contract.get("tables") or [])
     model_names: list[str] = []
 
     for table in tables:
         model_name = str(table.get("model_name", "")).strip()
         if not model_name:
-            label = table.get("suggested_model_name", "?")
-            errors.append(
-                f"FAIL[VALIDATE_NULL_MODEL]: Table '{label}' has empty model_name"
+            label = table.get("suggested_model_name") or table.get("bundle_worksheet_title", "?")
+            results.append(
+                ValidationResult(
+                    model_name=model_name if model_name else None,
+                    check_id="WORKBOOK-CONTRACT-NULL-MODEL",
+                    message=f"Table '{label}' has empty model_name",
+                    action="Set a unique model_name or add suggested_model_name to the contract",
+                )
             )
             continue
         model_names.append(model_name)
@@ -1030,9 +1037,13 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
     seen_model_names: set[str] = set()
     for mn in model_names:
         if mn in seen_model_names:
-            errors.append(
-                f'FAIL[VALIDATE_DUPLICATE_MODEL]: Duplicate model_name "{mn}" (2+ tables)'
-                "\n  → Action: Merge the duplicate tables or give them distinct model_name values."
+            results.append(
+                ValidationResult(
+                    model_name=mn,
+                    check_id="WORKBOOK-CONTRACT-DUPLICATE-MODEL",
+                    message=f'Duplicate model_name "{mn}" (2+ tables)',
+                    action="Rename one of the duplicate tables or merge them",
+                )
             )
         seen_model_names.add(mn)
 
@@ -1043,16 +1054,22 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[str]:
             if not field_name:
                 continue
             if not str(field_name).isidentifier() or keyword.iskeyword(str(field_name)):
-                errors.append(
-                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
-                    f"is not a valid Python identifier\n"
-                    "  → Action: Rename the source column in the contract."
+                results.append(
+                    ValidationResult(
+                        model_name=model_name or None,
+                        check_id="WORKBOOK-CONTRACT-INVALID-FIELD-NAME",
+                        message=f'Field "{field_name}" in model "{model_name}" is not a valid Python identifier',
+                        action="Rename the source column in the contract",
+                    )
                 )
             elif str(field_name)[0].isdigit():
-                errors.append(
-                    f'FAIL[VALIDATE_INVALID_FIELD_NAME]: Field "{field_name}" in model "{model_name}" '
-                    f"starts with a digit\n"
-                    "  → Action: Rename the source column in the contract."
+                results.append(
+                    ValidationResult(
+                        model_name=model_name or None,
+                        check_id="WORKBOOK-CONTRACT-INVALID-FIELD-NAME",
+                        message=f'Field "{field_name}" in model "{model_name}" starts with a digit',
+                        action="Rename the source column in the contract",
+                    )
                 )
 
-    return errors
+    return results
