@@ -954,3 +954,84 @@ def test_missing_bundle_path_raises_error():
             ic.pop("bundle_path", None)
     with pytest.raises(ValueError, match="bundle_path is missing"):
         render_import_py(contract, app_label="core")
+
+
+# ---------------------------------------------------------------------------
+# Year-loop detection
+# ---------------------------------------------------------------------------
+
+
+def test_render_import_py_year_loop_generated_when_bundle_path_has_year():
+    """When bundle_path contains {year}, the generated command includes year-loop methods."""
+    contract = {
+        "version": "1.3",
+        "source": {},
+        "tables": [
+            {
+                "model_name": "Crop",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField",
+                     "django_field_kwargs": {"max_length": 200}},
+                ],
+                "import_config": {
+                    "bundle_path": "{year}/crops.csv",
+                    "unique_on": ["name"],
+                },
+            },
+        ],
+    }
+    source = render_import_py(contract, app_label="core")
+    assert "_resolve_years" in source, f"Expected _resolve_years in generated code"
+    assert "_resolve_path" in source, f"Expected _resolve_path in generated code"
+    assert "_run_year" in source, f"Expected _run_year in generated code"
+    assert "--year" in source, f"Expected --year argument in generated code"
+
+
+def test_render_import_py_no_year_loop_when_bundle_path_is_static():
+    """When no bundle_path contains {year}, no year-loop methods are generated."""
+    contract = {
+        "version": "1.3",
+        "source": {},
+        "tables": [
+            {
+                "model_name": "Crop",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField",
+                     "django_field_kwargs": {"max_length": 200}},
+                ],
+                "import_config": {
+                    "bundle_path": "crops.csv",
+                    "unique_on": ["name"],
+                },
+            },
+        ],
+    }
+    source = render_import_py(contract, app_label="core")
+    assert "_resolve_years" not in source, f"Should not include _resolve_years for static bundle_path"
+    assert "_run_year" not in source, f"Should not include _run_year for static bundle_path"
+
+
+def test_render_import_py_resolve_path_substitutes_year():
+    """_resolve_path should substitute {year} in path templates."""
+    contract = {
+        "version": "1.3",
+        "source": {},
+        "tables": [
+            {
+                "model_name": "Crop",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField",
+                     "django_field_kwargs": {"max_length": 200}},
+                ],
+                "import_config": {
+                    "bundle_path": "{year}/crops.csv",
+                    "unique_on": ["name"],
+                },
+            },
+        ],
+    }
+    source = render_import_py(contract, app_label="core")
+    assert 'self._resolve_path(' in source, f"Expected _resolve_path call in _import_crop"
+    assert '{year}' not in source.split('_run_import_pipeline')[0], (
+        "Year template should be resolved at runtime, not hardcoded"
+    )
