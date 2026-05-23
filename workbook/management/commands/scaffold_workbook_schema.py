@@ -418,7 +418,11 @@ def _build_cohort_contract(
         _flag_fk_columns(table.get("columns", []))
         _flag_computed_fields(table)
 
-    tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error)
+    tables, collector = _validate_tables_for_scaffold(
+        tables,
+        continue_on_error=continue_on_error,
+        pivot_detection_threshold=pivot_detection_threshold,
+    )
 
     tab_headers = {}
     for table in tables:
@@ -673,6 +677,13 @@ class Command(BaseCommand):
             default=False,
             help="Collect validation errors and write partial contract YAML",
         )
+        parser.add_argument(
+            "--pivot-detection-threshold",
+            type=float,
+            default=0.5,
+            help="Ratio of numeric column headers that triggers pivot-table rejection "
+            "(default: 0.5, set to 1.0 to disable)",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out"]).resolve()
@@ -688,15 +699,20 @@ class Command(BaseCommand):
         cohort_dir = options.get("cohort_corpus_out_dir")
         bundle_config_path = options.get("bundle_config")
         continue_on_error = bool(options.get("continue_on_error", False))
+        pivot_detection_threshold = float(options.get("pivot_detection_threshold", 0.5))
 
         if cohort_dir:
             contract, collector = self._handle_cohort_corpus(
                 Path(cohort_dir).resolve(),
                 hardened=bool(options.get("hardened")),
                 continue_on_error=continue_on_error,
+                pivot_detection_threshold=pivot_detection_threshold,
             )
         elif bundle_config_path:
-            contract, collector = self._handle_bundle_config(options)
+            contract, collector = self._handle_bundle_config(
+                options,
+                pivot_detection_threshold=pivot_detection_threshold,
+            )
         else:
             raise CommandError(
                 "Either --bundle-config or --cohort-corpus-out-dir is required."
@@ -745,7 +761,7 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS(f"wrote {stub_path}"))
 
-    def _handle_bundle_config(self, options: dict[str, Any]) -> tuple[dict[str, Any], PartialOutputCollector]:
+    def _handle_bundle_config(self, options: dict[str, Any], *, pivot_detection_threshold: float = 0.5) -> tuple[dict[str, Any], PartialOutputCollector]:
         bundle_path = Path(options["bundle_config"]).resolve()
         if not bundle_path.is_file():
             raise CommandError(f"bundle-config not found: {bundle_path}")
@@ -785,7 +801,7 @@ class Command(BaseCommand):
             _flag_computed_fields(table)
 
         continue_on_error = bool(options.get("continue_on_error", False))
-        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error, pivot_detection_threshold=0.5)
+        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error, pivot_detection_threshold=pivot_detection_threshold)
         contract["tables"] = tables
 
         tab_headers = {}
@@ -800,7 +816,8 @@ class Command(BaseCommand):
         return contract, collector
 
     def _handle_cohort_corpus(
-        self, cohort_dir: Path, *, hardened: bool, continue_on_error: bool = False
+        self, cohort_dir: Path, *, hardened: bool, continue_on_error: bool = False,
+        pivot_detection_threshold: float = 0.5,
     ) -> tuple[dict[str, Any], PartialOutputCollector]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))
         if not coverage_files:
@@ -812,12 +829,12 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Expected a deep/ subdirectory inside {cohort_dir}; none found"
             )
-        pivot_threshold = float(coverage_payload.get("pivot_detection_threshold", 0.5))
+        config_threshold = float(coverage_payload.get("pivot_detection_threshold", 0.5))
         contract, collector = _build_cohort_contract(
             deep_dir,
             coverage_payload,
             hardened=hardened,
             continue_on_error=continue_on_error,
-            pivot_detection_threshold=pivot_threshold,
+            pivot_detection_threshold=pivot_detection_threshold,
         )
         return contract, collector
