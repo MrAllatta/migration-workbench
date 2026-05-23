@@ -57,7 +57,8 @@ def partition_contract_on_validation(
 
     Args:
         contract: The loaded (unvalidated) contract dict.
-        results: Output from ``strict_validate_contract``.
+        results: Validation results (list of ``ValidationResult``, from
+            ``strict_validate_contract`` after its return-type refactor).
         out_path: Path the *successful* output will be written to. Used to derive
             the rejection file name so parallel/sequential commands do not collide.
 
