@@ -37,7 +37,7 @@ def test_strict_validate_null_model():
     }
     results = strict_validate_contract(contract)
     assert isinstance(results, list)
-    assert any(r.model_name is None and r.check_id == "WORKBOOK-CONTRACT-NULL-MODEL" for r in results)
+    assert any(r.model_name == "_UNNAMED" and r.check_id == "WORKBOOK-CONTRACT-NULL-MODEL" for r in results)
 
 
 def test_strict_validate_returns_empty_for_valid():

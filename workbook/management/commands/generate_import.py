@@ -12,13 +12,18 @@ from __future__ import annotations
 import difflib
 import sys
 from pathlib import Path
-from typing import Any
-
-import yaml
 from django.core.management.base import BaseCommand, CommandError
 
-from workbook.codegen.contract import validate_contract_tables
+from workbook.codegen.contract import (
+    load_contract_unvalidated,
+    strict_validate_contract,
+    validate_contract_tables,
+)
 from workbook.codegen.import_generator import render_import_py
+from workbook.codegen.validation_pipeline import (
+    GlobalValidationError,
+    partition_contract_on_validation,
+)
 
 
 def _render_diff(source: str, current_path: Path) -> tuple[str, bool]:
@@ -86,8 +91,7 @@ class Command(BaseCommand):
         if not contract_path.is_file():
             raise CommandError(f"contract not found: {contract_path}")
 
-        continue_on_error = options.get("continue_on_error", False)
-        contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+        contract = load_contract_unvalidated(str(contract_path))
 
         app_label = options["app_label"]
         if app_label is None:
@@ -111,45 +115,21 @@ class Command(BaseCommand):
         force = options["force"]
         show_diff = options["diff"]
 
-        if continue_on_error and contract.get("tables"):
-            from workbook.codegen.contract import strict_validate_contract
-            validation_errors = strict_validate_contract(contract)
-            if validation_errors:
-                valid_model_names = set()
-                invalid_model_names = set()
-                for table in contract.get("tables", []):
-                    model_name = table.get("model_name", "")
-                    if any(model_name in err for err in validation_errors):
-                        invalid_model_names.add(model_name)
-                    else:
-                        valid_model_names.add(model_name)
-                clean_contract = dict(contract)
-                clean_contract["tables"] = [
-                    t for t in contract["tables"]
-                    if t.get("model_name") in valid_model_names
-                ]
-                from workbook.partial_output import PartialOutputCollector
-                collector = PartialOutputCollector()
-                for model_name in invalid_model_names:
-                    collector.add(
-                        {"model_name": model_name},
-                        check_id="GENERATE_IMPORT_INVALID_TABLE",
-                        message=f"Table {model_name!r} failed strict validation",
-                        action="Fix model_name or field identifiers in the contract",
-                    )
-                contract = clean_contract
-                if not collector.is_empty():
-                    rejection_path = out_path.parent / "schema-contract-rejected.yaml"
-                    collector.write_rejection_file(rejection_path)
-                    self.stdout.write(self.style.WARNING(collector.summary()))
+        results = strict_validate_contract(contract)
+        try:
+            clean_contract, rejection_collector = partition_contract_on_validation(
+                contract, results, out_path=out_path,
+            )
+        except GlobalValidationError as exc:
+            raise CommandError(str(exc)) from exc
 
-        warnings = validate_contract_tables(contract)
+        warnings = validate_contract_tables(clean_contract)
         for w in warnings:
             self.stdout.write(self.style.WARNING(f"validation: {w}"))
 
-        version = contract.get("version", "1.0") if contract else "1.0"
+        version = clean_contract.get("version", "1.0") if clean_contract else "1.0"
         tables_with_import = [
-            t for t in (contract.get("tables") or []) if t.get("import_config")
+            t for t in (clean_contract.get("tables") or []) if t.get("import_config")
         ]
         self.stdout.write(
             self.style.SUCCESS(
@@ -159,7 +139,7 @@ class Command(BaseCommand):
         )
 
         try:
-            source = render_import_py(contract, app_label=app_label)
+            source = render_import_py(clean_contract, app_label=app_label)
         except ValueError as exc:
             if "bundle_path" in str(exc):
                 raise CommandError(
@@ -171,6 +151,9 @@ class Command(BaseCommand):
                     "auto-generates bundle_path from the model name."
                 )
             raise
+
+        if not rejection_collector.is_empty():
+            self.stderr.write(self.style.WARNING(rejection_collector.summary()))
 
         if show_diff:
             diff_text, has_changes = _render_diff(source, out_path)

@@ -1047,7 +1047,7 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[ValidationResult]
             label = table.get("suggested_model_name") or table.get("bundle_worksheet_title", "?")
             results.append(
                 ValidationResult(
-                    model_name=model_name if model_name else None,
+                    model_name=model_name or "_UNNAMED",
                     check_id="WORKBOOK-CONTRACT-NULL-MODEL",
                     message=f"Table '{label}' has empty model_name",
                     action="Set a unique model_name or add suggested_model_name to the contract",
