@@ -76,9 +76,13 @@ def _make_contract_loader(base_path: str | Path) -> type:
         target = _resolve_include_target(loader, path_str)
         included = _load_included_yaml(loader, target)
         if not isinstance(included, list):
+            from workbench.exceptions import UserFacingError
+
             included_type_name = type(included).__name__
-            raise ValueError(
-                f"include_list expects a YAML list (got {included_type_name}) in {target}"
+            raise UserFacingError(
+                f"!include_list target must be a YAML list (got {included_type_name}) in {target}",
+                action="Ensure the included file contains a YAML list (a sequence starting with '-').",
+                check_id="WORKBOOK-CONTRACT-003",
             )
         return included
 
@@ -107,7 +111,13 @@ def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
     loader_cls = _make_contract_loader(path)
     raw: dict[str, Any] = yaml.load(src, Loader=loader_cls)
     if not isinstance(raw, dict):
-        raise ValueError("schema contract must be a YAML mapping")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            "Schema contract must be a YAML mapping",
+            action="Check that the contract file is valid YAML with a top-level mapping (not a list).",
+            check_id="WORKBOOK-CONTRACT-004",
+        )
 
     raw.setdefault("version", "")
     raw.setdefault("source", {})
@@ -115,7 +125,13 @@ def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
 
     tables = raw.get("tables")
     if not isinstance(tables, list):
-        raise ValueError("schema contract tables must be a YAML list")
+        from workbench.exceptions import UserFacingError
+
+        raise UserFacingError(
+            "Schema contract 'tables' must be a YAML list",
+            action="Ensure the 'tables' key in your contract contains a list of table mappings.",
+            check_id="WORKBOOK-CONTRACT-005",
+        )
 
     def _walk_table_entries(table_entries: list[Any]) -> list[dict[str, Any]]:
         flattened: list[dict[str, Any]] = []
@@ -124,10 +140,13 @@ def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
                 flattened.extend(_walk_table_entries(entry))
                 continue
             if not isinstance(entry, dict):
+                from workbench.exceptions import UserFacingError
+
                 entry_type_name = type(entry).__name__
-                raise ValueError(
-                    "schema contract tables entries must be mappings "
-                    f"(got {entry_type_name})"
+                raise UserFacingError(
+                    f"Schema contract table entries must be mappings (got {entry_type_name})",
+                    action="Each entry in the 'tables' list must be a mapping (key-value pairs). Check for stray scalar or list entries.",
+                    check_id="WORKBOOK-CONTRACT-006",
                 )
             flattened.append(entry)
         return flattened
@@ -141,8 +160,8 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     """Load and strictly validate a contract YAML.
 
     Loads the contract via :func:`load_contract_unvalidated` and then runs
-    :func:`strict_validate_contract`.  Raises ``ValueError`` (or
-    ``UserFacingError`` for include problems) if validation fails.
+    :func:`strict_validate_contract`.  Raises ``UserFacingError`` if
+    validation fails.
 
     Args:
         path: Filesystem path to a ``.yaml`` / ``.yml`` file.
@@ -152,6 +171,8 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         ``"tables"`` keys guaranteed present.
     """
     contract = load_contract_unvalidated(path)
+    from workbench.exceptions import UserFacingError
+
     results = strict_validate_contract(contract)
     if results:
         lines = [f"  {r.check_id}: {r.message}" for r in results]
@@ -160,19 +181,33 @@ def load_contract(path: str | Path) -> dict[str, Any]:
             for r in results:
                 if r.action:
                     lines.append(f"  - {r.action}")
-        raise ValueError("Contract validation failed:\n" + "\n".join(lines))
+        raise UserFacingError(
+            "Contract validation failed:\n" + "\n".join(lines),
+            action="Fix the reported issues in the contract and re-run.",
+            check_id="WORKBOOK-CONTRACT-007",
+        )
     return contract
 
 
 def _validate_contract_v2(contract: dict[str, Any]) -> None:
-    """Check v2.0 contract requirements.  Raises ValueError on violation."""
+    """Check v2.0 contract requirements.  Raises UserFacingError on violation."""
+    from workbench.exceptions import UserFacingError
+
     for table in contract.get("tables", []):
         label = table.get("suggested_model_name", "?")
         if "model_name" not in table:
-            raise ValueError(f"Table '{label}' is missing required field 'model_name'")
+            raise UserFacingError(
+                f"Table '{label}' is missing required field 'model_name'",
+                action="Add a 'model_name' field to the table entry.",
+                check_id="WORKBOOK-CONTRACT-008",
+            )
         mn = str(table["model_name"]).strip()
         if not mn:
-            raise ValueError(f"Table '{label}' has empty 'model_name'")
+            raise UserFacingError(
+                f"Table '{label}' has empty 'model_name'",
+                action="Set a non-empty 'model_name' for the table.",
+                check_id="WORKBOOK-CONTRACT-009",
+            )
 
 
 def get_model_name(table: dict[str, Any]) -> str:

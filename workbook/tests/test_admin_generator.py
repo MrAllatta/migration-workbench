@@ -141,9 +141,11 @@ def test_load_manifest(tmp_path):
 def test_load_manifest_bad_version(tmp_path):
     p = tmp_path / "bad.yaml"
     p.write_text(yaml.dump({"version": "v0", "views": []}), encoding="utf-8")
+    from workbench.exceptions import UserFacingError
+
     import pytest
 
-    with pytest.raises(ValueError, match="unsupported.*version"):
+    with pytest.raises(UserFacingError, match="Unsupported view manifest version"):
         load_manifest(str(p))
 
 

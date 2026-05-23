@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from workbench.exceptions import UserFacingError
 from workbook.codegen.contract import load_contract
 
 
@@ -57,7 +58,7 @@ tables:
     )
 
     with pytest.raises(
-        ValueError, match=r"include_list expects a YAML list"
+        UserFacingError, match=r"!include_list target must be a YAML list"
     ) as excinfo:
         load_contract(contract_path)
 
@@ -180,7 +181,7 @@ tables:
     )
 
     with pytest.raises(
-        ValueError, match=r"schema contract tables entries must be mappings"
+        UserFacingError, match=r"Schema contract table entries must be mappings"
     ) as excinfo:
         load_contract(contract_path)
 
