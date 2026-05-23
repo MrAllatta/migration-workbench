@@ -13,6 +13,7 @@ Usage::
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 from workbook.codegen.contract import (
     assign_import_tiers,
@@ -83,6 +84,80 @@ def _default_value(parser_name: str | None) -> str:
         "bool": "False",
     }
     return lookup.get(parser_name) if parser_name else '""'
+
+
+def _contract_has_year_bundle_path(contract: dict[str, Any]) -> bool:
+    """Return True if any table's bundle_path contains {year}."""
+    for table in contract.get("tables") or []:
+        cfg = table.get("import_config")
+        if cfg and "{year}" in (cfg.get("bundle_path") or ""):
+            return True
+    return False
+
+
+def _render_resolve_years(indent: int = 4) -> str:
+    """Render the _resolve_years method for year-loop imports."""
+    pad = " " * indent
+    lines = [
+        "",
+        f"{pad}def _resolve_years(self) -> list[int]:",
+        f'{pad}    """Return years to import, from --year flag or filesystem discovery."""',
+        f"{pad}    if self.years:",
+        f"{pad}        return sorted(self.years)",
+        f"{pad}    discovered = []",
+        f"{pad}    for entry in Path(self.data_dir).iterdir():",
+        f'{pad}        match = re.match(r"^year_(\\d{{4}})$", entry.name)',
+        f"{pad}        if match and entry.is_dir():",
+        f"{pad}            discovered.append(int(match.group(1)))",
+        f"{pad}    if not discovered:",
+        f"{pad}        from django.core.management.base import CommandError",
+        f"{pad}        raise CommandError(",
+        f'{pad}            f"No year_YYYY/ directories found in {{self.data_dir}}. "',
+        f'{pad}            "Pass --year explicitly or run pull_bundle first."',
+        f"{pad}        )",
+        f"{pad}    return sorted(discovered)",
+    ]
+    return "\n".join(lines)
+
+
+def _render_resolve_path(indent: int = 4) -> str:
+    """Render the _resolve_path method for {year} placeholder substitution."""
+    pad = " " * indent
+    lines = [
+        "",
+        f"{pad}def _resolve_path(self, path_template: str, year: int):",
+        f'{pad}    """Substitute {{year}} in a path template."""',
+        f'{pad}    return path_template.format_map({{"year": year}})',
+    ]
+    return "\n".join(lines)
+
+
+def _render_year_argument(indent: int = 8) -> str:
+    """Render the --year argument for add_arguments."""
+    pad = " " * indent
+    lines = [
+        f'{pad}parser.add_argument("--year", type=int, nargs="*", dest="years",',
+        f'{pad}                    help="Years to import (default: auto-detect from data_dir)")',
+    ]
+    return "\n".join(lines)
+
+
+def _render_run_import_pipeline_year_loop(tier_calls: list[str], indent: int = 4) -> str:
+    """Render _run_import_pipeline with year loop for multi-year imports."""
+    pad = " " * indent
+    inner_pad = " " * (indent + 4)
+    lines = [
+        "",
+        f"{pad}def _run_import_pipeline(self):",
+        f"{pad}    for year in self._resolve_years():",
+        f"{pad}        self._run_year(year)",
+        "",
+        f"{pad}def _run_year(self, year: int):",
+        f'{pad}    self.stdout.write(f"--- Importing year {{year}} ---")',
+    ]
+    for call in tier_calls:
+        lines.append(f"{inner_pad}{call}")
+    return "\n".join(lines)
 
 
 # -- rendering --------------------------------------------------------------
@@ -377,6 +452,7 @@ def _render_import_method(
     contract_fields: list[dict[str, Any]],
     import_cfg: dict[str, Any],
     indent: int = 4,
+    year_aware: bool = False,
 ) -> str:
     """Render a single import tier method."""
     method_name = f"_import_{model_name.lower()}"
@@ -400,17 +476,27 @@ def _render_import_method(
 
     tab_config = _render_tab_config(import_cfg, indent=0)
 
+    if year_aware:
+        method_sig = f"def {method_name}(self, year: int):"
+    else:
+        method_sig = f"def {method_name}(self):"
+
     lines = [
         "",
-        f"def {method_name}(self):",
+        method_sig,
         f"    tab_config = {tab_config}",
         "",
     ]
 
     # read_bundle_tab loop header.
-    lines.append(
-        f"    for row_number, row in self.read_bundle_tab({bundle_path!r}, tab_config):"
-    )
+    if year_aware:
+        lines.append(
+            f"    for row_number, row in self.read_bundle_tab(self._resolve_path({bundle_path!r}, year), tab_config):"
+        )
+    else:
+        lines.append(
+            f"    for row_number, row in self.read_bundle_tab({bundle_path!r}, tab_config):"
+        )
 
     # Required field checks (skip FK fields — they get richer checks below).
     if required:
@@ -562,6 +648,8 @@ def render_import_py(
 
     candidates.sort(key=lambda x: (x[0], x[1]))
 
+    year_aware = _contract_has_year_bundle_path(contract)
+
     base_class_name = f"GeneratedImport{app_label.capitalize()}"
 
     if not candidates:
@@ -599,13 +687,20 @@ def render_import_py(
     if skipped:
         parts.extend(skipped)
         parts.append("")
+    import_lines = [
+        "from typing import Any",
+        "from django.db import IntegrityError",
+        "from importer.base import BaseImportCommand",
+        f"from {app_label}.models import {', '.join(model_names)}",
+    ]
+    if year_aware:
+        import_lines.insert(0, "import re")
+        import_lines.insert(1, "from pathlib import Path")
+    import_lines.append("")
+    parts.extend(import_lines)
+
     parts.extend(
         [
-            "from typing import Any",
-            "from django.db import IntegrityError",
-            "from importer.base import BaseImportCommand",
-            f"from {app_label}.models import {', '.join(model_names)}",
-            "",
             "",
             f"class {base_class_name}(BaseImportCommand):",
             f'    help = "Import {app_label} data from normalized bundles."',
@@ -637,19 +732,41 @@ def render_import_py(
                 parts.append("")
                 seen_prepare_stubs.add(fname)
 
-    # _run_import_pipeline with tier calls.
-    parts.append("    def _run_import_pipeline(self):")
+    # Conditionally add add_arguments for --year.
+    if year_aware:
+        parts.append("    def add_arguments(self, parser):")
+        parts.append("        super().add_arguments(parser)")
+        parts.append(_render_year_argument(indent=8))
+        parts.append("")
+
+    # Build tier calls.
+    tier_calls: list[str] = []
     for tier, name, _ in candidates:
-        parts.append(
-            f'        self.tier("TIER {tier}: {name}s", self._import_{name.lower()})'
-        )
+        if year_aware:
+            tier_calls.append(
+                f'self.tier("TIER {tier}: {name}s", lambda: self._import_{name.lower()}(year))'
+            )
+        else:
+            tier_calls.append(
+                f'self.tier("TIER {tier}: {name}s", self._import_{name.lower()})'
+            )
+
+    # _run_import_pipeline (year-loop or standard).
+    if year_aware:
+        parts.append(_render_run_import_pipeline_year_loop(tier_calls))
+        parts.append(_render_resolve_years(indent=4))
+        parts.append(_render_resolve_path(indent=4))
+    else:
+        parts.append("    def _run_import_pipeline(self):")
+        for call in tier_calls:
+            parts.append(f"        {call}")
     parts.append("")
 
     # Per-model import methods.
     for _, name, table in candidates:
         fields = get_fields(table)
         cfg = get_import_config(table)
-        parts.append(_render_import_method(name, fields, cfg))
+        parts.append(_render_import_method(name, fields, cfg, year_aware=year_aware))
 
     parts.append("")
     parts.append("")

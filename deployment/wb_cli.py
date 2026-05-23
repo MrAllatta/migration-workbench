@@ -431,12 +431,14 @@ def _generate_import(args: argparse.Namespace) -> int:
 def _generate_manifest(args: argparse.Namespace) -> int:
     _setup_django(getattr(args, "django_settings", None))
     from django.core.management import call_command
-    from workbook.management.commands.generate_view_manifest import Command
+    from workbook.management.commands.scaffold_view_manifest import Command
 
     kwargs = {
         "structure": args.structure,
         "out": args.out,
     }
+    if args.contract:
+        kwargs["schema_contract"] = args.contract
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
     call_command(Command, **kwargs)
     return 0
