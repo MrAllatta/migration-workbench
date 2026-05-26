@@ -13,7 +13,6 @@ Usage::
 from __future__ import annotations
 
 from typing import Any
-from pathlib import Path
 
 from workbook.codegen.contract import (
     assign_import_tiers,
@@ -83,7 +82,7 @@ def _default_value(parser_name: str | None) -> str:
         "int": "0",
         "bool": "False",
     }
-    return lookup.get(parser_name) if parser_name else '""'
+    return lookup.get(parser_name, '""') if parser_name else '""'
 
 
 def _contract_has_year_bundle_path(contract: dict[str, Any]) -> bool:
@@ -142,7 +141,9 @@ def _render_year_argument(indent: int = 8) -> str:
     return "\n".join(lines)
 
 
-def _render_run_import_pipeline_year_loop(tier_calls: list[str], indent: int = 4) -> str:
+def _render_run_import_pipeline_year_loop(
+    tier_calls: list[str], indent: int = 4
+) -> str:
     """Render _run_import_pipeline with year loop for multi-year imports."""
     pad = " " * indent
     inner_pad = " " * (indent + 4)
@@ -765,7 +766,7 @@ def render_import_py(
     # Per-model import methods.
     for _, name, table in candidates:
         fields = get_fields(table)
-        cfg = get_import_config(table)
+        cfg = get_import_config(table) or {}
         parts.append(_render_import_method(name, fields, cfg, year_aware=year_aware))
 
     parts.append("")
