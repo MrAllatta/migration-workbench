@@ -10,7 +10,9 @@ from django.core.management.base import CommandError
 
 from profiler.tools.cohort_corpus import (
     ColumnProfile,
+    _compile_exclude_regexes,
     apply_tab_selection_overrides,
+    auto_select_tabs,
     build_cohort_corpus_index,
     compute_column_profiles,
     enrich_computed_fields,
@@ -1769,3 +1771,221 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
     assert deep_coverage["success_count"] == 1
     assert "dedup_trace" in deep_coverage
     assert deep_coverage["dedup_trace"]["402"]["profiled_latest_only"] == ["Plan Board"]
+
+
+# ── Fix 1: tab_exclude_patterns true-exclusion mode ────────────────────────
+
+
+def test_compile_exclude_regexes_selects_exclude_mode_only():
+    """_compile_exclude_regexes returns only entries with ``exclude: true``."""
+    heuristics = {
+        "tab_exclude_patterns": [
+            {"pattern": r"^Sheet\d+$", "exclude": True},
+            {"pattern": r"\b\d{3}\b", "penalty": -5},
+            {"pattern": "hidden", "exclude": True},
+        ]
+    }
+    regexes = _compile_exclude_regexes(heuristics)
+    assert len(regexes) == 2
+    assert regexes[0].pattern == r"^Sheet\d+$"
+    assert regexes[1].pattern == "hidden"
+
+
+def test_compile_exclude_regexes_skip_missing_pattern():
+    """Entries without a ``pattern`` key are silently skipped."""
+    regexes = _compile_exclude_regexes({"tab_exclude_patterns": [{"exclude": True}, {}]})
+    assert len(regexes) == 0
+
+
+def test_compile_exclude_regexes_skip_invalid_regex():
+    """Invalid regex patterns are logged but do not crash."""
+    regexes = _compile_exclude_regexes(
+        {"tab_exclude_patterns": [{"pattern": "[invalid", "exclude": True}]}
+    )
+    assert len(regexes) == 0
+
+
+def test_compile_exclude_regexes_backward_compat():
+    """Entries without ``exclude: true`` are not returned (penalty-only)."""
+    regexes = _compile_exclude_regexes(
+        {"tab_exclude_patterns": [{"pattern": "temp", "penalty": -10}]}
+    )
+    assert len(regexes) == 0
+
+
+def test_compile_exclude_regexes_none_config():
+    """``None`` or empty config returns empty list."""
+    assert _compile_exclude_regexes(None) == []
+    assert _compile_exclude_regexes({}) == []
+
+
+def test_select_tabs_from_inventory_exclude_mode_removes_tabs():
+    """Tabs matching exclude-mode patterns are removed before scoring."""
+    index = [
+        {
+            "spreadsheet_id": "s1",
+            "workbook_code": "402",
+            "year": 2026,
+            "spreadsheet_name": "402 Plan",
+        }
+    ]
+    inventory = [
+        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 50, "cols": 10, "tab_title": "Plan Board"},
+        {"spreadsheet_id": "s1", "sheet_id": 2, "rows": 10, "cols": 5, "tab_title": "Sheet1"},
+        {"spreadsheet_id": "s1", "sheet_id": 3, "rows": 5, "cols": 3, "tab_title": "hidden data"},
+    ]
+    heuristics = {
+        "operational_tokens": ["plan", "board"],
+        "operational_weight": 3,
+        "tab_exclude_patterns": [
+            {"pattern": r"^Sheet\d+$", "exclude": True},
+            {"pattern": "hidden", "exclude": True},
+        ],
+    }
+    result = select_tabs_from_inventory(index, inventory, tab_score_heuristics=heuristics)
+    titles = [r["tab_title"] for r in result]
+    assert "Plan Board" in titles
+    assert "Sheet1" not in titles
+    assert "hidden data" not in titles
+
+
+# ── Fix 1b: score_cutoff in auto_select_tabs ───────────────────────────────
+
+
+def test_auto_select_tabs_score_cutoff_excludes_low_scores():
+    """``score_cutoff`` excludes tabs below the threshold even if slots remain."""
+    shortlist = [
+        {"workbook_code": "402", "tab_title": "Good", "final_score": 5.0, "occurrences": 1,
+         "avg_score": 5.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
+        {"workbook_code": "402", "tab_title": "Mid", "final_score": 2.0, "occurrences": 1,
+         "avg_score": 2.0, "confidence": "medium", "coverage_bonus": 0, "reasons": ["ref"]},
+        {"workbook_code": "402", "tab_title": "Bad", "final_score": -3.0, "occurrences": 1,
+         "avg_score": -3.0, "confidence": "low", "coverage_bonus": 0, "reasons": ["bad"]},
+    ]
+    approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=0.0)
+    assert "Good" in approved["402"]
+    assert "Mid" in approved["402"]
+    assert "Bad" not in approved["402"]
+
+
+def test_auto_select_tabs_score_cutoff_no_effect_when_none():
+    """``score_cutoff=None`` behaves as before (no filtering)."""
+    shortlist = [
+        {"workbook_code": "402", "tab_title": "A", "final_score": -5.0, "occurrences": 1,
+         "avg_score": -5.0, "confidence": "low", "coverage_bonus": 0, "reasons": []},
+        {"workbook_code": "402", "tab_title": "B", "final_score": 3.0, "occurrences": 1,
+         "avg_score": 3.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
+    ]
+    approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=None)
+    assert len(approved["402"]) == 2
+
+
+# ── Fix 2: tab_details in auto_select_tabs return ──────────────────────────
+
+
+def test_auto_select_tabs_details_includes_scores_and_reasons():
+    """The second return value contains per-tab score data."""
+    shortlist = [
+        {"workbook_code": "402", "tab_title": "Plan", "final_score": 4.5, "occurrences": 2,
+         "avg_score": 4.0, "confidence": "high", "coverage_bonus": 1, "reasons": ["op"]},
+    ]
+    approved, details = auto_select_tabs(shortlist, per_workbook=5)
+    assert approved["402"] == ["Plan"]
+    assert len(details["402"]) == 1
+    entry = details["402"][0]
+    assert entry["tab_title"] == "Plan"
+    assert entry["final_score"] == 4.5
+    assert entry["avg_score"] == 4.0
+    assert entry["confidence"] == "high"
+    assert entry["coverage_bonus"] == 1
+    assert entry["reasons"] == ["op"]
+
+
+def test_auto_select_tabs_details_multiple_workbooks():
+    """Details are grouped per workbook code."""
+    shortlist = [
+        {"workbook_code": "402", "tab_title": "A", "final_score": 5.0, "occurrences": 1,
+         "avg_score": 5.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
+        {"workbook_code": "602", "tab_title": "B", "final_score": 3.0, "occurrences": 2,
+         "avg_score": 3.0, "confidence": "medium", "coverage_bonus": 0, "reasons": ["ref"]},
+    ]
+    approved, details = auto_select_tabs(shortlist, per_workbook=5)
+    assert "402" in details
+    assert "602" in details
+    assert details["402"][0]["tab_title"] == "A"
+    assert details["602"][0]["tab_title"] == "B"
+
+
+def test_auto_select_tabs_details_with_score_cutoff():
+    """Details only includes tabs that survive the cutoff."""
+    shortlist = [
+        {"workbook_code": "402", "tab_title": "High", "final_score": 8.0, "occurrences": 1,
+         "avg_score": 8.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
+        {"workbook_code": "402", "tab_title": "Low", "final_score": -1.0, "occurrences": 1,
+         "avg_score": -1.0, "confidence": "low", "coverage_bonus": 0, "reasons": ["bad"]},
+    ]
+    approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=0.0)
+    assert len(details["402"]) == 1
+    assert details["402"][0]["tab_title"] == "High"
+
+
+# ── Fix 3: per_workbook_heuristic_overrides ────────────────────────────────
+
+
+def test_select_tabs_per_workbook_heuristic_overrides():
+    """Per-workbook heuristic overrides affect scoring for that workbook only."""
+    index = [
+        {"spreadsheet_id": "s402", "workbook_code": "402", "year": 2026,
+         "spreadsheet_name": "402 Plan"},
+        {"spreadsheet_id": "s602", "workbook_code": "602", "year": 2026,
+         "spreadsheet_name": "602 Harvest"},
+    ]
+    inventory = [
+        {"spreadsheet_id": "s402", "sheet_id": 1, "rows": 10, "cols": 5, "tab_title": "Crop Plan"},
+        {"spreadsheet_id": "s402", "sheet_id": 2, "rows": 10, "cols": 5, "tab_title": "Other Data"},
+        {"spreadsheet_id": "s602", "sheet_id": 3, "rows": 10, "cols": 5, "tab_title": "Harvest Log"},
+        {"spreadsheet_id": "s602", "sheet_id": 4, "rows": 10, "cols": 5, "tab_title": "Temp Ref"},
+    ]
+    base = {"operational_tokens": [], "reference_tokens": [],
+            "support_tokens": [], "derived_tokens": []}
+    overrides = {
+        "402": {"operational_tokens": ["crop", "plan"], "operational_weight": 4},
+    }
+    result = select_tabs_from_inventory(
+        index, inventory,
+        tab_score_heuristics=base,
+        per_workbook_heuristic_overrides=overrides,
+    )
+    scores = {r["tab_title"]: r["final_score"] for r in result}
+    # 402's "Crop Plan" gets +4 from overrides (no other matches)
+    assert scores.get("Crop Plan", 0) == 4.0
+    # 402's "Other Data" has no operational token match → score 0 → below min → excluded
+    assert "Other Data" not in scores
+    # 602's tabs have no overrides (no operational tokens in base) → excluded below min
+    assert "Harvest Log" not in scores
+    assert "Temp Ref" not in scores
+
+
+def test_select_tabs_per_workbook_exclude_patterns():
+    """Per-workbook exclude-mode patterns remove tabs for that workbook only."""
+    index = [
+        {"spreadsheet_id": "s402", "workbook_code": "402", "year": 2026,
+         "spreadsheet_name": "402 Plan"},
+    ]
+    inventory = [
+        {"spreadsheet_id": "s402", "sheet_id": 1, "rows": 100, "cols": 10,
+         "tab_title": "Plan Board"},
+        {"spreadsheet_id": "s402", "sheet_id": 2, "rows": 10, "cols": 5,
+         "tab_title": "Sheet1"},
+    ]
+    base = {"operational_tokens": ["plan", "board"], "operational_weight": 3,
+            "reference_tokens": [], "support_tokens": [], "derived_tokens": []}
+    overrides = {"402": {"tab_exclude_patterns": [{"pattern": r"^Sheet\d+$", "exclude": True}]}}
+    result = select_tabs_from_inventory(
+        index, inventory,
+        tab_score_heuristics=base,
+        per_workbook_heuristic_overrides=overrides,
+    )
+    titles = [r["tab_title"] for r in result]
+    assert "Plan Board" in titles
+    assert "Sheet1" not in titles

@@ -318,13 +318,17 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
             isinstance(token, str) for token in entry
         ):
             combo_tokens.append(tuple(token.lower() for token in entry))
+    tab_exclude_regexes: list[re.Pattern] = []
     exclude_patterns: list[dict] = []
     for entry in config.get("tab_exclude_patterns") or []:
         if isinstance(entry, dict) and "pattern" in entry:
             try:
                 compiled = re.compile(entry["pattern"])
-                penalty = int(entry.get("penalty", -5))
-                exclude_patterns.append({"pattern": compiled, "penalty": penalty})
+                if entry.get("exclude", False):
+                    tab_exclude_regexes.append(compiled)
+                else:
+                    penalty = int(entry.get("penalty", -5))
+                    exclude_patterns.append({"pattern": compiled, "penalty": penalty})
             except re.error:
                 logger.warning(
                     "Invalid tab_exclude_pattern regex: %r", entry["pattern"]
@@ -357,6 +361,7 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
         "support_weight": support_weight,
         "reference_combo_weight": reference_combo_weight,
         "match_mode": match_mode,
+        "tab_exclude_regexes": tab_exclude_regexes,
         "exclude_patterns": exclude_patterns,
         "expansion_formula_penalty": int(config.get("expansion_formula_penalty", 0)),
         "expansion_formula_threshold": float(
@@ -552,6 +557,34 @@ def score_tab(
     return score, reasons, breakdown
 
 
+def _compile_exclude_regexes(
+    tab_score_heuristics: dict | None,
+) -> list[re.Pattern]:
+    """Compile exclude-mode regexes from tab scoring heuristics.
+
+    Extracts patterns where ``"exclude": true`` in ``tab_exclude_patterns``
+    entries.  These are used for unconditional removal before scoring,
+    unlike penalty patterns that only adjust scores.
+
+    Args:
+        tab_score_heuristics: Raw heuristic config dict (may be ``None``).
+
+    Returns:
+        list[re.Pattern]: Compiled regex patterns for true exclusion.
+    """
+    exclude_regexes: list[re.Pattern] = []
+    for entry in (tab_score_heuristics or {}).get("tab_exclude_patterns", []):
+        if isinstance(entry, dict) and entry.get("exclude", False) and "pattern" in entry:
+            try:
+                exclude_regexes.append(re.compile(entry["pattern"]))
+            except re.error:
+                logger.warning(
+                    "Invalid tab_exclude_pattern regex (exclude mode): %r",
+                    entry["pattern"],
+                )
+    return exclude_regexes
+
+
 def select_tabs_from_inventory(
     index_records: list[dict],
     inventory_rows: list[dict],
@@ -559,20 +592,56 @@ def select_tabs_from_inventory(
     min_final_score: float = 2.0,
     tab_score_heuristics: dict | None = None,
     domain_context: DomainContext | None = None,
+    per_workbook_heuristic_overrides: dict[str, dict] | None = None,
 ) -> list[dict]:
     """Score, aggregate across years, and filter inventory tabs by final score. Applies coverage bonus for tabs appearing in 3+ years. Returns a sorted shortlist."""
-    effective_heuristics = merge_vocabulary(tab_score_heuristics or {}, domain_context)
+    tab_exclude_regexes = _compile_exclude_regexes(tab_score_heuristics)
+    per_wb_exclude_regexes: dict[str, list[re.Pattern]] = {}
+    for wb_code, wb_overrides in (per_workbook_heuristic_overrides or {}).items():
+        per_wb_exclude_regexes[wb_code] = _compile_exclude_regexes(wb_overrides)
+
+    base_heuristics = merge_vocabulary(tab_score_heuristics or {}, domain_context)
+    effective_heuristics_by_wb: dict[str, dict] = {}
     by_sheet_id = {record["spreadsheet_id"]: record for record in index_records}
     scored: list[dict] = []
     for row in inventory_rows:
         meta = by_sheet_id.get(row["spreadsheet_id"])
         if meta is None:
             continue
+        wb_code = meta["workbook_code"]
+
+        # True exclusion — tabs matching exclude-mode patterns are removed
+        # entirely from the candidate pool before scoring.
+        if any(
+            exclude_re.search(row["tab_title"])
+            for exclude_re in tab_exclude_regexes + per_wb_exclude_regexes.get(wb_code, [])
+        ):
+            continue
+
+        # Resolve per-workbook heuristic overrides
+        if wb_code not in effective_heuristics_by_wb:
+            wb_overrides = (per_workbook_heuristic_overrides or {}).get(wb_code, {})
+            if wb_overrides:
+                merged = dict(base_heuristics)
+                for override_key, override_value in wb_overrides.items():
+                    if override_key == "tab_exclude_patterns":
+                        continue  # already handled by _compile_exclude_regexes
+                    if (
+                        isinstance(override_value, list)
+                        and isinstance(merged.get(override_key), list)
+                    ):
+                        merged[override_key] = merged[override_key] + override_value
+                    else:
+                        merged[override_key] = override_value
+                effective_heuristics_by_wb[wb_code] = merged
+            else:
+                effective_heuristics_by_wb[wb_code] = base_heuristics
+
         score, reasons, breakdown = score_tab(
             row["tab_title"],
             row["rows"],
             row["cols"],
-            tab_score_heuristics=effective_heuristics,
+            tab_score_heuristics=effective_heuristics_by_wb[wb_code],
             domain_context=domain_context,
         )
         scored.append(
@@ -692,19 +761,51 @@ def auto_select_tabs(
     *,
     per_workbook: int = 3,
     per_code_overrides: dict[str, int] | None = None,
-) -> dict[str, list[str]]:
-    """Group shortlisted tabs by workbook code, sort by score/occurrences, and pick the top N per workbook. Returns ``{workbook_code: [tab_titles]}``."""
+    score_cutoff: float | None = None,
+) -> tuple[dict[str, list[str]], dict[str, list[dict]]]:
+    """Group shortlisted tabs by workbook code, sort by score, apply cutoffs, and pick the top N per workbook.
+
+    Args:
+        tab_shortlist: Shortlisted tab records with ``final_score`` and
+            ``occurrences``.
+        per_workbook: Default maximum tabs per workbook.
+        per_code_overrides: Per-workbook overrides for ``per_workbook``.
+        score_cutoff: When set, tabs with ``final_score`` below this
+            threshold are excluded regardless of the per-workbook limit.
+
+    Returns:
+        tuple:
+            - ``approved_tabs``: ``{workbook_code: [tab_title, ...]}``
+            - ``tab_details``: ``{workbook_code: {tab_title: {score_data}}}``
+              with ``final_score``, ``avg_score``, ``confidence``,
+              ``coverage_bonus``, ``reasons`` for each selected tab.
+    """
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in tab_shortlist:
         grouped[row["workbook_code"]].append(row)
     approved: dict[str, list[str]] = {}
+    details: dict[str, list[dict]] = {}
     for workbook_code, rows in grouped.items():
         limit = (per_code_overrides or {}).get(workbook_code, per_workbook)
         rows.sort(
             key=lambda row: (-row["final_score"], -row["occurrences"], row["tab_title"])
         )
-        approved[workbook_code] = [row["tab_title"] for row in rows[:limit]]
-    return approved
+        if score_cutoff is not None:
+            rows = [row for row in rows if row["final_score"] >= score_cutoff]
+        selected = rows[:limit]
+        approved[workbook_code] = [row["tab_title"] for row in selected]
+        details[workbook_code] = [
+            {
+                "tab_title": row["tab_title"],
+                "final_score": row["final_score"],
+                "avg_score": row.get("avg_score"),
+                "confidence": row.get("confidence"),
+                "coverage_bonus": row.get("coverage_bonus"),
+                "reasons": row.get("reasons"),
+            }
+            for row in selected
+        ]
+    return approved, details
 
 
 TAB_SELECTION_OVERRIDE_KEYS = frozenset({"add", "remove", "replace", "tabs"})
@@ -1301,6 +1402,9 @@ def run_cohort_corpus(
             inventory_rows,
             tab_score_heuristics=tab_score_heuristics,
             domain_context=domain_context,
+            per_workbook_heuristic_overrides=(
+                config.get("per_workbook_heuristic_overrides") or {}
+            ),
         )
         selection_summary: dict = {
             "by_workbook_by_year": {},
@@ -1337,10 +1441,11 @@ def run_cohort_corpus(
             },
         )
 
-        heuristic_tabs = auto_select_tabs(
+        heuristic_tabs, tab_details = auto_select_tabs(
             tab_shortlist,
             per_workbook=int(config.get("tab_auto_limit", 3)),
             per_code_overrides=config.get("tab_auto_limit_overrides"),
+            score_cutoff=config.get("score_cutoff"),
         )
         overrides = config.get("tab_selection_overrides")
         approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
@@ -1351,6 +1456,7 @@ def run_cohort_corpus(
                 else "heuristic tab selection"
             ),
             "approved_tabs": approved_tabs,
+            "tab_details": tab_details,
         }
         if overrides:
             tab_selection_payload["overrides_applied"] = overrides
@@ -1452,6 +1558,9 @@ def run_cohort_corpus(
             inventory_rows,
             tab_score_heuristics=tab_score_heuristics,
             domain_context=domain_context,
+            per_workbook_heuristic_overrides=(
+                config.get("per_workbook_heuristic_overrides") or {}
+            ),
         )
         selection_summary: dict = {
             "by_workbook_by_year": {},
@@ -1488,10 +1597,11 @@ def run_cohort_corpus(
             },
         )
 
-        heuristic_tabs = auto_select_tabs(
+        heuristic_tabs, tab_details = auto_select_tabs(
             tab_shortlist,
             per_workbook=int(config.get("tab_auto_limit", 3)),
             per_code_overrides=config.get("tab_auto_limit_overrides"),
+            score_cutoff=config.get("score_cutoff"),
         )
         overrides = config.get("tab_selection_overrides")
         approved_tabs = apply_tab_selection_overrides(heuristic_tabs, overrides)
@@ -1502,6 +1612,7 @@ def run_cohort_corpus(
                 else "heuristic tab selection"
             ),
             "approved_tabs": approved_tabs,
+            "tab_details": tab_details,
         }
         if overrides:
             tab_selection_payload["overrides_applied"] = overrides

@@ -7,7 +7,9 @@
     "support_tokens": "Words indicating helper/index/validation tabs (penalized in scoring).",
     "derived_tokens": "Words indicating auto-generated/pivot/summary tabs (penalized in scoring).",
     "tab_auto_limit": "Maximum tabs auto-selected per workbook code. Use tab_selection_overrides to hand-pick important tabs.",
-    "tab_exclude_patterns": "Regex patterns to block tabs. Each entry: {\"pattern\": \"regex\", \"penalty\": -5}.",
+    "tab_exclude_patterns": "Regex patterns to block tabs. Each entry: {\"pattern\": \"regex\", \"penalty\": -5} or {\"pattern\": \"regex\", \"exclude\": true} for unconditional removal.",
+    "score_cutoff": "Blanket score floor: tabs below this final_score are excluded regardless of per-workbook limit.",
+    "per_workbook_heuristic_overrides": "Per-workbook overrides for scoring parameters (tokens, weights, exclude patterns).",
     "year_regex": "Used to group workbooks by year. Set year_scope in domain_context.yaml to limit profiling to active years.",
     "domain_context": "Path to a domain_context.yaml file providing vocabulary, year scoping, deduplication, and glossary.",
     "tab_selection_overrides": {

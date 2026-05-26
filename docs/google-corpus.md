@@ -64,15 +64,50 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
     **Tab exclusion by pattern** (`tab_exclude_patterns`, optional):
     A list of dicts `{pattern, penalty}`. Any tab whose title matches the
     regex `pattern` receives the configured `penalty` (default `-5`) added
-    to its auto-selection score. Useful for blocking known noise patterns:
-    ```json
-    "tab_exclude_patterns": [
+    to its auto-selection score. Useful for blocking known noise patterns.
+
+    Two modes are supported:
+
+    - **Penalty mode** (default): matching tabs receive the configured
+      ``penalty`` as a score adjustment. Use when the pattern indicates a
+      low-value tab that should rank below better tabs:
+      ```json
       {"pattern": "^Sheet\\d+$"},
       {"pattern": "blankslate|template", "penalty": -10}
-    ]
-    ```
+      ```
+
+    - **Exclude mode** (``"exclude": true``): matching tabs are removed
+      from the candidate pool *entirely*, before scoring. Use when the
+      pattern indicates a tab that must never be selected:
+      ```json
+      {"pattern": "^Sheet\\d+$", "exclude": true}
+      ```
+
     Patterns are tested against the lowered tab title via `re.compile`.
-    Invalid regexes are logged and skipped.
+    Invalid regexes are logged and skipped.  Exclude-mode patterns can also
+    be specified per workbook via ``per_workbook_heuristic_overrides``.
+
+    **Score cutoff** (`score_cutoff`, optional):
+    An integer or float threshold.  Tabs whose ``final_score`` falls below
+    this value are excluded regardless of the per-workbook tab limit.
+    Unlike ``tab_exclude_patterns`` (which matches specific patterns), this
+    is a blanket score floor:
+    ```json
+    "score_cutoff": 0
+    ```
+
+    **Per-workbook heuristic overrides** (`per_workbook_heuristic_overrides`, optional):
+    A dict mapping workbook codes to override dicts.  Each override dict
+    accepts the same keys as ``heuristics.tab_score`` (tokens, weights,
+    match_mode, tab_exclude_patterns).  List values (tokens) are appended
+    to the base list; scalar values (weights) replace the base value.
+    Useful when a specific workbook needs different scoring:
+    ```json
+    "per_workbook_heuristic_overrides": {
+      "402": {"operational_tokens": ["planning", "budget"], "operational_weight": 5},
+      "602": {"tab_exclude_patterns": [{"pattern": "^Sheet\\d+$", "exclude": true}]}
+    }
+    ```
 
     **Expansion formula penalty** (`expansion_formula_penalty` / `expansion_formula_threshold`, optional):
     Reduces auto-selection scores for tabs dominated by auto-expanding formulas
@@ -88,7 +123,13 @@ Do not combine nested impersonation (see troubleshooting in [google-auth.md](goo
    python manage.py profile_cohort_corpus --config path/to/cohort_corpus.json --out-dir data/profile_snapshots/cohort_run
   ```
    Or from the workbench repo root:
-5. **Tab selection loop** — Review `tab_selection_<date>.json`. Hand-edit `**approved_tabs**` as needed, then re-run with the **same** `--out-dir` and `--date-stamp` as the full corpus run (`in_scope_workbook_index_<date>.json` must still sit beside tab selection):
+5. **Tab selection loop** — Review `tab_selection_<date>.json`. The file includes a
+   ``tab_details`` block with each selected tab's ``final_score``, ``avg_score``,
+   ``confidence``, ``coverage_bonus``, and ``reasons`` so you can understand *why*
+   each tab was chosen without cross-referencing ``tab_shortlist.json``. Hand-edit
+   ``approved_tabs`` as needed, then re-run with the **same** ``--out-dir`` and
+   ``--date-stamp`` as the full corpus run (`in_scope_workbook_index_<date>.json`
+   must still sit beside tab selection):
 
   ```bash
    python manage.py profile_cohort_corpus \
