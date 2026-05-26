@@ -185,7 +185,8 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
     return (
         "generate-pipeline-manifest:\n"
         + _indent(
-            'wb generate manifest --pipeline --contract "$(CONTRACT)" '
+            '$(MANAGE) generate_pipeline_manifest '
+            '--contract "$(CONTRACT)" '
             "--corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} "
             "--out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml}"
         )
@@ -340,7 +341,7 @@ def import_blocks(ctx: MakeContext) -> str:
         )
         + "\n"
         + _indent(
-            "wb generate discovery-interview "
+            "$(MANAGE) generate_discovery_interview "
             '--manifest "$(VIEW_MANIFEST)" '
             "--out build/discovery-interview.md"
         )

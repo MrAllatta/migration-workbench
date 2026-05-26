@@ -78,8 +78,8 @@ def test_generate_view_manifest_block():
 def test_generate_pipeline_manifest_block():
     block = generate_pipeline_manifest_block(MakeContext())
     assert block.startswith("generate-pipeline-manifest:")
-    assert "wb generate manifest --pipeline" in block
-    assert "generate_pipeline_manifest" not in block
+    assert "$(MANAGE) generate_pipeline_manifest" in block
+    assert "wb generate manifest --pipeline" not in block
     assert "CORPUS_CONFIG" in block
     assert "PIPELINE_MANIFEST_OUT" in block
 
@@ -184,7 +184,6 @@ def test_codegen_tooling_uses_wb_for_codegen():
         "generate_admin",
         "generate_import",
         "scaffold_view_manifest",
-        "generate_pipeline_manifest",
     ]:
         assert f"$(MANAGE) {cmd}" not in block
     assert "wb generate models" in block
@@ -193,26 +192,22 @@ def test_codegen_tooling_uses_wb_for_codegen():
     assert "$(MANAGE) check" in block
 
 
-def test_full_targets_no_manage_codegen():
+def test_full_targets_routes_to_real_commands():
     from workbook.makefile_targets import full_targets_block
 
     full = full_targets_block(MakeContext())
-    for cmd in [
-        "generate_models",
-        "generate_admin",
-        "generate_import",
-        "scaffold_view_manifest",
-        "generate_pipeline_manifest",
-        "generate_discovery_interview",
-    ]:
-        assert f"$(MANAGE) {cmd}" not in full
     assert "wb generate models" in full
     assert "wb generate admin" in full
     assert "wb generate import" in full
     assert "wb generate manifest" in full
+    assert "$(MANAGE) generate_pipeline_manifest" in full
+    assert "$(MANAGE) generate_discovery_interview" in full
+    assert "$(MANAGE) merge_discovery_notes" in full
+    assert "wb generate manifest --pipeline" not in full
+    assert "wb generate discovery-interview" not in full
 
 
-def test_import_blocks_discovery_interview_uses_wb():
+def test_import_blocks_discovery_interview_uses_manage():
     block = import_blocks(MakeContext())
-    assert "wb generate discovery-interview" in block
-    assert "$(MANAGE) generate_discovery_interview" not in block
+    assert "$(MANAGE) generate_discovery_interview" in block
+    assert "wb generate discovery-interview" not in block
