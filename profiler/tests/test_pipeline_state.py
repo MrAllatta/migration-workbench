@@ -1,4 +1,6 @@
-"""Tests for PipelineState — dataclass, bridge, checkpoint I/O, phase methods."""
+"""Tests for PipelineState — dataclass, checkpoint I/O, phase methods, artifacts."""
+
+from pathlib import Path
 
 import pytest
 
@@ -9,56 +11,84 @@ from profiler.tools.pipeline_state import (
     PipelineState,
 )
 
+
 # ---------------------------------------------------------------------------
 # 1. Dataclass defaults
 # ---------------------------------------------------------------------------
 
 
-def test_pipeline_state_defaults():
-    """Fresh PipelineState has version="0.1.0" and all sub-objects exist."""
-    state = PipelineState()
-    assert state.version == "0.1.0"
-    assert isinstance(state.discovery, DiscoveryState)
-    assert isinstance(state.deep_profile_index, DeepProfileIndex)
-    assert isinstance(state.domain_knowledge, DomainKnowledge)
-    assert state.schema_contract is None
-    assert state.interaction_contract is None
+class TestDataclassDefaults:
+    """Verify default field values for each dataclass."""
 
+    def test_pipeline_state_defaults(self):
+        """Fresh PipelineState has version="0.2.0" and all sub-objects."""
+        state = PipelineState()
+        assert state.version == "0.2.0"
+        assert isinstance(state.discovery, DiscoveryState)
+        assert isinstance(state.deep_profile_index, DeepProfileIndex)
+        assert isinstance(state.domain_knowledge, DomainKnowledge)
+        assert state.schema_contract is None
+        assert state.interaction_contract is None
 
-def test_discovery_state_fields():
-    """All DiscoveryState fields accept values."""
-    ds = DiscoveryState(
-        source_tree={"provider": "google_sheets"},
-        workbook_index=[{"workbook_code": "101", "year": 2023}],
-        broad_inventory=[{"tab": "Sheet1", "rows": 100}],
-        shortlist=[{"tab": "Sheet1", "score": 0.9}],
-        approved_tabs={"101": ["Crop Planner"]},
-    )
-    assert ds.source_tree == {"provider": "google_sheets"}
-    assert ds.workbook_index == [{"workbook_code": "101", "year": 2023}]
-    assert ds.broad_inventory == [{"tab": "Sheet1", "rows": 100}]
-    assert ds.shortlist == [{"tab": "Sheet1", "score": 0.9}]
-    assert ds.approved_tabs == {"101": ["Crop Planner"]}
+    def test_discovery_state_empty(self):
+        """All DiscoveryState fields start as empty or None."""
+        ds = DiscoveryState()
+        assert ds.source_tree is None
+        assert ds.workbook_index == []
+        assert ds.broad_inventory == []
+        assert ds.shortlist is None
+        assert ds.approved_tabs is None
 
+    def test_discovery_state_fields(self):
+        """All DiscoveryState fields accept values."""
+        ds = DiscoveryState(
+            source_tree={"provider": "google_sheets"},
+            workbook_index=[{"workbook_code": "101", "year": 2023}],
+            broad_inventory=[{"tab": "Sheet1", "rows": 100}],
+            shortlist=[{"tab": "Sheet1", "score": 0.9}],
+            approved_tabs={"101": ["Crop Planner"]},
+        )
+        assert ds.source_tree == {"provider": "google_sheets"}
+        assert ds.workbook_index == [{"workbook_code": "101", "year": 2023}]
+        assert ds.broad_inventory == [{"tab": "Sheet1", "rows": 100}]
+        assert ds.shortlist == [{"tab": "Sheet1", "score": 0.9}]
+        assert ds.approved_tabs == {"101": ["Crop Planner"]}
 
-def test_domain_knowledge_fields():
-    """All DomainKnowledge fields accept values."""
-    dk = DomainKnowledge(
-        domain="farm_management",
-        vocabulary={"operational": ["crop"], "reference": ["market"]},
-        year_scope={"active": [2025, 2026], "archived": [2023]},
-        deduplication={"strategy": "latest_year", "exceptions": []},
-        entities=[{"name": "Season", "source_tabs": ["Crop Planner"]}],
-        glossary={"qty": "quantity"},
-        scope_notes="Focus on 2025",
-    )
-    assert dk.domain == "farm_management"
-    assert dk.vocabulary["operational"] == ["crop"]
-    assert dk.year_scope["active"] == [2025, 2026]
-    assert dk.deduplication["strategy"] == "latest_year"
-    assert len(dk.entities) == 1
-    assert dk.glossary["qty"] == "quantity"
-    assert dk.scope_notes == "Focus on 2025"
+    def test_domain_knowledge_fields(self):
+        """All DomainKnowledge fields accept values."""
+        dk = DomainKnowledge(
+            domain="farm_management",
+            vocabulary={
+                "operational": ["crop"],
+                "reference": ["market"],
+                "support": [],
+                "derived": [],
+            },
+            year_scope={
+                "active": [2025, 2026],
+                "archived": [2023],
+                "forward": [],
+            },
+            deduplication={
+                "strategy": "latest_year",
+                "exceptions": [],
+            },
+            entities=[{"name": "Season", "source_tabs": ["Crop Planner"]}],
+            glossary={"qty": "quantity"},
+            scope_notes="Focus on 2025",
+        )
+        assert dk.domain == "farm_management"
+        assert dk.vocabulary["operational"] == ["crop"]
+        assert dk.year_scope["active"] == [2025, 2026]
+        assert dk.deduplication["strategy"] == "latest_year"
+        assert len(dk.entities) == 1
+        assert dk.glossary["qty"] == "quantity"
+        assert dk.scope_notes == "Focus on 2025"
+
+    def test_deep_profile_index_defaults(self):
+        """DeepProfileIndex starts with an empty entries list."""
+        dpi = DeepProfileIndex()
+        assert dpi.entries == []
 
 
 # ---------------------------------------------------------------------------
@@ -66,65 +96,175 @@ def test_domain_knowledge_fields():
 # ---------------------------------------------------------------------------
 
 
-def test_checkpoint_roundtrip(tmp_path):
-    """save_checkpoint → load() preserves all fields."""
-    state = PipelineState(
-        version="0.1.0",
-        discovery=DiscoveryState(
-            source_tree={"provider": "google_sheets"},
-            workbook_index=[{"workbook_code": "101", "year": 2023}],
-        ),
-        domain_knowledge=DomainKnowledge(
-            domain="test_domain",
-            vocabulary={"operational": ["test"]},
-        ),
-        schema_contract={"tables": []},
-    )
-    path = tmp_path / "pipeline-state.yaml"
-    state.save_checkpoint(path)
-    assert path.exists()
+class TestCheckpointRoundTrip:
+    """Verify save_checkpoint → load preserves state."""
 
-    loaded = PipelineState.load(path)
-    assert loaded.version == "0.1.0"
-    assert loaded.discovery.source_tree == {"provider": "google_sheets"}
-    assert loaded.discovery.workbook_index == [{"workbook_code": "101", "year": 2023}]
-    assert loaded.domain_knowledge.domain == "test_domain"
-    assert loaded.domain_knowledge.vocabulary == {"operational": ["test"]}
-    assert loaded.schema_contract == {"tables": []}
+    def test_empty_state_round_trip(self, tmp_path: Path):
+        """An empty state saves and reloads as empty."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.version == "0.2.0"
+        assert loaded.discovery.source_tree == {}
+        assert loaded.discovery.approved_tabs == {}
+        assert loaded.domain_knowledge.domain == ""
+
+    def test_approved_tabs_preserved(self, tmp_path: Path):
+        """Human edits to approved_tabs survive round-trip."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.approved_tabs = {
+            "101": ["Crop Planner", "Field Record"],
+            "501": ["Harvest Availability"],
+        }
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.discovery.approved_tabs == {
+            "101": ["Crop Planner", "Field Record"],
+            "501": ["Harvest Availability"],
+        }
+
+    def test_domain_knowledge_preserved(self, tmp_path: Path):
+        """Domain knowledge round-trips through checkpoint."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.domain_knowledge.domain = "farm_management"
+        state.domain_knowledge.vocabulary = {
+            "operational": ["crop", "harvest"],
+            "reference": [],
+            "support": [],
+            "derived": [],
+        }
+        state.domain_knowledge.year_scope = {
+            "active": [2025, 2026],
+            "archived": [2023, 2024],
+            "forward": [],
+        }
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.domain_knowledge.domain == "farm_management"
+        assert loaded.domain_knowledge.vocabulary["operational"] == [
+            "crop",
+            "harvest",
+        ]
+        assert loaded.domain_knowledge.year_scope["active"] == [2025, 2026]
+
+    def test_checkpoint_roundtrip_full(self, tmp_path):
+        """Full PipelineState round-trips with all data intact."""
+        state = PipelineState(
+            version="0.2.0",
+            discovery=DiscoveryState(
+                source_tree={"provider": "google_sheets"},
+                workbook_index=[{"workbook_code": "101", "year": 2023}],
+            ),
+            deep_profile_index=DeepProfileIndex(
+                entries=[{"tab": "Crop Planner", "profiled": True}],
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="test_domain",
+                vocabulary={
+                    "operational": ["test"],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
+                },
+            ),
+            schema_contract={"tables": []},
+        )
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+        assert path.exists()
+
+        loaded = PipelineState.load(path)
+        assert loaded.version == "0.2.0"
+        assert loaded.discovery.source_tree == {"provider": "google_sheets"}
+        assert loaded.discovery.workbook_index == [
+            {"workbook_code": "101", "year": 2023}
+        ]
+        assert loaded.deep_profile_index.entries == [
+            {"tab": "Crop Planner", "profiled": True}
+        ]
+        assert loaded.domain_knowledge.domain == "test_domain"
+        assert loaded.domain_knowledge.vocabulary == {
+            "operational": ["test"],
+            "reference": [],
+            "support": [],
+            "derived": [],
+        }
+        # schema_contract is not reloaded from artifact — stays None
+        assert loaded.schema_contract is None
+
+    def test_missing_checkpoint_returns_empty_state(self, tmp_path: Path):
+        """Loading a non-existent checkpoint returns an empty state."""
+        checkpoint = tmp_path / "nonexistent.yaml"
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.version == "0.2.0"
+        assert loaded.discovery.approved_tabs is None
 
 
-def test_load_or_create_creates_fresh(tmp_path):
-    """No existing checkpoint → fresh PipelineState from config JSON."""
-    config_path = tmp_path / "config.json"
-    config_path.write_text(
-        '{"domain": "test_domain", "cohort_name": "test_cohort"}'
-    )
-    state = PipelineState.load_or_create(config_path=config_path)
-    assert isinstance(state, PipelineState)
-    assert state.version == "0.1.0"
-    # Domain should be populated from config
-    assert state.domain_knowledge.domain == "test_domain"
-    # discovery should be fresh (None)
-    assert state.discovery.source_tree is None
+class TestLoadOrCreate:
+    """Verify load_or_create behaviour."""
 
+    def test_load_or_create_creates_fresh(self, tmp_path):
+        """No existing checkpoint → fresh PipelineState from config JSON."""
+        config_path = tmp_path / "config.json"
+        config_path.write_text(
+            '{"domain": "test_domain", "cohort_name": "test_cohort"}'
+        )
+        state = PipelineState.load_or_create(config_path=config_path)
+        assert isinstance(state, PipelineState)
+        assert state.version == "0.2.0"
+        assert state.domain_knowledge.domain == "test_domain"
+        assert state.discovery.source_tree is None
 
-def test_load_or_create_loads_existing(tmp_path):
-    """Existing checkpoint → loads it (ignores config)."""
-    config_path = tmp_path / "config.json"
-    config_path.write_text('{"domain": "ignored_domain"}')
+    def test_load_or_create_loads_existing(self, tmp_path):
+        """Existing checkpoint → loads it (ignores config)."""
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "ignored_domain"}')
 
-    original = PipelineState(
-        domain_knowledge=DomainKnowledge(domain="checkpoint_domain"),
-        discovery=DiscoveryState(source_tree={"provider": "coda"}),
-    )
-    checkpoint_path = tmp_path / "pipeline-state.yaml"
-    original.save_checkpoint(checkpoint_path)
+        original = PipelineState(
+            domain_knowledge=DomainKnowledge(domain="checkpoint_domain"),
+            discovery=DiscoveryState(source_tree={"provider": "coda"}),
+        )
+        checkpoint_path = tmp_path / "pipeline-state.yaml"
+        original.save_checkpoint(checkpoint_path)
 
-    loaded = PipelineState.load_or_create(
-        config_path=config_path, checkpoint_path=checkpoint_path
-    )
-    assert loaded.domain_knowledge.domain == "checkpoint_domain"
-    assert loaded.discovery.source_tree == {"provider": "coda"}
+        loaded = PipelineState.load_or_create(
+            config_path=config_path,
+            checkpoint_path=checkpoint_path,
+        )
+        assert loaded.domain_knowledge.domain == "checkpoint_domain"
+        assert loaded.discovery.source_tree == {"provider": "coda"}
+
+    def test_load_or_create_creates_new_when_missing(self, tmp_path: Path):
+        """load_or_create returns a new state when file is missing."""
+        checkpoint = tmp_path / "new.yaml"
+        state = PipelineState.load_or_create(
+            config_path=tmp_path / "nonexistent.json",
+            checkpoint_path=checkpoint,
+        )
+        assert state.version == "0.2.0"
+        assert not checkpoint.exists()
+
+    def test_load_or_create_loads_existing_simple(self, tmp_path: Path):
+        """load_or_create loads existing checkpoint when present."""
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "seed"}')
+
+        checkpoint = tmp_path / "existing.yaml"
+        original = PipelineState()
+        original.discovery.approved_tabs = {"101": ["Crop Planner"]}
+        original.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load_or_create(
+            config_path=config_path,
+            checkpoint_path=checkpoint,
+        )
+        assert loaded.discovery.approved_tabs == {"101": ["Crop Planner"]}
 
 
 # ---------------------------------------------------------------------------
@@ -132,58 +272,64 @@ def test_load_or_create_loads_existing(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_discover_requires_no_prior_discovery():
-    """RuntimeError if source_tree already set."""
-    state = PipelineState(discovery=DiscoveryState(source_tree={}))
-    with pytest.raises(RuntimeError, match="source_tree already populated"):
+class TestPhaseGuardClauses:
+    """Verify each phase enforces ordering constraints."""
+
+    def test_discover_requires_no_prior_discovery(self):
+        """RuntimeError if source_tree already populated."""
+        state = PipelineState(
+            discovery=DiscoveryState(source_tree={"provider": "gsheets"})
+        )
+        with pytest.raises(RuntimeError, match="source_tree already populated"):
+            state.discover()
+
+    def test_score_and_select_requires_discovery(self):
+        """RuntimeError if source_tree is empty."""
+        state = PipelineState()
+        with pytest.raises(
+            RuntimeError, match="discover\\(\\) must run first"
+        ):
+            state.score_and_select()
+
+    def test_score_and_select_requires_shortlist(self):
+        """RuntimeError if shortlist is empty."""
+        state = PipelineState(
+            discovery=DiscoveryState(source_tree={})
+        )
+        with pytest.raises(RuntimeError, match="shortlist is None"):
+            state.score_and_select()
+
+    def test_deep_profile_requires_approved_tabs(self):
+        """RuntimeError if approved_tabs is empty."""
+        state = PipelineState(
+            discovery=DiscoveryState(source_tree={})
+        )
+        with pytest.raises(RuntimeError, match="no approved_tabs"):
+            state.deep_profile()
+
+    def test_derive_contracts_requires_deep_profile(self):
+        """RuntimeError if entries is empty."""
+        state = PipelineState()
+        with pytest.raises(
+            RuntimeError, match="deep_profile must run first"
+        ):
+            state.derive_contracts()
+
+    def test_phase_sequencing_happy_path(self):
+        """Full phase order works without errors."""
+        state = PipelineState()
         state.discover()
-
-
-def test_score_and_select_requires_discovery():
-    """RuntimeError if source_tree is None."""
-    state = PipelineState()
-    with pytest.raises(RuntimeError, match="discover\\(\\) must run first"):
         state.score_and_select()
-
-
-def test_score_and_select_requires_shortlist():
-    """RuntimeError if shortlist is None."""
-    state = PipelineState(discovery=DiscoveryState(source_tree={}))
-    with pytest.raises(RuntimeError, match="shortlist is None"):
-        state.score_and_select()
-
-
-def test_deep_profile_requires_approved_tabs():
-    """RuntimeError if approved_tabs is None."""
-    state = PipelineState(
-        discovery=DiscoveryState(source_tree={})
-    )
-    with pytest.raises(RuntimeError, match="no approved_tabs"):
         state.deep_profile()
-
-
-def test_derive_contracts_requires_deep_profile():
-    """RuntimeError if entries empty (NOT is None — entries list is never None)."""
-    state = PipelineState()
-    # deep_profile_index.entries defaults to [] — never None
-    with pytest.raises(RuntimeError, match="deep_profile must run first"):
+        state.deep_profile_index.entries.append(
+            {"tab": "Crop Planner"}
+        )
         state.derive_contracts()
-
-
-def test_phase_sequencing_happy_path():
-    """Full phase order works without errors."""
-    state = PipelineState()
-    state.discover()
-    state.score_and_select()
-    state.deep_profile()
-    state.deep_profile_index.entries.append({"tab": "Crop Planner"})
-    state.derive_contracts()
-    # After happy path, discovery fields are populated
-    assert state.discovery.source_tree == {}
-    assert state.discovery.approved_tabs == {}
-    assert isinstance(state.deep_profile_index, DeepProfileIndex)
-    assert state.schema_contract == {}
-    assert state.interaction_contract == {}
+        assert state.discovery.source_tree == {}
+        assert state.discovery.approved_tabs == {}
+        assert isinstance(state.deep_profile_index, DeepProfileIndex)
+        assert state.schema_contract == {}
+        assert state.interaction_contract == {}
 
 
 # ---------------------------------------------------------------------------
@@ -191,27 +337,45 @@ def test_phase_sequencing_happy_path():
 # ---------------------------------------------------------------------------
 
 
-def test_checkpoint_yaml_human_readable(tmp_path):
-    """Saved YAML uses block style with field names present."""
-    state = PipelineState(
-        discovery=DiscoveryState(
-            source_tree={"provider": "google_sheets"},
-            workbook_index=[{"workbook_code": "101"}],
-        ),
-        domain_knowledge=DomainKnowledge(domain="farm"),
-    )
-    path = tmp_path / "pipeline-state.yaml"
-    state.save_checkpoint(path)
+class TestYamlReadability:
+    """Saved YAML should be human-reviewable."""
 
-    raw = path.read_text()
-    # Should have block-style YAML (not flow style)
-    assert "version: " in raw
-    assert "discovery:" in raw
-    assert "domain_knowledge:" in raw
-    assert "source_tree:" in raw
-    assert "provider: google_sheets" in raw
-    assert "workbook_index:" in raw
-    assert "domain: farm" in raw
+    def test_checkpoint_yaml_human_readable(self, tmp_path):
+        """Saved YAML uses block style with field names present."""
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={"provider": "google_sheets"},
+                workbook_index=[{"workbook_code": "101"}],
+            ),
+            domain_knowledge=DomainKnowledge(domain="farm"),
+        )
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+
+        raw = path.read_text()
+        assert "version: " in raw
+        assert "discovery:" in raw
+        assert "domain_knowledge:" in raw
+        assert "source_tree:" in raw
+        assert "provider: google_sheets" in raw
+        assert "workbook_index:" in raw
+        assert "domain: farm" in raw
+
+    def test_large_fields_externalized(self, tmp_path):
+        """broad_inventory and shortlist are external to the YAML."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.broad_inventory = [
+            {"tab_title": "Crop Planner", "row_count": 100},
+        ]
+        state.discovery.shortlist = [
+            {"tab_title": "Crop Planner", "score": 0.9},
+        ]
+        state.save_checkpoint(checkpoint)
+
+        yaml_text = checkpoint.read_text()
+        assert "_artifact" in yaml_text
+        assert "pipeline-state-broad_inventory.json" in yaml_text
 
 
 # ---------------------------------------------------------------------------
@@ -219,156 +383,285 @@ def test_checkpoint_yaml_human_readable(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_domain_context_bridge():
-    """from_domain_context preserves year_scope, vocabulary, dedup, entities."""
-    from profiler.tools.domain_context import DomainContext as DC
+class TestDomainContextBridge:
+    """DomainContext → DomainKnowledge conversion."""
 
-    ctx = DC(
-        domain="farm_management",
-        description="Farm ops",
-        year_scope=DC.YearScope(
-            active=[2025, 2026],
-            archived=[2023, 2024],
-            forward=[2027],
-        ),
-        vocabulary=DC.VocabularyContext(
-            operational=["crop", "planting"],
-            reference=["market"],
-            support=["index"],
-            derived=["summary"],
-        ),
-        deduplication=DC.DeduplicationContext(
-            strategy="latest_year",
-            exceptions=[{"tab_title": "Annual Budget"}],
-        ),
-        entities=[{"name": "Season", "source_tabs": ["Crop Planner"]}],
-        glossary={"qty": "quantity"},
-        scope_notes="Focus on 2025-2026",
-    )
+    def test_domain_context_bridge(self):
+        """from_domain_context preserves all fields."""
+        from profiler.tools.domain_context import DomainContext as DC
 
-    dk = DomainKnowledge.from_domain_context(ctx)
-    assert dk.domain == "farm_management"
-    assert dk.year_scope == {
-        "active": [2025, 2026],
-        "archived": [2023, 2024],
-        "forward": [2027],
-    }
-    assert dk.vocabulary == {
-        "operational": ["crop", "planting"],
-        "reference": ["market"],
-        "support": ["index"],
-        "derived": ["summary"],
-    }
-    assert dk.deduplication == {
-        "strategy": "latest_year",
-        "exceptions": [{"tab_title": "Annual Budget"}],
-    }
-    assert len(dk.entities) == 1
-    assert dk.entities[0]["name"] == "Season"
-    assert dk.glossary["qty"] == "quantity"
-    assert dk.scope_notes == "Focus on 2025-2026"
-
-
-# ---------------------------------------------------------------------------
-# 6. Spec example roundtrip
-# ---------------------------------------------------------------------------
-
-
-def test_spec_example_roundtrip(tmp_path):
-    """Load the full YAML example from docs/pipeline-state.md spec."""
-    # Build a PipelineState matching the spec, save and reload
-    state = PipelineState(
-        version="0.2.0",
-        discovery=DiscoveryState(
-            source_tree={
-                "provider": "google_sheets",
-                "folder_id": "1ABC...",
-                "spreadsheets": [
-                    {"name": "101_FarmPlan_2023", "id": "1DEF..."},
-                ],
-            },
-            workbook_index=[
-                {
-                    "workbook_code": "101",
-                    "year": 2023,
-                    "spreadsheet_id": "1DEF...",
-                },
-            ],
-            broad_inventory=[
-                {"_artifact": "data/profile_snapshots/broad_profile_coverage_2026-05-26.json"},
-            ],
-            shortlist=[
-                {
-                    "_artifact": "data/profile_snapshots/tab_shortlist_2026-05-26.json",
-                    "selection_summary": {
-                        "by_workbook_by_year": {
-                            "101": {"2023": 4, "2024": 4},
-                        },
-                        "deduplicated_count": 14,
-                        "original_count": 48,
-                    },
-                },
-            ],
-            approved_tabs={
-                "101": ["Crop Planner", "Field Record", "Harvest Availability"],
-            },
-        ),
-        domain_knowledge=DomainKnowledge(
+        ctx = DC(
             domain="farm_management",
-            vocabulary={
-                "operational": ["crop", "planting", "harvest", "field", "variety"],
-                "reference": ["market", "channel", "customer"],
-            },
-            year_scope={
-                "active": [2025, 2026],
-                "archived": [2023, 2024],
-            },
-            deduplication={
-                "strategy": "latest_year",
-                "exceptions": [
-                    {"tab_title": "Annual Budget", "reason": "Changes meaning every year"},
+            description="Farm ops",
+            year_scope=DC.YearScope(
+                active=[2025, 2026],
+                archived=[2023, 2024],
+                forward=[2027],
+            ),
+            vocabulary=DC.VocabularyContext(
+                operational=["crop", "planting"],
+                reference=["market"],
+                support=["index"],
+                derived=["summary"],
+            ),
+            deduplication=DC.DeduplicationContext(
+                strategy="latest_year",
+                exceptions=[
+                    {"tab_title": "Annual Budget"}
                 ],
-            },
+            ),
             entities=[
                 {
                     "name": "Season",
                     "source_tabs": ["Crop Planner"],
-                    "fields": {
-                        "name": {"type": "CharField", "max_length": 100, "unique": True},
-                    },
-                    "import_key": ["name"],
-                },
+                }
             ],
-            glossary={"qty": "quantity", "amt": "amount"},
-            scope_notes="Focus on 2025-2026; 2023-2024 are historical only.",
-        ),
-        schema_contract={"_artifact": "build/schema-contract.yaml"},
-        interaction_contract={"_artifact": "build/interaction-contract.yaml"},
-    )
+            glossary={"qty": "quantity"},
+            scope_notes="Focus on 2025-2026",
+        )
 
-    path = tmp_path / "pipeline-state.yaml"
-    state.save_checkpoint(path)
+        dk = DomainKnowledge.from_domain_context(ctx)
+        assert dk.domain == "farm_management"
+        assert dk.year_scope == {
+            "active": [2025, 2026],
+            "archived": [2023, 2024],
+            "forward": [2027],
+        }
+        assert dk.vocabulary == {
+            "operational": ["crop", "planting"],
+            "reference": ["market"],
+            "support": ["index"],
+            "derived": ["summary"],
+        }
+        assert dk.deduplication == {
+            "strategy": "latest_year",
+            "exceptions": [{"tab_title": "Annual Budget"}],
+        }
+        assert len(dk.entities) == 1
+        assert dk.entities[0]["name"] == "Season"
+        assert dk.glossary["qty"] == "quantity"
+        assert dk.scope_notes == "Focus on 2025-2026"
 
-    loaded = PipelineState.load(path)
-    assert loaded.version == "0.2.0"
-    assert loaded.discovery.source_tree["provider"] == "google_sheets"
-    assert loaded.discovery.source_tree["spreadsheets"][0]["name"] == "101_FarmPlan_2023"
-    assert loaded.discovery.workbook_index[0]["workbook_code"] == "101"
-    assert loaded.discovery.workbook_index[0]["year"] == 2023
-    assert loaded.discovery.broad_inventory[0]["_artifact"] == (
-        "data/profile_snapshots/broad_profile_coverage_2026-05-26.json"
-    )
-    assert loaded.discovery.shortlist[0]["selection_summary"]["deduplicated_count"] == 14
-    assert loaded.discovery.approved_tabs["101"] == [
-        "Crop Planner", "Field Record", "Harvest Availability",
-    ]
-    assert loaded.domain_knowledge.domain == "farm_management"
-    assert loaded.domain_knowledge.vocabulary["operational"] == [
-        "crop", "planting", "harvest", "field", "variety",
-    ]
-    assert loaded.domain_knowledge.year_scope["active"] == [2025, 2026]
-    assert loaded.domain_knowledge.deduplication["strategy"] == "latest_year"
-    assert loaded.domain_knowledge.entities[0]["name"] == "Season"
-    assert loaded.domain_knowledge.glossary["qty"] == "quantity"
-    assert loaded.schema_contract["_artifact"] == "build/schema-contract.yaml"
-    assert loaded.interaction_contract["_artifact"] == "build/interaction-contract.yaml"
+    def test_from_domain_context_none(self):
+        """from_domain_context(None) returns an empty instance."""
+        dk = DomainKnowledge.from_domain_context(None)
+        assert dk.domain == ""
+        assert dk.vocabulary == {
+            "operational": [],
+            "reference": [],
+            "support": [],
+            "derived": [],
+        }
+
+
+# ---------------------------------------------------------------------------
+# 6. Artifact references
+# ---------------------------------------------------------------------------
+
+
+class TestArtifactReferences:
+    """Verify large data is externalized to JSON and resolved on load."""
+
+    def test_broad_inventory_written_as_artifact(self, tmp_path: Path):
+        """broad_inventory is externalized to a JSON artifact."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.broad_inventory = [
+            {"tab_title": "Crop Planner", "row_count": 100},
+            {"tab_title": "Field Record", "row_count": 50},
+        ]
+        state.save_checkpoint(checkpoint)
+
+        yaml_text = checkpoint.read_text()
+        assert "_artifact" in yaml_text
+        assert "pipeline-state-broad_inventory.json" in yaml_text
+
+    def test_artifact_resolved_on_load(self, tmp_path: Path):
+        """Loading resolves artifact references back to inline data."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.broad_inventory = [
+            {"tab_title": "Crop Planner", "row_count": 100},
+        ]
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.discovery.broad_inventory == [
+            {"tab_title": "Crop Planner", "row_count": 100},
+        ]
+
+    def test_missing_artifact_returns_empty_list(self, tmp_path: Path):
+        """Missing artifact files are gracefully handled as empty lists."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.broad_inventory = [
+            {"tab_title": "Test"}
+        ]
+        state.save_checkpoint(checkpoint)
+
+        # Delete the artifact file
+        artifact = tmp_path / "pipeline-state-broad_inventory.json"
+        artifact.unlink()
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.discovery.broad_inventory == []
+
+    def test_deep_profile_index_as_artifact(self, tmp_path: Path):
+        """DeepProfileIndex entries are externalized when present."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.deep_profile_index.entries = [
+            {"tab": "Crop Planner", "columns": 20},
+        ]
+        state.save_checkpoint(checkpoint)
+
+        yaml_text = checkpoint.read_text()
+        assert "_artifact" in yaml_text
+        assert "pipeline-state-deep-profiles.json" in yaml_text
+
+    def test_deep_profile_index_resolved_on_load(self, tmp_path: Path):
+        """DeepProfileIndex entries resolve correctly from artifact."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.deep_profile_index.entries = [
+            {"tab": "Crop Planner", "columns": 20},
+        ]
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.deep_profile_index.entries == [
+            {"tab": "Crop Planner", "columns": 20},
+        ]
+
+
+# ---------------------------------------------------------------------------
+# 7. Spec example roundtrip
+# ---------------------------------------------------------------------------
+
+
+class TestSpecExample:
+    """Full PipelineState matching the docs/pipeline-state.md spec."""
+
+    def test_spec_example_roundtrip(self, tmp_path):
+        """Load the full YAML example from the design spec."""
+        state = PipelineState(
+            version="0.2.0",
+            discovery=DiscoveryState(
+                source_tree={
+                    "provider": "google_sheets",
+                    "folder_id": "1ABC...",
+                    "spreadsheets": [
+                        {
+                            "name": "101_FarmPlan_2023",
+                            "id": "1DEF...",
+                        },
+                    ],
+                },
+                workbook_index=[
+                    {
+                        "workbook_code": "101",
+                        "year": 2023,
+                        "spreadsheet_id": "1DEF...",
+                    },
+                ],
+                approved_tabs={
+                    "101": [
+                        "Crop Planner",
+                        "Field Record",
+                        "Harvest Availability",
+                    ],
+                },
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="farm_management",
+                vocabulary={
+                    "operational": [
+                        "crop",
+                        "planting",
+                        "harvest",
+                        "field",
+                        "variety",
+                    ],
+                    "reference": ["market", "channel", "customer"],
+                    "support": [],
+                    "derived": [],
+                },
+                year_scope={
+                    "active": [2025, 2026],
+                    "archived": [2023, 2024],
+                    "forward": [],
+                },
+                deduplication={
+                    "strategy": "latest_year",
+                    "exceptions": [
+                        {
+                            "tab_title": "Annual Budget",
+                            "reason": "Changes meaning every year",
+                        },
+                    ],
+                },
+                entities=[
+                    {
+                        "name": "Season",
+                        "source_tabs": ["Crop Planner"],
+                        "fields": {
+                            "name": {
+                                "type": "CharField",
+                                "max_length": 100,
+                                "unique": True,
+                            },
+                        },
+                        "import_key": ["name"],
+                    },
+                ],
+                glossary={"qty": "quantity", "amt": "amount"},
+                scope_notes=(
+                    "Focus on 2025-2026; "
+                    "2023-2024 are historical only."
+                ),
+            ),
+            schema_contract={"tables": []},
+            interaction_contract={"views": []},
+        )
+
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+
+        loaded = PipelineState.load(path)
+        assert loaded.version == "0.2.0"
+        assert (
+            loaded.discovery.source_tree["provider"] == "google_sheets"
+        )
+        assert (
+            loaded.discovery.source_tree["spreadsheets"][0]["name"]
+            == "101_FarmPlan_2023"
+        )
+        assert (
+            loaded.discovery.workbook_index[0]["workbook_code"] == "101"
+        )
+        assert loaded.discovery.workbook_index[0]["year"] == 2023
+        assert loaded.discovery.approved_tabs["101"] == [
+            "Crop Planner",
+            "Field Record",
+            "Harvest Availability",
+        ]
+        assert loaded.domain_knowledge.domain == "farm_management"
+        assert loaded.domain_knowledge.vocabulary["operational"] == [
+            "crop",
+            "planting",
+            "harvest",
+            "field",
+            "variety",
+        ]
+        assert loaded.domain_knowledge.year_scope["active"] == [
+            2025,
+            2026,
+        ]
+        assert (
+            loaded.domain_knowledge.deduplication["strategy"]
+            == "latest_year"
+        )
+        assert (
+            loaded.domain_knowledge.entities[0]["name"] == "Season"
+        )
+        assert loaded.domain_knowledge.glossary["qty"] == "quantity"

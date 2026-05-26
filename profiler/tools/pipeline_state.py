@@ -1,16 +1,32 @@
 """PipelineState — layered profiler runtime state and checkpoint.
 
 The pipeline operator reads & edits checkpoint YAML between phases.
-Phase methods use guard clauses to enforce ordering.
+Phase methods use guard clauses to enforce ordering.  Large discovery
+data (``broad_inventory``, ``shortlist``) is externalized to JSON
+artifacts and referenced by ``_artifact`` keys to keep the YAML
+human-reviewable.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
-import yaml
+from django.core.management.base import CommandError
+
+from profiler.tools.domain_context import DomainContext
+
+logger = logging.getLogger(__name__)
+
+# Fields that are externalized to JSON artifacts (not inlined in YAML).
+_ARTIFACT_FIELDS: set[str] = {
+    "broad_inventory",
+    "shortlist",
+    "deep_profiles",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -20,61 +36,91 @@ import yaml
 
 @dataclass
 class DiscoveryState:
-    """Mechanical findings from the profiler's discovery phase.
+    """Machine-learned profiler findings (Layer 1).
 
-    Each field is small metadata — never raw grid data.
+    Each field is small metadata — never raw grid data.  Large lists
+    (``broad_inventory``, ``shortlist``) are externalized to JSON
+    artifacts during checkpoint save.
     """
 
-    source_tree: dict | None = None
-    workbook_index: list[dict] | None = None
-    broad_inventory: list[dict] | None = None
-    shortlist: list[dict] | None = None
-    approved_tabs: dict[str, list[str]] | None = None
+    source_tree: dict[str, Any] | None = field(default=None)
+    workbook_index: list[dict[str, Any]] = field(default_factory=list)
+    broad_inventory: list[dict[str, Any]] = field(default_factory=list)
+    shortlist: list[dict[str, Any]] | None = field(default=None)
+    approved_tabs: dict[str, list[str]] | None = field(default=None)
 
 
 @dataclass
 class DeepProfileIndex:
-    """References to external deep-profile JSON artifacts."""
+    """References to external deep-profile JSON artifacts.
 
-    entries: list[dict] = field(default_factory=list)
+    The ``entries`` list holds metadata and artifact paths for each
+    deep-profiled tab, keeping the checkpoint YAML compact.
+    """
+
+    entries: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class DomainKnowledge:
-    """Human-provided domain knowledge (evolved from DomainContext).
+    """Human-provided / confirmed domain knowledge (Layer 2).
 
-    Carries vocabulary, year scope, deduplication strategy, entity
-    definitions, glossary, and operator scope notes.
+    This is intentionally a plain-dict mirror of ``DomainContext`` so that it
+    round-trips through YAML without requiring the ``DomainContext`` nested
+    dataclass structure.  The PipelineState owns a *copy* of the domain
+    context data; ``DomainContext`` remains the authoritative input type.
     """
 
     domain: str = ""
-    vocabulary: dict[str, list[str]] = field(default_factory=dict)
-    year_scope: dict[str, list[int]] = field(default_factory=dict)
-    deduplication: dict = field(default_factory=dict)
-    entities: list[dict] = field(default_factory=list)
+    description: str = ""
+    vocabulary: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "operational": [],
+            "reference": [],
+            "support": [],
+            "derived": [],
+        }
+    )
+    year_scope: dict[str, Any] = field(
+        default_factory=lambda: {
+            "active": [],
+            "archived": [],
+            "forward": [],
+        }
+    )
+    deduplication: dict[str, Any] = field(
+        default_factory=lambda: {
+            "strategy": "latest_year",
+            "exceptions": [],
+        }
+    )
+    entities: list[dict[str, Any]] = field(default_factory=list)
     glossary: dict[str, str] = field(default_factory=dict)
     scope_notes: str = ""
 
     # ------------------------------------------------------------------ #
-    # B. DomainContext → DomainKnowledge bridge
+    # DomainContext → DomainKnowledge bridge
     # ------------------------------------------------------------------ #
 
     @classmethod
-    def from_domain_context(cls, ctx) -> DomainKnowledge:
-        """Convert a ``DomainContext`` to ``DomainKnowledge``.
+    def from_domain_context(cls, ctx: DomainContext | None) -> DomainKnowledge:
+        """Create a ``DomainKnowledge`` from a ``DomainContext``.
 
         Parameters
         ----------
-        ctx : DomainContext
-            Instance from ``profiler.tools.domain_context``.
+        ctx : DomainContext | None
+            Domain context instance.  If ``None``, returns an empty instance.
 
         Returns
         -------
         DomainKnowledge
             Flat-dict representation of the same domain knowledge.
         """
+        if ctx is None:
+            return cls()
         return cls(
-            domain=str(ctx.domain) if ctx.domain else "",
+            domain=ctx.domain,
+            description=ctx.description,
             vocabulary={
                 "operational": list(ctx.vocabulary.operational),
                 "reference": list(ctx.vocabulary.reference),
@@ -87,59 +133,83 @@ class DomainKnowledge:
                 "forward": list(ctx.year_scope.forward),
             },
             deduplication={
-                "strategy": str(ctx.deduplication.strategy),
+                "strategy": ctx.deduplication.strategy,
                 "exceptions": list(ctx.deduplication.exceptions),
             },
             entities=list(ctx.entities),
             glossary=dict(ctx.glossary),
-            scope_notes=str(ctx.scope_notes) if ctx.scope_notes else "",
+            scope_notes=ctx.scope_notes,
         )
 
 
 @dataclass
 class PipelineState:
-    """Top-level runtime state object for the profiler pipeline.
+    """Layered profiler runtime state.
 
-    Three layers:
-      1. Machine discoveries (``discovery``, ``deep_profile_index``)
-      2. Human domain knowledge (``domain_knowledge``)
-      3. Derived contracts    (``schema_contract``, ``interaction_contract``)
+    Attributes:
+        version: Format version string.
+        discovery: Machine discoveries (source tree, workbook index,
+            inventory, shortlist, approved tabs).
+        deep_profile_index: External references to deep-profile JSON
+            artifacts.
+        domain_knowledge: Human-provided domain knowledge (vocabulary,
+            year scope, entities, glossary).
+        schema_contract: Derived data contract (models, fields, FKs)
+            — read-only in checkpoint.
+        interaction_contract: Derived UI/workflow contract — read-only
+            in checkpoint.
     """
 
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     discovery: DiscoveryState = field(default_factory=DiscoveryState)
     deep_profile_index: DeepProfileIndex = field(default_factory=DeepProfileIndex)
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
-    schema_contract: dict | None = None
-    interaction_contract: dict | None = None
+    schema_contract: dict[str, Any] | None = None
+    interaction_contract: dict[str, Any] | None = None
 
-    # ------------------------------------------------------------------ #
-    # C. Checkpoint I/O
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------
+    # Checkpoint I/O
+    # ------------------------------------------------------------------
 
     def save_checkpoint(self, path: str | Path) -> None:
-        """Serialize to YAML using ``asdict()``.
+        """Serialize state to a YAML checkpoint with ``_artifact`` references.
+
+        Large fields (``broad_inventory``, ``shortlist``) are written to
+        sibling JSON files and referenced by ``_artifact`` keys, keeping the
+        YAML human-reviewable.
 
         Parameters
         ----------
         path : str | Path
             Filesystem path for the checkpoint YAML.
         """
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = asdict(self)
-        with open(path, "w", encoding="utf-8") as fh:
-            yaml.dump(
-                data,
-                fh,
-                default_flow_style=False,
+        file_path = Path(path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Build a plain dict representation with artifact references
+        payload = self._to_dict_with_artifacts(file_path.parent)
+
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise CommandError(
+                "PyYAML is required for checkpoint serialization."
+            ) from exc
+
+        file_path.write_text(
+            yaml.safe_dump(
+                payload,
                 sort_keys=False,
                 allow_unicode=True,
-            )
+                default_flow_style=False,
+            ),
+            encoding="utf-8",
+        )
+        logger.info("saved checkpoint %s", file_path)
 
     @classmethod
     def load(cls, path: str | Path) -> PipelineState:
-        """Deserialize from a checkpoint YAML file.
+        """Load a checkpoint from YAML, resolving ``_artifact`` references.
 
         Parameters
         ----------
@@ -150,61 +220,57 @@ class PipelineState:
         -------
         PipelineState
             Reconstructed pipeline state.
+
+        Raises
+        ------
+        CommandError
+            If the YAML is malformed or resolves to a non-dict.
         """
-        path = Path(path)
-        with open(path, "r", encoding="utf-8") as fh:
-            raw = yaml.safe_load(fh)
+        file_path = Path(path)
+        if not file_path.exists():
+            logger.info(
+                "checkpoint not found at %s — returning empty state", file_path
+            )
+            return cls()
+
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise CommandError(
+                "PyYAML is required for checkpoint deserialization."
+            ) from exc
+
+        try:
+            raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise CommandError(
+                f"Failed to parse checkpoint YAML at {file_path}: {exc}"
+            ) from exc
+
         if not isinstance(raw, dict):
-            raise ValueError(f"Expected a YAML mapping in {path}")
-        return cls._from_dict(raw)
+            raise CommandError(
+                f"Checkpoint at {file_path} is not a YAML mapping."
+            )
 
-    @classmethod
-    def _from_dict(cls, raw: dict) -> PipelineState:
-        """Build ``PipelineState`` from a deserialized YAML dict.
+        # Resolve _artifact references back into inline data
+        base_dir = file_path.parent
+        resolved = _resolve_artifacts(raw, base_dir)
+        if not isinstance(resolved, dict):
+            raise CommandError(
+                f"Checkpoint at {file_path} resolved to non-dict."
+            )
 
-        Handles missing / ``None`` keys gracefully.
-        """
-        discovery_raw = raw.get("discovery") or {}
-        discovery = DiscoveryState(
-            source_tree=discovery_raw.get("source_tree"),
-            workbook_index=discovery_raw.get("workbook_index"),
-            broad_inventory=discovery_raw.get("broad_inventory"),
-            shortlist=discovery_raw.get("shortlist"),
-            approved_tabs=discovery_raw.get("approved_tabs"),
-        )
-
-        deep_raw = raw.get("deep_profile_index") or {}
-        deep_profile_index = DeepProfileIndex(
-            entries=deep_raw.get("entries") or [],
-        )
-
-        dk_raw = raw.get("domain_knowledge") or raw.get("domain") or {}
-        domain_knowledge = DomainKnowledge(
-            domain=str(dk_raw.get("domain", "")),
-            vocabulary=dk_raw.get("vocabulary") or {},
-            year_scope=dk_raw.get("year_scope") or {},
-            deduplication=dk_raw.get("deduplication") or {},
-            entities=dk_raw.get("entities") or [],
-            glossary=dk_raw.get("glossary") or {},
-            scope_notes=str(dk_raw.get("scope_notes", "")),
-        )
-
-        return cls(
-            version=str(raw.get("version", "0.1.0")),
-            discovery=discovery,
-            deep_profile_index=deep_profile_index,
-            domain_knowledge=domain_knowledge,
-            schema_contract=raw.get("schema_contract"),
-            interaction_contract=raw.get("interaction_contract"),
-        )
+        return cls._from_resolved_dict(resolved)
 
     @classmethod
     def load_or_create(
         cls,
         config_path: str | Path,
         checkpoint_path: str | Path | None = None,
+        *,
+        domain_context: DomainContext | None = None,
     ) -> PipelineState:
-        """Load existing checkpoint or create fresh from config JSON.
+        """Load existing checkpoint or create fresh from config.
 
         Parameters
         ----------
@@ -213,6 +279,8 @@ class PipelineState:
         checkpoint_path : str | Path | None
             Path to an existing checkpoint YAML.  If ``None``, derived
             from ``config_path`` by replacing the suffix.
+        domain_context : DomainContext | None
+            Optional domain context to seed domain knowledge.
 
         Returns
         -------
@@ -225,12 +293,21 @@ class PipelineState:
         if checkpoint_path.exists():
             return cls.load(checkpoint_path)
 
-        # Fresh creation — read domain from config JSON if present
+        # Seed domain knowledge from DomainContext or config JSON
+        if domain_context is not None:
+            return cls(
+                domain_knowledge=DomainKnowledge.from_domain_context(
+                    domain_context
+                )
+            )
+
         state = cls()
-        config_path = Path(config_path)
-        if config_path.exists():
+        config_file = Path(config_path)
+        if config_file.exists():
             try:
-                config = json.loads(config_path.read_text(encoding="utf-8"))
+                config = json.loads(
+                    config_file.read_text(encoding="utf-8")
+                )
             except (json.JSONDecodeError, OSError):
                 config = {}
             domain_val = config.get("domain")
@@ -238,11 +315,142 @@ class PipelineState:
                 state.domain_knowledge.domain = str(domain_val)
         return state
 
-    # ------------------------------------------------------------------ #
-    # D. Phase methods with guard clauses
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------
+    # Serialization helpers
+    # ------------------------------------------------------------------
 
-    def discover(self, drive_service=None, sheets_service=None) -> PipelineState:
+    def _to_dict_with_artifacts(self, base_dir: Path) -> dict[str, Any]:
+        """Convert state to a plain dict, writing large lists to external JSON."""
+        payload: dict[str, Any] = {
+            "version": self.version,
+            "discovery": {},
+            "domain_knowledge": asdict(self.domain_knowledge),
+        }
+
+        discovery = self.discovery
+        disc: dict[str, Any] = {}
+
+        # Small fields inline (handle None defaults)
+        disc["source_tree"] = discovery.source_tree or {}
+        disc["workbook_index"] = discovery.workbook_index
+        disc["approved_tabs"] = discovery.approved_tabs or {}
+
+        # Large fields → external JSON (handle None defaults)
+        for field_name in ("broad_inventory", "shortlist"):
+            data = getattr(discovery, field_name)
+            if data:
+                artifact_path = (
+                    base_dir / f"pipeline-state-{field_name}.json"
+                )
+                artifact_path.write_text(
+                    json.dumps(data, indent=2), encoding="utf-8"
+                )
+                disc[field_name] = {
+                    "_artifact": str(
+                        artifact_path.relative_to(base_dir)
+                    )
+                }
+            else:
+                disc[field_name] = []
+
+        payload["discovery"] = disc
+
+        # Deep profile index as artifact reference
+        if self.deep_profile_index.entries:
+            artifact_path = (
+                base_dir / "pipeline-state-deep-profiles.json"
+            )
+            artifact_path.write_text(
+                json.dumps(self.deep_profile_index.entries, indent=2),
+                encoding="utf-8",
+            )
+            payload["deep_profile_index"] = {
+                "_artifact": str(
+                    artifact_path.relative_to(base_dir)
+                )
+            }
+        else:
+            payload["deep_profile_index"] = {"entries": []}
+
+        # Derived contracts as artifact references
+        if self.schema_contract:
+            payload["schema_contract"] = {
+                "_artifact": "build/schema-contract.yaml"
+            }
+        if self.interaction_contract:
+            payload["interaction_contract"] = {
+                "_artifact": "build/interaction-contract.yaml"
+            }
+
+        return payload
+
+    @classmethod
+    def _from_resolved_dict(
+        cls, raw: dict[str, Any]
+    ) -> PipelineState:
+        """Reconstruct a PipelineState from a fully-resolved plain dict."""
+        discovery_raw = raw.get("discovery") or {}
+        domain_raw = raw.get("domain_knowledge") or {}
+        deep_raw = raw.get("deep_profile_index") or {}
+
+        discovery = DiscoveryState(
+            source_tree=discovery_raw.get("source_tree") or {},
+            workbook_index=list(
+                discovery_raw.get("workbook_index") or []
+            ),
+            broad_inventory=list(
+                discovery_raw.get("broad_inventory") or []
+            ),
+            shortlist=list(discovery_raw.get("shortlist") or []),
+            approved_tabs=dict(
+                discovery_raw.get("approved_tabs") or {}
+            ),
+        )
+
+        # deep_profile_index may be a list (resolved artifact) or a dict
+        if isinstance(deep_raw, list):
+            deep_entries = deep_raw
+        else:
+            deep_entries = deep_raw.get("entries") or []
+        deep_profile_index = DeepProfileIndex(
+            entries=list(deep_entries),
+        )
+
+        domain_knowledge = DomainKnowledge(
+            domain=str(domain_raw.get("domain", "")),
+            description=str(domain_raw.get("description", "")),
+            year_scope=domain_raw.get("year_scope")
+            or {"active": [], "archived": [], "forward": []},
+            deduplication=domain_raw.get("deduplication")
+            or {"strategy": "latest_year", "exceptions": []},
+            entities=list(domain_raw.get("entities") or []),
+            vocabulary=domain_raw.get("vocabulary")
+            or {
+                "operational": [],
+                "reference": [],
+                "support": [],
+                "derived": [],
+            },
+            glossary=dict(domain_raw.get("glossary") or {}),
+            scope_notes=str(domain_raw.get("scope_notes", "")),
+        )
+
+        return cls(
+            version=str(raw.get("version", "0.2.0")),
+            discovery=discovery,
+            deep_profile_index=deep_profile_index,
+            domain_knowledge=domain_knowledge,
+            schema_contract=None,  # Loaded from artifact on demand
+            interaction_contract=None,
+        )
+
+    # ------------------------------------------------------------------
+    # Phase methods with guard clauses
+    # ------------------------------------------------------------------
+
+    def discover(
+        self, drive_service=None, sheets_service=None
+    ) -> PipelineState:
         """Phase 0/1: Discover source tree and enumerate workbooks.
 
         Parameters
@@ -263,7 +471,9 @@ class PipelineState:
             If ``source_tree`` is already populated.
         """
         if self.discovery.source_tree is not None:
-            raise RuntimeError("discover: source_tree already populated")
+            raise RuntimeError(
+                "discover: source_tree already populated"
+            )
         self.discovery.source_tree = {}
         self.discovery.workbook_index = []
         self.discovery.broad_inventory = []
@@ -285,9 +495,13 @@ class PipelineState:
             ``None``.
         """
         if self.discovery.source_tree is None:
-            raise RuntimeError("score_and_select: discover() must run first")
+            raise RuntimeError(
+                "score_and_select: discover() must run first"
+            )
         if self.discovery.shortlist is None:
-            raise RuntimeError("score_and_select: shortlist is None")
+            raise RuntimeError(
+                "score_and_select: shortlist is None"
+            )
         self.discovery.approved_tabs = {}
         return self
 
@@ -310,7 +524,9 @@ class PipelineState:
             If ``approved_tabs`` is ``None``.
         """
         if self.discovery.approved_tabs is None:
-            raise RuntimeError("deep_profile: no approved_tabs")
+            raise RuntimeError(
+                "deep_profile: no approved_tabs"
+            )
         return self
 
     def derive_contracts(self) -> PipelineState:
@@ -328,7 +544,66 @@ class PipelineState:
             never ``None`` — it defaults to ``[]``).
         """
         if not self.deep_profile_index.entries:
-            raise RuntimeError("derive_contracts: deep_profile must run first")
+            raise RuntimeError(
+                "derive_contracts: deep_profile must run first"
+            )
         self.schema_contract = {}
         self.interaction_contract = {}
         return self
+
+
+# ---------------------------------------------------------------------------
+# B. Artifact resolution helpers
+# ---------------------------------------------------------------------------
+
+
+def _resolve_artifacts(node: Any, base_dir: Path) -> Any:
+    """Recursively resolve ``{"_artifact": "path"}`` dicts into inline data.
+
+    Missing files are replaced with empty lists.
+
+    Parameters
+    ----------
+    node : Any
+        Data structure (dict, list, or scalar) to resolve.
+    base_dir : Path
+        Base directory for resolving relative artifact paths.
+
+    Returns
+    -------
+    Any
+        Resolved data with artifact references replaced by their contents.
+    """
+    if isinstance(node, dict):
+        if set(node.keys()) == {"_artifact"}:
+            artifact_path = base_dir / node["_artifact"]
+            if artifact_path.exists():
+                try:
+                    loaded = json.loads(
+                        artifact_path.read_text(encoding="utf-8")
+                    )
+                    return loaded
+                except Exception as exc:
+                    logger.warning(
+                        "failed to load artifact %s: %s — using empty list",
+                        artifact_path,
+                        exc,
+                    )
+                    return []
+            else:
+                logger.warning(
+                    "artifact not found: %s — using empty list",
+                    artifact_path,
+                )
+                return []
+        else:
+            return {
+                k: _resolve_artifacts(v, base_dir)
+                for k, v in node.items()
+            }
+    elif isinstance(node, list):
+        return [
+            _resolve_artifacts(item, base_dir) for item in node
+        ]
+    else:
+        return node
