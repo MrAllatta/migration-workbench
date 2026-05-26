@@ -19,3 +19,4 @@ fly.toml
 .opencode
 .worktrees/
 .worktrees/
+.omo
