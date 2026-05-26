@@ -15,9 +15,12 @@
 | [Architecture](architecture.md) | all | Five-layer design, data flow, Django project layout |
 | [Schema Design Loop](schema-design-loop.md) | adopter | Contract-first importer workflow |
 | [Schema Contract Reference](schema-contract.md) | adopter | YAML contract format reference |
-| [View Manifest Reference](view-manifest.md) | adopter | View manifest YAML format, admin generation effects |
+| [View Manifest Reference](view-manifest.md) | adopter | Codegen manifest YAML format, admin generation effects |
+| [Interaction Contract](interaction-contract.md) | adopter | Three-layer UI/workflow contract: profiler signals, human contract, codegen manifest |
+| [Pipeline State](pipeline-state.md) | implementer | Layered profiler runtime state and checkpoint design |
 | [Pipeline Manifest Reference](pipeline-manifest.md) | operator | Machine-generated execution plan format |
-| [Roadmap](roadmap.md) | all | Feature history and v1.0 criteria |
+| [Roadmap](roadmap.md) | all | Feature history and 0.1.0 beta criteria |
+| [Agent Harness](agent-harness.md) | all | Design philosophy: agent does everything that does not require judgment, alerting the human for the judgment |
 
 ## Operations
 

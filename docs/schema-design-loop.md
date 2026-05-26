@@ -2,33 +2,20 @@
 
 This loop keeps spreadsheet-driven importer work in product-owned configuration and schema docs, not ad hoc patches in importer internals.
 
-## Loop Steps
+## Loop Steps (with Agent-Harness Boundaries)
 
-1. **Profile**  
-   Run `profile_tab` and `scan_formula_patterns` to capture sheet structure and formula behavior into `data/profile_snapshots/`.
-2. **Observe**  
-   Read profile output and identify entities, attributes, relations, and formula-derived semantics as they exist in sheets.
-3. **Draft contract**  
-   Update `docs/schema-contract.md` with entity sections that cite tab, header row, source columns, and formula skeletons.
-4. **Decide per app**  
-   For each app area, choose `lift`, `modify`, or `rebuild` using contract evidence.
-5. **Author tab config**  
-   Encode import mappings in `bundles/<tier>.yaml` (`required_headers`, `aliases`, `column_map`, `default_values`, `row_transforms`).
-6. **Author view manifest**  
-   After pulling a bundle with `--include-structure` (produces `structure.json`),
-   run `scaffold_view_manifest` to generate a view-manifest YAML. This captures
-   UI/workflow metadata: editable vs computed fields, filterable columns, status
-   field inference, and tab sequence.
-7. **Discovery interview** (optional)  
-   Run `generate_discovery_interview` to produce a structured Markdown
-   questionnaire. Have the operator fill in role ownership, status semantics, and
-   weekly actions, then run `merge_discovery_notes` to patch the manifest.
-8. **Author importer**  
-   Keep importer commands thin `BaseImportCommand` subclasses that delegate to configured tiers.
-9. **Gate**  
-   Run validate-only before apply; keep chassis and product gates green.
-10. **Drift check**  
-   Re-profile periodically and diff against checked-in snapshots; treat column/formula changes as explicit contract updates.
+| Step | Agent Role | Consultant Role |
+|------|-----------|-----------------|
+| **1. Profile** | Runs profiler phases autonomously. Flags ambiguous tabs/columns for review. | Reviews `pipeline-state.yaml` alerts. Approves tab selection. |
+| **2. Observe** | Not involved. | Reads profiler output. Understands business operations. Pure human judgment. |
+| **3. Draft contract** | Proposes schema contract from profile + domain knowledge. | Hardens: model names, FK targets, field overrides. |
+| **4. Decide per app** | Not involved. | Chooses lift / modify / rebuild per app area. Client-specific consulting. |
+| **5. Author tab config** | Proposes `column_map`, `fk_lookup`, `field_parsers`. | Confirms or overrides. |
+| **6. Author interaction contract** | Classifies UI archetypes, proposes workflow sequence, role boundaries. | Confirms with business owner. |
+| **7. Discovery interview** | Generates questionnaire from profiler signals. | Conducts interview, merges answers into interaction contract. |
+| **8. Author importer** | Generates import command from hardened contract. | Reviews, runs validate-only. |
+| **9. Gate** | Runs tests, validates, checks. | Interprets results. Decides if ready. |
+| **10. Drift check** | Re-profiles, diffs against snapshots. | Evaluates if changes are material. |
 
 ## Are We Patching?
 

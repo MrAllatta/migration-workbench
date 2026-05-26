@@ -136,7 +136,7 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 All pipeline stages exist in isolation: profiler, schema contract system, codegen,
 import runtime, view manifest, discovery interview, deployment CLI. Each works on
-its own. The full end-to-end chain has not yet been exercised on real product data.
+its own. The full end-to-end chain is being exercised on the farm engagement.
 
 - Google Sheets profiler: Phase 0–3 corpus pipeline with domain context integration, tab scoring, column enrichment, computed field and FK candidate detection.
 - Coda profiler: doc enumeration, table profiling, formula scanning, canvas extraction, relationship map.
@@ -157,10 +157,13 @@ its own. The full end-to-end chain has not yet been exercised on real product da
 - Build system: shared `makefile_targets.py` module, preflight gate, product scaffold.
 - Documentation: full doc map, 80% docstring coverage, CI/CD with `chassis-gate`.
 
-**0.1.0 sprint — Pipeline proven**
+**0.1.0 sprint — Pipeline proven on real data**
 
 Next milestone: one product repo (farm) through the full end-to-end pipeline.
 Not a demo — the whole machine turns on real data.
+
+The goal is not just "pipeline runs." It is "consultant can complete a paid
+engagement in under two days with this tool."
 
 1. **Close broken connections** — fix `wb generate manifest` import path bug,
    build multi-year import loop (import command iterates year directories),
@@ -174,14 +177,32 @@ Not a demo — the whole machine turns on real data.
    sequence, generated code compiles without manual edits, import creates expected
    rows across all years, deploy passes health check.
 
-0.1.0 is the beta. Everything after is a pipeline capability.
+0.1.0 is the beta. There is no v1.0 — the version scheme resets so that
+0.1.0 is the first release where the whole machine actually turns.
 
-**0.2.0+ — Pipeline capabilities**
+**0.2.0+ — Consultant accelerant**
 
-- DomainModel orchestration (replace scattered JSON artifacts with a single state object)
-- School tooling + FERPA boundary (generalize beyond farm to schools with AppsScript)
-- Frontend manifest extraction (workflow sequence, UI archetype classification from profiler signals)
-- Provider interface extraction, multi-tenant, Postgres at scale
+Each version encodes more consultant judgment into the agent harness,
+making the operator faster. Not a feature list — a judgment-compounding system.
+
+- **0.2.0 PipelineState:** Agent reasoning is explicit and auditable.
+  Consultant reviews one checkpoint file, not scattered JSON.
+  Autonomous decisions where confidence is high; alerts where low.
+  See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
+
+- **0.3.0 Vertical templates:** After N engagements in a vertical,
+  extract reusable presets. The 10th farm migration is 5x faster
+  than the 1st.
+
+- **0.4.0 Interaction contract:** Agent infers how data is used
+  (form/list/dashboard/reference). Consultant confirms. Generated
+  admin reflects actual business workflows, not generic CRUD.
+  See [Interaction Contract](docs/interaction-contract.md).
+
+- **0.5.0+ Platform (conditional):** Only after judgment taxonomy
+  is dense enough to make the agent reliably correct.
+  Hosted workbench for consultants, not self-service for end users.
+  Self-service is a non-goal until proven safe.
 
 Semantic versioning applies; `**0.x`** may ship breaking changes — pin ranges in product repos.
 
@@ -210,7 +231,10 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 | [docs/pull-bundle.md](docs/pull-bundle.md)                                                        | Source config, live/offline modes, bundle validation           |
 | [docs/schema-contract.md](docs/schema-contract.md)                                                | YAML contract format reference (v1.0–v1.3)                   |
 | [docs/view-manifest.md](docs/view-manifest.md)                                                    | View manifest YAML format, admin generation effects           |
+| [docs/interaction-contract.md](docs/interaction-contract.md)                                      | Three-layer UI/workflow contract design                       |
+| [docs/pipeline-state.md](docs/pipeline-state.md)                                                | Layered profiler runtime state and checkpoint design          |
 | [docs/pipeline-manifest.md](docs/pipeline-manifest.md)                                            | Machine-generated execution plan format                       |
+| [docs/agent-harness.md](docs/agent-harness.md)                                                  | Consultant accelerant philosophy and confidence taxonomy      |
 | [docs/troubleshooting.md](docs/troubleshooting.md)                                                | Consolidated FAQ for common errors                            |
 | Per-package `README.md` under `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/` | App-local surfaces                                            |
 
@@ -349,6 +373,20 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 - Project bootstrap scripting (`new-product`).
 - Google Sheets / Drive and Coda adapters.
 - Deployment documentation for Fly.io + Litestream.
+
+## Non-goals
+
+- **Self-service end-user migration without consultant review.** The agent makes too
+  many mistakes on messy real-world data. Human judgment is mandatory until the
+  judgment taxonomy is dense enough to make the agent provably correct.
+- **GUI for contract authoring (today).** YAML is the consultant interface for now.
+  A hosted consultant UI is a 0.5.0+ possibility, not 0.2.0.
+- **Real-time sync back to source.** One-way pipeline (source → Django). Bidirectional
+  sync requires conflict resolution and change tracking.
+- **Arbitrary ETL.** Pipeline is opinionated: tabular → normalized CSV → Django models.
+  JSON APIs and unstructured data are out of scope.
+- **Non-Django targets.** Codegen is Django-specific. Extracting a generic ORM layer
+  is premature.
 
 ## Database modes
 

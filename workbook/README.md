@@ -32,7 +32,7 @@ Inputs are pull-bundle-style JSON (`tabs[]`, `required_headers`) plus optional `
 
 ## View manifest
 
-`scaffold_view_manifest` is a sibling artifact builder — it produces a **first-draft** UI/workflow contract from the profiler `structure.json` (emitted by `pull_bundle --include-structure`) and an optional schema-contract YAML.
+`scaffold_view_manifest` is a sibling artifact builder — it produces the **profiler signals** layer of the interaction contract from the profiler `structure.json` (emitted by `pull_bundle --include-structure`) and an optional schema-contract YAML. For the full three-layer interaction contract design (profiler signals → human contract → codegen manifest), see [Interaction Contract](../docs/interaction-contract.md).
 
 ```bash
 python manage.py scaffold_view_manifest \

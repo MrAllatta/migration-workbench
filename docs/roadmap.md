@@ -220,50 +220,71 @@ Three things exist but don't connect:
 0.1.0 is the beta. There is no v1.0 — the version scheme resets so that
 0.1.0 is the first release where the whole machine actually turns.
 
+The real gate is not "pipeline runs" but "consultant can complete a paid
+engagement in under two days with this tool."
+
 ---
 
-## 0.2.0+: Pipeline capabilities
+## 0.2.0+: Consultant accelerant
 
-Each version is a pipeline capability, not a feature list.
+Each version encodes more consultant judgment into the agent harness,
+making the operator faster. Not a feature list — a judgment-compounding system.
 
-### 0.2.0 — DomainModel orchestration
+### 0.2.0 — PipelineState: the agent's reasoning surface
 
-Replace the current scatter of date-stamped JSON artifacts with a single `DomainModel`
-object that is the profiler's runtime state. Phase boundaries are checkpoints on this
-object, not file writes. Human override is one YAML file between phases, not JSON editing.
+Replace the current scatter of date-stamped JSON artifacts with a single `PipelineState`
+checkpoint. The agent makes autonomous decisions where confidence is high and alerts
+the consultant where confidence is low. Every correction teaches the agent.
 
-The domain context artifact schema was designed as the DomainModel's serialization format.
-When DomainModel ships, the artifact is promoted from "input file" to "the model itself."
+The state model is layered: machine discoveries (source tree, workbook index, inventory,
+shortlist, approved tabs), human domain knowledge (vocabulary, year scope, entities),
+and derived contracts (schema contract, interaction contract). Raw grid data lives in
+external JSON artifacts referenced by the checkpoint, never inlined.
 
-### 0.3.0 — School tooling + FERPA boundary
+See [Pipeline State](pipeline-state.md) for the full design. See [Agent Harness](agent-harness.md)
+for the philosophy.
 
-Generalize the pipeline for school domains using Google AppsScript, where PII stays
-on the school's Drive. Profiler runs against school Drive folders with FERPA boundary
-rules. Designed models (`source_tab: null`) become the norm. Provider interface
-extraction is exercised by the AppsScript adapter.
+### 0.3.0 — Vertical migration templates
 
-### 0.4.0 — Frontend manifest extraction
+After N engagements in a vertical (farm, school, clinic), extract reusable presets:
+domain context vocabulary, entity defaults, scoring heuristics, schema contract templates,
+interaction contract defaults, and import error patterns. The 10th farm migration should
+be 5x faster than the 1st because the agent starts with learned defaults.
 
-The profiler currently extracts what the data IS (schema contract) and how it imports
-(bundle config). It does not extract how the data is USED. Cross-sheet formula references
-encode workflow sequence. Formula density + data validation + dimensions reveal UI
-archetype (form/list/dashboard). These signals feed into an enriched view manifest that
-admin generation consumes for smarter defaults.
+### 0.4.0 — Interaction contract: consultant decision support
 
-### 0.5.0+ — Platform
+The profiler extracts how the data is USED, not just what it IS. UI archetype
+classification (form / list / dashboard / reference) tells the consultant how to
+configure the generated admin. Workflow dependency graphs reveal operational sequences.
+Role boundaries inform permission design.
 
-- Provider interface as a plugin system (third-party adapters).
-- Frontend codegen from enriched manifest (React list/form/dashboard views).
-- Management interface on the workbench Fly app (hosted profiling→contract loop).
-- Postgres mode at scale.
-- Multi-model transaction safety in import pipeline.
+The immediate value is consultant decision support, not frontend codegen. Better
+decisions produce better admin defaults as a side effect.
+
+See [Interaction Contract](interaction-contract.md) for the three-layer design.
+
+### 0.5.0+ — Platform (conditional)
+
+Only after the judgment taxonomy is dense enough to make the agent reliably correct:
+
+- Hosted workbench for consultants who prefer a web UI to CLI
+- Self-service assessment for prospects ("Upload your spreadsheet, get a migration feasibility report")
+- Provider plugin system (only after 10+ verticals prove the model)
+- Postgres mode at scale
+- Multi-model transaction safety in import pipeline
+
+Self-service end-user migration remains a non-goal until the agent error rate
+is provably near-zero.
 
 ---
 
 ## Non-goals
 
-- **GUI for contract authoring.** YAML is the interface. Visual tooling would lock
-  the contract format before it stabilizes. (A hosted runtime is distinct from a GUI editor.)
+- **Self-service end-user migration without consultant review.** The agent makes too
+  many mistakes on messy real-world data. Human judgment is mandatory until the
+  judgment taxonomy is dense enough to make the agent provably correct.
+- **GUI for contract authoring (today).** YAML is the consultant interface for now.
+  A hosted consultant UI is a 0.5.0+ possibility, not 0.2.0.
 - **Real-time sync back to source.** One-way pipeline (source → Django). Bidirectional
   sync requires conflict resolution and change tracking.
 - **Arbitrary ETL.** Pipeline is opinionated: tabular → normalized CSV → Django models.

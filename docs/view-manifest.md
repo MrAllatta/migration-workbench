@@ -1,8 +1,9 @@
 # View Manifest Reference
 
-> **Artifact:** `build/view-manifest.yaml`
-> **Generator:** `python manage.py scaffold_view_manifest`
-> **Version:** `view-manifest-draft-1`
+> **Artifact:** `build/view-manifest.yaml`  
+> **Generator:** `python manage.py scaffold_view_manifest`  
+> **Version:** `view-manifest-draft-1`  
+> **Note:** This document describes the legacy flat format. See [Interaction Contract](interaction-contract.md) for the new three-layer design (profiler signals → human contract → codegen manifest). The format documented here is the **codegen manifest** layer consumed by `generate_admin`.
 
 A view manifest captures **UI and workflow** concerns for each spreadsheet tab
 mapped to a Django admin view. It is a sibling to the schema contract.
