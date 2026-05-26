@@ -167,7 +167,7 @@ Or omit `--year` to auto-discover from `data/` directory.
 
 **Command:**
 ```bash
-python manage.py scaffold_view_manifest --structure build/structure.json --contract build/schema-contract.yaml --out build/view-manifest.yaml
+python manage.py scaffold_view_manifest --structure build/structure.json --schema-contract build/schema-contract.yaml --out build/view-manifest.yaml
 ```
 
 **Input:** `build/structure.json`, `build/schema-contract.yaml`
@@ -193,7 +193,7 @@ python manage.py generate_discovery_interview --manifest build/view-manifest.yam
 
 Then merge:
 ```bash
-python manage.py merge_discovery --manifest build/view-manifest.yaml --interview build/discovery-interview.yaml --out build/view-manifest-merged.yaml
+python manage.py merge_discovery_notes --manifest build/view-manifest.yaml --interview build/discovery-interview.yaml --out build/view-manifest-merged.yaml
 ```
 
 ---
@@ -207,7 +207,7 @@ python manage.py generate_admin --contract build/schema-contract.yaml --manifest
 
 **Then:**
 ```bash
-wb deploy --live
+wb deploy <space> --env <preview|production> --live
 ```
 
 **Expected exit code:** 0
