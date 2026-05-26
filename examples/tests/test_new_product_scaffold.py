@@ -174,10 +174,7 @@ def test_check_env_coda_works_with_posix_sh(tmp_path):
     """make check-env must pass/fail correctly for Coda under /bin/sh (dash)."""
     output_dir = _run_new_product(tmp_path, "coda-check-env", "--coda")
     env_file = output_dir / ".env"
-    env_file.write_text(
-        "WORKBENCH=/tmp\n"
-        "CODA_API_TOKEN=test-token\n"
-    )
+    env_file.write_text("WORKBENCH=/tmp\nCODA_API_TOKEN=test-token\n")
 
     result = subprocess.run(
         ["make", "-C", str(output_dir), "check-env"],
@@ -188,10 +185,7 @@ def test_check_env_coda_works_with_posix_sh(tmp_path):
         f"check-env failed with all Coda vars set:\n{result.stderr}{result.stdout}"
     )
 
-    env_file.write_text(
-        "WORKBENCH=/tmp\n"
-        "CODA_API_TOKEN=\n"
-    )
+    env_file.write_text("WORKBENCH=/tmp\nCODA_API_TOKEN=\n")
     result = subprocess.run(
         ["make", "-C", str(output_dir), "check-env"],
         capture_output=True,

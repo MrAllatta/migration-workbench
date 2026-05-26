@@ -12,7 +12,10 @@ def test_strict_validate_duplicate_model():
     results = strict_validate_contract(contract)
     assert isinstance(results, list)
     assert all(isinstance(r, ValidationResult) for r in results)
-    assert any(r.model_name == "Crop" and r.check_id == "WORKBOOK-CONTRACT-DUPLICATE-MODEL" for r in results)
+    assert any(
+        r.model_name == "Crop" and r.check_id == "WORKBOOK-CONTRACT-DUPLICATE-MODEL"
+        for r in results
+    )
 
 
 def test_strict_validate_invalid_field():
@@ -26,7 +29,10 @@ def test_strict_validate_invalid_field():
     }
     results = strict_validate_contract(contract)
     assert isinstance(results, list)
-    assert any(r.model_name == "Unit" and r.check_id == "WORKBOOK-CONTRACT-INVALID-FIELD-NAME" for r in results)
+    assert any(
+        r.model_name == "Unit" and r.check_id == "WORKBOOK-CONTRACT-INVALID-FIELD-NAME"
+        for r in results
+    )
 
 
 def test_strict_validate_null_model():
@@ -37,7 +43,10 @@ def test_strict_validate_null_model():
     }
     results = strict_validate_contract(contract)
     assert isinstance(results, list)
-    assert any(r.model_name == "_UNNAMED" and r.check_id == "WORKBOOK-CONTRACT-NULL-MODEL" for r in results)
+    assert any(
+        r.model_name == "_UNNAMED" and r.check_id == "WORKBOOK-CONTRACT-NULL-MODEL"
+        for r in results
+    )
 
 
 def test_strict_validate_returns_empty_for_valid():

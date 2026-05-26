@@ -1058,7 +1058,9 @@ def strict_validate_contract(contract: dict[str, Any]) -> list[ValidationResult]
     for table in tables:
         model_name = str(table.get("model_name", "")).strip()
         if not model_name:
-            label = table.get("suggested_model_name") or table.get("bundle_worksheet_title", "?")
+            label = table.get("suggested_model_name") or table.get(
+                "bundle_worksheet_title", "?"
+            )
             results.append(
                 ValidationResult(
                     model_name=model_name or "_UNNAMED",

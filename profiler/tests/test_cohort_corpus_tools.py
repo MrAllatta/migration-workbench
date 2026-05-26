@@ -1559,7 +1559,9 @@ def test_score_tab_glossary_expansion():
     """Glossary 'qty → quantity' lets 'qty' in tab title match 'quantity' token."""
     ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
     score, reasons, breakdown = score_tab(
-        "Qty Tracker", 100, 20,
+        "Qty Tracker",
+        100,
+        20,
         tab_score_heuristics={"operational_tokens": ["quantity"]},
         domain_context=ctx,
     )
@@ -1574,13 +1576,25 @@ def test_select_tabs_vocabulary_merging():
         year_scope=DomainContext.YearScope(active=[2025], archived=[], forward=[]),
     )
     index_records = [
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402"},
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402",
+        },
     ]
     inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        },
     ]
     selected = select_tabs_from_inventory(
-        index_records, inventory_rows,
+        index_records,
+        inventory_rows,
         tab_score_heuristics={},
         domain_context=ctx,
     )
@@ -1590,20 +1604,49 @@ def test_select_tabs_vocabulary_merging():
 def test_select_tabs_coverage_bonus_active_years():
     """Coverage bonus is +1 when tab appears in >=2 active/forward years."""
     ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+        year_scope=DomainContext.YearScope(
+            active=[2025, 2026], archived=[2023, 2024], forward=[]
+        ),
     )
     index_records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+        {
+            "year": 2023,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2023",
+        },
+        {
+            "year": 2024,
+            "workbook_code": "402",
+            "spreadsheet_id": "s2",
+            "spreadsheet_name": "402 2024",
+        },
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s3",
+            "spreadsheet_name": "402 2025",
+        },
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "s4",
+            "spreadsheet_name": "402 2026",
+        },
     ]
     inventory_rows = [
-        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        {
+            "spreadsheet_id": f"s{i}",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        }
         for i in range(1, 5)
     ]
     selected = select_tabs_from_inventory(
-        index_records, inventory_rows,
+        index_records,
+        inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
         domain_context=ctx,
     )
@@ -1614,18 +1657,43 @@ def test_select_tabs_coverage_bonus_active_years():
 def test_select_tabs_duplicate_years_annotation():
     """Shortlist entries get duplicate_years annotation when spanning multiple years."""
     ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
+        year_scope=DomainContext.YearScope(
+            active=[2025, 2026], archived=[2023, 2024], forward=[]
+        ),
     )
     index_records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+        {
+            "year": 2023,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2023",
+        },
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "s4",
+            "spreadsheet_name": "402 2026",
+        },
     ]
     inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s4", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        },
+        {
+            "spreadsheet_id": "s4",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        },
     ]
     selected = select_tabs_from_inventory(
-        index_records, inventory_rows,
+        index_records,
+        inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
         domain_context=ctx,
     )
@@ -1636,21 +1704,46 @@ def test_select_tabs_duplicate_years_annotation():
 def test_derive_column_candidates_glossary():
     ctx = DomainContext(glossary={"qty": "quantity", "amt": "amount"})
     payload = {
-        "summary": {"formula_cell_count": 0, "functions_used": [], "column_formula_patterns": {}},
+        "summary": {
+            "formula_cell_count": 0,
+            "functions_used": [],
+            "column_formula_patterns": {},
+        },
         "raw": {
-            "sheets": [{
-                "data": [{
-                    "startRow": 0,
-                    "rowData": [
-                        {"values": [{"formattedValue": "Qty"}, {"formattedValue": "Item"}, {"formattedValue": "Price"}, {"formattedValue": "Date"}]},
-                        {"values": [{"formattedValue": "5"}, {"formattedValue": "Apple"}, {"formattedValue": "1.00"}, {"formattedValue": "2025-01-01"}]},
+            "sheets": [
+                {
+                    "data": [
+                        {
+                            "startRow": 0,
+                            "rowData": [
+                                {
+                                    "values": [
+                                        {"formattedValue": "Qty"},
+                                        {"formattedValue": "Item"},
+                                        {"formattedValue": "Price"},
+                                        {"formattedValue": "Date"},
+                                    ]
+                                },
+                                {
+                                    "values": [
+                                        {"formattedValue": "5"},
+                                        {"formattedValue": "Apple"},
+                                        {"formattedValue": "1.00"},
+                                        {"formattedValue": "2025-01-01"},
+                                    ]
+                                },
+                            ],
+                        }
                     ],
-                }],
-            }],
+                }
+            ],
         },
     }
     candidates = derive_column_candidates(
-        workbook_code="402", year=2025, spreadsheet_id="s1", tab_title="Test",
+        workbook_code="402",
+        year=2025,
+        spreadsheet_id="s1",
+        tab_title="Test",
         payload=payload,
         column_score_heuristics={"domain_keyword_tokens": ["quantity"]},
         domain_context=ctx,
@@ -1663,16 +1756,38 @@ def test_derive_column_candidates_glossary():
 def test_select_tabs_no_domain_context_unchanged():
     """Without domain_context, legacy behavior: coverage bonus, no duplicate_years."""
     index_records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+        {
+            "year": 2023,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2023",
+        },
+        {
+            "year": 2024,
+            "workbook_code": "402",
+            "spreadsheet_id": "s2",
+            "spreadsheet_name": "402 2024",
+        },
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s3",
+            "spreadsheet_name": "402 2025",
+        },
     ]
     inventory_rows = [
-        {"spreadsheet_id": f"s{i}", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"}
+        {
+            "spreadsheet_id": f"s{i}",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        }
         for i in range(1, 4)
     ]
     selected = select_tabs_from_inventory(
-        index_records, inventory_rows,
+        index_records,
+        inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
     )
     entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
@@ -1683,15 +1798,38 @@ def test_select_tabs_no_domain_context_unchanged():
 def test_select_tabs_legacy_coverage_bonus_two_years():
     """Legacy mode (no domain context) awards coverage bonus at >=2 years."""
     index_records = [
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2025"},
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2026"},
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2025",
+        },
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "s2",
+            "spreadsheet_name": "402 2026",
+        },
     ]
     inventory_rows = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
-        {"spreadsheet_id": "s2", "sheet_id": 1, "rows": 500, "cols": 20, "tab_title": "Crop Planner"},
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        },
+        {
+            "spreadsheet_id": "s2",
+            "sheet_id": 1,
+            "rows": 500,
+            "cols": 20,
+            "tab_title": "Crop Planner",
+        },
     ]
     selected = select_tabs_from_inventory(
-        index_records, inventory_rows,
+        index_records,
+        inventory_rows,
         tab_score_heuristics={"operational_tokens": ["crop"]},
     )
     entry = next(r for r in selected if r["tab_title"] == "Crop Planner")
@@ -1708,8 +1846,18 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
         "generated_from": f"drive_discovery_{date_stamp}.json",
         "record_count": 2,
         "records": [
-            {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2024"},
-            {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2026"},
+            {
+                "year": 2024,
+                "workbook_code": "402",
+                "spreadsheet_id": "s1",
+                "spreadsheet_name": "402 2024",
+            },
+            {
+                "year": 2026,
+                "workbook_code": "402",
+                "spreadsheet_id": "s2",
+                "spreadsheet_name": "402 2026",
+            },
         ],
     }
     index_path = corpus_out_dir / f"in_scope_workbook_index_{date_stamp}.json"
@@ -1721,8 +1869,20 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
         "failure_count": 0,
         "results": [],
         "inventory_rows": [
-            {"spreadsheet_id": "s1", "sheet_id": 0, "rows": 100, "cols": 10, "tab_title": "Plan Board"},
-            {"spreadsheet_id": "s2", "sheet_id": 0, "rows": 100, "cols": 10, "tab_title": "Plan Board"},
+            {
+                "spreadsheet_id": "s1",
+                "sheet_id": 0,
+                "rows": 100,
+                "cols": 10,
+                "tab_title": "Plan Board",
+            },
+            {
+                "spreadsheet_id": "s2",
+                "sheet_id": 0,
+                "rows": 100,
+                "cols": 10,
+                "tab_title": "Plan Board",
+            },
         ],
     }
     broad_path = corpus_out_dir / f"broad_profile_coverage_{date_stamp}.json"
@@ -1748,10 +1908,17 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
     mock_sheets = MagicMock()
 
     with (
-        patch("profiler.management.commands.profile_drive_folder.walk_folder") as mock_walk,
+        patch(
+            "profiler.management.commands.profile_drive_folder.walk_folder"
+        ) as mock_walk,
         patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
-        patch("profiler.tools.cohort_corpus.fetch_tab_grid", return_value={"sheets": []}),
-        patch("profiler.tools.cohort_corpus.summarize_tab", return_value={"formula_cell_count": 0}),
+        patch(
+            "profiler.tools.cohort_corpus.fetch_tab_grid", return_value={"sheets": []}
+        ),
+        patch(
+            "profiler.tools.cohort_corpus.summarize_tab",
+            return_value={"formula_cell_count": 0},
+        ),
     ):
         outputs = run_cohort_corpus(
             drive_service=mock_drive,
@@ -1766,7 +1933,9 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
     mock_list_tabs.assert_not_called()
 
     deep_coverage = json.loads(
-        (corpus_out_dir / f"deep_profile_coverage_{date_stamp}.json").read_text(encoding="utf-8")
+        (corpus_out_dir / f"deep_profile_coverage_{date_stamp}.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert deep_coverage["success_count"] == 1
     assert "dedup_trace" in deep_coverage
@@ -1793,7 +1962,9 @@ def test_compile_exclude_regexes_selects_exclude_mode_only():
 
 def test_compile_exclude_regexes_skip_missing_pattern():
     """Entries without a ``pattern`` key are silently skipped."""
-    regexes = _compile_exclude_regexes({"tab_exclude_patterns": [{"exclude": True}, {}]})
+    regexes = _compile_exclude_regexes(
+        {"tab_exclude_patterns": [{"exclude": True}, {}]}
+    )
     assert len(regexes) == 0
 
 
@@ -1830,9 +2001,27 @@ def test_select_tabs_from_inventory_exclude_mode_removes_tabs():
         }
     ]
     inventory = [
-        {"spreadsheet_id": "s1", "sheet_id": 1, "rows": 50, "cols": 10, "tab_title": "Plan Board"},
-        {"spreadsheet_id": "s1", "sheet_id": 2, "rows": 10, "cols": 5, "tab_title": "Sheet1"},
-        {"spreadsheet_id": "s1", "sheet_id": 3, "rows": 5, "cols": 3, "tab_title": "hidden data"},
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 1,
+            "rows": 50,
+            "cols": 10,
+            "tab_title": "Plan Board",
+        },
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 2,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Sheet1",
+        },
+        {
+            "spreadsheet_id": "s1",
+            "sheet_id": 3,
+            "rows": 5,
+            "cols": 3,
+            "tab_title": "hidden data",
+        },
     ]
     heuristics = {
         "operational_tokens": ["plan", "board"],
@@ -1842,7 +2031,9 @@ def test_select_tabs_from_inventory_exclude_mode_removes_tabs():
             {"pattern": "hidden", "exclude": True},
         ],
     }
-    result = select_tabs_from_inventory(index, inventory, tab_score_heuristics=heuristics)
+    result = select_tabs_from_inventory(
+        index, inventory, tab_score_heuristics=heuristics
+    )
     titles = [r["tab_title"] for r in result]
     assert "Plan Board" in titles
     assert "Sheet1" not in titles
@@ -1855,12 +2046,36 @@ def test_select_tabs_from_inventory_exclude_mode_removes_tabs():
 def test_auto_select_tabs_score_cutoff_excludes_low_scores():
     """``score_cutoff`` excludes tabs below the threshold even if slots remain."""
     shortlist = [
-        {"workbook_code": "402", "tab_title": "Good", "final_score": 5.0, "occurrences": 1,
-         "avg_score": 5.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
-        {"workbook_code": "402", "tab_title": "Mid", "final_score": 2.0, "occurrences": 1,
-         "avg_score": 2.0, "confidence": "medium", "coverage_bonus": 0, "reasons": ["ref"]},
-        {"workbook_code": "402", "tab_title": "Bad", "final_score": -3.0, "occurrences": 1,
-         "avg_score": -3.0, "confidence": "low", "coverage_bonus": 0, "reasons": ["bad"]},
+        {
+            "workbook_code": "402",
+            "tab_title": "Good",
+            "final_score": 5.0,
+            "occurrences": 1,
+            "avg_score": 5.0,
+            "confidence": "high",
+            "coverage_bonus": 0,
+            "reasons": ["op"],
+        },
+        {
+            "workbook_code": "402",
+            "tab_title": "Mid",
+            "final_score": 2.0,
+            "occurrences": 1,
+            "avg_score": 2.0,
+            "confidence": "medium",
+            "coverage_bonus": 0,
+            "reasons": ["ref"],
+        },
+        {
+            "workbook_code": "402",
+            "tab_title": "Bad",
+            "final_score": -3.0,
+            "occurrences": 1,
+            "avg_score": -3.0,
+            "confidence": "low",
+            "coverage_bonus": 0,
+            "reasons": ["bad"],
+        },
     ]
     approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=0.0)
     assert "Good" in approved["402"]
@@ -1871,10 +2086,26 @@ def test_auto_select_tabs_score_cutoff_excludes_low_scores():
 def test_auto_select_tabs_score_cutoff_no_effect_when_none():
     """``score_cutoff=None`` behaves as before (no filtering)."""
     shortlist = [
-        {"workbook_code": "402", "tab_title": "A", "final_score": -5.0, "occurrences": 1,
-         "avg_score": -5.0, "confidence": "low", "coverage_bonus": 0, "reasons": []},
-        {"workbook_code": "402", "tab_title": "B", "final_score": 3.0, "occurrences": 1,
-         "avg_score": 3.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
+        {
+            "workbook_code": "402",
+            "tab_title": "A",
+            "final_score": -5.0,
+            "occurrences": 1,
+            "avg_score": -5.0,
+            "confidence": "low",
+            "coverage_bonus": 0,
+            "reasons": [],
+        },
+        {
+            "workbook_code": "402",
+            "tab_title": "B",
+            "final_score": 3.0,
+            "occurrences": 1,
+            "avg_score": 3.0,
+            "confidence": "high",
+            "coverage_bonus": 0,
+            "reasons": ["op"],
+        },
     ]
     approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=None)
     assert len(approved["402"]) == 2
@@ -1886,8 +2117,16 @@ def test_auto_select_tabs_score_cutoff_no_effect_when_none():
 def test_auto_select_tabs_details_includes_scores_and_reasons():
     """The second return value contains per-tab score data."""
     shortlist = [
-        {"workbook_code": "402", "tab_title": "Plan", "final_score": 4.5, "occurrences": 2,
-         "avg_score": 4.0, "confidence": "high", "coverage_bonus": 1, "reasons": ["op"]},
+        {
+            "workbook_code": "402",
+            "tab_title": "Plan",
+            "final_score": 4.5,
+            "occurrences": 2,
+            "avg_score": 4.0,
+            "confidence": "high",
+            "coverage_bonus": 1,
+            "reasons": ["op"],
+        },
     ]
     approved, details = auto_select_tabs(shortlist, per_workbook=5)
     assert approved["402"] == ["Plan"]
@@ -1904,10 +2143,26 @@ def test_auto_select_tabs_details_includes_scores_and_reasons():
 def test_auto_select_tabs_details_multiple_workbooks():
     """Details are grouped per workbook code."""
     shortlist = [
-        {"workbook_code": "402", "tab_title": "A", "final_score": 5.0, "occurrences": 1,
-         "avg_score": 5.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
-        {"workbook_code": "602", "tab_title": "B", "final_score": 3.0, "occurrences": 2,
-         "avg_score": 3.0, "confidence": "medium", "coverage_bonus": 0, "reasons": ["ref"]},
+        {
+            "workbook_code": "402",
+            "tab_title": "A",
+            "final_score": 5.0,
+            "occurrences": 1,
+            "avg_score": 5.0,
+            "confidence": "high",
+            "coverage_bonus": 0,
+            "reasons": ["op"],
+        },
+        {
+            "workbook_code": "602",
+            "tab_title": "B",
+            "final_score": 3.0,
+            "occurrences": 2,
+            "avg_score": 3.0,
+            "confidence": "medium",
+            "coverage_bonus": 0,
+            "reasons": ["ref"],
+        },
     ]
     approved, details = auto_select_tabs(shortlist, per_workbook=5)
     assert "402" in details
@@ -1919,10 +2174,26 @@ def test_auto_select_tabs_details_multiple_workbooks():
 def test_auto_select_tabs_details_with_score_cutoff():
     """Details only includes tabs that survive the cutoff."""
     shortlist = [
-        {"workbook_code": "402", "tab_title": "High", "final_score": 8.0, "occurrences": 1,
-         "avg_score": 8.0, "confidence": "high", "coverage_bonus": 0, "reasons": ["op"]},
-        {"workbook_code": "402", "tab_title": "Low", "final_score": -1.0, "occurrences": 1,
-         "avg_score": -1.0, "confidence": "low", "coverage_bonus": 0, "reasons": ["bad"]},
+        {
+            "workbook_code": "402",
+            "tab_title": "High",
+            "final_score": 8.0,
+            "occurrences": 1,
+            "avg_score": 8.0,
+            "confidence": "high",
+            "coverage_bonus": 0,
+            "reasons": ["op"],
+        },
+        {
+            "workbook_code": "402",
+            "tab_title": "Low",
+            "final_score": -1.0,
+            "occurrences": 1,
+            "avg_score": -1.0,
+            "confidence": "low",
+            "coverage_bonus": 0,
+            "reasons": ["bad"],
+        },
     ]
     approved, details = auto_select_tabs(shortlist, per_workbook=5, score_cutoff=0.0)
     assert len(details["402"]) == 1
@@ -1935,24 +2206,61 @@ def test_auto_select_tabs_details_with_score_cutoff():
 def test_select_tabs_per_workbook_heuristic_overrides():
     """Per-workbook heuristic overrides affect scoring for that workbook only."""
     index = [
-        {"spreadsheet_id": "s402", "workbook_code": "402", "year": 2026,
-         "spreadsheet_name": "402 Plan"},
-        {"spreadsheet_id": "s602", "workbook_code": "602", "year": 2026,
-         "spreadsheet_name": "602 Harvest"},
+        {
+            "spreadsheet_id": "s402",
+            "workbook_code": "402",
+            "year": 2026,
+            "spreadsheet_name": "402 Plan",
+        },
+        {
+            "spreadsheet_id": "s602",
+            "workbook_code": "602",
+            "year": 2026,
+            "spreadsheet_name": "602 Harvest",
+        },
     ]
     inventory = [
-        {"spreadsheet_id": "s402", "sheet_id": 1, "rows": 10, "cols": 5, "tab_title": "Crop Plan"},
-        {"spreadsheet_id": "s402", "sheet_id": 2, "rows": 10, "cols": 5, "tab_title": "Other Data"},
-        {"spreadsheet_id": "s602", "sheet_id": 3, "rows": 10, "cols": 5, "tab_title": "Harvest Log"},
-        {"spreadsheet_id": "s602", "sheet_id": 4, "rows": 10, "cols": 5, "tab_title": "Temp Ref"},
+        {
+            "spreadsheet_id": "s402",
+            "sheet_id": 1,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Crop Plan",
+        },
+        {
+            "spreadsheet_id": "s402",
+            "sheet_id": 2,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Other Data",
+        },
+        {
+            "spreadsheet_id": "s602",
+            "sheet_id": 3,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Harvest Log",
+        },
+        {
+            "spreadsheet_id": "s602",
+            "sheet_id": 4,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Temp Ref",
+        },
     ]
-    base = {"operational_tokens": [], "reference_tokens": [],
-            "support_tokens": [], "derived_tokens": []}
+    base = {
+        "operational_tokens": [],
+        "reference_tokens": [],
+        "support_tokens": [],
+        "derived_tokens": [],
+    }
     overrides = {
         "402": {"operational_tokens": ["crop", "plan"], "operational_weight": 4},
     }
     result = select_tabs_from_inventory(
-        index, inventory,
+        index,
+        inventory,
         tab_score_heuristics=base,
         per_workbook_heuristic_overrides=overrides,
     )
@@ -1969,20 +2277,42 @@ def test_select_tabs_per_workbook_heuristic_overrides():
 def test_select_tabs_per_workbook_exclude_patterns():
     """Per-workbook exclude-mode patterns remove tabs for that workbook only."""
     index = [
-        {"spreadsheet_id": "s402", "workbook_code": "402", "year": 2026,
-         "spreadsheet_name": "402 Plan"},
+        {
+            "spreadsheet_id": "s402",
+            "workbook_code": "402",
+            "year": 2026,
+            "spreadsheet_name": "402 Plan",
+        },
     ]
     inventory = [
-        {"spreadsheet_id": "s402", "sheet_id": 1, "rows": 100, "cols": 10,
-         "tab_title": "Plan Board"},
-        {"spreadsheet_id": "s402", "sheet_id": 2, "rows": 10, "cols": 5,
-         "tab_title": "Sheet1"},
+        {
+            "spreadsheet_id": "s402",
+            "sheet_id": 1,
+            "rows": 100,
+            "cols": 10,
+            "tab_title": "Plan Board",
+        },
+        {
+            "spreadsheet_id": "s402",
+            "sheet_id": 2,
+            "rows": 10,
+            "cols": 5,
+            "tab_title": "Sheet1",
+        },
     ]
-    base = {"operational_tokens": ["plan", "board"], "operational_weight": 3,
-            "reference_tokens": [], "support_tokens": [], "derived_tokens": []}
-    overrides = {"402": {"tab_exclude_patterns": [{"pattern": r"^Sheet\d+$", "exclude": True}]}}
+    base = {
+        "operational_tokens": ["plan", "board"],
+        "operational_weight": 3,
+        "reference_tokens": [],
+        "support_tokens": [],
+        "derived_tokens": [],
+    }
+    overrides = {
+        "402": {"tab_exclude_patterns": [{"pattern": r"^Sheet\d+$", "exclude": True}]}
+    }
     result = select_tabs_from_inventory(
-        index, inventory,
+        index,
+        inventory,
         tab_score_heuristics=base,
         per_workbook_heuristic_overrides=overrides,
     )

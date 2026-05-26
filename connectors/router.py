@@ -6,8 +6,6 @@ dict and returns the appropriate :class:`~connectors.base.ProviderAdapter`
 subclass, keeping all provider-dispatch logic in one place.
 """
 
-from django.core.management.base import CommandError
-
 from connectors.coda import CodaAdapter
 from connectors.google_provider import GoogleSheetsAdapter
 from connectors.google_sheets import default_throttle

@@ -132,15 +132,32 @@ tables:
 
 def test_generate_import_skips_invalid_tables(tmp_path, monkeypatch):
     from django.core.management import call_command
+
     contract = tmp_path / "contract.yaml"
     contract.write_text(
-        yaml.safe_dump({
-            "version": "1.0",
-            "tables": [
-                {"model_name": "Valid", "import_config": {"bundle_path": "test.csv"}, "columns": [{"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 100}}]},
-                {"model_name": "", "import_config": {"bundle_path": "test.csv"}, "columns": []},
-            ],
-        })
+        yaml.safe_dump(
+            {
+                "version": "1.0",
+                "tables": [
+                    {
+                        "model_name": "Valid",
+                        "import_config": {"bundle_path": "test.csv"},
+                        "columns": [
+                            {
+                                "suggested_field_name": "name",
+                                "django_field_class": "models.CharField",
+                                "django_field_kwargs": {"max_length": 100},
+                            }
+                        ],
+                    },
+                    {
+                        "model_name": "",
+                        "import_config": {"bundle_path": "test.csv"},
+                        "columns": [],
+                    },
+                ],
+            }
+        )
     )
     out = tmp_path / "import.py"
     call_command("generate_import", contract=str(contract), out=str(out), force=True)
@@ -152,25 +169,27 @@ def test_generate_import_year_aware_contract(tmp_path):
     """When contract has {year} in bundle_path, generated command includes year-loop."""
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
-        yaml.safe_dump({
-            "version": "1.3",
-            "tables": [
-                {
-                    "model_name": "Crop",
-                    "columns": [
-                        {
-                            "suggested_field_name": "name",
-                            "django_field_class": "models.CharField",
-                            "django_field_kwargs": {"max_length": 200},
+        yaml.safe_dump(
+            {
+                "version": "1.3",
+                "tables": [
+                    {
+                        "model_name": "Crop",
+                        "columns": [
+                            {
+                                "suggested_field_name": "name",
+                                "django_field_class": "models.CharField",
+                                "django_field_kwargs": {"max_length": 200},
+                            },
+                        ],
+                        "import_config": {
+                            "bundle_path": "{year}/crops.csv",
+                            "unique_on": ["name"],
                         },
-                    ],
-                    "import_config": {
-                        "bundle_path": "{year}/crops.csv",
-                        "unique_on": ["name"],
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
     )
     out_path = tmp_path / "import_core.py"
     call_command(
@@ -190,25 +209,27 @@ def test_generate_import_static_bundle_path_unchanged(tmp_path):
     """When contract has static bundle_path, generated command matches existing format."""
     contract_path = tmp_path / "contract.yaml"
     contract_path.write_text(
-        yaml.safe_dump({
-            "version": "1.3",
-            "tables": [
-                {
-                    "model_name": "Crop",
-                    "columns": [
-                        {
-                            "suggested_field_name": "name",
-                            "django_field_class": "models.CharField",
-                            "django_field_kwargs": {"max_length": 200},
+        yaml.safe_dump(
+            {
+                "version": "1.3",
+                "tables": [
+                    {
+                        "model_name": "Crop",
+                        "columns": [
+                            {
+                                "suggested_field_name": "name",
+                                "django_field_class": "models.CharField",
+                                "django_field_kwargs": {"max_length": 200},
+                            },
+                        ],
+                        "import_config": {
+                            "bundle_path": "crops.csv",
+                            "unique_on": ["name"],
                         },
-                    ],
-                    "import_config": {
-                        "bundle_path": "crops.csv",
-                        "unique_on": ["name"],
                     },
-                },
-            ],
-        })
+                ],
+            }
+        )
     )
     out_path = tmp_path / "import_core.py"
     call_command(

@@ -1,6 +1,6 @@
 from pathlib import Path
 import yaml
-from workbook.partial_output import PartialOutputCollector, RejectedTable
+from workbook.partial_output import PartialOutputCollector
 
 
 def test_collector_add_and_summary():

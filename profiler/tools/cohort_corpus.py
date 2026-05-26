@@ -574,7 +574,11 @@ def _compile_exclude_regexes(
     """
     exclude_regexes: list[re.Pattern] = []
     for entry in (tab_score_heuristics or {}).get("tab_exclude_patterns", []):
-        if isinstance(entry, dict) and entry.get("exclude", False) and "pattern" in entry:
+        if (
+            isinstance(entry, dict)
+            and entry.get("exclude", False)
+            and "pattern" in entry
+        ):
             try:
                 exclude_regexes.append(re.compile(entry["pattern"]))
             except re.error:
@@ -614,7 +618,8 @@ def select_tabs_from_inventory(
         # entirely from the candidate pool before scoring.
         if any(
             exclude_re.search(row["tab_title"])
-            for exclude_re in tab_exclude_regexes + per_wb_exclude_regexes.get(wb_code, [])
+            for exclude_re in tab_exclude_regexes
+            + per_wb_exclude_regexes.get(wb_code, [])
         ):
             continue
 
@@ -626,9 +631,8 @@ def select_tabs_from_inventory(
                 for override_key, override_value in wb_overrides.items():
                     if override_key == "tab_exclude_patterns":
                         continue  # already handled by _compile_exclude_regexes
-                    if (
-                        isinstance(override_value, list)
-                        and isinstance(merged.get(override_key), list)
+                    if isinstance(override_value, list) and isinstance(
+                        merged.get(override_key), list
                     ):
                         merged[override_key] = merged[override_key] + override_value
                     else:
@@ -1388,7 +1392,9 @@ def run_cohort_corpus(
                 "Re-run discovery without resume flags to regenerate in the new format."
             )
         for inventory_row in inventory_rows:
-            known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
+            known_tabs.add(
+                (inventory_row["spreadsheet_id"], inventory_row["tab_title"])
+            )
         try:
             workbook_index_payload = json.loads(index_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
@@ -1551,7 +1557,9 @@ def run_cohort_corpus(
         )
 
         for inventory_row in inventory_rows:
-            known_tabs.add((inventory_row["spreadsheet_id"], inventory_row["tab_title"]))
+            known_tabs.add(
+                (inventory_row["spreadsheet_id"], inventory_row["tab_title"])
+            )
 
         tab_shortlist = select_tabs_from_inventory(
             index_records,

@@ -131,7 +131,9 @@ def render_model(
     return "\n".join(lines) + "\n", get_and_clear_codegen_warnings()
 
 
-def render_models_py(contract: dict[str, Any], app_label: str = "core") -> tuple[str, list[str]]:
+def render_models_py(
+    contract: dict[str, Any], app_label: str = "core"
+) -> tuple[str, list[str]]:
     """Render a complete ``models.py`` file from a schema contract.
 
     Args:

@@ -9,7 +9,6 @@ identical to the pre-domain-context baseline.
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 

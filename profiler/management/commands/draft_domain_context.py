@@ -25,8 +25,12 @@ class Command(BaseCommand):
     help = "Draft domain_context.yaml from drive tree and optional raw notes."
 
     def add_arguments(self, parser):
-        parser.add_argument("--drive-tree", required=True, help="Path to drive_tree.json")
-        parser.add_argument("--raw-notes-dir", default=None, help="Directory with .md/.txt raw notes")
+        parser.add_argument(
+            "--drive-tree", required=True, help="Path to drive_tree.json"
+        )
+        parser.add_argument(
+            "--raw-notes-dir", default=None, help="Directory with .md/.txt raw notes"
+        )
         parser.add_argument("--out", default=None, help="Output path (default: stdout)")
         parser.add_argument("--smoke", action="store_true", help="Smoke test mode")
 
@@ -79,7 +83,11 @@ class Command(BaseCommand):
 
                 freq = Counter(all_words)
                 for category, starters in _STARTER_KEYWORDS.items():
-                    hits = [(word, count) for word, count in freq.most_common(200) if word in starters]
+                    hits = [
+                        (word, count)
+                        for word, count in freq.most_common(200)
+                        if word in starters
+                    ]
                     vocabulary[category] = [word for word, _count in hits[:5]]
 
         payload = {
@@ -97,9 +105,7 @@ class Command(BaseCommand):
             },
             "deduplication": {
                 "strategy": "latest_year",
-                "exceptions": [
-                    {"tab_title": "", "reason": ""}
-                ],
+                "exceptions": [{"tab_title": "", "reason": ""}],
             },
             "entities": [],
             "vocabulary": vocabulary,
@@ -107,7 +113,9 @@ class Command(BaseCommand):
             "scope_notes": "",
         }
 
-        yaml_text = yaml.dump(payload, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        yaml_text = yaml.dump(
+            payload, default_flow_style=False, sort_keys=False, allow_unicode=True
+        )
 
         out_path = options.get("out")
         if out_path:

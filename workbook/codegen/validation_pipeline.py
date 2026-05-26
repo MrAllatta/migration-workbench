@@ -109,9 +109,7 @@ def partition_contract_on_validation(
     for model_name in sorted(error_model_names):
         table = table_by_model_name.get(model_name, {"model_name": model_name})
         first_result = next(
-            r
-            for r in results
-            if r.model_name == model_name and r.severity == "error"
+            r for r in results if r.model_name == model_name and r.severity == "error"
         )
         collector.add(
             table,

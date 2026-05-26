@@ -76,7 +76,9 @@ def load_profile(path: Path) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Assess spreadsheet complexity for scoping")
+    parser = argparse.ArgumentParser(
+        description="Assess spreadsheet complexity for scoping"
+    )
     parser.add_argument("--profile", type=Path, help="Path to profiler output JSON")
     args = parser.parse_args()
 

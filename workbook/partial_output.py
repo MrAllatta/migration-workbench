@@ -23,7 +23,14 @@ class PartialOutputCollector:
 
     rejected: list[RejectedTable] = field(default_factory=list)
 
-    def add(self, table: dict[str, Any], *, check_id: str, message: str, action: str | None = None) -> None:
+    def add(
+        self,
+        table: dict[str, Any],
+        *,
+        check_id: str,
+        message: str,
+        action: str | None = None,
+    ) -> None:
         """Record a rejected table."""
         self.rejected.append(
             RejectedTable(
@@ -57,15 +64,20 @@ class PartialOutputCollector:
                 for r in self.rejected
             ]
         }
-        path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        path.write_text(
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
 
     def summary(self) -> str:
         """Return a human-readable summary string."""
-        lines = [f"WARN[SCAFFOLD_PARTIAL_OUTPUT]: wrote partial output."]
+        lines = ["WARN[SCAFFOLD_PARTIAL_OUTPUT]: wrote partial output."]
         lines.append(f"  Tables rejected: {len(self.rejected)}")
         for r in self.rejected:
             tab_info = f" ({r.source_tab_title})" if r.source_tab_title else ""
             lines.append(f"  - {r.check_id}: {r.message}{tab_info}")
         if self.rejected:
-            lines.append("  Action: Review rejected tables, fix upstream data, and re-run without --continue-on-error.")
+            lines.append(
+                "  Action: Review rejected tables, fix upstream data, and re-run without --continue-on-error."
+            )
         return "\n".join(lines)

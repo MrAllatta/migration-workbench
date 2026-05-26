@@ -1,9 +1,5 @@
 """Tests for domain context loading, vocabulary merging, and index deduplication."""
 
-from pathlib import Path
-
-import pytest
-
 from profiler.tools.domain_context import (
     DomainContext,
     deduplicate_index_records,
@@ -78,14 +74,38 @@ def test_merge_vocabulary_no_context():
 
 def test_deduplicate_index_records_filters_archived():
     ctx = DomainContext(
-        year_scope=DomainContext.YearScope(active=[2025, 2026], archived=[2023, 2024], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
+        year_scope=DomainContext.YearScope(
+            active=[2025, 2026], archived=[2023, 2024], forward=[]
+        ),
+        deduplication=DomainContext.DeduplicationContext(
+            strategy="latest_year", exceptions=[]
+        ),
     )
     records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2024, "workbook_code": "402", "spreadsheet_id": "s2", "spreadsheet_name": "402 2024"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
-        {"year": 2026, "workbook_code": "402", "spreadsheet_id": "s4", "spreadsheet_name": "402 2026"},
+        {
+            "year": 2023,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2023",
+        },
+        {
+            "year": 2024,
+            "workbook_code": "402",
+            "spreadsheet_id": "s2",
+            "spreadsheet_name": "402 2024",
+        },
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s3",
+            "spreadsheet_name": "402 2025",
+        },
+        {
+            "year": 2026,
+            "workbook_code": "402",
+            "spreadsheet_id": "s4",
+            "spreadsheet_name": "402 2026",
+        },
     ]
     approved = {"402": ["Crop Planner"]}
     filtered = deduplicate_index_records(records, approved, ctx)
@@ -96,11 +116,23 @@ def test_deduplicate_index_records_filters_archived():
 def test_deduplicate_index_records_archived_filter():
     ctx = DomainContext(
         year_scope=DomainContext.YearScope(active=[2025], archived=[2023], forward=[]),
-        deduplication=DomainContext.DeduplicationContext(strategy="latest_year", exceptions=[]),
+        deduplication=DomainContext.DeduplicationContext(
+            strategy="latest_year", exceptions=[]
+        ),
     )
     records = [
-        {"year": 2023, "workbook_code": "402", "spreadsheet_id": "s1", "spreadsheet_name": "402 2023"},
-        {"year": 2025, "workbook_code": "402", "spreadsheet_id": "s3", "spreadsheet_name": "402 2025"},
+        {
+            "year": 2023,
+            "workbook_code": "402",
+            "spreadsheet_id": "s1",
+            "spreadsheet_name": "402 2023",
+        },
+        {
+            "year": 2025,
+            "workbook_code": "402",
+            "spreadsheet_id": "s3",
+            "spreadsheet_name": "402 2025",
+        },
     ]
     approved = {"402": ["Crop Planner"]}
     filtered = deduplicate_index_records(records, approved, ctx)

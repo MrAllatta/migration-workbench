@@ -1,7 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, mock_open
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -9,7 +9,6 @@ import preflight
 
 
 class TestCheckVenv(unittest.TestCase):
-
     def test_missing_venv_exits_with_code_1(self):
         with patch.object(preflight, "VENV_DIR", Path("/fake/.venv")):
             with patch.object(Path, "exists", return_value=False):
@@ -36,7 +35,6 @@ class TestCheckVenv(unittest.TestCase):
 
 
 class TestCheckWb(unittest.TestCase):
-
     def test_wb_not_found_exits_with_code_1(self):
         with patch.object(preflight, "WB_PATH", Path("/fake/.venv/bin/wb")):
             with patch.object(preflight, "VENV_DIR", Path("/fake/.venv")):
@@ -66,7 +64,6 @@ class TestCheckWb(unittest.TestCase):
 
 
 class TestCheckDomainContext(unittest.TestCase):
-
     def test_config_missing_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=False):
@@ -102,7 +99,10 @@ class TestCheckDomainContext(unittest.TestCase):
     def test_year_scope_empty_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=True):
-                with patch("builtins.open", mock_open(read_data="domain: myapp\nyear_scope:\n  active: []")):
+                with patch(
+                    "builtins.open",
+                    mock_open(read_data="domain: myapp\nyear_scope:\n  active: []"),
+                ):
                     with self.assertRaises(SystemExit) as cm:
                         preflight.check_domain_context()
                     self.assertEqual(cm.exception.code, 1)
@@ -110,7 +110,12 @@ class TestCheckDomainContext(unittest.TestCase):
     def test_vocabulary_empty_exits_with_code_1(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=True):
-                with patch("builtins.open", mock_open(read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational: []\n  reference: []")):
+                with patch(
+                    "builtins.open",
+                    mock_open(
+                        read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational: []\n  reference: []"
+                    ),
+                ):
                     with self.assertRaises(SystemExit) as cm:
                         preflight.check_domain_context()
                     self.assertEqual(cm.exception.code, 1)
@@ -118,13 +123,17 @@ class TestCheckDomainContext(unittest.TestCase):
     def test_all_valid_passes(self):
         with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
             with patch.object(Path, "exists", return_value=True):
-                with patch("builtins.open", mock_open(read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational:\n    - order\n    - invoice")):
+                with patch(
+                    "builtins.open",
+                    mock_open(
+                        read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational:\n    - order\n    - invoice"
+                    ),
+                ):
                     result = preflight.check_domain_context()
                     self.assertTrue(result)
 
 
 class TestMainIntegration(unittest.TestCase):
-
     def test_missing_venv_exits_with_code_1(self):
         with patch.object(preflight, "VENV_DIR", Path("/fake/.venv")):
             with patch.object(Path, "exists", return_value=False):
@@ -135,7 +144,9 @@ class TestMainIntegration(unittest.TestCase):
     def test_wb_not_found_exits_with_code_1(self):
         with patch.object(preflight, "WB_PATH", Path("/fake/.venv/bin/wb")):
             with patch.object(preflight, "VENV_DIR", Path("/fake/.venv")):
-                with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
+                with patch.object(
+                    preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")
+                ):
                     with patch.object(Path, "exists", return_value=False):
                         with patch("shutil.which", return_value=None):
                             with self.assertRaises(SystemExit) as cm:
@@ -145,10 +156,17 @@ class TestMainIntegration(unittest.TestCase):
     def test_all_checks_pass_exits_with_code_0(self):
         with patch.object(preflight, "WB_PATH", Path("/fake/.venv/bin/wb")):
             with patch.object(preflight, "VENV_DIR", Path("/fake/.venv")):
-                with patch.object(preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")):
+                with patch.object(
+                    preflight, "DOMAIN_CONTEXT_PATH", Path("/fake/config.yaml")
+                ):
                     with patch.object(Path, "exists", return_value=True):
                         with patch("shutil.which", return_value="/usr/bin/wb"):
-                            with patch("builtins.open", mock_open(read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational:\n    - order")):
+                            with patch(
+                                "builtins.open",
+                                mock_open(
+                                    read_data="domain: myapp\nyear_scope:\n  active: [2024]\nvocabulary:\n  operational:\n    - order"
+                                ),
+                            ):
                                 try:
                                     preflight.main()
                                     self.fail("Expected SystemExit with code 0")

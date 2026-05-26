@@ -197,12 +197,7 @@ class PipelineState:
             ) from exc
 
         file_path.write_text(
-            yaml.safe_dump(
-                payload,
-                sort_keys=False,
-                allow_unicode=True,
-                default_flow_style=False,
-            ),
+            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True, default_flow_style=False),
             encoding="utf-8",
         )
         logger.info("saved checkpoint %s", file_path)
@@ -339,16 +334,10 @@ class PipelineState:
         for field_name in ("broad_inventory", "shortlist"):
             data = getattr(discovery, field_name)
             if data:
-                artifact_path = (
-                    base_dir / f"pipeline-state-{field_name}.json"
-                )
-                artifact_path.write_text(
-                    json.dumps(data, indent=2), encoding="utf-8"
-                )
+                artifact_path = base_dir / f"pipeline-state-{field_name}.json"
+                artifact_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
                 disc[field_name] = {
-                    "_artifact": str(
-                        artifact_path.relative_to(base_dir)
-                    )
+                    "_artifact": str(artifact_path.relative_to(base_dir))
                 }
             else:
                 disc[field_name] = []
@@ -425,12 +414,7 @@ class PipelineState:
             or {"strategy": "latest_year", "exceptions": []},
             entities=list(domain_raw.get("entities") or []),
             vocabulary=domain_raw.get("vocabulary")
-            or {
-                "operational": [],
-                "reference": [],
-                "support": [],
-                "derived": [],
-            },
+            or {"operational": [], "reference": [], "support": [], "derived": []},
             glossary=dict(domain_raw.get("glossary") or {}),
             scope_notes=str(domain_raw.get("scope_notes", "")),
         )
@@ -592,8 +576,7 @@ def _resolve_artifacts(node: Any, base_dir: Path) -> Any:
                     return []
             else:
                 logger.warning(
-                    "artifact not found: %s — using empty list",
-                    artifact_path,
+                    "artifact not found: %s — using empty list", artifact_path
                 )
                 return []
         else:

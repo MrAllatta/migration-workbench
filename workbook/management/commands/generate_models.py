@@ -87,7 +87,9 @@ class Command(BaseCommand):
         results = strict_validate_contract(contract)
         try:
             clean_contract, rejection_collector = partition_contract_on_validation(
-                contract, results, out_path=out_path,
+                contract,
+                results,
+                out_path=out_path,
             )
         except GlobalValidationError as exc:
             raise CommandError(str(exc)) from exc

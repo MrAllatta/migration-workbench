@@ -190,7 +190,7 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
     return (
         "generate-pipeline-manifest:\n"
         + _indent(
-            '$(MANAGE) generate_pipeline_manifest '
+            "$(MANAGE) generate_pipeline_manifest "
             '--contract "$(CONTRACT)" '
             "--corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} "
             "--out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml}"
@@ -499,9 +499,9 @@ def draft_domain_context_block(ctx: MakeContext) -> str:
     return (
         "draft-domain-context:\n"
         + _indent(
-            '$(MANAGE) draft_domain_context '
+            "$(MANAGE) draft_domain_context "
             '--drive-tree "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}" '
-            '--out config/domain_context.yaml'
+            "--out config/domain_context.yaml"
         )
         + "\n\n"
     )
@@ -510,7 +510,9 @@ def draft_domain_context_block(ctx: MakeContext) -> str:
 def validate_domain_context_block(ctx: MakeContext) -> str:
     return (
         "validate-domain-context:\n"
-        + _indent('$(MANAGE) validate_domain_context --config config/domain_context.yaml')
+        + _indent(
+            "$(MANAGE) validate_domain_context --config config/domain_context.yaml"
+        )
         + "\n\n"
     )
 
@@ -519,10 +521,10 @@ def extract_workbook_codes_block(ctx: MakeContext) -> str:
     return (
         "extract-workbook-codes:\n"
         + _indent(
-            '$(MANAGE) extract_workbook_codes '
+            "$(MANAGE) extract_workbook_codes "
             '--drive-tree "$${DRIVE_FOLDER_OUT:-data/profile_snapshots/drive_tree.json}" '
-            '--config config/cohort_corpus.json '
-            '--update-config'
+            "--config config/cohort_corpus.json "
+            "--update-config"
         )
         + "\n\n"
     )

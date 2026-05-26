@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import keyword
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -146,14 +145,18 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
             )
             suggested["_meta"] = {"generated_by": "designed_model_detection"}
             if "model_name" not in suggested:
-                suggested["model_name"] = _to_pascal_case(suggested.get("suggested_model_name", merged_name))
+                suggested["model_name"] = _to_pascal_case(
+                    suggested.get("suggested_model_name", merged_name)
+                )
             tables.append(suggested)
 
     return tables
 
 
 def _validate_tables_for_scaffold(
-    tables: list[dict[str, Any]], continue_on_error: bool = False, pivot_detection_threshold: float = 0.5
+    tables: list[dict[str, Any]],
+    continue_on_error: bool = False,
+    pivot_detection_threshold: float = 0.5,
 ) -> tuple[list[dict[str, Any]], PartialOutputCollector]:
     collector = PartialOutputCollector()
     valid_tables: list[dict[str, Any]] = []
@@ -181,7 +184,9 @@ def _validate_tables_for_scaffold(
                     f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name'
                 )
 
-        pivot_errors = _check_pivot_tables(table, pivot_detection_threshold=pivot_detection_threshold)
+        pivot_errors = _check_pivot_tables(
+            table, pivot_detection_threshold=pivot_detection_threshold
+        )
         if pivot_errors:
             if continue_on_error:
                 collector.add(
@@ -218,7 +223,9 @@ def _check_null_model_names(tables: list[dict]) -> list[str]:
     for table in tables:
         model_name = str(table.get("model_name", "")).strip()
         if not model_name:
-            tab_title = table.get("bundle_worksheet_title") or table.get("suggested_model_name", "?")
+            tab_title = table.get("bundle_worksheet_title") or table.get(
+                "suggested_model_name", "?"
+            )
             errors.append(
                 f'FAIL[SCAFFOLD_NULL_MODEL_NAME]: Tab "{tab_title}" produced empty model_name\n'
                 "  → Action: Deduplicate the tab across year workbooks or set a unique suggested_model_name\n"
@@ -227,7 +234,9 @@ def _check_null_model_names(tables: list[dict]) -> list[str]:
     return errors
 
 
-def _check_pivot_tables(table: dict, *, pivot_detection_threshold: float = 0.5) -> list[str]:
+def _check_pivot_tables(
+    table: dict, *, pivot_detection_threshold: float = 0.5
+) -> list[str]:
     """Return error messages if the table looks like a pivot table."""
     errors: list[str] = []
     columns = table.get("columns", [])
@@ -749,7 +758,9 @@ class Command(BaseCommand):
             rejection_path = out_path.parent / "schema-contract-rejected.yaml"
             collector.write_rejection_file(rejection_path)
             self.stdout.write(self.style.WARNING(collector.summary()))
-            self.stdout.write(self.style.WARNING(f"Rejections written to: {rejection_path}"))
+            self.stdout.write(
+                self.style.WARNING(f"Rejections written to: {rejection_path}")
+            )
 
         stub_out = options.get("models_stub_out")
         if stub_out:
@@ -761,7 +772,9 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS(f"wrote {stub_path}"))
 
-    def _handle_bundle_config(self, options: dict[str, Any], *, pivot_detection_threshold: float = 0.5) -> tuple[dict[str, Any], PartialOutputCollector]:
+    def _handle_bundle_config(
+        self, options: dict[str, Any], *, pivot_detection_threshold: float = 0.5
+    ) -> tuple[dict[str, Any], PartialOutputCollector]:
         bundle_path = Path(options["bundle_config"]).resolve()
         if not bundle_path.is_file():
             raise CommandError(f"bundle-config not found: {bundle_path}")
@@ -801,7 +814,11 @@ class Command(BaseCommand):
             _flag_computed_fields(table)
 
         continue_on_error = bool(options.get("continue_on_error", False))
-        tables, collector = _validate_tables_for_scaffold(tables, continue_on_error=continue_on_error, pivot_detection_threshold=pivot_detection_threshold)
+        tables, collector = _validate_tables_for_scaffold(
+            tables,
+            continue_on_error=continue_on_error,
+            pivot_detection_threshold=pivot_detection_threshold,
+        )
         contract["tables"] = tables
 
         tab_headers = {}
@@ -816,7 +833,11 @@ class Command(BaseCommand):
         return contract, collector
 
     def _handle_cohort_corpus(
-        self, cohort_dir: Path, *, hardened: bool, continue_on_error: bool = False,
+        self,
+        cohort_dir: Path,
+        *,
+        hardened: bool,
+        continue_on_error: bool = False,
         pivot_detection_threshold: float = 0.5,
     ) -> tuple[dict[str, Any], PartialOutputCollector]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))

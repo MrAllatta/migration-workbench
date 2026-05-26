@@ -1,6 +1,5 @@
 import json
 from io import StringIO
-from pathlib import Path
 
 import pytest
 from django.core.management import call_command

@@ -116,24 +116,11 @@ class Command(BaseCommand):
     ) -> None:
         """Run all phases sequentially, skipping completed ones."""
         phase_gates = [
-            (
-                "discover",
-                state.discovery.source_tree is None,
-            ),
-            (
-                "score_and_select",
-                state.discovery.approved_tabs is None,
-            ),
-            (
-                "deep_profile",
-                not state.deep_profile_index.entries,
-            ),
-            (
-                "derive_contracts",
-                state.schema_contract is None,
-            ),
+            ("discover", state.discovery.source_tree is None),
+            ("score_and_select", state.discovery.shortlist is None),
+            ("deep_profile", not state.deep_profile_index.entries),
+            ("derive_contracts", state.schema_contract is None),
         ]
-
         for phase_name, needs_run in phase_gates:
             if not needs_run:
                 self.stdout.write(
@@ -178,14 +165,102 @@ class Command(BaseCommand):
             )
         )
 
-    # ------------------------------------------------------------------
-    # Helpers for artifact loading
-    # ------------------------------------------------------------------
+    def _run_discover(
+        self, state, config, out_dir, date_stamp, checkpoint_path, stop_before_deep
+    ):
+        """Phase 0/1: Discovery through tab selection."""
+        if state.discovery.source_tree and state.discovery.approved_tabs:
+            self.stdout.write("Checkpoint has approved_tabs — skipping discover phase")
+            return
+
+        self.stdout.write("Running Phase 0/1: Discovery and tab selection...")
+
+        # TODO: Integrate with run_cohort_corpus once PipelineState wiring is complete.
+        # For now, this is a scaffold that creates a minimal checkpoint.
+        from profiler.tools.cohort_corpus import run_cohort_corpus
+
+        artifact_paths = run_cohort_corpus(
+            drive_service=None,  # type: ignore[arg-type]
+            sheets_service=None,  # type: ignore[arg-type]
+            config=config,
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+            stop_before_deep=stop_before_deep,
+        )
+
+        # Populate PipelineState from artifacts
+        state.discovery.source_tree = self._load_json_artifact(
+            artifact_paths.get("discovery"), {}
+        )
+        state.discovery.workbook_index = self._load_json_artifact(
+            artifact_paths.get("index"), []
+        )
+        state.discovery.broad_inventory = self._load_json_artifact(
+            artifact_paths.get("broad_coverage"), []
+        )
+        state.discovery.shortlist = self._load_json_artifact(
+            artifact_paths.get("tab_shortlist"), []
+        )
+        state.discovery.approved_tabs = self._load_json_artifact(
+            artifact_paths.get("tab_selection"), {}
+        )
+
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(f"Phase 0/1 complete — checkpoint saved to {checkpoint_path}")
+
+    def _run_score_and_select(
+        self, state, config, out_dir, date_stamp, checkpoint_path, stop_before_deep
+    ):
+        """Phase 2: Re-run scoring with current config (no API calls)."""
+        if not state.discovery.broad_inventory:
+            self.stdout.write("No broad_inventory in checkpoint — cannot re-score")
+            return
+
+        self.stdout.write("Running Phase 2: Re-scoring and selection...")
+
+        # TODO: Implement pure re-scoring without API calls
+        # For now, just save the checkpoint to preserve any manual edits
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(f"Phase 2 complete — checkpoint saved to {checkpoint_path}")
+
+    def _run_deep_profile(self, state, config, out_dir, date_stamp, checkpoint_path):
+        """Phase 3: Deep profiling of approved tabs."""
+        if not state.discovery.approved_tabs:
+            self.stdout.write("No approved_tabs in checkpoint — run discover first")
+            return
+
+        self.stdout.write("Running Phase 3: Deep profiling...")
+
+        # TODO: Integrate with run_cohort_corpus resume_from_tab_selection
+        from profiler.tools.cohort_corpus import run_cohort_corpus
+
+        artifact_paths = run_cohort_corpus(
+            drive_service=None,  # type: ignore[arg-type]
+            sheets_service=None,  # type: ignore[arg-type]
+            config=config,
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+            resume_from_tab_selection=True,
+        )
+
+        # Update PipelineState with deep profile results
+        deep_coverage = self._load_json_artifact(
+            artifact_paths.get("deep_coverage"), {}
+        )
+        if deep_coverage:
+            state.discovery.deep_profile_index = deep_coverage  # type: ignore[attr-defined]
+
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(f"Phase 3 complete — checkpoint saved to {checkpoint_path}")
 
     @staticmethod
-    def _load_json_artifact(
-        path: str | None, default: Any
-    ) -> Any:
+    def _today_stamp() -> str:
+        from datetime import date
+
+        return date.today().isoformat()
+
+    @staticmethod
+    def _load_json_artifact(path: str | None, default: Any) -> Any:
         """Load a JSON artifact file, returning *default* on failure."""
         if not path:
             return default

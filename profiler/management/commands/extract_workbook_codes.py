@@ -14,9 +14,17 @@ class Command(BaseCommand):
     help = "Extract workbook codes from drive tree JSON and optionally update config."
 
     def add_arguments(self, parser):
-        parser.add_argument("--drive-tree", required=True, help="Path to drive_tree.json")
-        parser.add_argument("--config", required=True, help="Path to cohort_corpus.json")
-        parser.add_argument("--update-config", action="store_true", help="Rewrite in_scope_workbooks in config")
+        parser.add_argument(
+            "--drive-tree", required=True, help="Path to drive_tree.json"
+        )
+        parser.add_argument(
+            "--config", required=True, help="Path to cohort_corpus.json"
+        )
+        parser.add_argument(
+            "--update-config",
+            action="store_true",
+            help="Rewrite in_scope_workbooks in config",
+        )
         parser.add_argument("--smoke", action="store_true", help="Smoke test mode")
 
     def handle(self, *args, **options):
@@ -62,6 +70,12 @@ class Command(BaseCommand):
         if options["update_config"]:
             config["in_scope_workbooks"] = sorted_codes
             bak_path = config_path.with_suffix(".json.bak")
-            bak_path.write_text(config_path.read_text(encoding="utf-8"), encoding="utf-8")
-            config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-            self.stdout.write(self.style.SUCCESS(f"Updated {config_path} (backup: {bak_path})"))
+            bak_path.write_text(
+                config_path.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            config_path.write_text(
+                json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            self.stdout.write(
+                self.style.SUCCESS(f"Updated {config_path} (backup: {bak_path})")
+            )

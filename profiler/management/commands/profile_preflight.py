@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from profiler.management.commands._config_helpers import load_folder_id_from_config
 from connectors.google_sheets import (

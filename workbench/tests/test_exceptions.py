@@ -1,4 +1,3 @@
-import pytest
 from django.core.management.base import CommandError
 
 from workbench.exceptions import UserFacingError, command_error

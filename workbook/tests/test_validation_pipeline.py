@@ -84,7 +84,10 @@ class TestPartitionContractOnValidation:
             "source": {},
             "tables": [
                 {"model_name": "Crop", "columns": [{"suggested_field_name": "name"}]},
-                {"model_name": "SaleItem", "columns": [{"suggested_field_name": "amount"}]},
+                {
+                    "model_name": "SaleItem",
+                    "columns": [{"suggested_field_name": "amount"}],
+                },
                 {"model_name": "Farm", "columns": [{"suggested_field_name": "name"}]},
             ],
         }
@@ -92,10 +95,14 @@ class TestPartitionContractOnValidation:
     def test_drops_error_tables(self, basic_contract, tmp_path):
         out_path = tmp_path / "models_auto.py"
         results = [
-            ValidationResult(model_name="SaleItem", check_id="TEST-001", message="duplicate"),
+            ValidationResult(
+                model_name="SaleItem", check_id="TEST-001", message="duplicate"
+            ),
         ]
         clean, collector = partition_contract_on_validation(
-            basic_contract, results, out_path=out_path,
+            basic_contract,
+            results,
+            out_path=out_path,
         )
         assert [t["model_name"] for t in clean["tables"]] == ["Crop", "Farm"]
         assert not collector.is_empty()
@@ -111,9 +118,15 @@ class TestPartitionContractOnValidation:
             ),
         ]
         clean, collector = partition_contract_on_validation(
-            basic_contract, results, out_path=out_path,
+            basic_contract,
+            results,
+            out_path=out_path,
         )
-        assert [t["model_name"] for t in clean["tables"]] == ["Crop", "SaleItem", "Farm"]
+        assert [t["model_name"] for t in clean["tables"]] == [
+            "Crop",
+            "SaleItem",
+            "Farm",
+        ]
         assert collector.is_empty()
 
     def test_rejection_file_derived_from_out_path(self, basic_contract, tmp_path):
@@ -122,7 +135,9 @@ class TestPartitionContractOnValidation:
             ValidationResult(model_name="SaleItem", check_id="TEST-001", message="bad"),
         ]
         clean, collector = partition_contract_on_validation(
-            basic_contract, results, out_path=out_path,
+            basic_contract,
+            results,
+            out_path=out_path,
         )
         expected_rejection = tmp_path / "backend" / "models_auto-rejected.yaml"
         assert expected_rejection.exists()
@@ -138,7 +153,9 @@ class TestPartitionContractOnValidation:
             ),
         ]
         clean, collector = partition_contract_on_validation(
-            basic_contract, results, out_path=out_path,
+            basic_contract,
+            results,
+            out_path=out_path,
         )
         assert collector.rejected[0].check_id == "WORKBOOK-CONTRACT-003"
         assert collector.rejected[0].action == "Rename one of the duplicate tables"
@@ -146,7 +163,9 @@ class TestPartitionContractOnValidation:
     def test_raises_global_error(self, basic_contract, tmp_path):
         out_path = tmp_path / "models_auto.py"
         results = [
-            ValidationResult(model_name=None, check_id="GLOBAL-001", message="no tables key"),
+            ValidationResult(
+                model_name=None, check_id="GLOBAL-001", message="no tables key"
+            ),
         ]
         with pytest.raises(GlobalValidationError):
             partition_contract_on_validation(basic_contract, results, out_path=out_path)
@@ -162,14 +181,22 @@ class TestPartitionContractOnValidation:
             ),
         ]
         clean, collector = partition_contract_on_validation(
-            basic_contract, results, out_path=out_path,
+            basic_contract,
+            results,
+            out_path=out_path,
         )
         assert len(clean["tables"]) == 3
 
     def test_no_errors_returns_clean_copy(self, basic_contract, tmp_path):
         out_path = tmp_path / "models_auto.py"
         clean, collector = partition_contract_on_validation(
-            basic_contract, [], out_path=out_path,
+            basic_contract,
+            [],
+            out_path=out_path,
         )
-        assert [t["model_name"] for t in clean["tables"]] == ["Crop", "SaleItem", "Farm"]
+        assert [t["model_name"] for t in clean["tables"]] == [
+            "Crop",
+            "SaleItem",
+            "Farm",
+        ]
         assert collector.is_empty()

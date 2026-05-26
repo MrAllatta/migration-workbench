@@ -481,7 +481,10 @@ def test_validate_tables_keeps_valid_and_rejects_invalid():
 
 
 def test_check_pivot_tables_respects_threshold():
-    from workbook.management.commands.scaffold_workbook_schema import _check_pivot_tables
+    from workbook.management.commands.scaffold_workbook_schema import (
+        _check_pivot_tables,
+    )
+
     table = {
         "bundle_worksheet_title": "Test",
         "columns": [
@@ -496,7 +499,12 @@ def test_check_pivot_tables_respects_threshold():
 
 def test_validate_tables_skips_designed_models():
     tables = [
-        {"source_tab": None, "bundle_worksheet_title": None, "model_name": "DesignedModel", "columns": []},
+        {
+            "source_tab": None,
+            "bundle_worksheet_title": None,
+            "model_name": "DesignedModel",
+            "columns": [],
+        },
     ]
     valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=True)
     assert len(valid) == 1

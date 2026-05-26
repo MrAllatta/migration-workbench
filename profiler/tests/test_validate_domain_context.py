@@ -1,5 +1,4 @@
 from io import StringIO
-from pathlib import Path
 
 import pytest
 from django.core.management import call_command
@@ -24,7 +23,7 @@ def test_validate_domain_context_missing_file():
 
 def test_validate_domain_context_bad_year_type(tmp_path):
     ctx = tmp_path / "domain_context.yaml"
-    ctx.write_text("year_scope:\n  active: [\"2025\"]\n", encoding="utf-8")
+    ctx.write_text('year_scope:\n  active: ["2025"]\n', encoding="utf-8")
     out = StringIO()
     with pytest.raises(CommandError, match="Validation failed"):
         call_command("validate_domain_context", config=str(ctx), stdout=out)
@@ -35,4 +34,6 @@ def test_validate_domain_context_strict_warning(tmp_path):
     ctx.write_text("year_scope:\n  active: [2025]\n", encoding="utf-8")
     out = StringIO()
     with pytest.raises(CommandError, match="strict"):
-        call_command("validate_domain_context", config=str(ctx), strict=True, stdout=out)
+        call_command(
+            "validate_domain_context", config=str(ctx), strict=True, stdout=out
+        )

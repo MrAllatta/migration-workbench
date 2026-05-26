@@ -15,7 +15,6 @@ from connectors.google_sheets import (
     build_google_service,
 )
 from profiler.tools.cohort_corpus import run_cohort_corpus
-from profiler.tools.domain_context import has_meaningful_vocabulary, load_domain_context
 
 
 class Command(BaseCommand):

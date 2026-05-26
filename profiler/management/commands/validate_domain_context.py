@@ -13,8 +13,12 @@ class Command(BaseCommand):
     help = "Validate domain_context.yaml structure."
 
     def add_arguments(self, parser):
-        parser.add_argument("--config", required=True, help="Path to domain_context.yaml")
-        parser.add_argument("--strict", action="store_true", help="Treat warnings as errors (exit 2)")
+        parser.add_argument(
+            "--config", required=True, help="Path to domain_context.yaml"
+        )
+        parser.add_argument(
+            "--strict", action="store_true", help="Treat warnings as errors (exit 2)"
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -47,18 +51,24 @@ class Command(BaseCommand):
             ):
                 errors.append(f"vocabulary.{key} must be a list of strings")
 
-        if not any(vocab.get(k) for k in ("operational", "reference", "support", "derived")):
+        if not any(
+            vocab.get(k) for k in ("operational", "reference", "support", "derived")
+        ):
             warnings.append("vocabulary has no tokens")
 
         dedup = raw.get("deduplication") or {}
         strategy = dedup.get("strategy", "latest_year")
         if strategy not in ("latest_year", "none"):
-            errors.append(f"deduplication.strategy must be 'latest_year' or 'none', got {strategy!r}")
+            errors.append(
+                f"deduplication.strategy must be 'latest_year' or 'none', got {strategy!r}"
+            )
 
         glossary = raw.get("glossary") or {}
         if not isinstance(glossary, dict):
             errors.append("glossary must be a mapping")
-        elif glossary and not all(isinstance(k, str) and isinstance(v, str) for k, v in glossary.items()):
+        elif glossary and not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in glossary.items()
+        ):
             errors.append("glossary keys and values must be strings")
 
         for err in errors:
@@ -72,4 +82,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Domain context is valid"))
 
         if warnings and options["strict"]:
-            raise CommandError(f"Validation failed with {len(warnings)} warning(s) (strict mode)")
+            raise CommandError(
+                f"Validation failed with {len(warnings)} warning(s) (strict mode)"
+            )

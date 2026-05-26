@@ -87,35 +87,23 @@ class Command(BaseCommand):
             }
             self.stdout.write(json.dumps(payload, indent=2))
             if errors:
-                raise CommandError(
-                    f"{len(errors)} validation error(s) found"
-                )
+                raise CommandError(f"{len(errors)} validation error(s) found")
             return
 
         for r in results:
             if r.severity == "error":
-                self.stdout.write(
-                    self.style.ERROR(f"  {r.check_id}: {r.message}")
-                )
+                self.stdout.write(self.style.ERROR(f"  {r.check_id}: {r.message}"))
             else:
-                self.stdout.write(
-                    self.style.WARNING(f"  {r.check_id}: {r.message}")
-                )
+                self.stdout.write(self.style.WARNING(f"  {r.check_id}: {r.message}"))
 
         for w in table_warnings:
             self.stdout.write(self.style.WARNING(f"  {w}"))
 
         if errors:
-            raise CommandError(
-                f"{len(errors)} validation error(s) found"
-            )
+            raise CommandError(f"{len(errors)} validation error(s) found")
 
         if table_warnings:
-            raise CommandError(
-                f"{len(table_warnings)} validation warning(s) found"
-            )
+            raise CommandError(f"{len(table_warnings)} validation warning(s) found")
 
         count = len(contract.get("tables", []))
-        self.stdout.write(
-            self.style.SUCCESS(f"Contract is valid: {count} table(s)")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Contract is valid: {count} table(s)"))
