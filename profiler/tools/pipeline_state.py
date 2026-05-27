@@ -627,13 +627,13 @@ class PipelineState:
             # Write the contract artifact next to the checkpoint and reference it
             # relative to the checkpoint directory to ensure checkpoint-relative
             # paths (no hard-coded build/ prefixes).
-            contract_artifact_path = base_dir / "schema-contract.yaml"
+            contract_artifact_path = base_dir / "schema-contract.json"
             payload["schema_contract"] = {
                 "_artifact": str(contract_artifact_path.relative_to(base_dir))
             }
             _write_contract_artifact(self.schema_contract, contract_artifact_path)
         if self.interaction_contract:
-            contract_artifact_path = base_dir / "interaction-contract.yaml"
+            contract_artifact_path = base_dir / "interaction-contract.json"
             payload["interaction_contract"] = {
                 "_artifact": str(contract_artifact_path.relative_to(base_dir))
             }
@@ -917,7 +917,7 @@ class PipelineState:
 
             # Normalize score to 0.0-1.0 range for confidence
             max_possible = 100
-            normalized = min(raw_score / max_possible, 1.0) if max_possible else 0.0
+            normalized = max(0.0, min(raw_score / max_possible, 1.0)) if max_possible else 0.0
 
             entry = {
                 "tab_title": title,

@@ -1097,6 +1097,6 @@ class TestArtifactPaths:
         state.save_checkpoint(path)
 
         yaml_text = path.read_text()
-        assert "schema-contract.yaml" in yaml_text
-        assert "interaction-contract.yaml" in yaml_text
+        assert "schema-contract.json" in yaml_text
+        assert "interaction-contract.json" in yaml_text
         assert "build/" not in yaml_text  # No hardcoded build/ path
