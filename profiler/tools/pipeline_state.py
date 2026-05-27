@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
+from datetime import date
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -320,7 +321,6 @@ class PipelineState:
         Returns:
             PipelineState: Self for chaining.
         """
-        from datetime import date
         self._config = config or self._config or {}
         self._out_dir = Path(out_dir) if out_dir else (self._out_dir or Path("data/profile_snapshots"))
         self._date_stamp = date_stamp or self._date_stamp or date.today().isoformat()
@@ -752,9 +752,14 @@ class PipelineState:
     # ------------------------------------------------------------------
 
     def discover(
-        self, drive_service=None, sheets_service=None
+        self,
+        drive_service=None,
+        sheets_service=None,
     ) -> PipelineState:
-        """Phase 0/1: Discover source tree and enumerate workbooks.
+        """Phase 0/1: Discover source tree, enumerate workbooks, and score tabs.
+
+        Delegates to ``run_cohort_corpus()`` for profiling, then maps results
+        onto discovery fields and records tab-scoring decisions.
 
         Parameters
         ----------
@@ -777,14 +782,59 @@ class PipelineState:
             raise RuntimeError(
                 "discover: source_tree already populated"
             )
-        self.discovery.source_tree = {}
-        self.discovery.workbook_index = []
-        self.discovery.broad_inventory = []
-        self.discovery.shortlist = []
+        from profiler.tools.cohort_corpus import run_cohort_corpus
+
+        out_dir = self._out_dir or Path("data/profile_snapshots")
+        date_stamp = self._date_stamp or date.today().isoformat()
+
+        artifact_paths = run_cohort_corpus(
+            drive_service=drive_service,
+            sheets_service=sheets_service,
+            config=self._config or {},
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+            stop_before_deep=True,
+        )
+
+        self.discovery.source_tree = self._load_json_artifact(
+            artifact_paths.get("discovery"), {}
+        )
+        self.discovery.workbook_index = self._load_json_artifact(
+            artifact_paths.get("index"), []
+        )
+        self.discovery.broad_inventory = self._load_json_artifact(
+            artifact_paths.get("broad_coverage"), []
+        )
+        self.discovery.shortlist = self._load_json_artifact(
+            artifact_paths.get("tab_shortlist"), []
+        )
+        self.discovery.approved_tabs = self._load_json_artifact(
+            artifact_paths.get("tab_selection"), {}
+        )
+
+        for tab in (self.discovery.shortlist or []):
+            score = tab.get("score", 0)
+            confidence = min(abs(score) / 100.0, 1.0) if score else 0.5
+            self.record_decision(
+                decision_id=f"discover_tab_{tab.get('tab_title', 'unknown')}",
+                phase="discover",
+                description=(
+                    f"Scored tab '{tab.get('tab_title', 'unknown')}' "
+                    f"({tab.get('scoring_rationale', 'heuristics')})"
+                ),
+                outcome="approved" if confidence >= 0.5 else "deferred",
+                confidence=confidence,
+                metadata={"score": score, "tab_title": tab.get("tab_title", "")},
+            )
+
         return self
 
     def score_and_select(self) -> PipelineState:
-        """Phase 1/2: Score and select tabs for deep profiling.
+        """Phase 1/2: Re-score tabs using domain knowledge (no API calls).
+
+        Scores ``broad_inventory`` entries against ``domain_knowledge.vocabulary``
+        via ``score_tab()``, updates ``shortlist``, and auto-selects high-confidence
+        tabs (confidence >= 0.90) into ``approved_tabs``.
 
         Returns
         -------
@@ -805,11 +855,86 @@ class PipelineState:
             raise RuntimeError(
                 "score_and_select: shortlist is None"
             )
-        self.discovery.approved_tabs = {}
+        from profiler.tools.cohort_corpus import score_tab
+
+        domain_ctx = DomainContext(
+            domain=self.domain_knowledge.domain,
+            description=self.domain_knowledge.description,
+            vocabulary=DomainContext.VocabularyContext(
+                operational=self.domain_knowledge.vocabulary.get("operational", []),
+                reference=self.domain_knowledge.vocabulary.get("reference", []),
+                support=self.domain_knowledge.vocabulary.get("support", []),
+                derived=self.domain_knowledge.vocabulary.get("derived", []),
+            ),
+            year_scope=DomainContext.YearScope(
+                active=self.domain_knowledge.year_scope.get("active", []),
+                archived=self.domain_knowledge.year_scope.get("archived", []),
+                forward=self.domain_knowledge.year_scope.get("forward", []),
+            ),
+            deduplication=DomainContext.DeduplicationContext(
+                strategy=self.domain_knowledge.deduplication.get(
+                    "strategy", "latest_year"
+                ),
+                exceptions=self.domain_knowledge.deduplication.get("exceptions", []),
+            ),
+            entities=list(self.domain_knowledge.entities),
+            glossary=dict(self.domain_knowledge.glossary),
+            scope_notes=self.domain_knowledge.scope_notes,
+        )
+
+        scored_tabs: list[dict] = []
+        for tab in (self.discovery.broad_inventory or []):
+            title = tab.get("tab_title", "")
+            rows = tab.get("row_count", 0) or 0
+            cols = tab.get("column_count", 0) or 0
+
+            raw_score, reasons, breakdown = score_tab(
+                title=title,
+                rows=rows,
+                cols=cols,
+                domain_context=domain_ctx,
+            )
+
+            # Normalize score to 0.0-1.0 range for confidence
+            max_possible = 100
+            normalized = min(raw_score / max_possible, 1.0) if max_possible else 0.0
+
+            entry = {
+                "tab_title": title,
+                "score": raw_score,
+                "confidence": normalized,
+                "scoring_rationale": "; ".join(reasons) if reasons else "No domain match",
+                "breakdown": breakdown,
+            }
+            scored_tabs.append(entry)
+
+            self.record_decision(
+                decision_id=f"rescore_{title}",
+                phase="score_and_select",
+                description=(
+                    f"Re-scored tab '{title}': "
+                    f"{'; '.join(reasons) if reasons else 'No domain match'}"
+                ),
+                outcome="approved" if normalized >= 0.5 else "deferred",
+                confidence=normalized,
+                metadata={"raw_score": raw_score, "tab_title": title},
+            )
+
+        self.discovery.shortlist = scored_tabs
+
+        approved: dict[str, list[str]] = {}
+        for tab in scored_tabs:
+            if tab["confidence"] >= 0.90:
+                approved.setdefault("auto_selected", []).append(tab["tab_title"])
+        self.discovery.approved_tabs = approved
+
         return self
 
     def deep_profile(self, sheets_service=None) -> PipelineState:
         """Phase 3: Deep-profile approved tabs.
+
+        Delegates to ``run_cohort_corpus()`` in resume mode, then populates
+        ``deep_profile_index.entries`` and records FK candidate decisions.
 
         Parameters
         ----------
@@ -830,10 +955,56 @@ class PipelineState:
             raise RuntimeError(
                 "deep_profile: no approved_tabs"
             )
+        from profiler.tools.cohort_corpus import run_cohort_corpus
+
+        out_dir = self._out_dir or Path("data/profile_snapshots")
+        date_stamp = self._date_stamp or date.today().isoformat()
+
+        artifact_paths = run_cohort_corpus(
+            drive_service=None,
+            sheets_service=sheets_service,
+            config=self._config or {},
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+            resume_from_tab_selection=True,
+        )
+
+        deep_coverage = self._load_json_artifact(
+            artifact_paths.get("deep_coverage"), {}
+        )
+        if isinstance(deep_coverage, list):
+            self.deep_profile_index.entries = deep_coverage
+        elif isinstance(deep_coverage, dict):
+            self.deep_profile_index.entries = list(deep_coverage.values())
+
+        for entry in self.deep_profile_index.entries:
+            for fk_candidate in entry.get("fk_candidates") or []:
+                col = fk_candidate.get("column", "unknown")
+                target = fk_candidate.get("target", "unknown")
+                confidence = fk_candidate.get("confidence", 0.5)
+                self.record_decision(
+                    decision_id=f"fk_{entry.get('tab', 'unknown')}_{col}",
+                    phase="deep_profile",
+                    description=(
+                        f"FK candidate: "
+                        f"{entry.get('tab', 'unknown')}.{col} -> {target}"
+                    ),
+                    outcome="approved" if confidence >= 0.5 else "deferred",
+                    confidence=confidence,
+                    metadata={
+                        "tab": entry.get("tab", ""),
+                        "column": col,
+                        "target": target,
+                    },
+                )
+
         return self
 
     def derive_contracts(self) -> PipelineState:
-        """Derive schema and interaction contracts from profile data.
+        """Derive schema and interaction contracts from deep profile data.
+
+        Builds a schema contract from ``deep_profile_index.entries`` by
+        creating model names and field definitions for each profiled tab.
 
         Returns
         -------
@@ -850,8 +1021,47 @@ class PipelineState:
             raise RuntimeError(
                 "derive_contracts: deep_profile must run first"
             )
-        self.schema_contract = {}
-        self.interaction_contract = {}
+        tables: list[dict] = []
+        for entry in self.deep_profile_index.entries:
+            tab_name = entry.get("tab", "unknown")
+            columns = entry.get("columns") or []
+            fields = []
+            for col in columns:
+                col_name = col.get("header", "unknown")
+                col_type = col.get("data_type", "string")
+                fields.append({
+                    "name": col_name,
+                    "source_column": col_name,
+                    "data_type": col_type,
+                })
+
+            # Convert tab name to PascalCase model name
+            model_name = "".join(
+                word.capitalize()
+                for word in tab_name.replace("-", "_").replace(" ", "_").split("_")
+            )
+            table = {
+                "model_name": model_name,
+                "source_tab": tab_name,
+                "fields": fields,
+            }
+            tables.append(table)
+
+            self.record_decision(
+                decision_id=f"model_{tab_name}",
+                phase="derive_contracts",
+                description=(
+                    f"Derived model name '{model_name}' "
+                    f"from tab title '{tab_name}'"
+                ),
+                outcome="approved",
+                confidence=0.7,
+                metadata={"tab_name": tab_name, "model_name": model_name},
+            )
+
+        self.schema_contract = {"tables": tables}
+        self.interaction_contract = {"views": []}
+
         return self
 
 

@@ -2,6 +2,7 @@
 
 import tomllib
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -408,8 +409,17 @@ class TestPhaseGuardClauses:
         ):
             state.derive_contracts()
 
-    def test_phase_sequencing_happy_path(self):
+    @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+    def test_phase_sequencing_happy_path(self, mock_run):
         """Full phase order works without errors."""
+        mock_run.return_value = {
+            "discovery": "",
+            "index": "",
+            "broad_coverage": "",
+            "tab_shortlist": "",
+            "tab_selection": "",
+            "deep_coverage": "",
+        }
         state = PipelineState()
         state.discover()
         state.score_and_select()
@@ -421,8 +431,10 @@ class TestPhaseGuardClauses:
         assert state.discovery.source_tree == {}
         assert state.discovery.approved_tabs == {}
         assert isinstance(state.deep_profile_index, DeepProfileIndex)
-        assert state.schema_contract == {}
-        assert state.interaction_contract == {}
+        assert state.schema_contract is not None
+        assert len(state.schema_contract["tables"]) == 1
+        assert state.schema_contract["tables"][0]["model_name"] == "CropPlanner"
+        assert state.interaction_contract == {"views": []}
 
 
 # ---------------------------------------------------------------------------
@@ -869,6 +881,96 @@ class TestVersionConsistency:
             f"PipelineState.version ({PipelineState.version}) "
             f"!= pyproject.toml version ({pyproject_version})"
         )
+
+
+# ---------------------------------------------------------------------------
+# 11. Phase method delegation
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseMethods:
+    """Verify phase methods delegate, populate fields, and record decisions."""
+
+    @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+    def test_discover_delegates_and_records_decisions(self, mock_run, tmp_path):
+        """discover() calls run_cohort_corpus and records decisions."""
+        mock_run.return_value = {
+            "discovery": "",
+            "index": "",
+            "broad_coverage": "",
+            "tab_shortlist": "",
+            "tab_selection": "",
+        }
+
+        state = PipelineState()
+        state.configure(out_dir=str(tmp_path), date_stamp="2026-05-27")
+        state.discover()
+
+        assert mock_run.called
+        assert state.discovery.source_tree == {}
+        assert state.discovery.workbook_index == []
+
+    @patch("profiler.tools.cohort_corpus.score_tab")
+    def test_score_and_select_records_decisions(self, mock_score):
+        """score_and_select() records scoring decisions."""
+        mock_score.return_value = (50, ["operational_tab_name"], {})
+
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[],
+                broad_inventory=[
+                    {
+                        "tab_title": "Crop Planner",
+                        "row_count": 100,
+                        "column_count": 20,
+                    }
+                ],
+                shortlist=[],  # not None, so guard passes
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="farm",
+                vocabulary={
+                    "operational": ["crop", "field"],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
+                },
+            ),
+        )
+        state.configure(date_stamp="2026-05-27")
+        result = state.score_and_select()
+        assert len(result.decisions) == 1
+        assert result.decisions[0].decision_id.startswith("rescore_")
+        assert result.decisions[0].phase == "score_and_select"
+
+    def test_derive_contracts_creates_tables(self):
+        """derive_contracts() builds tables from deep profile entries."""
+        state = PipelineState(
+            deep_profile_index=DeepProfileIndex(entries=[
+                {
+                    "tab": "Crop Planner",
+                    "columns": [
+                        {"header": "crop_name", "data_type": "string"},
+                        {"header": "planting_date", "data_type": "date"},
+                    ],
+                },
+            ]),
+        )
+        result = state.derive_contracts()
+        assert result.schema_contract is not None
+        assert len(result.schema_contract["tables"]) == 1
+        assert result.schema_contract["tables"][0]["model_name"] == "CropPlanner"
+        assert len(result.schema_contract["tables"][0]["fields"]) == 2
+        assert len(result.decisions) == 1
+        assert result.decisions[0].phase == "derive_contracts"
+        assert result.interaction_contract is not None
+
+    def test_derive_contracts_guard_raises(self):
+        """derive_contracts() raises if deep_profile_index is empty."""
+        state = PipelineState()
+        with pytest.raises(RuntimeError, match="deep_profile must run first"):
+            state.derive_contracts()
 
 
 # ---------------------------------------------------------------------------
