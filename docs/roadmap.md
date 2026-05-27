@@ -40,6 +40,11 @@ Import runtime works. They have not yet been coupled end-to-end on real data.
 - **Coda corpus:** doc enumeration, broad profile, table scoring (with Coda-specific
   heuristics for relation columns and formula column density), deep profiling,
   relationship summary, optional canvas extraction.
+- **PipelineState:** Layered checkpoint model (`PipelineState` dataclass, `.yaml` I/O)
+  with 4-phase dispatch (discover → score_and_select → deep_profile → derive_contracts),
+  resume with guard clauses, and deterministic artifact externalization. Each phase
+  records a gate closure preventing re-entry. See [Pipeline State](pipeline-state.md)
+  for the full design and [Agent Harness](agent-harness.md) for the philosophy.
 - **Auxiliary commands:** `scan_formula_patterns`, `extract_workbook_codes`,
   `snapshot_bundle`, `pull_bundle`.
 
@@ -230,28 +235,14 @@ engagement in under two days with this tool."
 Each version encodes more consultant judgment into the agent harness,
 making the operator faster. Not a feature list — a judgment-compounding system.
 
-### 0.2.0 — PipelineState: the agent's reasoning surface
-
-Replace the current scatter of date-stamped JSON artifacts with a single `PipelineState`
-checkpoint. The agent makes autonomous decisions where confidence is high and alerts
-the consultant where confidence is low. Every correction teaches the agent.
-
-The state model is layered: machine discoveries (source tree, workbook index, inventory,
-shortlist, approved tabs), human domain knowledge (vocabulary, year scope, entities),
-and derived contracts (schema contract, interaction contract). Raw grid data lives in
-external JSON artifacts referenced by the checkpoint, never inlined.
-
-See [Pipeline State](pipeline-state.md) for the full design. See [Agent Harness](agent-harness.md)
-for the philosophy.
-
-### 0.3.0 — Vertical migration templates
+### 0.2.0 — Vertical migration templates
 
 After N engagements in a vertical (farm, school, clinic), extract reusable presets:
 domain context vocabulary, entity defaults, scoring heuristics, schema contract templates,
 interaction contract defaults, and import error patterns. The 10th farm migration should
 be 5x faster than the 1st because the agent starts with learned defaults.
 
-### 0.4.0 — Interaction contract: consultant decision support
+### 0.3.0 — Interaction contract: consultant decision support
 
 The profiler extracts how the data is USED, not just what it IS. UI archetype
 classification (form / list / dashboard / reference) tells the consultant how to
@@ -263,7 +254,7 @@ decisions produce better admin defaults as a side effect.
 
 See [Interaction Contract](interaction-contract.md) for the three-layer design.
 
-### 0.5.0+ — Platform (conditional)
+### 0.4.0+ — Platform (conditional)
 
 Only after the judgment taxonomy is dense enough to make the agent reliably correct:
 

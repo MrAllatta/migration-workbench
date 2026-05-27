@@ -26,7 +26,7 @@ This spec replaces the monolithic "DomainModel" proposal with a **layered, check
 ```python
 @dataclass
 class PipelineState:
-    version: str                      # e.g., "0.2.0"
+    version: str                      # e.g., "0.0.9"
 
     # Layer 1 — What the machine learned (profiler outputs)
     discovery: DiscoveryState         # source_tree, workbook_index, inventory, shortlist
@@ -82,7 +82,7 @@ Computed outputs that downstream stages consume. These are **not** hand-edited d
 The human checkpoint surface is **one file** — `pipeline-state.yaml`. It contains only Layers 1 and 2 metadata plus decisions. Raw grid data is referenced, never inlined.
 
 ```yaml
-version: "0.2.0"
+version: "0.0.9"
 
 # Layer 1 — Machine discoveries
 discovery:
@@ -237,7 +237,7 @@ Internal functions (`score_tab`, `compute_column_profiles`, `deduplicate_index_r
 
 ## Storage Evolution
 
-**Phase A (0.2.0):** Checkpoint is YAML. Human edits directly. `PipelineState.load()` parses YAML; `save_checkpoint()` writes YAML.
+**Phase A:** Checkpoint is YAML. Human edits directly. `PipelineState.load()` parses YAML; `save_checkpoint()` writes YAML.
 
 **Phase B (0.3.0+):** When state size exceeds comfortable YAML editing (e.g., 500+ tabs, deep profile metadata), `PipelineState` transparently migrates to SQLite at the same file path. The API stays identical:
 
@@ -268,4 +268,4 @@ The previous proposal used three names for the same concept (`DomainContext`, `D
 - [Domain Context Artifact](schema-contract.md) — vocabulary, year scope, deduplication (existing implementation in `profiler/tools/domain_context.py`)
 - [Interaction Contract](interaction-contract.md) — three-layer UI/workflow contract design
 - [Schema Contract Reference](schema-contract.md) — data contract format consumed by codegen
-- [Roadmap](roadmap.md) — 0.2.0 milestone criteria
+- [Roadmap](roadmap.md) — PipelineState reference

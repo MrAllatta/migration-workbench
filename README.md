@@ -34,7 +34,7 @@ for the group change to take effect permanently.
 ## Three ways to use it
 
 **1. As a library (recommended for product repos)**  
-Add the apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Django project. Set `**DJANGO_SETTINGS_MODULE`** to your project’s settings module (not `migration_workbench.settings`) in production. Depend on a released version, e.g. `migration-workbench>=0.1.0,<1`.
+Add the apps you need to `INSTALLED_APPS` and wire URLs/commands in **your** Django project. Set `**DJANGO_SETTINGS_MODULE`** to your project’s settings module (not `migration_workbench.settings`) in production. Depend on a released version, e.g. `migration-workbench>=0.0.9,<1`.
 
 **2. Scaffold a new product repo**  
 From a sibling checkout of this repo:
@@ -156,6 +156,10 @@ its own. The full end-to-end chain is being exercised on the farm engagement.
   manifest validation, deploy smoke tests.
 - Build system: shared `makefile_targets.py` module, preflight gate, product scaffold.
 - Documentation: full doc map, 80% docstring coverage, CI/CD with `chassis-gate`.
+- PipelineState: Layered checkpoint model for the profiler pipeline —
+  4-phase dispatch (discover → score_and_select → deep_profile → derive_contracts),
+  resume with guard clauses, deterministic YAML checkpoint output.
+  See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
 
 **0.1.0 sprint — Pipeline proven on real data**
 
@@ -185,21 +189,16 @@ engagement in under two days with this tool."
 Each version encodes more consultant judgment into the agent harness,
 making the operator faster. Not a feature list — a judgment-compounding system.
 
-- **0.2.0 PipelineState:** Agent reasoning is explicit and auditable.
-  Consultant reviews one checkpoint file, not scattered JSON.
-  Autonomous decisions where confidence is high; alerts where low.
-  See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
-
-- **0.3.0 Vertical templates:** After N engagements in a vertical,
+- **0.2.0 Vertical templates:** After N engagements in a vertical,
   extract reusable presets. The 10th farm migration is 5x faster
   than the 1st.
 
-- **0.4.0 Interaction contract:** Agent infers how data is used
+- **0.3.0 Interaction contract:** Agent infers how data is used
   (form/list/dashboard/reference). Consultant confirms. Generated
   admin reflects actual business workflows, not generic CRUD.
   See [Interaction Contract](docs/interaction-contract.md).
 
-- **0.5.0+ Platform (conditional):** Only after judgment taxonomy
+- **0.4.0+ Platform (conditional):** Only after judgment taxonomy
   is dense enough to make the agent reliably correct.
   Hosted workbench for consultants, not self-service for end users.
   Self-service is a non-goal until proven safe.

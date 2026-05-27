@@ -1,6 +1,6 @@
 # Agent Harness
 
-> **Status:** Design philosophy (incorporated into 0.2.0+)  
+> **Status:** Design philosophy (implemented in PipelineState, v0.0.9+)  
 > **Audience:** Workbench developers, pipeline operators, product strategists
 
 The migration-workbench is not a self-service platform.
