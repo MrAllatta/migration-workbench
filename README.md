@@ -241,6 +241,13 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.9.4
+
+- **PipelineState checkpoint system:** New `profiler/tools/pipeline_state.py` module with 4 lifecycle dataclasses (PipelineState, DiscoveryState, DeepProfileIndex, DomainKnowledge) and checkpoint I/O via `pipeline_state.checkpoint()` / `resume()`. Supports 4-phase state machine: discover → score_and_select → deep_profile → derive_contracts. Guard clauses prevent re-entering completed phases. Deep-profile index preserves entries on resume.
+- **`run_pipeline_state` management command:** `--config`, `--phase {discover,score_and_select,deep_profile,derive_contracts,all}`, `--checkpoint`. `--phase all` auto-skips completed phases. YAML checkpoint output at each gate.
+- **Makefile targets:** `profile-phase-discover`, `profile-phase-score`, `profile-phase-deep`, `profile-phase-derive`, `profile-phase-all` added to workbench and product-scaffold Makefiles via `workbook/makefile_targets.py`.
+- **Product scaffold:** PipelineState added to AGENTS.md human-judgment table, operator.md profiling docs, and scaffolded Makefile targets. `PIPELINE_CHECKPOINT` variable (defaults to `build/pipeline-state.yaml`) available for override.
+
 ### 0.9.3
 
 - **`model_name` in `build_contract()`:** bundle-config path now produces valid v2 contracts with `model_name` on every table.

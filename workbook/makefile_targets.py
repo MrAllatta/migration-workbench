@@ -82,6 +82,11 @@ def phonies(ctx: MakeContext) -> list[str]:
         "profile-cohort-corpus-phase1",
         "profile-cohort-corpus-phase2",
         "profile-cohort-corpus-phase3",
+        "profile-phase-discover",
+        "profile-phase-score",
+        "profile-phase-deep",
+        "profile-phase-derive",
+        "profile-phase-all",
         "draft-domain-context",
         "validate-domain-context",
         "extract-workbook-codes",
@@ -523,6 +528,55 @@ def extract_workbook_codes_block(ctx: MakeContext) -> str:
     )
 
 
+def profile_phase_blocks(ctx: MakeContext) -> str:
+    """Return Makefile targets for PipelineState checkpoint-based profiling phases."""
+    return (
+        "# PipelineState checkpoint-based profiling — replaces the phased corpus workflow.\n"
+        "# Requires COHORT_CORPUS_CONFIG and optionally PIPELINE_CHECKPOINT in .env.\n"
+        + "profile-phase-discover:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            '--phase discover '
+            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+        )
+        + "\n\n"
+        + "profile-phase-score:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            '--phase score_and_select '
+            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+        )
+        + "\n\n"
+        + "profile-phase-deep:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            '--phase deep_profile '
+            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+        )
+        + "\n\n"
+        + "profile-phase-derive:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            '--phase derive_contracts '
+            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+        )
+        + "\n\n"
+        + "# Run all phases in sequence, skipping completed ones.\n"
+        + "profile-phase-all:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            '--phase all '
+            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+        )
+        + "\n"
+    )
+
+
 def orient_block(ctx: MakeContext) -> str:
     return "orient: validate-domain-context profile-drive-folder extract-workbook-codes\n\n"
 
@@ -549,6 +603,8 @@ def full_targets_block(ctx: MakeContext) -> str:
         import_blocks(ctx),
         "\n",
         profile_blocks(ctx),
+        "\n",
+        profile_phase_blocks(ctx),
         "\n",
         deploy_blocks(ctx),
         "\n",

@@ -861,6 +861,7 @@ These are the decisions the agent **must not make autonomously**. When reaching 
 |---|-------|-----------------|
 | 0 | Environment | Verify `.env` is configured. Run `make check-env`. Confirm DRIVE_FOLDER_ID, GOOGLE_IMPERSONATE_SERVICE_ACCOUNT (or CODA_API_TOKEN), and WORKBENCH (if dev mode) are set. |
 | 1 | Post-profile | Review profiler output. Which tabs are in scope? Which are ignored? |
+| 1a | PipelineState checkpoint | Review YAML checkpoint between phases. Edit `approved_tabs` to override tab selection. Resolve alerts at each gate. See migration-workbench `docs/pipeline-state.md`. |
 | 2 | Schema draft | What should each Django model be named? (source tab → entity name) |
 | 3 | Schema draft | For each column: is it a stored field, a computed property, or irrelevant? |
 | 4 | Schema draft | What Django field type fits? (CharField vs TextField? IntegerField vs DecimalField? DateField vs DateTimeField?) |
@@ -1105,6 +1106,8 @@ Profiling uses a **3-phase workflow** to avoid expensive API calls during heuris
 - **Phase 1** (`make profile-cohort-corpus-phase1`): discovery + tab selection only, stops before deep grid fetches. Review `tab_selection_<date>.json`.
 - **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json` (token lists, `tab_exclude_patterns`, `expansion_formula_penalty`), then re-run.
 - **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`. Output includes formula pattern classification per column.
+
+An alternative **PipelineState** checkpoint-based workflow (`make profile-phase-{{discover,score,deep,derive}}`) replaces the phased corpus workflow with a single YAML checkpoint file that tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). Set `PIPELINE_CHECKPOINT` in `.env` to override the default path (`build/pipeline-state.yaml`). See migration-workbench `docs/pipeline-state.md`.
 
 **Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
 
