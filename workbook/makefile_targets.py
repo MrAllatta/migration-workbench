@@ -87,6 +87,8 @@ def phonies(ctx: MakeContext) -> list[str]:
         "profile-phase-deep",
         "profile-phase-derive",
         "profile-phase-all",
+        "profile-phase-validate",
+        "profile-clean",
         "draft-domain-context",
         "validate-domain-context",
         "extract-workbook-codes",
@@ -531,40 +533,70 @@ def extract_workbook_codes_block(ctx: MakeContext) -> str:
 
 
 def profile_phase_blocks(ctx: MakeContext) -> str:
-    """Return Makefile targets for PipelineState checkpoint-based profiling phases."""
+    """Return Makefile targets for PipelineState checkpoint-based profiling phases.
+
+    Each target accepts an optional ``DOMAIN_CONTEXT`` env var (default:
+    ``config/domain_context.yaml`` from the CLI).  Set ``PIPELINE_CHECKPOINT``
+    in ``.env`` to override the default checkpoint path.
+
+    .. deprecated::
+       The older ``profile-cohort-corpus-phase{1,2,3}`` targets (see
+       :func:`profile_blocks`) are superseded by these checkpoint-aware targets.
+       New projects should only use ``profile-phase-*``.
+    """
+    _domain_ctx = ' $${DOMAIN_CONTEXT:+--domain-context "$$DOMAIN_CONTEXT"}'
+    _checkpoint = '$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}'
     return (
         "# PipelineState checkpoint-based profiling — replaces the phased corpus workflow.\n"
-        "# Requires COHORT_CORPUS_CONFIG and optionally PIPELINE_CHECKPOINT in .env.\n"
+        "# Requires COHORT_CORPUS_CONFIG and optionally PIPELINE_CHECKPOINT / DOMAIN_CONTEXT in .env.\n"
+        "# DOMAIN_CONTEXT defaults to config/domain_context.yaml (resolved by the CLI).\n"
+        "#\n"
+        "# .. deprecated::\n"
+        "#    The older profile-cohort-corpus-phase{1,2,3} targets remain for backward\n"
+        "#    compatibility but are superseded.  New profiling work should use these targets.\n"
         + "profile-phase-discover:\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
-            '--phase discover '
-            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+            "--phase discover "
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-score:\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
-            '--phase score_and_select '
-            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+            "--phase score_and_select "
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-deep:\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
-            '--phase deep_profile '
-            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+            "--phase deep_profile "
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-derive:\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
-            '--phase derive_contracts '
-            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+            "--phase derive_contracts "
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
+        )
+        + "\n\n"
+        + "profile-phase-validate:\n"
+        + _indent(
+            "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
+            '--config "$${COHORT_CORPUS_CONFIG:?required}" '
+            "--phase validate "
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
         )
         + "\n\n"
         + "# Run all phases in sequence, skipping completed ones.\n"
@@ -573,7 +605,37 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             '--phase all '
-            '--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"'
+            f'--checkpoint "{_checkpoint}"'
+            + _domain_ctx
+        )
+        + "\n"
+    )
+
+
+def profile_clean_block(ctx: MakeContext) -> str:
+    """Return the profile-clean Makefile target.
+
+    Removes stale profiling artifacts after confirmation.  Use when
+    restarting profiling from scratch or cleaning up between engagements.
+    """
+    return (
+        "# Remove stale profiling artifacts.  Asks for confirmation because\n"
+        "# artifacts (tab_selection_*.json, approved_tabs edits, checkpoint)\n"
+        "# may contain hand-edited consultant decisions.\n"
+        "profile-clean:\n"
+        + _indent(
+            r"""@echo "WARNING: This will remove ALL profiling artifacts."; \
+	read -p "Are you sure? [y/N] " confirm; \
+	if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
+		echo "Aborted."; exit 0; \
+	fi; \
+	echo "Removing PipelineState checkpoint..."; \
+	rm -f $(PIPELINE_CHECKPOINT) build/pipeline-state-*.json; \
+	echo "Removing old phased workflow artifacts..."; \
+	rm -rf data/profile_snapshots/; \
+	echo "Removing Coda corpus..."; \
+	rm -rf $${CODA_CORPUS_OUT_DIR:-build/coda_corpus}; \
+	echo 'Done. Run make profile-phase-discover to start fresh.'"""
         )
         + "\n"
     )
@@ -607,6 +669,8 @@ def full_targets_block(ctx: MakeContext) -> str:
         profile_blocks(ctx),
         "\n",
         profile_phase_blocks(ctx),
+        "\n",
+        profile_clean_block(ctx),
         "\n",
         deploy_blocks(ctx),
         "\n",
