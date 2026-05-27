@@ -106,7 +106,6 @@ class Command(BaseCommand):
         date_stamp = options.get("date_stamp") or date.today().isoformat()
         stop_before_deep = options.get("stop_before_deep", False)
 
-        # Load or create state, then propagate CLI values
         state = PipelineState.load_or_create(
             config_path,
             checkpoint_path,
@@ -125,10 +124,6 @@ class Command(BaseCommand):
                 state, config, out_dir, date_stamp,
                 checkpoint_path, stop_before_deep,
             )
-
-    # ------------------------------------------------------------------
-    # --phase all  — skip completed phases
-    # ------------------------------------------------------------------
 
     def _run_all(
         self,
@@ -167,10 +162,6 @@ class Command(BaseCommand):
             self._run_derive_contracts(state, checkpoint_path)
         else:
             self.stdout.write("[skip] derive_contracts already complete")
-
-    # ------------------------------------------------------------------
-    # Individual phase runners — thin wrappers over PipelineState methods
-    # ------------------------------------------------------------------
 
     def _run_discover(
         self,

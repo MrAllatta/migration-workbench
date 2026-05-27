@@ -916,8 +916,7 @@ class PipelineState:
             )
 
             # Normalize score to 0.0-1.0 range for confidence
-            max_possible = 100
-            normalized = max(0.0, min(raw_score / max_possible, 1.0)) if max_possible else 0.0
+            normalized = max(0.0, min(raw_score / 100.0, 1.0))
 
             entry = {
                 "tab_title": title,
