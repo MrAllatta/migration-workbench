@@ -182,7 +182,7 @@ class TestCheckpointRoundTrip:
     """Verify save_checkpoint → load preserves state."""
 
     def test_empty_state_round_trip(self, tmp_path: Path):
-        """An empty state saves and reloads as empty."""
+        """An empty state saves and reloads with None sentinels preserved."""
         checkpoint = tmp_path / "pipeline-state.yaml"
         state = PipelineState()
         state.save_checkpoint(checkpoint)
@@ -190,7 +190,9 @@ class TestCheckpointRoundTrip:
         loaded = PipelineState.load(checkpoint)
         assert loaded.version == "0.0.9"
         assert loaded.discovery.source_tree == {}
-        assert loaded.discovery.approved_tabs == {}
+        # Guard-clause sentinels survive round-trip
+        assert loaded.discovery.shortlist is None
+        assert loaded.discovery.approved_tabs is None
         assert loaded.domain_knowledge.domain == ""
 
     def test_approved_tabs_preserved(self, tmp_path: Path):

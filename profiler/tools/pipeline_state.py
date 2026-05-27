@@ -582,9 +582,14 @@ class PipelineState:
         # Small fields inline (handle None defaults)
         disc["source_tree"] = discovery.source_tree or {}
         disc["workbook_index"] = discovery.workbook_index
-        disc["approved_tabs"] = discovery.approved_tabs or {}
 
-        # Large fields → external JSON (handle None defaults)
+        # approved_tabs: preserve None sentinel for guard clauses
+        if discovery.approved_tabs is None:
+            disc["approved_tabs"] = None
+        else:
+            disc["approved_tabs"] = discovery.approved_tabs
+
+        # Large fields → external JSON (preserve None sentinels)
         for field_name in ("broad_inventory", "shortlist"):
             data = getattr(discovery, field_name)
             if data:
@@ -593,6 +598,8 @@ class PipelineState:
                 disc[field_name] = {
                     "_artifact": str(artifact_path.relative_to(base_dir))
                 }
+            elif data is None:
+                disc[field_name] = None  # preserve sentinel for guard clauses
             else:
                 disc[field_name] = []
 
@@ -680,6 +687,21 @@ class PipelineState:
         deep_raw = raw.get("deep_profile_index") or {}
         decisions_raw = raw.get("decisions", [])
 
+        # Preserve None sentinels — guard clauses distinguish
+        # "not yet populated" (None) from "populated but empty" ([]/{}).
+        shortlist_raw = discovery_raw.get("shortlist")
+        shortlist = (
+            list(shortlist_raw)
+            if isinstance(shortlist_raw, list)
+            else shortlist_raw
+        )
+        approved_tabs_raw = discovery_raw.get("approved_tabs")
+        approved_tabs = (
+            dict(approved_tabs_raw)
+            if isinstance(approved_tabs_raw, dict)
+            else approved_tabs_raw
+        )
+
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree") or {},
             workbook_index=list(
@@ -688,10 +710,8 @@ class PipelineState:
             broad_inventory=list(
                 discovery_raw.get("broad_inventory") or []
             ),
-            shortlist=list(discovery_raw.get("shortlist") or []),
-            approved_tabs=dict(
-                discovery_raw.get("approved_tabs") or {}
-            ),
+            shortlist=shortlist,
+            approved_tabs=approved_tabs,
         )
 
         # deep_profile_index may be a list (resolved artifact) or a dict

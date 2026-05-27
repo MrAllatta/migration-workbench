@@ -48,6 +48,13 @@ PHASES = (
 
 
 class Command(BaseCommand):
+    """Run profiler pipeline phase(s) using PipelineState checkpoint.
+
+    Each ``_run_*`` method is a thin wrapper: it calls the corresponding
+    ``PipelineState`` phase method (which owns all the business logic,
+    guard clauses, and decision recording), then saves a checkpoint.
+    """
+
     help = "Run profiler pipeline phase(s) using PipelineState checkpoint."
 
     def add_arguments(self, parser):
@@ -99,35 +106,24 @@ class Command(BaseCommand):
         date_stamp = options.get("date_stamp") or date.today().isoformat()
         stop_before_deep = options.get("stop_before_deep", False)
 
-        # Load or create PipelineState, seeding domain from config JSON
-        state = PipelineState.load_or_create(config_path, checkpoint_path)
+        # Load or create state, then propagate CLI values
+        state = PipelineState.load_or_create(
+            config_path,
+            checkpoint_path,
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+        )
+        state.configure(config=config, out_dir=out_dir, date_stamp=date_stamp)
 
         if phase == "all":
             self._run_all(
                 state, config, out_dir, date_stamp,
                 checkpoint_path, stop_before_deep,
             )
-        elif phase == "discover":
-            self._run_discover(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
-            )
-        elif phase == "score_and_select":
-            self._run_score_and_select(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
-            )
-        elif phase == "deep_profile":
-            self._run_deep_profile(
-                state, config, out_dir, date_stamp, checkpoint_path,
-            )
-        elif phase == "derive_contracts":
-            self._run_derive_contracts(state, checkpoint_path)
         else:
-            getattr(state, phase)()
-            state.save_checkpoint(checkpoint_path)
-            self.stdout.write(
-                self.style.SUCCESS(f"{phase} → {checkpoint_path}")
+            getattr(self, f"_run_{phase}")(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
             )
 
     # ------------------------------------------------------------------
@@ -173,112 +169,108 @@ class Command(BaseCommand):
             self.stdout.write("[skip] derive_contracts already complete")
 
     # ------------------------------------------------------------------
-    # derive_contracts
+    # Individual phase runners — thin wrappers over PipelineState methods
     # ------------------------------------------------------------------
 
-    def _run_derive_contracts(
-        self, state: PipelineState, checkpoint_path: Path
+    def _run_discover(
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
     ) -> None:
-        """Derive schema and interaction contracts from profile data."""
-        if not state.deep_profile_index.entries:
-            # Seed a placeholder so derive_contracts can proceed
-            state.deep_profile_index.entries.append(
-                {"_stub": True}
+        """Phase 0/1: Discovery through tab selection."""
+        if state.discovery.source_tree and state.discovery.approved_tabs:
+            self.stdout.write(
+                "Checkpoint has approved_tabs — skipping discover phase"
             )
+            return
+
+        self.stdout.write(
+            "Running Phase 0/1: Discovery and tab selection..."
+        )
+        drive_service, sheets_service = self._build_services()
+        state.discover(drive_service, sheets_service)
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"discover complete — {checkpoint_path}"
+            )
+        )
+
+    def _run_score_and_select(
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
+    ) -> None:
+        """Phase 2: Re-score tabs using domain knowledge (no API calls)."""
+        if not state.discovery.broad_inventory:
+            self.stdout.write(
+                "No broad_inventory in checkpoint — cannot re-score"
+            )
+            return
+
+        self.stdout.write("Running score_and_select...")
+        state.score_and_select()
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"score_and_select complete — {checkpoint_path}"
+            )
+        )
+
+    def _run_deep_profile(
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
+    ) -> None:
+        """Phase 3: Deep profiling of approved tabs."""
+        if not state.discovery.approved_tabs:
+            self.stdout.write(
+                "No approved_tabs in checkpoint — run discover first"
+            )
+            return
+
+        self.stdout.write("Running deep_profile...")
+        _drive, sheets_service = self._build_services()
+        state.deep_profile(sheets_service)
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"deep_profile complete — {checkpoint_path}"
+            )
+        )
+
+    def _run_derive_contracts(
+        self,
+        state: PipelineState,
+        checkpoint_path: Path,
+    ) -> None:
+        """Phase 4: Derive schema and interaction contracts."""
+        if not state.deep_profile_index.entries:
+            self.stdout.write(
+                "No deep profile data — run deep_profile first"
+            )
+            return
+
+        self.stdout.write("Running derive_contracts...")
         state.derive_contracts()
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
             self.style.SUCCESS(
-                f"derive_contracts → {checkpoint_path}"
+                f"derive_contracts complete — {checkpoint_path}"
             )
         )
-
-    def _run_discover(
-        self, state, config, out_dir, date_stamp, checkpoint_path, stop_before_deep
-    ):
-        """Phase 0/1: Discovery through tab selection."""
-        if state.discovery.source_tree and state.discovery.approved_tabs:
-            self.stdout.write("Checkpoint has approved_tabs — skipping discover phase")
-            return
-
-        self.stdout.write("Running Phase 0/1: Discovery and tab selection...")
-
-        drive_service, sheets_service = self._build_services()
-
-        from profiler.tools.cohort_corpus import run_cohort_corpus
-
-        artifact_paths = run_cohort_corpus(
-            drive_service=drive_service,
-            sheets_service=sheets_service,
-            config=config,
-            out_dir=out_dir,
-            date_stamp=date_stamp,
-            stop_before_deep=stop_before_deep,
-        )
-
-        state.discovery.source_tree = self._load_json_artifact(
-            artifact_paths.get("discovery"), {}
-        )
-        state.discovery.workbook_index = self._load_json_artifact(
-            artifact_paths.get("index"), []
-        )
-        state.discovery.broad_inventory = self._load_json_artifact(
-            artifact_paths.get("broad_coverage"), []
-        )
-        state.discovery.shortlist = self._load_json_artifact(
-            artifact_paths.get("tab_shortlist"), []
-        )
-        state.discovery.approved_tabs = self._load_json_artifact(
-            artifact_paths.get("tab_selection"), {}
-        )
-
-        state.save_checkpoint(checkpoint_path)
-        self.stdout.write(f"Phase 0/1 complete — checkpoint saved to {checkpoint_path}")
-
-    def _run_score_and_select(
-        self, state, config, out_dir, date_stamp, checkpoint_path, stop_before_deep
-    ):
-        """Phase 2: Re-run scoring with current config (no API calls)."""
-        if not state.discovery.broad_inventory:
-            self.stdout.write("No broad_inventory in checkpoint — cannot re-score")
-            return
-
-        self.stdout.write("Running Phase 2: Re-scoring and selection...")
-
-        # TODO: Implement pure re-scoring without API calls
-        # For now, just save the checkpoint to preserve any manual edits
-        state.save_checkpoint(checkpoint_path)
-        self.stdout.write(f"Phase 2 complete — checkpoint saved to {checkpoint_path}")
-
-    def _run_deep_profile(self, state, config, out_dir, date_stamp, checkpoint_path):
-        """Phase 3: Deep profiling of approved tabs."""
-        if not state.discovery.approved_tabs:
-            self.stdout.write("No approved_tabs in checkpoint — run discover first")
-            return
-
-        self.stdout.write("Running Phase 3: Deep profiling...")
-
-        drive_service, sheets_service = self._build_services()
-
-        from profiler.tools.cohort_corpus import run_cohort_corpus
-
-        artifact_paths = run_cohort_corpus(
-            drive_service=drive_service,
-            sheets_service=sheets_service,
-            config=config,
-            out_dir=out_dir,
-            date_stamp=date_stamp,
-            resume_from_tab_selection=True,
-        )
-
-        deep_coverage = self._load_json_artifact(
-            artifact_paths.get("deep_coverage"), {}
-        )
-        if isinstance(deep_coverage, list):
-            state.deep_profile_index.entries = deep_coverage
-
-        state.save_checkpoint(checkpoint_path)
-        self.stdout.write(f"Phase 3 complete — checkpoint saved to {checkpoint_path}")
 
     def _build_services(self):
         """Build Google Drive and Sheets API service objects.
@@ -308,17 +300,3 @@ class Command(BaseCommand):
         drive_service = build_google_service("drive", "v3", scopes)
         sheets_service = build_google_service("sheets", "v4", scopes)
         return drive_service, sheets_service
-
-    @staticmethod
-    def _today_stamp() -> str:
-        return date.today().isoformat()
-
-    @staticmethod
-    def _load_json_artifact(path: str | None, default: Any) -> Any:
-        """Load a JSON artifact file, returning *default* on failure."""
-        if not path:
-            return default
-        p = Path(path)
-        if not p.exists():
-            return default
-        return json.loads(p.read_text(encoding="utf-8"))

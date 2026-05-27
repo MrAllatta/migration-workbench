@@ -83,20 +83,61 @@ def test_run_pipeline_state_discover_phase(
     assert raw["discovery"]["source_tree"] == {}
     assert raw["discovery"]["workbook_index"] == []
     assert raw["domain_knowledge"]["domain"] == "test_domain"
-    assert "Phase 0/1 complete" in out.getvalue()
+    assert "discover complete" in out.getvalue()
 
 
 @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
 def test_run_pipeline_state_all_phase(
     mock_run_cohort_corpus, tmp_path: Path
 ):
-    """--phase all runs all four phases in sequence."""
-    mock_run_cohort_corpus.return_value = {}
-
+    """--phase all runs deep_profile and derive_contracts on a partial
+    checkpoint, skipping already-completed phases."""
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"domain": "test_domain"}), encoding="utf-8")
 
     checkpoint = tmp_path / "state.yaml"
+
+    # Create a deep coverage file so deep_profile populates entries,
+    # allowing derive_contracts to proceed.
+    deep_file = tmp_path / "deep_coverage.json"
+    deep_file.write_text(
+        json.dumps([
+            {
+                "tab": "Crop Planner",
+                "columns": [
+                    {"header": "name", "data_type": "string"},
+                ],
+            },
+        ]),
+        encoding="utf-8",
+    )
+    mock_run_cohort_corpus.return_value = {"deep_coverage": str(deep_file)}
+
+    # Seed a checkpoint with discover and score_and_select already
+    # complete, so only deep_profile and derive_contracts run.
+    from profiler.tools.pipeline_state import (
+        DiscoveryState,
+        DomainKnowledge,
+        PipelineState,
+    )
+
+    state = PipelineState(
+        domain_knowledge=DomainKnowledge(domain="test_domain"),
+        discovery=DiscoveryState(
+            source_tree={"provider": "google_sheets"},
+            workbook_index=[{"workbook_code": "101", "year": 2023}],
+            broad_inventory=[
+                {
+                    "tab_title": "Crop Planner",
+                    "row_count": 100,
+                    "column_count": 20,
+                },
+            ],
+            shortlist=[{"tab_title": "Crop Planner", "score": 85}],
+            approved_tabs={"101": ["Crop Planner"]},
+        ),
+    )
+    state.save_checkpoint(checkpoint)
 
     out = StringIO()
     call_command(
@@ -111,12 +152,15 @@ def test_run_pipeline_state_all_phase(
     assert checkpoint.exists()
     raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
     assert raw is not None
-    assert raw["discovery"]["source_tree"] == {}
     assert raw["domain_knowledge"]["domain"] == "test_domain"
 
     output = out.getvalue()
-    assert "Phase 0/1 complete" in output
-    assert "derive_contracts" in output
+    assert "[skip] discover already complete" in output
+    assert "deep_profile complete" in output
+    assert "derive_contracts complete" in output
+    # Verify the checkpoint contains derived contracts
+    assert "schema_contract" in raw
+    assert "interaction_contract" in raw
 
 
 @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
@@ -131,14 +175,23 @@ def test_run_pipeline_state_resume(
 
     checkpoint = tmp_path / "state.yaml"
 
-    # Start with discover and score_and_select already done.
-    # Seed approved_tabs so deep_profile proceeds past its guard.
+    # Seed a checkpoint with discover, score_and_select, and
+    # deep_profile already complete (entries populated, approved_tabs set,
+    # schema_contract still None so derive_contracts runs).
     from profiler.tools.pipeline_state import PipelineState
 
     state = PipelineState()
     state.discover()
     state.score_and_select()
     state.discovery.approved_tabs = {"101": ["Sheet1"]}
+    state.deep_profile_index.entries = [
+        {
+            "tab": "Crop Planner",
+            "columns": [
+                {"header": "crop_name", "data_type": "string"},
+            ],
+        },
+    ]
     state.save_checkpoint(checkpoint)
 
     out = StringIO()
@@ -153,9 +206,13 @@ def test_run_pipeline_state_resume(
     output = out.getvalue()
     assert "[skip] discover already complete" in output
     assert "[skip] score_and_select already complete" in output
-    assert "derive_contracts" in output
+    assert "[skip] deep_profile already complete" in output
+    assert "derive_contracts complete" in output
 
-    # Verify final checkpoint preserves data from completed phases.
+    # Verify final checkpoint preserves data from completed phases
+    # and includes derived contracts.
     raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
     assert "discovery" in raw
     assert "domain_knowledge" in raw
+    assert "schema_contract" in raw
+    assert "interaction_contract" in raw
