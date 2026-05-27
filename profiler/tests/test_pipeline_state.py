@@ -1186,3 +1186,38 @@ class TestArtifactPaths:
         assert "schema-contract.json" in yaml_text
         assert "interaction-contract.json" in yaml_text
         assert "build/" not in yaml_text  # No hardcoded build/ path
+
+
+class TestExtractApprovedTabs:
+    """Verify _extract_approved_tabs finds approved_tabs at any nesting depth."""
+
+    def test_top_level_direct_hit(self):
+        """Top-level approved_tabs key returns immediately."""
+        from profiler.tools.pipeline_state import _extract_approved_tabs
+        raw = {"approved_tabs": {"wb001": ["Sheet1"]}}
+        assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
+
+    def test_nested_two_levels(self):
+        """Approved_tabs nested under one key is found."""
+        from profiler.tools.pipeline_state import _extract_approved_tabs
+        raw = {"selection": {"approved_tabs": {"wb001": ["Sheet1"]}}}
+        assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
+
+    def test_nested_three_levels(self):
+        """Approved_tabs nested under two keys is found."""
+        from profiler.tools.pipeline_state import _extract_approved_tabs
+        raw = {"tab_selection": {"selection": {"approved_tabs": {"wb001": ["Sheet1"]}}}}
+        assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
+
+    def test_empty_returns_default(self):
+        """No approved_tabs returns default."""
+        from profiler.tools.pipeline_state import _extract_approved_tabs
+        raw = {"selection": {"tabs": []}}
+        assert _extract_approved_tabs(raw) is None
+        assert _extract_approved_tabs(raw, default={}) == {}
+
+    def test_non_dict_approved_tabs_returns_default(self):
+        """approved_tabs value that is not a dict returns default."""
+        from profiler.tools.pipeline_state import _extract_approved_tabs
+        raw = {"approved_tabs": "not_a_dict"}
+        assert _extract_approved_tabs(raw) is None

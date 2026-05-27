@@ -33,6 +33,43 @@ _ARTIFACT_FIELDS: set[str] = {
 }
 
 
+def _extract_approved_tabs(raw: dict[str, Any] | Any, default: Any = None) -> Any:
+    """Find ``approved_tabs`` in a tab-selection artifact regardless of nesting depth.
+
+    The old phased corpus workflow writes ``approved_tabs`` at the top level
+    of ``tab_selection_<date>.json``, while the PipelineState ``discover``
+    phase may nest it under a ``tab_selection.selection.approved_tabs`` path
+    (or other multi-level keys).  This function searches recursively through
+    the dict to find the first key named ``"approved_tabs"`` whose value is a
+    dict mapping workbook codes to tab-name lists.
+
+    Args:
+        raw: Parsed tab-selection artifact (dict, list, or scalar).
+        default: Fallback if no approved_tabs is found.
+
+    Returns:
+        The ``approved_tabs`` dict, or *default*.
+    """
+    if isinstance(raw, dict):
+        # Direct hit — top-level approved_tabs
+        if "approved_tabs" in raw:
+            val = raw["approved_tabs"]
+            if isinstance(val, dict):
+                return val
+            return default
+        # Recurse into first dict value that looks like a wrapper
+        for key, value in raw.items():
+            result = _extract_approved_tabs(value, default=None)
+            if result is not None:
+                return result
+    elif isinstance(raw, list):
+        for item in raw:
+            result = _extract_approved_tabs(item, default=None)
+            if result is not None:
+                return result
+    return default
+
+
 def _version_tuple(version: str) -> tuple[int, ...]:
     """Parse a semver string into a comparable tuple.
 
@@ -849,11 +886,12 @@ class PipelineState:
         tab_selection_raw = self._load_json_artifact(
             artifact_paths.get("tab_selection"), {}
         )
-        self.discovery.approved_tabs = (
-            tab_selection_raw.get("approved_tabs")
-            if isinstance(tab_selection_raw, dict)
-            else tab_selection_raw
-        )
+        if isinstance(tab_selection_raw, dict):
+            self.discovery.approved_tabs = _extract_approved_tabs(
+                tab_selection_raw
+            )
+        else:
+            self.discovery.approved_tabs = tab_selection_raw
 
         shortlist_entries = self.discovery.shortlist
         if isinstance(shortlist_entries, dict):
