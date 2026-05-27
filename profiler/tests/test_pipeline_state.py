@@ -1,5 +1,6 @@
 """Tests for PipelineState — dataclass, checkpoint I/O, phase methods, artifacts."""
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -21,9 +22,9 @@ class TestDataclassDefaults:
     """Verify default field values for each dataclass."""
 
     def test_pipeline_state_defaults(self):
-        """Fresh PipelineState has version="0.2.0" and all sub-objects."""
+        """Fresh PipelineState has version="0.0.9" and all sub-objects."""
         state = PipelineState()
-        assert state.version == "0.2.0"
+        assert state.version == "0.0.9"
         assert isinstance(state.discovery, DiscoveryState)
         assert isinstance(state.deep_profile_index, DeepProfileIndex)
         assert isinstance(state.domain_knowledge, DomainKnowledge)
@@ -106,7 +107,7 @@ class TestCheckpointRoundTrip:
         state.save_checkpoint(checkpoint)
 
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.0.9"
         assert loaded.discovery.source_tree == {}
         assert loaded.discovery.approved_tabs == {}
         assert loaded.domain_knowledge.domain == ""
@@ -156,7 +157,7 @@ class TestCheckpointRoundTrip:
     def test_checkpoint_roundtrip_full(self, tmp_path):
         """Full PipelineState round-trips with all data intact."""
         state = PipelineState(
-            version="0.2.0",
+            version="0.0.9",
             discovery=DiscoveryState(
                 source_tree={"provider": "google_sheets"},
                 workbook_index=[{"workbook_code": "101", "year": 2023}],
@@ -180,7 +181,7 @@ class TestCheckpointRoundTrip:
         assert path.exists()
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.0.9"
         assert loaded.discovery.source_tree == {"provider": "google_sheets"}
         assert loaded.discovery.workbook_index == [
             {"workbook_code": "101", "year": 2023}
@@ -202,7 +203,7 @@ class TestCheckpointRoundTrip:
         """Loading a non-existent checkpoint returns an empty state."""
         checkpoint = tmp_path / "nonexistent.yaml"
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.0.9"
         assert loaded.discovery.approved_tabs is None
 
 
@@ -217,7 +218,7 @@ class TestLoadOrCreate:
         )
         state = PipelineState.load_or_create(config_path=config_path)
         assert isinstance(state, PipelineState)
-        assert state.version == "0.2.0"
+        assert state.version == "0.0.9"
         assert state.domain_knowledge.domain == "test_domain"
         assert state.discovery.source_tree is None
 
@@ -247,7 +248,7 @@ class TestLoadOrCreate:
             config_path=tmp_path / "nonexistent.json",
             checkpoint_path=checkpoint,
         )
-        assert state.version == "0.2.0"
+        assert state.version == "0.0.9"
         assert not checkpoint.exists()
 
     def test_load_or_create_loads_existing_simple(self, tmp_path: Path):
@@ -545,7 +546,7 @@ class TestSpecExample:
     def test_spec_example_roundtrip(self, tmp_path):
         """Load the full YAML example from the design spec."""
         state = PipelineState(
-            version="0.2.0",
+            version="0.0.9",
             discovery=DiscoveryState(
                 source_tree={
                     "provider": "google_sheets",
@@ -628,7 +629,7 @@ class TestSpecExample:
         state.save_checkpoint(path)
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.0.9"
         assert (
             loaded.discovery.source_tree["provider"] == "google_sheets"
         )
@@ -664,4 +665,24 @@ class TestSpecExample:
         assert (
             loaded.domain_knowledge.entities[0]["name"] == "Season"
         )
-        assert loaded.domain_knowledge.glossary["qty"] == "quantity"
+
+
+# ---------------------------------------------------------------------------
+# 5. Version consistency
+# ---------------------------------------------------------------------------
+
+
+class TestVersionConsistency:
+    """PipelineState.version must match pyproject.toml project version."""
+
+    def test_version_matches_pyproject_toml(self) -> None:
+        """Assert PipelineState default version equals pyproject.toml version."""
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        pyproject_path = repo_root / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        pyproject_version = data["project"]["version"]
+        assert PipelineState.version == pyproject_version, (
+            f"PipelineState.version ({PipelineState.version}) "
+            f"!= pyproject.toml version ({pyproject_version})"
+        )

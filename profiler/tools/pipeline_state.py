@@ -160,7 +160,9 @@ class PipelineState:
             in checkpoint.
     """
 
-    version: str = "0.2.0"
+    # Must match pyproject.toml version — kept here so checkpoint format
+    # version is explicit and testable without importing pyproject.toml.
+    version: str = "0.0.9"
     discovery: DiscoveryState = field(default_factory=DiscoveryState)
     deep_profile_index: DeepProfileIndex = field(default_factory=DeepProfileIndex)
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
@@ -420,7 +422,7 @@ class PipelineState:
         )
 
         return cls(
-            version=str(raw.get("version", "0.2.0")),
+            version=str(raw.get("version", "0.0.9")),
             discovery=discovery,
             deep_profile_index=deep_profile_index,
             domain_knowledge=domain_knowledge,
