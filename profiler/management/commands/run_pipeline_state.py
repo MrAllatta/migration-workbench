@@ -91,6 +91,13 @@ class Command(BaseCommand):
             action="store_true",
             help="Stop after tab selection (Phase 1 gate).",
         )
+        parser.add_argument(
+            "--domain-context",
+            default=None,
+            help="Path to domain_context.yaml for scoring. "
+            "If not provided, falls back to the 'domain_context' key "
+            "in the config file, then to config/domain_context.yaml.",
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -106,9 +113,19 @@ class Command(BaseCommand):
         date_stamp = options.get("date_stamp") or date.today().isoformat()
         stop_before_deep = options.get("stop_before_deep", False)
 
+        # Load domain context from --domain-context, config, or default path
+        domain_context = None
+        domain_ctx_source = options.get("domain_context")
+        if domain_ctx_source is None:
+            domain_ctx_source = config.get("domain_context", "config/domain_context.yaml")
+        if domain_ctx_source:
+            from profiler.tools.domain_context import load_domain_context
+            domain_context = load_domain_context(domain_ctx_source)
+
         state = PipelineState.load_or_create(
             config_path,
             checkpoint_path,
+            domain_context=domain_context,
             out_dir=out_dir,
             date_stamp=date_stamp,
         )

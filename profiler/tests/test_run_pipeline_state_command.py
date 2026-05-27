@@ -216,3 +216,53 @@ def test_run_pipeline_state_resume(
     assert "domain_knowledge" in raw
     assert "schema_contract" in raw
     assert "interaction_contract" in raw
+
+
+class TestDomainContextArgument:
+    """Verify --domain-context is accepted and routed."""
+
+    def test_domain_context_flag_in_help(self, capsys):
+        """--help shows --domain-context."""
+        with pytest.raises(SystemExit):
+            call_command("run_pipeline_state", "--help")
+        captured = capsys.readouterr()
+        assert "--domain-context" in captured.out
+
+    @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+    def test_domain_context_seeds_domain_knowledge(
+        self, mock_run_cohort_corpus, tmp_path
+    ):
+        """Passing --domain-context seeds DomainKnowledge on fresh state."""
+        mock_run_cohort_corpus.return_value = {}
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "test"}', encoding="utf-8")
+
+        dc_path = tmp_path / "domain_context.yaml"
+        dc_path.write_text(
+            'domain: "test_domain"\n'
+            "vocabulary:\n"
+            "  operational: [test_token]\n"
+            "  reference: []\n"
+            "  support: []\n"
+            "  derived: []\n"
+            "year_scope:\n"
+            "  active: [2026]\n"
+            "  archived: []\n"
+            "  forward: []\n",
+            encoding="utf-8",
+        )
+
+        checkpoint = tmp_path / "state.yaml"
+        out = StringIO()
+        call_command(
+            "run_pipeline_state",
+            f"--config={config_path}",
+            f"--checkpoint={checkpoint}",
+            "--phase=discover",
+            f"--domain-context={dc_path}",
+            stdout=out,
+        )
+
+        raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
+        assert raw["domain_knowledge"]["domain"] == "test_domain"
+        assert "test_token" in raw["domain_knowledge"]["vocabulary"].get("operational", [])

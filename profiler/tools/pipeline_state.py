@@ -944,6 +944,14 @@ class PipelineState:
             raise RuntimeError(
                 "score_and_select: shortlist is None"
             )
+
+        if not self.domain_knowledge.vocabulary.get("operational") and not self.domain_knowledge.vocabulary.get("reference"):
+            logger.warning(
+                "DomainKnowledge is empty — score_and_select phase will not re-rank. "
+                "Provide a domain context file via --domain-context, "
+                "or populate config/domain_context.yaml."
+            )
+
         from profiler.tools.cohort_corpus import score_tab
 
         domain_ctx = DomainContext(
