@@ -449,6 +449,8 @@ class TestYamlReadability:
 
     def test_checkpoint_yaml_human_readable(self, tmp_path):
         """Saved YAML uses block style with field names present."""
+        import json
+
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={"provider": "google_sheets"},
@@ -464,9 +466,17 @@ class TestYamlReadability:
         assert "discovery:" in raw
         assert "domain_knowledge:" in raw
         assert "source_tree:" in raw
-        assert "provider: google_sheets" in raw
+        assert "_artifact" in raw
+        assert "pipeline-state-source-tree.json" in raw
+        assert "provider: google_sheets" not in raw  # externalized to artifact
         assert "workbook_index:" in raw
         assert "domain: farm" in raw
+
+        # Verify the source_tree artifact file
+        artifact_path = tmp_path / "pipeline-state-source-tree.json"
+        assert artifact_path.exists()
+        artifact_data = json.loads(artifact_path.read_text())
+        assert artifact_data == {"provider": "google_sheets"}
 
     def test_large_fields_externalized(self, tmp_path):
         """broad_inventory and shortlist are external to the YAML."""
@@ -639,6 +649,82 @@ class TestArtifactReferences:
         assert loaded.deep_profile_index.entries == [
             {"tab": "Crop Planner", "columns": 20},
         ]
+
+    def test_source_tree_written_as_artifact(self, tmp_path: Path):
+        """source_tree is externalized to a JSON artifact."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.source_tree = {
+            "provider": "google_sheets",
+            "folders": [
+                {
+                    "name": "FarmData",
+                    "spreadsheets": [
+                        {"title": "CropPlan"},
+                    ],
+                },
+            ],
+        }
+        state.save_checkpoint(checkpoint)
+
+        yaml_text = checkpoint.read_text()
+        assert "_artifact" in yaml_text
+        assert "pipeline-state-source-tree.json" in yaml_text
+
+        artifact_path = tmp_path / "pipeline-state-source-tree.json"
+        assert artifact_path.exists()
+        import json
+
+        artifact_data = json.loads(artifact_path.read_text())
+        assert artifact_data["provider"] == "google_sheets"
+        assert artifact_data["folders"][0]["name"] == "FarmData"
+
+    def test_source_tree_artifact_resolved_on_load(self, tmp_path: Path):
+        """Loading resolves source_tree artifact back to inline data."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.discovery.source_tree = {
+            "provider": "google_sheets",
+            "folders": [
+                {
+                    "name": "FarmData",
+                    "spreadsheets": [
+                        {"title": "CropPlan"},
+                    ],
+                },
+            ],
+        }
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.discovery.source_tree == {
+            "provider": "google_sheets",
+            "folders": [
+                {
+                    "name": "FarmData",
+                    "spreadsheets": [
+                        {"title": "CropPlan"},
+                    ],
+                },
+            ],
+        }
+
+    def test_source_tree_empty_is_inline(self, tmp_path: Path):
+        """Empty source_tree stays inline as {} — not externalized."""
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        # source_tree is None → should serialize as {} inline
+        state.save_checkpoint(checkpoint)
+
+        yaml_text = checkpoint.read_text()
+        assert "source_tree: {}" in yaml_text
+        assert "_artifact" not in yaml_text or "source-tree" not in yaml_text
+
+        artifact_path = tmp_path / "pipeline-state-source-tree.json"
+        assert not artifact_path.exists()
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.discovery.source_tree == {}
 
 
 # ---------------------------------------------------------------------------

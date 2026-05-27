@@ -2,15 +2,16 @@
 
 The pipeline operator reads & edits checkpoint YAML between phases.
 Phase methods use guard clauses to enforce ordering.  Large discovery
-data (``broad_inventory``, ``shortlist``) is externalized to JSON
-artifacts and referenced by ``_artifact`` keys to keep the YAML
-human-reviewable.
+data (``broad_inventory``, ``shortlist``, ``source_tree``) is
+externalized to JSON artifacts and referenced by ``_artifact`` keys
+to keep the YAML human-reviewable.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import Callable
 from datetime import date
 from dataclasses import asdict, dataclass, field
@@ -24,10 +25,11 @@ from profiler.tools.domain_context import DomainContext
 logger = logging.getLogger(__name__)
 
 # Fields that are externalized to JSON artifacts (not inlined in YAML).
+# ``_to_dict_with_artifacts()`` iterates over these to drive serialization.
 _ARTIFACT_FIELDS: set[str] = {
     "broad_inventory",
     "shortlist",
-    "deep_profiles",
+    "source_tree",
 }
 
 
@@ -94,9 +96,9 @@ _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
 class DiscoveryState:
     """Machine-learned profiler findings (Layer 1).
 
-    Each field is small metadata — never raw grid data.  Large lists
-    (``broad_inventory``, ``shortlist``) are externalized to JSON
-    artifacts during checkpoint save.
+    Each field is small metadata — never raw grid data.  Large fields
+    (``broad_inventory``, ``shortlist``, ``source_tree``) are
+    externalized to JSON artifacts during checkpoint save.
     """
 
     source_tree: dict[str, Any] | None = field(default=None)
@@ -418,9 +420,9 @@ class PipelineState:
     def save_checkpoint(self, path: str | Path) -> None:
         """Serialize state to a YAML checkpoint with ``_artifact`` references.
 
-        Large fields (``broad_inventory``, ``shortlist``) are written to
-        sibling JSON files and referenced by ``_artifact`` keys, keeping the
-        YAML human-reviewable.
+        Large fields (``broad_inventory``, ``shortlist``, ``source_tree``)
+        are written to sibling JSON files and referenced by ``_artifact``
+        keys, keeping the YAML human-reviewable.
 
         Parameters
         ----------
@@ -580,7 +582,6 @@ class PipelineState:
         disc: dict[str, Any] = {}
 
         # Small fields inline (handle None defaults)
-        disc["source_tree"] = discovery.source_tree or {}
         disc["workbook_index"] = discovery.workbook_index
 
         # approved_tabs: preserve None sentinel for guard clauses
@@ -589,8 +590,20 @@ class PipelineState:
         else:
             disc["approved_tabs"] = discovery.approved_tabs
 
-        # Large fields → external JSON (preserve None sentinels)
-        for field_name in ("broad_inventory", "shortlist"):
+        # source_tree → external JSON artifact (full drive tree, not small metadata)
+        if discovery.source_tree:
+            artifact_path = base_dir / "pipeline-state-source-tree.json"
+            artifact_path.write_text(
+                json.dumps(discovery.source_tree, indent=2), encoding="utf-8"
+            )
+            disc["source_tree"] = {
+                "_artifact": str(artifact_path.relative_to(base_dir))
+            }
+        else:
+            disc["source_tree"] = {}
+
+        # Remaining artifact fields → external JSON (preserve None sentinels)
+        for field_name in sorted(_ARTIFACT_FIELDS - {"source_tree"}):
             data = getattr(discovery, field_name)
             if data:
                 artifact_path = base_dir / f"pipeline-state-{field_name}.json"
@@ -807,6 +820,10 @@ class PipelineState:
         out_dir = self._out_dir or Path("data/profile_snapshots")
         date_stamp = self._date_stamp or date.today().isoformat()
 
+        folder_id = self._config.get("folder_id") or os.environ.get(
+            "DRIVE_FOLDER_ID"
+        )
+
         artifact_paths = run_cohort_corpus(
             drive_service=drive_service,
             sheets_service=sheets_service,
@@ -814,6 +831,7 @@ class PipelineState:
             out_dir=out_dir,
             date_stamp=date_stamp,
             stop_before_deep=True,
+            folder_id=folder_id,
         )
 
         self.discovery.source_tree = self._load_json_artifact(
@@ -828,23 +846,36 @@ class PipelineState:
         self.discovery.shortlist = self._load_json_artifact(
             artifact_paths.get("tab_shortlist"), []
         )
-        self.discovery.approved_tabs = self._load_json_artifact(
+        tab_selection_raw = self._load_json_artifact(
             artifact_paths.get("tab_selection"), {}
         )
+        self.discovery.approved_tabs = (
+            tab_selection_raw.get("approved_tabs")
+            if isinstance(tab_selection_raw, dict)
+            else tab_selection_raw
+        )
 
-        for tab in (self.discovery.shortlist or []):
-            score = tab.get("score", 0)
-            confidence = min(abs(score) / 100.0, 1.0) if score else 0.5
+        shortlist_entries = self.discovery.shortlist
+        if isinstance(shortlist_entries, dict):
+            shortlist_entries = shortlist_entries.get("selected") or []
+        for tab in (shortlist_entries or []):
+            score = tab.get("final_score", 0)
+            confidence = min(abs(score) / 10.0, 1.0) if score else 0.5
+            rationale = tab.get("breakdown_summary") or "heuristics"
             self.record_decision(
                 decision_id=f"discover_tab_{tab.get('tab_title', 'unknown')}",
                 phase="discover",
                 description=(
                     f"Scored tab '{tab.get('tab_title', 'unknown')}' "
-                    f"({tab.get('scoring_rationale', 'heuristics')})"
+                    f"({rationale})"
                 ),
                 outcome="approved" if confidence >= 0.5 else "deferred",
                 confidence=confidence,
-                metadata={"score": score, "tab_title": tab.get("tab_title", "")},
+                metadata={
+                    "score": score,
+                    "tab_title": tab.get("tab_title", ""),
+                    "workbook_code": tab.get("workbook_code", ""),
+                },
             )
 
         return self
