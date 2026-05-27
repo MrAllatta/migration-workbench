@@ -797,7 +797,61 @@ class TestPostInitValidation:
 
 
 # ---------------------------------------------------------------------------
-# 9. Version consistency
+# 9. Config routing
+# ---------------------------------------------------------------------------
+
+
+class TestConfigRouting:
+    """Verify config is properly routed to phase methods."""
+
+    def test_configure_sets_fields(self):
+        """configure() stores config, out_dir, date_stamp."""
+        state = PipelineState()
+        state.configure(
+            config={"domain": "test"},
+            out_dir="/tmp/test_out",
+            date_stamp="2026-05-27",
+        )
+        assert state._config == {"domain": "test"}
+        assert str(state._out_dir) == "/tmp/test_out"
+        assert state._date_stamp == "2026-05-27"
+
+    def test_load_or_create_stores_config(self, tmp_path):
+        """load_or_create stores config on fresh PipelineState."""
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "farm_test"}')
+
+        state = PipelineState.load_or_create(config_path=config_path)
+        assert state._config.get("domain") == "farm_test"
+
+    def test_load_or_create_without_config_file(self, tmp_path):
+        """load_or_create handles missing config file gracefully."""
+        config_path = tmp_path / "nonexistent.json"
+        state = PipelineState.load_or_create(config_path=config_path)
+        assert state._config == {}
+        assert state._date_stamp is not None
+
+    def test_load_json_artifact_with_valid_file(self, tmp_path):
+        """_load_json_artifact loads and parses JSON."""
+        path = tmp_path / "data.json"
+        path.write_text('{"key": "value"}')
+        result = PipelineState._load_json_artifact(path)
+        assert result == {"key": "value"}
+
+    def test_load_json_artifact_with_missing_file(self, tmp_path):
+        """_load_json_artifact returns default for missing file."""
+        path = tmp_path / "missing.json"
+        result = PipelineState._load_json_artifact(path, default=[])
+        assert result == []
+
+    def test_load_json_artifact_with_none_path(self):
+        """_load_json_artifact returns default for None path."""
+        result = PipelineState._load_json_artifact(None, default={})
+        assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# 10. Version consistency
 # ---------------------------------------------------------------------------
 
 

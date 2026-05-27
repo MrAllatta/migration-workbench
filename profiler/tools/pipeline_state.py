@@ -270,6 +270,11 @@ class PipelineState:
     interaction_contract: dict[str, Any] | None = None
     decisions: list[DecisionRecord] = field(default_factory=list)
 
+    # Runtime-only fields (not serialized to checkpoint).
+    _config: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    _out_dir: Path | None = field(default=None, repr=False, compare=False)
+    _date_stamp: str | None = field(default=None, repr=False, compare=False)
+
     def __post_init__(self) -> None:
         """Validate field types on construction."""
         if self.version and not isinstance(self.version, str):
@@ -290,6 +295,81 @@ class PipelineState:
                 f"domain_knowledge must be DomainKnowledge, "
                 f"got {type(self.domain_knowledge).__name__}"
             )
+
+    # ------------------------------------------------------------------
+    # Runtime configuration
+    # ------------------------------------------------------------------
+
+    def configure(
+        self,
+        *,
+        config: dict[str, Any] | None = None,
+        out_dir: str | Path | None = None,
+        date_stamp: str | None = None,
+    ) -> PipelineState:
+        """Set runtime configuration for pipeline execution.
+
+        These fields are stored privately (not serialized to checkpoint)
+        and are consumed by phase methods that need them.
+
+        Args:
+            config: Parsed cohort corpus config dict.
+            out_dir: Directory for profiler JSON artifacts.
+            date_stamp: Timestamp for artifact filenames (ISO date string).
+
+        Returns:
+            PipelineState: Self for chaining.
+        """
+        from datetime import date
+        self._config = config or self._config or {}
+        self._out_dir = Path(out_dir) if out_dir else (self._out_dir or Path("data/profile_snapshots"))
+        self._date_stamp = date_stamp or self._date_stamp or date.today().isoformat()
+        return self
+
+    @staticmethod
+    def _load_json_artifact(path: str | Path | None, default: Any = None) -> Any:
+        """Load a JSON artifact file, returning *default* on failure.
+
+        Args:
+            path: Path to JSON file, or ``None``.
+            default: Fallback value if file is missing or unreadable.
+
+        Returns:
+            Parsed JSON content or *default*.
+        """
+        if not path:
+            return default
+        p = Path(path)
+        if not p.exists():
+            return default
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            logger.exception("failed to load artifact %s", p)
+            return default
+
+    @staticmethod
+    def _build_google_services() -> tuple[Any, Any]:
+        """Build Google Drive and Sheets API service objects.
+
+        Returns:
+            tuple: ``(drive_service, sheets_service)`` or ``(None, None)``
+            if the required packages are not installed.
+        """
+        try:
+            from connectors.google_sheets import (
+                DRIVE_READONLY_SCOPE,
+                SHEETS_READONLY_SCOPE,
+                build_google_service,
+            )
+        except ImportError:
+            logger.warning("connectors.google_sheets not available")
+            return None, None
+
+        scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
+        drive_service = build_google_service("drive", "v3", scopes)
+        sheets_service = build_google_service("sheets", "v4", scopes)
+        return drive_service, sheets_service
 
     # ------------------------------------------------------------------
     # Decision recording
@@ -431,6 +511,8 @@ class PipelineState:
         checkpoint_path: str | Path | None = None,
         *,
         domain_context: DomainContext | None = None,
+        out_dir: str | Path | None = None,
+        date_stamp: str | None = None,
     ) -> PipelineState:
         """Load existing checkpoint or create fresh from config.
 
@@ -443,6 +525,10 @@ class PipelineState:
             from ``config_path`` by replacing the suffix.
         domain_context : DomainContext | None
             Optional domain context to seed domain knowledge.
+        out_dir : str | Path | None
+            Output directory for profiler artifacts.
+        date_stamp : str | None
+            ISO date string for artifact filenames.
 
         Returns
         -------
@@ -452,29 +538,29 @@ class PipelineState:
             checkpoint_path = Path(str(config_path)).with_suffix(".yaml")
         checkpoint_path = Path(checkpoint_path)
 
-        if checkpoint_path.exists():
-            return cls.load(checkpoint_path)
-
-        # Seed domain knowledge from DomainContext or config JSON
-        if domain_context is not None:
-            return cls(
-                domain_knowledge=DomainKnowledge.from_domain_context(
-                    domain_context
-                )
-            )
-
-        state = cls()
+        # Read config JSON once
         config_file = Path(config_path)
+        config: dict[str, Any] = {}
         if config_file.exists():
             try:
-                config = json.loads(
-                    config_file.read_text(encoding="utf-8")
-                )
+                raw_config = json.loads(config_file.read_text(encoding="utf-8"))
+                config = {k: v for k, v in raw_config.items() if not k.startswith("_")}
             except (json.JSONDecodeError, OSError):
                 config = {}
+
+        if checkpoint_path.exists():
+            state = cls.load(checkpoint_path)
+        elif domain_context is not None:
+            state = cls(
+                domain_knowledge=DomainKnowledge.from_domain_context(domain_context),
+            )
+        else:
+            state = cls()
             domain_val = config.get("domain")
             if domain_val:
                 state.domain_knowledge.domain = str(domain_val)
+
+        state.configure(config=config, out_dir=out_dir, date_stamp=date_stamp)
         return state
 
     # ------------------------------------------------------------------
@@ -531,18 +617,21 @@ class PipelineState:
 
         # Derived contracts as artifact references
         if self.schema_contract:
+            # Write the contract artifact next to the checkpoint and reference it
+            # relative to the checkpoint directory to ensure checkpoint-relative
+            # paths (no hard-coded build/ prefixes).
+            contract_artifact_path = base_dir / "schema-contract.yaml"
             payload["schema_contract"] = {
-                "_artifact": "schema-contract.yaml"
+                "_artifact": str(contract_artifact_path.relative_to(base_dir))
             }
-            _write_contract_artifact(
-                self.schema_contract, base_dir / "schema-contract.yaml"
-            )
+            _write_contract_artifact(self.schema_contract, contract_artifact_path)
         if self.interaction_contract:
+            contract_artifact_path = base_dir / "interaction-contract.yaml"
             payload["interaction_contract"] = {
-                "_artifact": "interaction-contract.yaml"
+                "_artifact": str(contract_artifact_path.relative_to(base_dir))
             }
             _write_contract_artifact(
-                self.interaction_contract, base_dir / "interaction-contract.yaml"
+                self.interaction_contract, contract_artifact_path
             )
 
         return payload
