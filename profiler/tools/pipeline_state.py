@@ -422,7 +422,7 @@ class PipelineState:
                 f"Checkpoint at {file_path} resolved to non-dict."
             )
 
-        return cls._from_resolved_dict(resolved)
+        return cls._from_resolved_dict(resolved, base_dir=base_dir)
 
     @classmethod
     def load_or_create(
@@ -532,12 +532,18 @@ class PipelineState:
         # Derived contracts as artifact references
         if self.schema_contract:
             payload["schema_contract"] = {
-                "_artifact": "build/schema-contract.yaml"
+                "_artifact": "schema-contract.yaml"
             }
+            _write_contract_artifact(
+                self.schema_contract, base_dir / "schema-contract.yaml"
+            )
         if self.interaction_contract:
             payload["interaction_contract"] = {
-                "_artifact": "build/interaction-contract.yaml"
+                "_artifact": "interaction-contract.yaml"
             }
+            _write_contract_artifact(
+                self.interaction_contract, base_dir / "interaction-contract.yaml"
+            )
 
         return payload
 
@@ -569,9 +575,17 @@ class PipelineState:
 
     @classmethod
     def _from_resolved_dict(
-        cls, raw: dict[str, Any]
+        cls, raw: dict[str, Any], base_dir: Path | None = None
     ) -> PipelineState:
-        """Reconstruct a PipelineState from a fully-resolved plain dict."""
+        """Reconstruct a PipelineState from a fully-resolved plain dict.
+
+        Args:
+            raw: Deserialized checkpoint dictionary with artifact references
+                already resolved.
+            base_dir: Base directory for resolving contract artifacts.
+                When provided, ``schema_contract`` and ``interaction_contract``
+                are eagerly resolved from artifact files.
+        """
         discovery_raw = raw.get("discovery") or {}
         domain_raw = raw.get("domain_knowledge") or {}
         deep_raw = raw.get("deep_profile_index") or {}
@@ -618,13 +632,29 @@ class PipelineState:
             DecisionRecord(**d) for d in decisions_raw
         ]
 
+        # Contract resolution — resolve artifact references eagerly
+        schema_contract: dict[str, Any] | None = None
+        interaction_contract: dict[str, Any] | None = None
+        if base_dir is not None:
+            schema_raw = raw.get("schema_contract")
+            if schema_raw:
+                resolved = _resolve_artifacts(schema_raw, base_dir)
+                if isinstance(resolved, dict) and resolved:
+                    schema_contract = resolved
+
+            interaction_raw = raw.get("interaction_contract")
+            if interaction_raw:
+                resolved = _resolve_artifacts(interaction_raw, base_dir)
+                if isinstance(resolved, dict) and resolved:
+                    interaction_contract = resolved
+
         return cls(
             version=str(raw.get("version", "0.0.9")),
             discovery=discovery,
             deep_profile_index=deep_profile_index,
             domain_knowledge=domain_knowledge,
-            schema_contract=None,  # Loaded from artifact on demand
-            interaction_contract=None,
+            schema_contract=schema_contract,
+            interaction_contract=interaction_contract,
             decisions=decisions,
         )
 
@@ -790,3 +820,16 @@ def _resolve_artifacts(node: Any, base_dir: Path) -> Any:
         ]
     else:
         return node
+
+
+def _write_contract_artifact(data: dict[str, Any], path: Path) -> None:
+    """Write a contract dict as a JSON artifact file.
+
+    Uses JSON for consistency with existing artifact patterns
+    (broad_inventory, shortlist, etc. are all JSON).
+    """
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("failed to write contract artifact %s: %s", path, exc)

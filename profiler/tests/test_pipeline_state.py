@@ -283,8 +283,8 @@ class TestCheckpointRoundTrip:
             "support": [],
             "derived": [],
         }
-        # schema_contract is not reloaded from artifact — stays None
-        assert loaded.schema_contract is None
+        # schema_contract is now eagerly resolved from artifact
+        assert loaded.schema_contract == {"tables": []}
         # decisions survive round-trip
         assert len(loaded.decisions) == 1
         assert loaded.decisions[0].decision_id == "sel_001"
@@ -886,3 +886,59 @@ class TestVersionMigration:
         loaded = PipelineState.load(path)
         assert loaded.version == "0.0.9"
         assert loaded.domain_knowledge.domain == "test"
+
+
+# ---------------------------------------------------------------------------
+# 11. Contract resolution
+# ---------------------------------------------------------------------------
+
+
+class TestContractResolution:
+    """Verify contract artifacts survive save_checkpoint → load."""
+
+    def test_schema_contract_round_trip(self, tmp_path):
+        """Schema contract is preserved through checkpoint save/load."""
+        state = PipelineState(
+            schema_contract={"tables": [{"name": "CropPlan"}]},
+        )
+        path = tmp_path / "state.yaml"
+        state.save_checkpoint(path)
+
+        loaded = PipelineState.load(path)
+        assert loaded.schema_contract == {"tables": [{"name": "CropPlan"}]}
+
+    def test_interaction_contract_round_trip(self, tmp_path):
+        """Interaction contract is preserved through checkpoint save/load."""
+        state = PipelineState(
+            interaction_contract={"views": [{"name": "crop_list"}]},
+        )
+        path = tmp_path / "state.yaml"
+        state.save_checkpoint(path)
+
+        loaded = PipelineState.load(path)
+        assert loaded.interaction_contract == {"views": [{"name": "crop_list"}]}
+
+    def test_contracts_default_to_none(self):
+        """Fresh state has None contracts."""
+        state = PipelineState()
+        assert state.schema_contract is None
+        assert state.interaction_contract is None
+
+
+class TestArtifactPaths:
+    """Verify artifact paths are derived from checkpoint location."""
+
+    def test_contract_artifact_paths_relative_to_checkpoint(self, tmp_path):
+        """Contract artifact paths are checkpoint-relative, not hardcoded."""
+        state = PipelineState(
+            schema_contract={"tables": []},
+            interaction_contract={"views": []},
+        )
+        path = tmp_path / "checkpoints" / "pipeline-state.yaml"
+        path.parent.mkdir(parents=True)
+        state.save_checkpoint(path)
+
+        yaml_text = path.read_text()
+        assert "schema-contract.yaml" in yaml_text
+        assert "interaction-contract.yaml" in yaml_text
+        assert "build/" not in yaml_text  # No hardcoded build/ path
