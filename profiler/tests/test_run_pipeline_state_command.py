@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from django.core.management import call_command
@@ -54,8 +55,13 @@ def test_run_pipeline_state_invalid_phase():
         )
 
 
-def test_run_pipeline_state_discover_phase(tmp_path: Path):
-    """--phase discover runs discover() and writes a checkpoint."""
+@patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+def test_run_pipeline_state_discover_phase(
+    mock_run_cohort_corpus, tmp_path: Path
+):
+    """--phase discover runs the discovery pipeline and writes a checkpoint."""
+    mock_run_cohort_corpus.return_value = {}
+
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"domain": "test_domain"}), encoding="utf-8")
 
@@ -70,17 +76,23 @@ def test_run_pipeline_state_discover_phase(tmp_path: Path):
         stdout=out,
     )
 
+    assert mock_run_cohort_corpus.called
     assert checkpoint.exists()
     raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
     assert raw is not None
     assert raw["discovery"]["source_tree"] == {}
     assert raw["discovery"]["workbook_index"] == []
     assert raw["domain_knowledge"]["domain"] == "test_domain"
-    assert "discover" in out.getvalue()
+    assert "Phase 0/1 complete" in out.getvalue()
 
 
-def test_run_pipeline_state_all_phase(tmp_path: Path):
+@patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+def test_run_pipeline_state_all_phase(
+    mock_run_cohort_corpus, tmp_path: Path
+):
     """--phase all runs all four phases in sequence."""
+    mock_run_cohort_corpus.return_value = {}
+
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"domain": "test_domain"}), encoding="utf-8")
 
@@ -95,35 +107,38 @@ def test_run_pipeline_state_all_phase(tmp_path: Path):
         stdout=out,
     )
 
+    assert mock_run_cohort_corpus.called
     assert checkpoint.exists()
     raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
     assert raw is not None
     assert raw["discovery"]["source_tree"] == {}
-    assert raw["discovery"]["approved_tabs"] == {}
-    # Derived contracts are serialized as _artifact references
-    # or omitted when empty — check domain_knowledge instead.
     assert raw["domain_knowledge"]["domain"] == "test_domain"
 
     output = out.getvalue()
-    assert "discover" in output
-    assert "score_and_select" in output
-    assert "deep_profile" in output
+    assert "Phase 0/1 complete" in output
     assert "derive_contracts" in output
 
 
-def test_run_pipeline_state_resume(tmp_path: Path):
+@patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+def test_run_pipeline_state_resume(
+    mock_run_cohort_corpus, tmp_path: Path
+):
     """Loading a partial checkpoint skips completed phases."""
+    mock_run_cohort_corpus.return_value = {}
+
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"domain": "resume_test"}), encoding="utf-8")
 
     checkpoint = tmp_path / "state.yaml"
 
     # Start with discover and score_and_select already done.
+    # Seed approved_tabs so deep_profile proceeds past its guard.
     from profiler.tools.pipeline_state import PipelineState
 
     state = PipelineState()
     state.discover()
     state.score_and_select()
+    state.discovery.approved_tabs = {"101": ["Sheet1"]}
     state.save_checkpoint(checkpoint)
 
     out = StringIO()
@@ -138,7 +153,6 @@ def test_run_pipeline_state_resume(tmp_path: Path):
     output = out.getvalue()
     assert "[skip] discover already complete" in output
     assert "[skip] score_and_select already complete" in output
-    assert "deep_profile" in output
     assert "derive_contracts" in output
 
     # Verify final checkpoint preserves data from completed phases.

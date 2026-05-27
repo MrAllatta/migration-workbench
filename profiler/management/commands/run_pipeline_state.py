@@ -31,6 +31,7 @@ the checkpoint YAML and re-run ``deep_profile`` without repeating discovery.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -89,18 +90,40 @@ class Command(BaseCommand):
         if not config_path.is_file():
             raise CommandError(f"Config file not found: {config_path}")
 
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config = {k: v for k, v in config.items() if not k.startswith("_")}
+
         checkpoint_path = Path(options["checkpoint"]).resolve()
         phase = options["phase"]
+        out_dir = Path(options["out_dir"]).resolve()
+        date_stamp = options.get("date_stamp") or date.today().isoformat()
+        stop_before_deep = options.get("stop_before_deep", False)
 
         # Load or create PipelineState, seeding domain from config JSON
         state = PipelineState.load_or_create(config_path, checkpoint_path)
 
         if phase == "all":
-            self._run_all(state, checkpoint_path)
+            self._run_all(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
+            )
+        elif phase == "discover":
+            self._run_discover(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
+            )
+        elif phase == "score_and_select":
+            self._run_score_and_select(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
+            )
+        elif phase == "deep_profile":
+            self._run_deep_profile(
+                state, config, out_dir, date_stamp, checkpoint_path,
+            )
         elif phase == "derive_contracts":
             self._run_derive_contracts(state, checkpoint_path)
         else:
-            # Delegate to the PipelineState phase method
             getattr(state, phase)()
             state.save_checkpoint(checkpoint_path)
             self.stdout.write(
@@ -112,37 +135,42 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _run_all(
-        self, state: PipelineState, checkpoint_path: Path
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
     ) -> None:
         """Run all phases sequentially, skipping completed ones."""
-        phase_gates = [
-            ("discover", state.discovery.source_tree is None),
-            ("score_and_select", state.discovery.shortlist is None),
-            ("deep_profile", not state.deep_profile_index.entries),
-            ("derive_contracts", state.schema_contract is None),
-        ]
-        for phase_name, needs_run in phase_gates:
-            if not needs_run:
-                self.stdout.write(
-                    f"[skip] {phase_name} already complete"
-                )
-                continue
-            getattr(state, phase_name)()
-            # v0.2.0 stub: deep_profile does not yet populate entries,
-            # so seed a placeholder so derive_contracts can proceed.
-            if (
-                phase_name == "deep_profile"
-                and not state.deep_profile_index.entries
-            ):
-                state.deep_profile_index.entries.append(
-                    {"_stub": True}
-                )
-            state.save_checkpoint(checkpoint_path)
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"{phase_name} → {checkpoint_path}"
-                )
+        if state.discovery.source_tree is None:
+            self._run_discover(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
             )
+        else:
+            self.stdout.write("[skip] discover already complete")
+
+        if state.discovery.shortlist is None:
+            self._run_score_and_select(
+                state, config, out_dir, date_stamp,
+                checkpoint_path, stop_before_deep,
+            )
+        else:
+            self.stdout.write("[skip] score_and_select already complete")
+
+        if not state.deep_profile_index.entries:
+            self._run_deep_profile(
+                state, config, out_dir, date_stamp, checkpoint_path,
+            )
+        else:
+            self.stdout.write("[skip] deep_profile already complete")
+
+        if state.schema_contract is None:
+            self._run_derive_contracts(state, checkpoint_path)
+        else:
+            self.stdout.write("[skip] derive_contracts already complete")
 
     # ------------------------------------------------------------------
     # derive_contracts
@@ -175,20 +203,19 @@ class Command(BaseCommand):
 
         self.stdout.write("Running Phase 0/1: Discovery and tab selection...")
 
-        # TODO: Integrate with run_cohort_corpus once PipelineState wiring is complete.
-        # For now, this is a scaffold that creates a minimal checkpoint.
+        drive_service, sheets_service = self._build_services()
+
         from profiler.tools.cohort_corpus import run_cohort_corpus
 
         artifact_paths = run_cohort_corpus(
-            drive_service=None,  # type: ignore[arg-type]
-            sheets_service=None,  # type: ignore[arg-type]
+            drive_service=drive_service,
+            sheets_service=sheets_service,
             config=config,
             out_dir=out_dir,
             date_stamp=date_stamp,
             stop_before_deep=stop_before_deep,
         )
 
-        # Populate PipelineState from artifacts
         state.discovery.source_tree = self._load_json_artifact(
             artifact_paths.get("discovery"), {}
         )
@@ -231,32 +258,59 @@ class Command(BaseCommand):
 
         self.stdout.write("Running Phase 3: Deep profiling...")
 
-        # TODO: Integrate with run_cohort_corpus resume_from_tab_selection
+        drive_service, sheets_service = self._build_services()
+
         from profiler.tools.cohort_corpus import run_cohort_corpus
 
         artifact_paths = run_cohort_corpus(
-            drive_service=None,  # type: ignore[arg-type]
-            sheets_service=None,  # type: ignore[arg-type]
+            drive_service=drive_service,
+            sheets_service=sheets_service,
             config=config,
             out_dir=out_dir,
             date_stamp=date_stamp,
             resume_from_tab_selection=True,
         )
 
-        # Update PipelineState with deep profile results
         deep_coverage = self._load_json_artifact(
             artifact_paths.get("deep_coverage"), {}
         )
-        if deep_coverage:
-            state.discovery.deep_profile_index = deep_coverage  # type: ignore[attr-defined]
+        if isinstance(deep_coverage, list):
+            state.deep_profile_index.entries = deep_coverage
 
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(f"Phase 3 complete — checkpoint saved to {checkpoint_path}")
 
+    def _build_services(self):
+        """Build Google Drive and Sheets API service objects.
+
+        Returns
+        -------
+        tuple[googleapiclient.discovery.Resource | None, googleapiclient.discovery.Resource | None]
+            ``(drive_service, sheets_service)`` — returns ``(None, None)``
+            if the required packages are not installed.
+        """
+        try:
+            from connectors.google_sheets import (
+                DRIVE_READONLY_SCOPE,
+                SHEETS_READONLY_SCOPE,
+                build_google_service,
+            )
+        except ImportError:
+            self.stdout.write(
+                self.style.WARNING(
+                    "connectors.google_sheets not available — "
+                    "Google API calls will fail"
+                )
+            )
+            return None, None
+
+        scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
+        drive_service = build_google_service("drive", "v3", scopes)
+        sheets_service = build_google_service("sheets", "v4", scopes)
+        return drive_service, sheets_service
+
     @staticmethod
     def _today_stamp() -> str:
-        from datetime import date
-
         return date.today().isoformat()
 
     @staticmethod
