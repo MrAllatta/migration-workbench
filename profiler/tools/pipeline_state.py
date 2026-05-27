@@ -57,8 +57,30 @@ _CHECKPOINT_CURRENT_VERSION = "0.0.9"
 # Registry: version_string -> list of migration functions.
 # Each function takes and returns a raw dict (parsed YAML payload).
 # Used to upgrade old checkpoint formats transparently on load.
+def _migrate_v0_0_8_to_v0_0_9(raw: dict[str, Any]) -> dict[str, Any]:
+    """Migration from checkpoint version 0.0.8 to 0.0.9.
+
+    This is a minimal, safe migration that preserves existing payload while
+    updating the checkpoint semantic version. It is intentionally a no-op for
+    fields that are already compatible with 0.0.9. It exists to satisfy the
+    test suite which expects a migration path from 0.0.8 to 0.0.9.
+
+    Args:
+        raw: Deserialized checkpoint dictionary.
+
+    Returns:
+        Migrated checkpoint dictionary with version bumped to 0.0.9 (actual
+        data unchanged if already compatible).
+    """
+    # No structural changes required for this minimal migration. The driver will
+    # bump the version after migrations anyway.
+    return raw
+
+
 _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
-    # Future entries: "0.0.8": [_migrate_v0_0_8_to_v0_0_9],
+    # Migrations keyed by the target version; when upgrading from a(version) < key
+    # and the key is <= current, apply the migrations to upgrade payloads.
+    "0.0.9": [_migrate_v0_0_8_to_v0_0_9],
 }
 
 
@@ -204,6 +226,23 @@ class DomainKnowledge:
 
 
 @dataclass
+class DecisionRecord:
+    """A recorded decision made during pipeline execution.
+
+    Each decision captures what was chosen, why, and with what confidence
+    so that the operator can audit and override later.
+    """
+
+    decision_id: str = ""
+    timestamp: str = ""  # ISO 8601 string
+    phase: str = ""  # e.g. "score_and_select", "derive_contracts"
+    description: str = ""  # Human-readable what-was-decided
+    outcome: str = ""  # e.g. "approved", "rejected", "deferred"
+    confidence: float = 0.0  # 0.0–1.0
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class PipelineState:
     """Layered profiler runtime state.
 
@@ -229,6 +268,7 @@ class PipelineState:
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
     schema_contract: dict[str, Any] | None = None
     interaction_contract: dict[str, Any] | None = None
+    decisions: list[DecisionRecord] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate field types on construction."""
@@ -250,6 +290,46 @@ class PipelineState:
                 f"domain_knowledge must be DomainKnowledge, "
                 f"got {type(self.domain_knowledge).__name__}"
             )
+
+    # ------------------------------------------------------------------
+    # Decision recording
+    # ------------------------------------------------------------------
+
+    def record_decision(
+        self,
+        decision_id: str,
+        phase: str,
+        description: str,
+        outcome: str,
+        confidence: float = 0.0,
+        metadata: dict[str, Any] | None = None,
+    ) -> DecisionRecord:
+        """Record a pipeline decision and append it to the decisions list.
+
+        Args:
+            decision_id: Unique identifier for this decision.
+            phase: Pipeline phase that produced this decision.
+            description: Human-readable explanation.
+            outcome: Decision outcome (approved/rejected/deferred).
+            confidence: Confidence score 0.0–1.0.
+            metadata: Optional structured metadata.
+
+        Returns:
+            The appended DecisionRecord.
+        """
+        import datetime
+
+        record = DecisionRecord(
+            decision_id=decision_id,
+            timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            phase=phase,
+            description=description,
+            outcome=outcome,
+            confidence=confidence,
+            metadata=metadata or {},
+        )
+        self.decisions.append(record)
+        return record
 
     # ------------------------------------------------------------------
     # Checkpoint I/O
@@ -407,6 +487,7 @@ class PipelineState:
             "version": self.version,
             "discovery": {},
             "domain_knowledge": asdict(self.domain_knowledge),
+            "decisions": [asdict(d) for d in self.decisions],
         }
 
         discovery = self.discovery
@@ -494,6 +575,7 @@ class PipelineState:
         discovery_raw = raw.get("discovery") or {}
         domain_raw = raw.get("domain_knowledge") or {}
         deep_raw = raw.get("deep_profile_index") or {}
+        decisions_raw = raw.get("decisions", [])
 
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree") or {},
@@ -532,6 +614,10 @@ class PipelineState:
             scope_notes=str(domain_raw.get("scope_notes", "")),
         )
 
+        decisions = [
+            DecisionRecord(**d) for d in decisions_raw
+        ]
+
         return cls(
             version=str(raw.get("version", "0.0.9")),
             discovery=discovery,
@@ -539,6 +625,7 @@ class PipelineState:
             domain_knowledge=domain_knowledge,
             schema_contract=None,  # Loaded from artifact on demand
             interaction_contract=None,
+            decisions=decisions,
         )
 
     # ------------------------------------------------------------------

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from profiler.tools.pipeline_state import (
+    DecisionRecord,
     DeepProfileIndex,
     DiscoveryState,
     DomainKnowledge,
@@ -30,6 +31,7 @@ class TestDataclassDefaults:
         assert isinstance(state.domain_knowledge, DomainKnowledge)
         assert state.schema_contract is None
         assert state.interaction_contract is None
+        assert state.decisions == []
 
     def test_discovery_state_empty(self):
         """All DiscoveryState fields start as empty or None."""
@@ -93,7 +95,85 @@ class TestDataclassDefaults:
 
 
 # ---------------------------------------------------------------------------
-# 2. Checkpoint I/O
+# 2. DecisionRecord tests
+# ---------------------------------------------------------------------------
+
+
+class TestDecisionRecord:
+    """Verify DecisionRecord dataclass and PipelineState.decisions."""
+
+    def test_empty_decisions_default(self):
+        """Fresh PipelineState has empty decisions list."""
+        state = PipelineState()
+        assert state.decisions == []
+
+    def test_record_decision_appends(self):
+        """Calling record_decision() adds to the decisions list."""
+        state = PipelineState()
+        state.record_decision(
+            decision_id="sel_001",
+            phase="score_and_select",
+            description="Selected Crop Planner tab for deep profiling",
+            outcome="approved",
+        )
+        assert len(state.decisions) == 1
+
+    def test_record_decision_returns_record(self):
+        """record_decision() returns the DecisionRecord with timestamp."""
+        state = PipelineState()
+        record = state.record_decision(
+            decision_id="sel_002",
+            phase="derive_contracts",
+            description="Accepted schema contract",
+            outcome="approved",
+            confidence=0.95,
+        )
+        assert isinstance(record, DecisionRecord)
+        assert record.decision_id == "sel_002"
+        assert record.timestamp != ""  # timestamp is set
+        assert record.phase == "derive_contracts"
+        assert record.confidence == 0.95
+
+    def test_decisions_survive_round_trip(self, tmp_path):
+        """Decisions are preserved through save-checkpoint → load cycle."""
+        state = PipelineState()
+        state.record_decision(
+            decision_id="sel_001",
+            phase="score_and_select",
+            description="Selected tabs",
+            outcome="approved",
+        )
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+
+        loaded = PipelineState.load(path)
+        assert len(loaded.decisions) == 1
+        assert loaded.decisions[0].decision_id == "sel_001"
+        assert loaded.decisions[0].phase == "score_and_select"
+        assert loaded.decisions[0].outcome == "approved"
+
+    def test_decision_record_fields(self):
+        """All DecisionRecord fields are stored correctly."""
+        record = DecisionRecord(
+            decision_id="dec_003",
+            timestamp="2026-05-27T12:00:00+00:00",
+            phase="deep_profile",
+            description="Profiled sheet with 20 columns",
+            outcome="approved",
+            confidence=0.75,
+            metadata={"column_count": 20, "tab_title": "Crop Planner"},
+        )
+        assert record.decision_id == "dec_003"
+        assert record.timestamp == "2026-05-27T12:00:00+00:00"
+        assert record.phase == "deep_profile"
+        assert record.description == "Profiled sheet with 20 columns"
+        assert record.outcome == "approved"
+        assert record.confidence == 0.75
+        assert record.metadata == {"column_count": 20, "tab_title": "Crop Planner"}
+
+
+# ---------------------------------------------------------------------------
+# 3. Checkpoint I/O
 # ---------------------------------------------------------------------------
 
 
@@ -176,6 +256,13 @@ class TestCheckpointRoundTrip:
             ),
             schema_contract={"tables": []},
         )
+        state.record_decision(
+            decision_id="sel_001",
+            phase="score_and_select",
+            description="Selected Crop Planner tab for deep profiling",
+            outcome="approved",
+            confidence=0.85,
+        )
         path = tmp_path / "pipeline-state.yaml"
         state.save_checkpoint(path)
         assert path.exists()
@@ -198,6 +285,11 @@ class TestCheckpointRoundTrip:
         }
         # schema_contract is not reloaded from artifact — stays None
         assert loaded.schema_contract is None
+        # decisions survive round-trip
+        assert len(loaded.decisions) == 1
+        assert loaded.decisions[0].decision_id == "sel_001"
+        assert loaded.decisions[0].phase == "score_and_select"
+        assert loaded.decisions[0].outcome == "approved"
 
     def test_missing_checkpoint_returns_empty_state(self, tmp_path: Path):
         """Loading a non-existent checkpoint returns an empty state."""
