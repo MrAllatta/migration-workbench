@@ -668,7 +668,44 @@ class TestSpecExample:
 
 
 # ---------------------------------------------------------------------------
-# 5. Version consistency
+# 8. Post-init validation
+# ---------------------------------------------------------------------------
+
+
+class TestPostInitValidation:
+    """Verify __post_init__ catches invalid states."""
+
+    def test_domain_knowledge_rejects_missing_vocab_keys(self):
+        """Missing vocabulary keys raise ValueError."""
+        from profiler.tools.pipeline_state import DomainKnowledge
+
+        with pytest.raises(ValueError, match="vocabulary must contain keys"):
+            DomainKnowledge(vocabulary={"operational": []})
+
+    def test_domain_knowledge_rejects_missing_year_scope_keys(self):
+        """Missing year_scope keys raise ValueError."""
+        from profiler.tools.pipeline_state import DomainKnowledge
+
+        with pytest.raises(ValueError, match="year_scope must contain keys"):
+            DomainKnowledge(year_scope={"active": []})
+
+    def test_discovery_state_rejects_wrong_source_tree_type(self):
+        """source_tree as non-dict raises TypeError."""
+        from profiler.tools.pipeline_state import DiscoveryState
+
+        with pytest.raises(TypeError, match="source_tree must be dict or None"):
+            DiscoveryState(source_tree="not_a_dict")
+
+    def test_pipeline_state_rejects_wrong_discovery_type(self):
+        """discovery as non-DiscoveryState raises TypeError."""
+        from profiler.tools.pipeline_state import PipelineState
+
+        with pytest.raises(TypeError, match="discovery must be DiscoveryState"):
+            PipelineState(discovery="bad")
+
+
+# ---------------------------------------------------------------------------
+# 9. Version consistency
 # ---------------------------------------------------------------------------
 
 

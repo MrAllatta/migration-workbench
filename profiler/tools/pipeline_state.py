@@ -49,6 +49,19 @@ class DiscoveryState:
     shortlist: list[dict[str, Any]] | None = field(default=None)
     approved_tabs: dict[str, list[str]] | None = field(default=None)
 
+    def __post_init__(self) -> None:
+        """Validate field types on construction."""
+        if self.source_tree is not None and not isinstance(self.source_tree, dict):
+            raise TypeError(
+                f"source_tree must be dict or None, "
+                f"got {type(self.source_tree).__name__}"
+            )
+        if not isinstance(self.workbook_index, list):
+            raise TypeError(
+                f"workbook_index must be list, "
+                f"got {type(self.workbook_index).__name__}"
+            )
+
 
 @dataclass
 class DeepProfileIndex:
@@ -97,6 +110,21 @@ class DomainKnowledge:
     entities: list[dict[str, Any]] = field(default_factory=list)
     glossary: dict[str, str] = field(default_factory=dict)
     scope_notes: str = ""
+
+    def __post_init__(self) -> None:
+        """Validate required dictionary keys on construction."""
+        required_vocab_keys = {"operational", "reference", "support", "derived"}
+        if not required_vocab_keys.issubset(self.vocabulary.keys()):
+            raise ValueError(
+                f"vocabulary must contain keys {required_vocab_keys}, "
+                f"got {set(self.vocabulary.keys())}"
+            )
+        required_year_keys = {"active", "archived", "forward"}
+        if not required_year_keys.issubset(self.year_scope.keys()):
+            raise ValueError(
+                f"year_scope must contain keys {required_year_keys}, "
+                f"got {set(self.year_scope.keys())}"
+            )
 
     # ------------------------------------------------------------------ #
     # DomainContext → DomainKnowledge bridge
@@ -168,6 +196,27 @@ class PipelineState:
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
     schema_contract: dict[str, Any] | None = None
     interaction_contract: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        """Validate field types on construction."""
+        if self.version and not isinstance(self.version, str):
+            raise TypeError(
+                f"version must be str, got {type(self.version).__name__}"
+            )
+        if self.discovery is not None and not isinstance(
+            self.discovery, DiscoveryState
+        ):
+            raise TypeError(
+                f"discovery must be DiscoveryState, "
+                f"got {type(self.discovery).__name__}"
+            )
+        if self.domain_knowledge is not None and not isinstance(
+            self.domain_knowledge, DomainKnowledge
+        ):
+            raise TypeError(
+                f"domain_knowledge must be DomainKnowledge, "
+                f"got {type(self.domain_knowledge).__name__}"
+            )
 
     # ------------------------------------------------------------------
     # Checkpoint I/O
