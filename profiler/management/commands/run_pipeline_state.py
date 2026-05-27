@@ -44,6 +44,7 @@ PHASES = (
     "score_and_select",
     "deep_profile",
     "derive_contracts",
+    "validate",
 )
 
 
@@ -273,12 +274,48 @@ class Command(BaseCommand):
 
         self.stdout.write("Running derive_contracts...")
         state.derive_contracts()
-        state.save_checkpoint(checkpoint_path)
+        state.save_checkpoint(checkpoint_path        )
         self.stdout.write(
             self.style.SUCCESS(
                 f"derive_contracts complete — {checkpoint_path}"
             )
         )
+
+    def _run_validate(
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
+    ) -> None:
+        """Validate checkpoint internal consistency."""
+        self.stdout.write("Validating checkpoint...")
+        errors = state.validate()
+        if not errors:
+            summary = self._checkpoint_summary(state)
+            self.stdout.write(self.style.SUCCESS(f"Checkpoint valid: {summary}"))
+        else:
+            for error in errors:
+                self.stdout.write(self.style.ERROR(f"  {error}"))
+            raise CommandError(f"Checkpoint validation failed: {len(errors)} error(s)")
+
+    def _checkpoint_summary(self, state: PipelineState) -> str:
+        """Return a human-readable summary of checkpoint contents."""
+        parts = []
+        workbook_count = len(state.discovery.workbook_index)
+        parts.append(f"{workbook_count} workbooks")
+
+        approved = state.discovery.approved_tabs
+        if approved and isinstance(approved, dict):
+            tab_count = sum(len(v) for v in approved.values())
+            parts.append(f"{tab_count} approved tabs")
+        else:
+            parts.append("no approved tabs")
+
+        parts.append(f"{len(state.decisions)} decisions")
+        return ", ".join(parts)
 
     def _build_services(self):
         """Build Google Drive and Sheets API service objects.

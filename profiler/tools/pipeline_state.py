@@ -1160,6 +1160,102 @@ class PipelineState:
 
         return self
 
+    def validate(self) -> list[str]:
+        """Validate checkpoint internal consistency.
+
+        Checks:
+        1. DomainKnowledge structure (vocabulary keys, year_scope keys)
+        2. ``approved_tabs`` workbook codes exist in ``workbook_index``
+        3. No duplicate tab entries across workbooks
+        4. Decision records have required fields
+        5. ``approved_tabs`` values are lists of strings
+
+        Returns:
+            List of error messages.  Empty list means valid.
+        """
+        errors: list[str] = []
+
+        # 1. DomainKnowledge structure
+        try:
+            required_vocab = {"operational", "reference", "support", "derived"}
+            vocab_keys = set(self.domain_knowledge.vocabulary.keys())
+            if not required_vocab.issubset(vocab_keys):
+                errors.append(
+                    f"domain_knowledge.vocabulary missing keys: "
+                    f"{required_vocab - vocab_keys}"
+                )
+        except AttributeError as exc:
+            errors.append(f"domain_knowledge.vocabulary structure error: {exc}")
+
+        try:
+            required_year = {"active", "archived", "forward"}
+            year_keys = set(self.domain_knowledge.year_scope.keys())
+            if not required_year.issubset(year_keys):
+                errors.append(
+                    f"domain_knowledge.year_scope missing keys: "
+                    f"{required_year - year_keys}"
+                )
+        except AttributeError as exc:
+            errors.append(f"domain_knowledge.year_scope structure error: {exc}")
+
+        # 2. approved_tabs workbook_code cross-reference
+        approved = self.discovery.approved_tabs
+        if approved is not None and isinstance(approved, dict):
+            workbook_codes = {
+                str(wb.get("workbook_code", ""))
+                for wb in self.discovery.workbook_index
+                if wb.get("workbook_code")
+            }
+            for wb_code, tab_list in approved.items():
+                if wb_code not in workbook_codes:
+                    errors.append(
+                        f"approved_tabs workbook code '{wb_code}' "
+                        f"not found in workbook_index"
+                    )
+                if not isinstance(tab_list, list):
+                    errors.append(
+                        f"approved_tabs['{wb_code}'] is not a list"
+                    )
+                else:
+                    for tab_name in tab_list:
+                        if not isinstance(tab_name, str):
+                            errors.append(
+                                f"approved_tabs['{wb_code}'] contains "
+                                f"non-string entry: {tab_name!r}"
+                            )
+
+            # 3. No duplicate tab entries across workbooks
+            seen_tabs: set[str] = set()
+            for wb_code, tab_list in approved.items():
+                for tab_name in tab_list:
+                    key = f"{wb_code}:{tab_name}"
+                    if key in seen_tabs:
+                        errors.append(
+                            f"Duplicate tab entry: {tab_name} "
+                            f"in workbook {wb_code}"
+                        )
+                    seen_tabs.add(key)
+        elif approved is not None:
+            errors.append(
+                f"approved_tabs must be a dict or None, "
+                f"got {type(approved).__name__}"
+            )
+
+        # 4. Decision record completeness
+        for idx, decision in enumerate(self.decisions):
+            if not decision.decision_id:
+                errors.append(f"decision[{idx}] missing decision_id")
+            if not decision.timestamp:
+                errors.append(
+                    f"decision[{idx}] ({decision.decision_id}) missing timestamp"
+                )
+            if not decision.phase:
+                errors.append(
+                    f"decision[{idx}] ({decision.decision_id}) missing phase"
+                )
+
+        return errors
+
 
 # ---------------------------------------------------------------------------
 # B. Artifact resolution helpers

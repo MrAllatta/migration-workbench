@@ -1221,3 +1221,119 @@ class TestExtractApprovedTabs:
         from profiler.tools.pipeline_state import _extract_approved_tabs
         raw = {"approved_tabs": "not_a_dict"}
         assert _extract_approved_tabs(raw) is None
+
+
+class TestCheckpointValidation:
+    """Verify PipelineState.validate() catches inconsistency."""
+
+    def test_valid_empty_state(self):
+        """Fresh empty state passes validation."""
+        from profiler.tools.pipeline_state import PipelineState, DomainKnowledge
+        state = PipelineState(
+            domain_knowledge=DomainKnowledge(
+                domain="test",
+                vocabulary={
+                    "operational": [], "reference": [],
+                    "support": [], "derived": [],
+                },
+                year_scope={"active": [], "archived": [], "forward": []},
+            ),
+        )
+        errors = state.validate()
+        assert errors == []
+
+    def test_valid_with_approved_tabs(self):
+        """State with valid approved_tabs passes."""
+        from profiler.tools.pipeline_state import (
+            PipelineState, DiscoveryState, DomainKnowledge,
+        )
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[{"workbook_code": "001"}],
+                approved_tabs={"001": ["Sheet1", "Sheet2"]},
+                shortlist=[],
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="test",
+                vocabulary={
+                    "operational": [], "reference": [],
+                    "support": [], "derived": [],
+                },
+                year_scope={"active": [], "archived": [], "forward": []},
+            ),
+        )
+        errors = state.validate()
+        assert errors == []
+
+    def test_invalid_workbook_code(self):
+        """approved_tabs referencing unknown workbook code fails."""
+        from profiler.tools.pipeline_state import (
+            PipelineState, DiscoveryState, DomainKnowledge,
+        )
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[{"workbook_code": "001"}],
+                approved_tabs={"999": ["Sheet1"]},
+                shortlist=[],
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="test",
+                vocabulary={
+                    "operational": [], "reference": [],
+                    "support": [], "derived": [],
+                },
+                year_scope={"active": [], "archived": [], "forward": []},
+            ),
+        )
+        errors = state.validate()
+        assert any("999" in e for e in errors)
+
+    def test_duplicate_tab_detected(self):
+        """Same tab in same workbook twice fails."""
+        from profiler.tools.pipeline_state import (
+            PipelineState, DiscoveryState, DomainKnowledge,
+        )
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[{"workbook_code": "001"}],
+                approved_tabs={"001": ["Sheet1", "Sheet1"]},
+                shortlist=[],
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="test",
+                vocabulary={
+                    "operational": [], "reference": [],
+                    "support": [], "derived": [],
+                },
+                year_scope={"active": [], "archived": [], "forward": []},
+            ),
+        )
+        errors = state.validate()
+        assert any("Duplicate" in e for e in errors)
+
+    def test_approved_tabs_wrong_type(self):
+        """approved_tabs as non-dict fails."""
+        from profiler.tools.pipeline_state import (
+            PipelineState, DiscoveryState, DomainKnowledge,
+        )
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[],
+                approved_tabs=["not", "a", "dict"],
+                shortlist=[],
+            ),
+            domain_knowledge=DomainKnowledge(
+                domain="test",
+                vocabulary={
+                    "operational": [], "reference": [],
+                    "support": [], "derived": [],
+                },
+                year_scope={"active": [], "archived": [], "forward": []},
+            ),
+        )
+        errors = state.validate()
+        assert any("must be a dict" in e for e in errors)

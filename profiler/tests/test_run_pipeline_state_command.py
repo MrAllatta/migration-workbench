@@ -266,3 +266,23 @@ class TestDomainContextArgument:
         raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
         assert raw["domain_knowledge"]["domain"] == "test_domain"
         assert "test_token" in raw["domain_knowledge"]["vocabulary"].get("operational", [])
+
+
+class TestValidatePhase:
+    """Verify --phase validate works end-to-end."""
+
+    def test_validate_empty_checkpoint(self, tmp_path):
+        """validate on a fresh/empty checkpoint succeeds."""
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "test"}', encoding="utf-8")
+
+        out = StringIO()
+        call_command(
+            "run_pipeline_state",
+            f"--config={config_path}",
+            "--phase=validate",
+            f"--checkpoint={tmp_path / 'pipeline-state.yaml'}",
+            stdout=out,
+        )
+        output = out.getvalue()
+        assert "Checkpoint valid" in output
