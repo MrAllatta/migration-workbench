@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus profile-phase-discover profile-phase-score profile-phase-deep profile-phase-derive profile-phase-all validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -145,6 +145,36 @@ profile-cohort-corpus:
 
 profile-coda-canvas:
 	DB_ENGINE=sqlite $(MANAGE) profile_coda_canvas --smoke
+
+profile-phase-discover:
+	DB_ENGINE=sqlite $(MANAGE) run_pipeline_state \
+		--config "$${COHORT_CORPUS_CONFIG:?required}" \
+		--phase discover \
+		--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
+
+profile-phase-score:
+	DB_ENGINE=sqlite $(MANAGE) run_pipeline_state \
+		--config "$${COHORT_CORPUS_CONFIG:?required}" \
+		--phase score_and_select \
+		--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
+
+profile-phase-deep:
+	DB_ENGINE=sqlite $(MANAGE) run_pipeline_state \
+		--config "$${COHORT_CORPUS_CONFIG:?required}" \
+		--phase deep_profile \
+		--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
+
+profile-phase-derive:
+	DB_ENGINE=sqlite $(MANAGE) run_pipeline_state \
+		--config "$${COHORT_CORPUS_CONFIG:?required}" \
+		--phase derive_contracts \
+		--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
+
+profile-phase-all:
+	DB_ENGINE=sqlite $(MANAGE) run_pipeline_state \
+		--config "$${COHORT_CORPUS_CONFIG:?required}" \
+		--phase all \
+		--checkpoint "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
 
 validate-domain-context:
 	@test -n "$(DOMAIN_CONTEXT)" || (echo "Usage: make validate-domain-context DOMAIN_CONTEXT=path/to/domain_context.yaml"; exit 1)

@@ -167,9 +167,9 @@ class PipelineState:
         discovery_raw = raw.get("discovery") or {}
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree"),
-            workbook_index=discovery_raw.get("workbook_index") or [],
-            broad_inventory=discovery_raw.get("broad_inventory") or [],
-            shortlist=discovery_raw.get("shortlist") or [],
+            workbook_index=discovery_raw.get("workbook_index"),
+            broad_inventory=discovery_raw.get("broad_inventory"),
+            shortlist=discovery_raw.get("shortlist"),
             approved_tabs=discovery_raw.get("approved_tabs"),
         )
 
@@ -311,7 +311,6 @@ class PipelineState:
         """
         if self.discovery.approved_tabs is None:
             raise RuntimeError("deep_profile: no approved_tabs")
-        self.deep_profile_index = DeepProfileIndex()
         return self
 
     def derive_contracts(self) -> PipelineState:
