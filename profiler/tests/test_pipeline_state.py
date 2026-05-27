@@ -723,3 +723,74 @@ class TestVersionConsistency:
             f"PipelineState.version ({PipelineState.version}) "
             f"!= pyproject.toml version ({pyproject_version})"
         )
+
+
+# ---------------------------------------------------------------------------
+# 10. Version migration
+# ---------------------------------------------------------------------------
+
+
+class TestVersionMigration:
+    """Verify version comparison and migration application."""
+
+    def test_version_less_than(self):
+        """_version_less_than compares correctly."""
+        from profiler.tools.pipeline_state import _version_less_than as vlt
+
+        assert vlt("0.0.8", "0.0.9")
+        assert vlt("0.0.9", "0.1.0")
+        assert not vlt("0.0.9", "0.0.9")
+        assert not vlt("0.1.0", "0.0.9")
+
+    def test_version_less_eq(self):
+        """_version_less_eq compares correctly."""
+        from profiler.tools.pipeline_state import _version_less_eq as vle
+
+        assert vle("0.0.9", "0.0.9")
+        assert vle("0.0.8", "0.0.9")
+        assert not vle("0.1.0", "0.0.9")
+
+    def test_apply_migrations_bumps_version(self, tmp_path):
+        """Old version checkpoint gets version bumped."""
+        import yaml
+
+        raw = {
+            "version": "0.0.8",
+            "discovery": {
+                "source_tree": {},
+                "workbook_index": [],
+                "broad_inventory": [],
+                "shortlist": [],
+                "approved_tabs": {},
+            },
+            "domain_knowledge": {
+                "domain": "test",
+                "description": "",
+                "vocabulary": {
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
+                },
+                "year_scope": {
+                    "active": [],
+                    "archived": [],
+                    "forward": [],
+                },
+                "deduplication": {
+                    "strategy": "latest_year",
+                    "exceptions": [],
+                },
+                "entities": [],
+                "glossary": {},
+                "scope_notes": "",
+            },
+        }
+        path = tmp_path / "old-state.yaml"
+        path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+        from profiler.tools.pipeline_state import PipelineState
+
+        loaded = PipelineState.load(path)
+        assert loaded.version == "0.0.9"
+        assert loaded.domain_knowledge.domain == "test"

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,38 @@ _ARTIFACT_FIELDS: set[str] = {
     "broad_inventory",
     "shortlist",
     "deep_profiles",
+}
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Parse a semver string into a comparable tuple.
+
+    Args:
+        version: Semver string like ``"0.0.9"``.
+
+    Returns:
+        Tuple of integer version components.
+    """
+    return tuple(int(part) for part in version.split("."))
+
+
+def _version_less_than(v1: str, v2: str) -> bool:
+    """True if *v1* is strictly less than *v2*."""
+    return _version_tuple(v1) < _version_tuple(v2)
+
+
+def _version_less_eq(v1: str, v2: str) -> bool:
+    """True if *v1* is less than or equal to *v2*."""
+    return _version_tuple(v1) <= _version_tuple(v2)
+
+
+_CHECKPOINT_CURRENT_VERSION = "0.0.9"
+
+# Registry: version_string -> list of migration functions.
+# Each function takes and returns a raw dict (parsed YAML payload).
+# Used to upgrade old checkpoint formats transparently on load.
+_CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
+    # Future entries: "0.0.8": [_migrate_v0_0_8_to_v0_0_9],
 }
 
 
@@ -298,6 +331,9 @@ class PipelineState:
                 f"Checkpoint at {file_path} is not a YAML mapping."
             )
 
+        # Apply format migrations before resolving artifacts
+        raw = cls._apply_migrations(raw)
+
         # Resolve _artifact references back into inline data
         base_dir = file_path.parent
         resolved = _resolve_artifacts(raw, base_dir)
@@ -423,6 +459,32 @@ class PipelineState:
             }
 
         return payload
+
+    @classmethod
+    def _apply_migrations(cls, raw: dict[str, Any]) -> dict[str, Any]:
+        """Apply checkpoint format migrations from stored version to current.
+
+        Called in ``load()`` after YAML parsing, before ``_from_resolved_dict()``.
+
+        Args:
+            raw: Parsed checkpoint dict.
+
+        Returns:
+            Migrated dict with ``version`` bumped to current.
+        """
+        version = raw.get("version", "0.0.0")
+        if not isinstance(version, str):
+            version = "0.0.0"
+
+        for from_ver in sorted(_CHECKPOINT_MIGRATIONS):
+            if _version_less_than(version, from_ver) and _version_less_eq(
+                from_ver, _CHECKPOINT_CURRENT_VERSION
+            ):
+                for migrate_fn in _CHECKPOINT_MIGRATIONS[from_ver]:
+                    raw = migrate_fn(raw)
+
+        raw["version"] = _CHECKPOINT_CURRENT_VERSION
+        return raw
 
     @classmethod
     def _from_resolved_dict(
