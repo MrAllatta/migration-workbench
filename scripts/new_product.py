@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -352,7 +353,20 @@ class {user_model_name}(AbstractUser):
 """
 
 
+def _workbench_version() -> str:
+    """Read migration-workbench version from its own pyproject.toml."""
+    workbench_root = Path(__file__).resolve().parent.parent
+    pyproject_path = workbench_root / "pyproject.toml"
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("project", {}).get("version", "0.0.9")
+    except Exception:
+        return "0.0.9"
+
+
 def render_pyproject_toml(project_name: str, py_name: str) -> str:
+    _wb_ver = _workbench_version()
     return f"""[build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -364,7 +378,8 @@ description = "{project_name} — Django product with migration-workbench"
 requires-python = ">=3.11"
 dependencies = [
   "Django>=5.0,<6.0",
-  "migration-workbench>=0.1.0,<1",
+  "migration-workbench>={_wb_ver},<1",
+
 ]
 
 [project.optional-dependencies]
