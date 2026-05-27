@@ -114,11 +114,11 @@ class Command(BaseCommand):
         date_stamp = options.get("date_stamp") or date.today().isoformat()
         stop_before_deep = options.get("stop_before_deep", False)
 
-        # Load domain context from --domain-context, config, or default path
+        # Load domain context from --domain-context or config key
         domain_context = None
         domain_ctx_source = options.get("domain_context")
         if domain_ctx_source is None:
-            domain_ctx_source = config.get("domain_context", "config/domain_context.yaml")
+            domain_ctx_source = config.get("domain_context")
         if domain_ctx_source:
             from profiler.tools.domain_context import load_domain_context
             domain_context = load_domain_context(domain_ctx_source)
