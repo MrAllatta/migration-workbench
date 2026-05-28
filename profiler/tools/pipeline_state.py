@@ -160,8 +160,8 @@ class PipelineState:
             in checkpoint.
     """
 
-    # Must match pyproject.toml version — kept here so checkpoint format
-    # version is explicit and testable without importing pyproject.toml.
+    # Schema version for checkpoint migration. Independent of the package version in pyproject.toml
+    # -- see Agents.md "Schema versions".
     version: str = "0.0.9"
     discovery: DiscoveryState = field(default_factory=DiscoveryState)
     deep_profile_index: DeepProfileIndex = field(default_factory=DeepProfileIndex)
