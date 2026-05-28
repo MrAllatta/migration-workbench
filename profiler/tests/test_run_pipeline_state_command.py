@@ -56,8 +56,9 @@ def test_run_pipeline_state_invalid_phase():
 
 
 @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+@patch("connectors.google_sheets.build_google_service")
 def test_run_pipeline_state_discover_phase(
-    mock_run_cohort_corpus, tmp_path: Path
+    mock_build_google_service, mock_run_cohort_corpus, tmp_path: Path
 ):
     """--phase discover runs the discovery pipeline and writes a checkpoint."""
     mock_run_cohort_corpus.return_value = {}
@@ -87,8 +88,9 @@ def test_run_pipeline_state_discover_phase(
 
 
 @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+@patch("connectors.google_sheets.build_google_service")
 def test_run_pipeline_state_all_phase(
-    mock_run_cohort_corpus, tmp_path: Path
+    mock_build_google_service, mock_run_cohort_corpus, tmp_path: Path
 ):
     """--phase all runs deep_profile and derive_contracts on a partial
     checkpoint, skipping already-completed phases."""
@@ -229,8 +231,9 @@ class TestDomainContextArgument:
         assert "--domain-context" in captured.out
 
     @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
+    @patch("connectors.google_sheets.build_google_service")
     def test_domain_context_seeds_domain_knowledge(
-        self, mock_run_cohort_corpus, tmp_path
+        self, mock_build_google_service, mock_run_cohort_corpus, tmp_path
     ):
         """Passing --domain-context seeds DomainKnowledge on fresh state."""
         mock_run_cohort_corpus.return_value = {}
