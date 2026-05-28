@@ -261,6 +261,16 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.1.0
+
+- **PipelineState maturity:** Validation phase (`--phase validate`), config routing via `configure()`, `DecisionRecord` dataclass, version migration registry, post-init validation, `reset_bindings`/`validate_bindings` for guard-clause hygiene.
+- **Checkpoint checkpoint:** Source tree externalized to JSON artifact. Contract artifacts written as `.json` (not `.yaml`). Approved tabs extracted at any nesting depth.
+- **Profiler ergonomics:** Tab `exclude: true` mode, `score_cutoff` parameter, per-tab details in `tab_selection.json` output, per-workbook scoring overrides.
+- **Management command wiring:** `run_pipeline_state` delegates to `PipelineState` phase methods with real Google API service dispatch. `--domain-context` arg seeds `DomainKnowledge`. `--stop-before-deep` for partial runs.
+- **Type safety:** Three `basedpyright` fixes, ruff lint/format sweep of 47 files, packaging fix for bare `workbench/` directory.
+- **Version semantics:** `PipelineState.version` now independent of package version. See AGENTS.md for policy.
+- **Release discipline:** AGENTS.md documents solo release hygiene — merge = release, pre-release tagging, agents do not commit.
+
 ### 0.9.4
 
 - **PipelineState checkpoint system:** New `profiler/tools/pipeline_state.py` module with 4 lifecycle dataclasses (PipelineState, DiscoveryState, DeepProfileIndex, DomainKnowledge) and checkpoint I/O via `pipeline_state.checkpoint()` / `resume()`. Supports 4-phase state machine: discover → score_and_select → deep_profile → derive_contracts. Guard clauses prevent re-entering completed phases. Deep-profile index preserves entries on resume.
