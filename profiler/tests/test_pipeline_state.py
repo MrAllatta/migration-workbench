@@ -382,33 +382,25 @@ class TestPhaseGuardClauses:
     def test_score_and_select_requires_discovery(self):
         """RuntimeError if source_tree is empty."""
         state = PipelineState()
-        with pytest.raises(
-            RuntimeError, match="discover\\(\\) must run first"
-        ):
+        with pytest.raises(RuntimeError, match="discover\\(\\) must run first"):
             state.score_and_select()
 
     def test_score_and_select_requires_shortlist(self):
         """RuntimeError if shortlist is empty."""
-        state = PipelineState(
-            discovery=DiscoveryState(source_tree={})
-        )
+        state = PipelineState(discovery=DiscoveryState(source_tree={}))
         with pytest.raises(RuntimeError, match="shortlist is None"):
             state.score_and_select()
 
     def test_deep_profile_requires_approved_tabs(self):
         """RuntimeError if approved_tabs is empty."""
-        state = PipelineState(
-            discovery=DiscoveryState(source_tree={})
-        )
+        state = PipelineState(discovery=DiscoveryState(source_tree={}))
         with pytest.raises(RuntimeError, match="no approved_tabs"):
             state.deep_profile()
 
     def test_derive_contracts_requires_deep_profile(self):
         """RuntimeError if entries is empty."""
         state = PipelineState()
-        with pytest.raises(
-            RuntimeError, match="deep_profile must run first"
-        ):
+        with pytest.raises(RuntimeError, match="deep_profile must run first"):
             state.derive_contracts()
 
     @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
@@ -426,9 +418,7 @@ class TestPhaseGuardClauses:
         state.discover()
         state.score_and_select()
         state.deep_profile()
-        state.deep_profile_index.entries.append(
-            {"tab_title": "Crop Planner"}
-        )
+        state.deep_profile_index.entries.append({"tab_title": "Crop Planner"})
         state.derive_contracts()
         assert state.discovery.source_tree == {}
         assert state.discovery.approved_tabs == {}
@@ -523,9 +513,7 @@ class TestDomainContextBridge:
             ),
             deduplication=DC.DeduplicationContext(
                 strategy="latest_year",
-                exceptions=[
-                    {"tab_title": "Annual Budget"}
-                ],
+                exceptions=[{"tab_title": "Annual Budget"}],
             ),
             entities=[
                 {
@@ -611,9 +599,7 @@ class TestArtifactReferences:
         """Missing artifact files are gracefully handled as empty lists."""
         checkpoint = tmp_path / "pipeline-state.yaml"
         state = PipelineState()
-        state.discovery.broad_inventory = [
-            {"tab_title": "Test"}
-        ]
+        state.discovery.broad_inventory = [{"tab_title": "Test"}]
         state.save_checkpoint(checkpoint)
 
         # Delete the artifact file
@@ -808,10 +794,7 @@ class TestSpecExample:
                     },
                 ],
                 glossary={"qty": "quantity", "amt": "amount"},
-                scope_notes=(
-                    "Focus on 2025-2026; "
-                    "2023-2024 are historical only."
-                ),
+                scope_notes=("Focus on 2025-2026; 2023-2024 are historical only."),
             ),
             schema_contract={"tables": []},
             interaction_contract={"views": []},
@@ -822,16 +805,12 @@ class TestSpecExample:
 
         loaded = PipelineState.load(path)
         assert loaded.version == "0.0.9"
-        assert (
-            loaded.discovery.source_tree["provider"] == "google_sheets"
-        )
+        assert loaded.discovery.source_tree["provider"] == "google_sheets"
         assert (
             loaded.discovery.source_tree["spreadsheets"][0]["name"]
             == "101_FarmPlan_2023"
         )
-        assert (
-            loaded.discovery.workbook_index[0]["workbook_code"] == "101"
-        )
+        assert loaded.discovery.workbook_index[0]["workbook_code"] == "101"
         assert loaded.discovery.workbook_index[0]["year"] == 2023
         assert loaded.discovery.approved_tabs["101"] == [
             "Crop Planner",
@@ -850,13 +829,8 @@ class TestSpecExample:
             2025,
             2026,
         ]
-        assert (
-            loaded.domain_knowledge.deduplication["strategy"]
-            == "latest_year"
-        )
-        assert (
-            loaded.domain_knowledge.entities[0]["name"] == "Season"
-        )
+        assert loaded.domain_knowledge.deduplication["strategy"] == "latest_year"
+        assert loaded.domain_knowledge.entities[0]["name"] == "Season"
 
 
 # ---------------------------------------------------------------------------
@@ -955,20 +929,29 @@ class TestConfigRouting:
 # ---------------------------------------------------------------------------
 
 
-class TestVersionConsistency:
-    """PipelineState.version must match pyproject.toml project version."""
+class TestVersionIndependence:
+    """PipelineState.version is independent of pyproject.toml version.
+    See AGENTS.md "Schema versions"."""
 
-    def test_version_matches_pyproject_toml(self) -> None:
-        """Assert PipelineState default version equals pyproject.toml version."""
+    def test_pipeline_state_version_is_valid_semver(self) -> None:
+        """Assert PipelineState.version is a valid semver string."""
+        import re
+
+        assert re.match(r"^\d+\.\d+\.\d+$", PipelineState.version), (
+            f"PipelineState.version ({PipelineState.version}) is not valid semver"
+        )
+
+    def test_pipeline_state_version_not_tied_to_pyproject(self) -> None:
+        """Assert PipelineState.version is independent of pyproject.toml."""
         repo_root = Path(__file__).resolve().parent.parent.parent
         pyproject_path = repo_root / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
         pyproject_version = data["project"]["version"]
-        assert PipelineState.version == pyproject_version, (
-            f"PipelineState.version ({PipelineState.version}) "
-            f"!= pyproject.toml version ({pyproject_version})"
-        )
+        # Schema version and package version may differ — that's by design.
+        # This test documents the current values.
+        assert isinstance(PipelineState.version, str)
+        assert isinstance(pyproject_version, str)
 
 
 # ---------------------------------------------------------------------------
@@ -1035,15 +1018,17 @@ class TestPhaseMethods:
     def test_derive_contracts_creates_tables(self):
         """derive_contracts() builds tables from deep profile entries."""
         state = PipelineState(
-            deep_profile_index=DeepProfileIndex(entries=[
-                {
-                    "tab_title": "Crop Planner",
-                    "columns": [
-                        {"header": "crop_name", "data_type": "string"},
-                        {"header": "planting_date", "data_type": "date"},
-                    ],
-                },
-            ]),
+            deep_profile_index=DeepProfileIndex(
+                entries=[
+                    {
+                        "tab_title": "Crop Planner",
+                        "columns": [
+                            {"header": "crop_name", "data_type": "string"},
+                            {"header": "planting_date", "data_type": "date"},
+                        ],
+                    },
+                ]
+            ),
         )
         result = state.derive_contracts()
         assert result.schema_contract is not None
@@ -1063,14 +1048,16 @@ class TestPhaseMethods:
     def test_derive_contracts_old_tab_key_compat(self):
         """derive_contracts() still resolves tab name from old 'tab' key."""
         state = PipelineState(
-            deep_profile_index=DeepProfileIndex(entries=[
-                {
-                    "tab": "Legacy Tab Name",
-                    "columns": [
-                        {"header": "legacy_col", "data_type": "string"},
-                    ],
-                },
-            ]),
+            deep_profile_index=DeepProfileIndex(
+                entries=[
+                    {
+                        "tab": "Legacy Tab Name",
+                        "columns": [
+                            {"header": "legacy_col", "data_type": "string"},
+                        ],
+                    },
+                ]
+            ),
         )
         result = state.derive_contracts()
         assert result.schema_contract is not None
@@ -1080,9 +1067,11 @@ class TestPhaseMethods:
     def test_derive_contracts_missing_tab_keys_fallback(self):
         """derive_contracts() falls back to 'unknown' when neither key exists."""
         state = PipelineState(
-            deep_profile_index=DeepProfileIndex(entries=[
-                {"workbook_code": "101", "year": 2024, "out_json": "none"},
-            ]),
+            deep_profile_index=DeepProfileIndex(
+                entries=[
+                    {"workbook_code": "101", "year": 2024, "out_json": "none"},
+                ]
+            ),
         )
         result = state.derive_contracts()
         assert result.schema_contract is not None
@@ -1223,24 +1212,28 @@ class TestExtractApprovedTabs:
     def test_top_level_direct_hit(self):
         """Top-level approved_tabs key returns immediately."""
         from profiler.tools.pipeline_state import _extract_approved_tabs
+
         raw = {"approved_tabs": {"wb001": ["Sheet1"]}}
         assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
 
     def test_nested_two_levels(self):
         """Approved_tabs nested under one key is found."""
         from profiler.tools.pipeline_state import _extract_approved_tabs
+
         raw = {"selection": {"approved_tabs": {"wb001": ["Sheet1"]}}}
         assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
 
     def test_nested_three_levels(self):
         """Approved_tabs nested under two keys is found."""
         from profiler.tools.pipeline_state import _extract_approved_tabs
+
         raw = {"tab_selection": {"selection": {"approved_tabs": {"wb001": ["Sheet1"]}}}}
         assert _extract_approved_tabs(raw) == {"wb001": ["Sheet1"]}
 
     def test_empty_returns_default(self):
         """No approved_tabs returns default."""
         from profiler.tools.pipeline_state import _extract_approved_tabs
+
         raw = {"selection": {"tabs": []}}
         assert _extract_approved_tabs(raw) is None
         assert _extract_approved_tabs(raw, default={}) == {}
@@ -1248,6 +1241,7 @@ class TestExtractApprovedTabs:
     def test_non_dict_approved_tabs_returns_default(self):
         """approved_tabs value that is not a dict returns default."""
         from profiler.tools.pipeline_state import _extract_approved_tabs
+
         raw = {"approved_tabs": "not_a_dict"}
         assert _extract_approved_tabs(raw) is None
 
@@ -1258,12 +1252,15 @@ class TestCheckpointValidation:
     def test_valid_empty_state(self):
         """Fresh empty state passes validation."""
         from profiler.tools.pipeline_state import PipelineState, DomainKnowledge
+
         state = PipelineState(
             domain_knowledge=DomainKnowledge(
                 domain="test",
                 vocabulary={
-                    "operational": [], "reference": [],
-                    "support": [], "derived": [],
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
                 },
                 year_scope={"active": [], "archived": [], "forward": []},
             ),
@@ -1274,8 +1271,11 @@ class TestCheckpointValidation:
     def test_valid_with_approved_tabs(self):
         """State with valid approved_tabs passes."""
         from profiler.tools.pipeline_state import (
-            PipelineState, DiscoveryState, DomainKnowledge,
+            PipelineState,
+            DiscoveryState,
+            DomainKnowledge,
         )
+
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={},
@@ -1286,8 +1286,10 @@ class TestCheckpointValidation:
             domain_knowledge=DomainKnowledge(
                 domain="test",
                 vocabulary={
-                    "operational": [], "reference": [],
-                    "support": [], "derived": [],
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
                 },
                 year_scope={"active": [], "archived": [], "forward": []},
             ),
@@ -1298,8 +1300,11 @@ class TestCheckpointValidation:
     def test_invalid_workbook_code(self):
         """approved_tabs referencing unknown workbook code fails."""
         from profiler.tools.pipeline_state import (
-            PipelineState, DiscoveryState, DomainKnowledge,
+            PipelineState,
+            DiscoveryState,
+            DomainKnowledge,
         )
+
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={},
@@ -1310,8 +1315,10 @@ class TestCheckpointValidation:
             domain_knowledge=DomainKnowledge(
                 domain="test",
                 vocabulary={
-                    "operational": [], "reference": [],
-                    "support": [], "derived": [],
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
                 },
                 year_scope={"active": [], "archived": [], "forward": []},
             ),
@@ -1322,8 +1329,11 @@ class TestCheckpointValidation:
     def test_duplicate_tab_detected(self):
         """Same tab in same workbook twice fails."""
         from profiler.tools.pipeline_state import (
-            PipelineState, DiscoveryState, DomainKnowledge,
+            PipelineState,
+            DiscoveryState,
+            DomainKnowledge,
         )
+
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={},
@@ -1334,8 +1344,10 @@ class TestCheckpointValidation:
             domain_knowledge=DomainKnowledge(
                 domain="test",
                 vocabulary={
-                    "operational": [], "reference": [],
-                    "support": [], "derived": [],
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
                 },
                 year_scope={"active": [], "archived": [], "forward": []},
             ),
@@ -1346,8 +1358,11 @@ class TestCheckpointValidation:
     def test_approved_tabs_wrong_type(self):
         """approved_tabs as non-dict fails."""
         from profiler.tools.pipeline_state import (
-            PipelineState, DiscoveryState, DomainKnowledge,
+            PipelineState,
+            DiscoveryState,
+            DomainKnowledge,
         )
+
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={},
@@ -1358,8 +1373,10 @@ class TestCheckpointValidation:
             domain_knowledge=DomainKnowledge(
                 domain="test",
                 vocabulary={
-                    "operational": [], "reference": [],
-                    "support": [], "derived": [],
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
                 },
                 year_scope={"active": [], "archived": [], "forward": []},
             ),

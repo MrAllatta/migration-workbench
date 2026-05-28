@@ -103,14 +103,16 @@ def test_run_pipeline_state_all_phase(
     # allowing derive_contracts to proceed.
     deep_file = tmp_path / "deep_coverage.json"
     deep_file.write_text(
-        json.dumps([
-            {
-                "tab_title": "Crop Planner",
-                "columns": [
-                    {"header": "name", "data_type": "string"},
-                ],
-            },
-        ]),
+        json.dumps(
+            [
+                {
+                    "tab_title": "Crop Planner",
+                    "columns": [
+                        {"header": "name", "data_type": "string"},
+                    ],
+                },
+            ]
+        ),
         encoding="utf-8",
     )
     mock_run_cohort_corpus.return_value = {"deep_coverage": str(deep_file)}
@@ -166,9 +168,7 @@ def test_run_pipeline_state_all_phase(
 
 
 @patch("profiler.tools.cohort_corpus.run_cohort_corpus")
-def test_run_pipeline_state_resume(
-    mock_run_cohort_corpus, tmp_path: Path
-):
+def test_run_pipeline_state_resume(mock_run_cohort_corpus, tmp_path: Path):
     """Loading a partial checkpoint skips completed phases."""
     mock_run_cohort_corpus.return_value = {}
 
@@ -268,7 +268,9 @@ class TestDomainContextArgument:
 
         raw = yaml.safe_load(checkpoint.read_text(encoding="utf-8"))
         assert raw["domain_knowledge"]["domain"] == "test_domain"
-        assert "test_token" in raw["domain_knowledge"]["vocabulary"].get("operational", [])
+        assert "test_token" in raw["domain_knowledge"]["vocabulary"].get(
+            "operational", []
+        )
 
 
 class TestValidatePhase:

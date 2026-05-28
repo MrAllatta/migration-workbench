@@ -121,6 +121,7 @@ class Command(BaseCommand):
             domain_ctx_source = config.get("domain_context")
         if domain_ctx_source:
             from profiler.tools.domain_context import load_domain_context
+
             domain_context = load_domain_context(domain_ctx_source)
 
         state = PipelineState.load_or_create(
@@ -134,13 +135,21 @@ class Command(BaseCommand):
 
         if phase == "all":
             self._run_all(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
+                stop_before_deep,
             )
         else:
             getattr(self, f"_run_{phase}")(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
+                stop_before_deep,
             )
 
     def _run_all(
@@ -155,30 +164,46 @@ class Command(BaseCommand):
         """Run all phases sequentially, skipping completed ones."""
         if state.discovery.source_tree is None:
             self._run_discover(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
+                stop_before_deep,
             )
         else:
             self.stdout.write("[skip] discover already complete")
 
         if state.discovery.shortlist is None:
             self._run_score_and_select(
-                state, config, out_dir, date_stamp,
-                checkpoint_path, stop_before_deep,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
+                stop_before_deep,
             )
         else:
             self.stdout.write("[skip] score_and_select already complete")
 
         if not state.deep_profile_index.entries:
             self._run_deep_profile(
-                state, config, out_dir, date_stamp, checkpoint_path,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
             )
         else:
             self.stdout.write("[skip] deep_profile already complete")
 
         if state.schema_contract is None:
             self._run_derive_contracts(
-                state, config, out_dir, date_stamp, checkpoint_path,
+                state,
+                config,
+                out_dir,
+                date_stamp,
+                checkpoint_path,
             )
         else:
             self.stdout.write("[skip] derive_contracts already complete")
@@ -194,22 +219,14 @@ class Command(BaseCommand):
     ) -> None:
         """Phase 0/1: Discovery through tab selection."""
         if state.discovery.source_tree and state.discovery.approved_tabs:
-            self.stdout.write(
-                "Checkpoint has approved_tabs — skipping discover phase"
-            )
+            self.stdout.write("Checkpoint has approved_tabs — skipping discover phase")
             return
 
-        self.stdout.write(
-            "Running Phase 0/1: Discovery and tab selection..."
-        )
+        self.stdout.write("Running Phase 0/1: Discovery and tab selection...")
         drive_service, sheets_service = self._build_services()
         state.discover(drive_service, sheets_service)
         state.save_checkpoint(checkpoint_path)
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"discover complete — {checkpoint_path}"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"discover complete — {checkpoint_path}"))
 
     def _run_score_and_select(
         self,
@@ -222,18 +239,14 @@ class Command(BaseCommand):
     ) -> None:
         """Phase 2: Re-score tabs using domain knowledge (no API calls)."""
         if not state.discovery.broad_inventory:
-            self.stdout.write(
-                "No broad_inventory in checkpoint — cannot re-score"
-            )
+            self.stdout.write("No broad_inventory in checkpoint — cannot re-score")
             return
 
         self.stdout.write("Running score_and_select...")
         state.score_and_select()
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
-            self.style.SUCCESS(
-                f"score_and_select complete — {checkpoint_path}"
-            )
+            self.style.SUCCESS(f"score_and_select complete — {checkpoint_path}")
         )
 
     def _run_deep_profile(
@@ -247,9 +260,7 @@ class Command(BaseCommand):
     ) -> None:
         """Phase 3: Deep profiling of approved tabs."""
         if not state.discovery.approved_tabs:
-            self.stdout.write(
-                "No approved_tabs in checkpoint — run discover first"
-            )
+            self.stdout.write("No approved_tabs in checkpoint — run discover first")
             return
 
         self.stdout.write("Running deep_profile...")
@@ -257,9 +268,7 @@ class Command(BaseCommand):
         state.deep_profile(sheets_service)
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
-            self.style.SUCCESS(
-                f"deep_profile complete — {checkpoint_path}"
-            )
+            self.style.SUCCESS(f"deep_profile complete — {checkpoint_path}")
         )
 
     def _run_derive_contracts(
@@ -273,18 +282,14 @@ class Command(BaseCommand):
     ) -> None:
         """Phase 4: Derive schema and interaction contracts."""
         if not state.deep_profile_index.entries:
-            self.stdout.write(
-                "No deep profile data — run deep_profile first"
-            )
+            self.stdout.write("No deep profile data — run deep_profile first")
             return
 
         self.stdout.write("Running derive_contracts...")
         state.derive_contracts()
-        state.save_checkpoint(checkpoint_path        )
+        state.save_checkpoint(checkpoint_path)
         self.stdout.write(
-            self.style.SUCCESS(
-                f"derive_contracts complete — {checkpoint_path}"
-            )
+            self.style.SUCCESS(f"derive_contracts complete — {checkpoint_path}")
         )
 
     def _run_validate(

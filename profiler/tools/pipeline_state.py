@@ -94,6 +94,7 @@ def _version_less_eq(v1: str, v2: str) -> bool:
 
 _CHECKPOINT_CURRENT_VERSION = "0.0.9"
 
+
 # Registry: version_string -> list of migration functions.
 # Each function takes and returns a raw dict (parsed YAML payload).
 # Used to upgrade old checkpoint formats transparently on load.
@@ -153,8 +154,7 @@ class DiscoveryState:
             )
         if not isinstance(self.workbook_index, list):
             raise TypeError(
-                f"workbook_index must be list, "
-                f"got {type(self.workbook_index).__name__}"
+                f"workbook_index must be list, got {type(self.workbook_index).__name__}"
             )
 
 
@@ -318,15 +318,12 @@ class PipelineState:
     def __post_init__(self) -> None:
         """Validate field types on construction."""
         if self.version and not isinstance(self.version, str):
-            raise TypeError(
-                f"version must be str, got {type(self.version).__name__}"
-            )
+            raise TypeError(f"version must be str, got {type(self.version).__name__}")
         if self.discovery is not None and not isinstance(
             self.discovery, DiscoveryState
         ):
             raise TypeError(
-                f"discovery must be DiscoveryState, "
-                f"got {type(self.discovery).__name__}"
+                f"discovery must be DiscoveryState, got {type(self.discovery).__name__}"
             )
         if self.domain_knowledge is not None and not isinstance(
             self.domain_knowledge, DomainKnowledge
@@ -361,7 +358,11 @@ class PipelineState:
             PipelineState: Self for chaining.
         """
         self._config = config or self._config or {}
-        self._out_dir = Path(out_dir) if out_dir else (self._out_dir or Path("data/profile_snapshots"))
+        self._out_dir = (
+            Path(out_dir)
+            if out_dir
+            else (self._out_dir or Path("data/profile_snapshots"))
+        )
         self._date_stamp = date_stamp or self._date_stamp or date.today().isoformat()
         return self
 
@@ -480,7 +481,9 @@ class PipelineState:
             ) from exc
 
         file_path.write_text(
-            yaml.safe_dump(payload, sort_keys=False, allow_unicode=True, default_flow_style=False),
+            yaml.safe_dump(
+                payload, sort_keys=False, allow_unicode=True, default_flow_style=False
+            ),
             encoding="utf-8",
         )
         logger.info("saved checkpoint %s", file_path)
@@ -506,9 +509,7 @@ class PipelineState:
         """
         file_path = Path(path)
         if not file_path.exists():
-            logger.info(
-                "checkpoint not found at %s — returning empty state", file_path
-            )
+            logger.info("checkpoint not found at %s — returning empty state", file_path)
             return cls()
 
         try:
@@ -526,9 +527,7 @@ class PipelineState:
             ) from exc
 
         if not isinstance(raw, dict):
-            raise CommandError(
-                f"Checkpoint at {file_path} is not a YAML mapping."
-            )
+            raise CommandError(f"Checkpoint at {file_path} is not a YAML mapping.")
 
         # Apply format migrations before resolving artifacts
         raw = cls._apply_migrations(raw)
@@ -537,9 +536,7 @@ class PipelineState:
         base_dir = file_path.parent
         resolved = _resolve_artifacts(raw, base_dir)
         if not isinstance(resolved, dict):
-            raise CommandError(
-                f"Checkpoint at {file_path} resolved to non-dict."
-            )
+            raise CommandError(f"Checkpoint at {file_path} resolved to non-dict.")
 
         return cls._from_resolved_dict(resolved, base_dir=base_dir)
 
@@ -657,17 +654,13 @@ class PipelineState:
 
         # Deep profile index as artifact reference
         if self.deep_profile_index.entries:
-            artifact_path = (
-                base_dir / "pipeline-state-deep-profiles.json"
-            )
+            artifact_path = base_dir / "pipeline-state-deep-profiles.json"
             artifact_path.write_text(
                 json.dumps(self.deep_profile_index.entries, indent=2),
                 encoding="utf-8",
             )
             payload["deep_profile_index"] = {
-                "_artifact": str(
-                    artifact_path.relative_to(base_dir)
-                )
+                "_artifact": str(artifact_path.relative_to(base_dir))
             }
         else:
             payload["deep_profile_index"] = {"entries": []}
@@ -687,9 +680,7 @@ class PipelineState:
             payload["interaction_contract"] = {
                 "_artifact": str(contract_artifact_path.relative_to(base_dir))
             }
-            _write_contract_artifact(
-                self.interaction_contract, contract_artifact_path
-            )
+            _write_contract_artifact(self.interaction_contract, contract_artifact_path)
 
         return payload
 
@@ -741,9 +732,7 @@ class PipelineState:
         # "not yet populated" (None) from "populated but empty" ([]/{}).
         shortlist_raw = discovery_raw.get("shortlist")
         shortlist = (
-            list(shortlist_raw)
-            if isinstance(shortlist_raw, list)
-            else shortlist_raw
+            list(shortlist_raw) if isinstance(shortlist_raw, list) else shortlist_raw
         )
         approved_tabs_raw = discovery_raw.get("approved_tabs")
         approved_tabs = (
@@ -756,7 +745,9 @@ class PipelineState:
         raw_index = discovery_raw.get("workbook_index") or []
         if isinstance(raw_index, dict) and "records" in raw_index:
             index_data = raw_index["records"]
-        elif isinstance(raw_index, list) and raw_index and isinstance(raw_index[0], dict):
+        elif (
+            isinstance(raw_index, list) and raw_index and isinstance(raw_index[0], dict)
+        ):
             index_data = raw_index
         else:
             index_data = []
@@ -764,9 +755,7 @@ class PipelineState:
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree") or {},
             workbook_index=list(index_data),
-            broad_inventory=list(
-                discovery_raw.get("broad_inventory") or []
-            ),
+            broad_inventory=list(discovery_raw.get("broad_inventory") or []),
             shortlist=shortlist,
             approved_tabs=approved_tabs,
         )
@@ -794,9 +783,7 @@ class PipelineState:
             scope_notes=str(domain_raw.get("scope_notes", "")),
         )
 
-        decisions = [
-            DecisionRecord(**d) for d in decisions_raw
-        ]
+        decisions = [DecisionRecord(**d) for d in decisions_raw]
 
         # Contract resolution — resolve artifact references eagerly
         schema_contract: dict[str, Any] | None = None
@@ -856,17 +843,13 @@ class PipelineState:
             If ``source_tree`` is already populated.
         """
         if self.discovery.source_tree is not None:
-            raise RuntimeError(
-                "discover: source_tree already populated"
-            )
+            raise RuntimeError("discover: source_tree already populated")
         from profiler.tools.cohort_corpus import run_cohort_corpus
 
         out_dir = self._out_dir or Path("data/profile_snapshots")
         date_stamp = self._date_stamp or date.today().isoformat()
 
-        folder_id = self._config.get("folder_id") or os.environ.get(
-            "DRIVE_FOLDER_ID"
-        )
+        folder_id = self._config.get("folder_id") or os.environ.get("DRIVE_FOLDER_ID")
 
         artifact_paths = run_cohort_corpus(
             drive_service=drive_service,
@@ -882,9 +865,7 @@ class PipelineState:
             artifact_paths.get("discovery"), {}
         )
         # workbook_index JSON may be a dict with "records" key or a plain list.
-        raw_index = self._load_json_artifact(
-            artifact_paths.get("index"), []
-        )
+        raw_index = self._load_json_artifact(artifact_paths.get("index"), [])
         if isinstance(raw_index, dict) and "records" in raw_index:
             self.discovery.workbook_index = raw_index["records"]
         elif isinstance(raw_index, list):
@@ -901,16 +882,14 @@ class PipelineState:
             artifact_paths.get("tab_selection"), {}
         )
         if isinstance(tab_selection_raw, dict):
-            self.discovery.approved_tabs = _extract_approved_tabs(
-                tab_selection_raw
-            )
+            self.discovery.approved_tabs = _extract_approved_tabs(tab_selection_raw)
         else:
             self.discovery.approved_tabs = tab_selection_raw
 
         shortlist_entries = self.discovery.shortlist
         if isinstance(shortlist_entries, dict):
             shortlist_entries = shortlist_entries.get("selected") or []
-        for tab in (shortlist_entries or []):
+        for tab in shortlist_entries or []:
             score = tab.get("final_score", 0)
             confidence = min(abs(score) / 10.0, 1.0) if score else 0.5
             rationale = tab.get("breakdown_summary") or "heuristics"
@@ -918,8 +897,7 @@ class PipelineState:
                 decision_id=f"discover_tab_{tab.get('tab_title', 'unknown')}",
                 phase="discover",
                 description=(
-                    f"Scored tab '{tab.get('tab_title', 'unknown')}' "
-                    f"({rationale})"
+                    f"Scored tab '{tab.get('tab_title', 'unknown')}' ({rationale})"
                 ),
                 outcome="approved" if confidence >= 0.5 else "deferred",
                 confidence=confidence,
@@ -951,15 +929,13 @@ class PipelineState:
             ``None``.
         """
         if self.discovery.source_tree is None:
-            raise RuntimeError(
-                "score_and_select: discover() must run first"
-            )
+            raise RuntimeError("score_and_select: discover() must run first")
         if self.discovery.shortlist is None:
-            raise RuntimeError(
-                "score_and_select: shortlist is None"
-            )
+            raise RuntimeError("score_and_select: shortlist is None")
 
-        if not self.domain_knowledge.vocabulary.get("operational") and not self.domain_knowledge.vocabulary.get("reference"):
+        if not self.domain_knowledge.vocabulary.get(
+            "operational"
+        ) and not self.domain_knowledge.vocabulary.get("reference"):
             logger.warning(
                 "DomainKnowledge is empty — score_and_select phase will not re-rank. "
                 "Provide a domain context file via --domain-context, "
@@ -994,7 +970,7 @@ class PipelineState:
         )
 
         scored_tabs: list[dict] = []
-        for tab in (self.discovery.broad_inventory or []):
+        for tab in self.discovery.broad_inventory or []:
             title = tab.get("tab_title", "")
             rows = tab.get("row_count", 0) or 0
             cols = tab.get("column_count", 0) or 0
@@ -1013,7 +989,9 @@ class PipelineState:
                 "tab_title": title,
                 "score": raw_score,
                 "confidence": normalized,
-                "scoring_rationale": "; ".join(reasons) if reasons else "No domain match",
+                "scoring_rationale": "; ".join(reasons)
+                if reasons
+                else "No domain match",
                 "breakdown": breakdown,
             }
             scored_tabs.append(entry)
@@ -1062,9 +1040,7 @@ class PipelineState:
             If ``approved_tabs`` is ``None``.
         """
         if self.discovery.approved_tabs is None:
-            raise RuntimeError(
-                "deep_profile: no approved_tabs"
-            )
+            raise RuntimeError("deep_profile: no approved_tabs")
         from profiler.tools.cohort_corpus import run_cohort_corpus
 
         out_dir = self._out_dir or Path("data/profile_snapshots")
@@ -1098,10 +1074,7 @@ class PipelineState:
                 self.record_decision(
                     decision_id=f"fk_{entry_tab}_{col}",
                     phase="deep_profile",
-                    description=(
-                        f"FK candidate: "
-                        f"{entry_tab}.{col} -> {target}"
-                    ),
+                    description=(f"FK candidate: {entry_tab}.{col} -> {target}"),
                     outcome="approved" if confidence >= 0.5 else "deferred",
                     confidence=confidence,
                     metadata={
@@ -1193,9 +1166,7 @@ class PipelineState:
             never ``None`` — it defaults to ``[]``).
         """
         if not self.deep_profile_index.entries:
-            raise RuntimeError(
-                "derive_contracts: deep_profile must run first"
-            )
+            raise RuntimeError("derive_contracts: deep_profile must run first")
         tables: list[dict] = []
         for entry in self.deep_profile_index.entries:
             tab_name = entry.get("tab_title") or entry.get("tab", "unknown")
@@ -1204,11 +1175,13 @@ class PipelineState:
             for col in columns:
                 col_name = col.get("header", "unknown")
                 col_type = col.get("data_type", "string")
-                fields.append({
-                    "name": col_name,
-                    "source_column": col_name,
-                    "data_type": col_type,
-                })
+                fields.append(
+                    {
+                        "name": col_name,
+                        "source_column": col_name,
+                        "data_type": col_type,
+                    }
+                )
 
             # Convert tab name to PascalCase model name
             model_name = "".join(
@@ -1226,8 +1199,7 @@ class PipelineState:
                 decision_id=f"model_{tab_name}",
                 phase="derive_contracts",
                 description=(
-                    f"Derived model name '{model_name}' "
-                    f"from tab title '{tab_name}'"
+                    f"Derived model name '{model_name}' from tab title '{tab_name}'"
                 ),
                 outcome="approved",
                 confidence=0.7,
@@ -1295,9 +1267,7 @@ class PipelineState:
                         f"not found in workbook_index"
                     )
                 if not isinstance(tab_list, list):
-                    errors.append(
-                        f"approved_tabs['{wb_code}'] is not a list"
-                    )
+                    errors.append(f"approved_tabs['{wb_code}'] is not a list")
                 else:
                     for tab_name in tab_list:
                         if not isinstance(tab_name, str):
@@ -1313,14 +1283,12 @@ class PipelineState:
                     key = f"{wb_code}:{tab_name}"
                     if key in seen_tabs:
                         errors.append(
-                            f"Duplicate tab entry: {tab_name} "
-                            f"in workbook {wb_code}"
+                            f"Duplicate tab entry: {tab_name} in workbook {wb_code}"
                         )
                     seen_tabs.add(key)
         elif approved is not None:
             errors.append(
-                f"approved_tabs must be a dict or None, "
-                f"got {type(approved).__name__}"
+                f"approved_tabs must be a dict or None, got {type(approved).__name__}"
             )
 
         # 4. Decision record completeness
@@ -1332,9 +1300,7 @@ class PipelineState:
                     f"decision[{idx}] ({decision.decision_id}) missing timestamp"
                 )
             if not decision.phase:
-                errors.append(
-                    f"decision[{idx}] ({decision.decision_id}) missing phase"
-                )
+                errors.append(f"decision[{idx}] ({decision.decision_id}) missing phase")
 
         return errors
 
@@ -1366,9 +1332,7 @@ def _resolve_artifacts(node: Any, base_dir: Path) -> Any:
             artifact_path = base_dir / node["_artifact"]
             if artifact_path.exists():
                 try:
-                    loaded = json.loads(
-                        artifact_path.read_text(encoding="utf-8")
-                    )
+                    loaded = json.loads(artifact_path.read_text(encoding="utf-8"))
                     return loaded
                 except Exception as exc:
                     logger.warning(
@@ -1383,14 +1347,9 @@ def _resolve_artifacts(node: Any, base_dir: Path) -> Any:
                 )
                 return []
         else:
-            return {
-                k: _resolve_artifacts(v, base_dir)
-                for k, v in node.items()
-            }
+            return {k: _resolve_artifacts(v, base_dir) for k, v in node.items()}
     elif isinstance(node, list):
-        return [
-            _resolve_artifacts(item, base_dir) for item in node
-        ]
+        return [_resolve_artifacts(item, base_dir) for item in node]
     else:
         return node
 

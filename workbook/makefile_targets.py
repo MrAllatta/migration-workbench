@@ -545,7 +545,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
        New projects should only use ``profile-phase-*``.
     """
     _domain_ctx = ' $${DOMAIN_CONTEXT:+--domain-context "$$DOMAIN_CONTEXT"}'
-    _checkpoint = '$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}'
+    _checkpoint = "$${PIPELINE_CHECKPOINT:-build/pipeline-state.yaml}"
     return (
         "# PipelineState checkpoint-based profiling — replaces the phased corpus workflow.\n"
         "# Requires COHORT_CORPUS_CONFIG and optionally PIPELINE_CHECKPOINT / DOMAIN_CONTEXT in .env.\n"
@@ -559,8 +559,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             "--phase discover "
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-score:\n"
@@ -568,8 +567,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             "--phase score_and_select "
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-deep:\n"
@@ -577,8 +575,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             "--phase deep_profile "
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-derive:\n"
@@ -586,8 +583,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             "--phase derive_contracts "
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n\n"
         + "profile-phase-validate:\n"
@@ -595,8 +591,7 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
             "--phase validate "
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n\n"
         + "# Run all phases in sequence, skipping completed ones.\n"
@@ -604,9 +599,8 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) run_pipeline_state "
             '--config "$${COHORT_CORPUS_CONFIG:?required}" '
-            '--phase all '
-            f'--checkpoint "{_checkpoint}"'
-            + _domain_ctx
+            "--phase all "
+            f'--checkpoint "{_checkpoint}"' + _domain_ctx
         )
         + "\n"
     )
