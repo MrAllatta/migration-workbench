@@ -13,7 +13,6 @@ workbench.code-workspace
 example_data/_import_artifacts/
 data/
 .cursor
-AGENTS.md
 fly.preview.toml
 fly.toml
 .opencode
