@@ -1,3 +1,10 @@
+"""Generate a ``source_config.json`` from a schema-contract YAML and workbook index JSON.
+
+The output is a ``source_config.json`` suitable for ``pull_bundle``; it maps
+contract tables to worksheet titles, column mappings, and year-indexed
+spreadsheet IDs.
+"""
+
 import json
 from pathlib import Path
 
@@ -6,9 +13,12 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
+    """Generate ``source_config.json`` from a schema-contract YAML and workbook index JSON."""
+
     help = "Generate source_config.json from a contract and workbook index."
 
     def add_arguments(self, parser):
+        """Add CLI arguments for the ``generate_source_config`` command."""
         parser.add_argument("--contract", required=True, help="Path to contract YAML")
         parser.add_argument(
             "--index", required=True, help="Path to workbook index JSON"
@@ -23,6 +33,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Read contract tables and index workbooks, then write ``source_config.json``."""
         contract_path = Path(options["contract"])
         index_path = Path(options["index"])
         out_path = Path(options["out"])

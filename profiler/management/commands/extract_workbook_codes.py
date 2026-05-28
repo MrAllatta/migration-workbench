@@ -11,9 +11,12 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
+    """Extract workbook codes from a drive tree JSON and optionally update corpus config."""
+
     help = "Extract workbook codes from drive tree JSON and optionally update config."
 
     def add_arguments(self, parser):
+        """Add CLI arguments for the ``extract_workbook_codes`` command."""
         parser.add_argument(
             "--drive-tree", required=True, help="Path to drive_tree.json"
         )
@@ -28,6 +31,7 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true", help="Smoke test mode")
 
     def handle(self, *args, **options):
+        """Read the drive tree, match workbook-code patterns, and optionally update corpus config."""
         drive_tree_path = Path(options["drive_tree"]).resolve()
         config_path = Path(options["config"]).resolve()
 
@@ -52,6 +56,7 @@ class Command(BaseCommand):
         codes: set[str] = set()
 
         def walk(node: dict):
+            """Recursively collect workbook codes from spreadsheet names in the tree."""
             for sheet in node.get("spreadsheets", []):
                 name = sheet.get("name", "")
                 match = pattern.search(name)

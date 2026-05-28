@@ -22,9 +22,12 @@ _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
 
 class Command(BaseCommand):
+    """Draft a ``domain_context.yaml`` from a drive tree JSON and optional raw notes."""
+
     help = "Draft domain_context.yaml from drive tree and optional raw notes."
 
     def add_arguments(self, parser):
+        """Add CLI arguments for the ``draft_domain_context`` command."""
         parser.add_argument(
             "--drive-tree", required=True, help="Path to drive_tree.json"
         )
@@ -35,6 +38,7 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true", help="Smoke test mode")
 
     def handle(self, *args, **options):
+        """Walk the drive tree, extract years and vocabulary, then write domain context YAML."""
         if options["smoke"]:
             self.stdout.write(self.style.SUCCESS("draft_domain_context smoke ok"))
             return
@@ -48,6 +52,7 @@ class Command(BaseCommand):
         years: set[int] = set()
 
         def walk(node: dict):
+            """Recursively extract years from folder/spreadsheet names in the drive tree."""
             name = node.get("name", "")
             for m in _YEAR_RE.finditer(name):
                 years.add(int(m.group(1)))

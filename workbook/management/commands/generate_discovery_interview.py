@@ -10,6 +10,8 @@ from workbook.discovery import render_interview
 
 
 class Command(BaseCommand):
+    """Render a discovery-interview Markdown questionnaire from a view-manifest YAML."""
+
     help = (
         "Render a pre-populated discovery-interview Markdown questionnaire "
         "from a view-manifest YAML. The operator fills in the answer "
@@ -18,6 +20,7 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
+        """Add CLI arguments for the ``generate_discovery_interview`` command."""
         parser.add_argument(
             "--manifest",
             required=True,
@@ -30,6 +33,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """Read the view-manifest YAML and render the interview Markdown to disk."""
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
