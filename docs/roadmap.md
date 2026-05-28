@@ -3,9 +3,10 @@
 Version history and direction.
 
 ```
-0.0.1 – 0.0.N   Component assembly  ← you are here (v0.0.9)
-0.1.0            Pipeline proven     next milestone
-0.2.0+           Pipeline capabilities
+0.0.1 – 0.0.N   Component assembly           ← shipped
+0.1.0            Pipeline proven on real data ← current
+0.2.0            Spreadsheet replacement      ← next milestone (handoff)
+0.3.0+           Consultant accelerant         ← future
 ```
 
 ---
@@ -163,86 +164,108 @@ Import runtime works. They have not yet been coupled end-to-end on real data.
 
 ---
 
-## 0.1.0 sprint: Pipeline proven
+## 0.1.0 — Pipeline proven on real data (current)
 
-The criterion: one product repo (farm) pushed through the entire pipeline end-to-end
-with real data. Not a demo, not a subset — the full loop.
+The profile→model→codegen→import→deploy pipeline has been exercised
+end-to-end on the farm engagement — 56 workbooks, 239 tabs, spanning
+an 11-model schema contract. PipelineState checkpointing,
+schema contract scaffolding, codegen, import runtime, view manifest
+generation, discovery interviews, and Fly.io deployment all function
+on real data.
 
-### A. Close the broken connections
+Fixes discovered during farm execution have been collected in the
+`pipeline-maturity` branch. These address coupling issues between
+pipeline stages, import path bugs, and multi-year import scaffolding
+that the 0.0.x isolation work did not surface.
 
-Three things exist but don't connect:
+### What shipped
 
-1. **`wb generate manifest` import path bug** — references `generate_view_manifest`
-   module; actual command is `scaffold_view_manifest`. One-line fix.
+The full 0.0.x component catalog operated as a coupled system on a
+production corpus. Breakages found mid-pipeline were fixed upstream
+with test coverage, validating the patching boundary defined in AGENTS.md.
+All pipeline commands can be invoked in sequence on a real source.
 
-2. **Multi-year import loop** — the generated import command reads a single
-   `bundle_path` per table. The pipeline manifest knows per-year spreadsheet IDs.
-   `pull_bundle` produces `year_YYYY/` directories. The import command needs to
-   iterate over year directories, resolve per-year CSV paths, and inject
-   `source_bundle_year` dynamically. `make import-historical` target to wrap it.
+### Carried to 0.2.0
 
-3. **Contract→pipeline_manifest→pull_bundle→import coupling** — each stage works
-   in isolation but the data flow between them (output paths, year resolution,
-   column_map consistency) has never been validated as a chain.
+Farm execution revealed that "pipeline runs" is the prerequisite, not
+the terminal milestone. The gate criteria below carry forward into
+the 0.2.0 spreadsheet replacement milestone:
 
-### B. Farm execution
-
-4. **Profile farm corpus** — run full Sheets corpus pipeline against farm Drive folder.
-   Phase 0 → Phase 1 + tab selection review → Phase 3 deep profiling. Tune domain
-   context vocabulary and glossary iteratively.
-
-5. **Domain context for farm** — draft, validate, iterate. Vocabulary from farm
-   operations, entity definitions, glossary synonyms, year scope setup.
-
-6. **Scaffold and harden farm contract** — `scaffold_workbook_schema` from profiling
-   output, then hand-harden: model names, FK targets, computed fields, import_config
-   for every table.
-
-7. **Generate farm code** — `generate_models`, `generate_admin`, `generate_import`.
-   Review diffs, verify compilation, run `validate_contract --strict`.
-
-8. **Pull historical bundles** — `pull_bundle` with per-year config. Verify output
-   headers and row counts.
-
-9. **Import all years** — run generated import command against each year's bundle.
-   Verify summary JSON. Fix import_config gaps iteratively.
-
-10. **View manifest + discovery** — scaffold view manifest, generate interview,
-    conduct with operator, merge answers, regenerate admin.
-
-11. **Deploy farm** — `wb deploy --live` to Fly.io with real data. Health check passes.
-    Release recorded.
-
-### C. 0.1.0 gate
-
-- Pipeline runs from scratch in under 30 minutes with a single documented command sequence.
-- Generated code compiles without manual edits.
-- Import creates expected rows across all years.
-- Summary JSON shows zero unexpected errors.
-- Fly.io deploy passes health check.
-- Discovery interview captures operator knowledge that meaningfully changes the admin.
-
-0.1.0 is the beta. There is no v1.0 — the version scheme resets so that
-0.1.0 is the first release where the whole machine actually turns.
-
-The real gate is not "pipeline runs" but "consultant can complete a paid
-engagement in under two days with this tool."
+- **Full historical import loop** — year directory iteration,
+  `source_bundle_year` injection across 5+ years of data.
+- **30-minute gate from scratch** — single command sequence, zero
+  manual edits.
+- **Admin that replaces the spreadsheet** — view manifest and
+  discovery interview meaningfully change admin output; stakeholder
+  can complete weekly cycle without the source workbook.
 
 ---
 
-## 0.2.0+: Consultant accelerant
+## 0.2.0 — Spreadsheet replacement (next milestone)
+
+The goal: a product repo running a generated Django app that operators
+genuinely prefer to the spreadsheet. Not "pipeline runs" but
+"the app replaces the workbook."
+
+### Interaction contract Layer 1–3
+
+The three-layer design from [Interaction Contract](interaction-contract.md)
+must be fully wired:
+
+1. **Profiler signals** — `scaffold_view_manifest --signals-only` produces
+   `profiler-signals.yaml` with ui_archetype, formula_density, cross-sheet
+   references, null rates, confidence scores.
+2. **Human interaction contract** — the discovery interview feeds operator
+   answers into `interaction-contract.yaml`. Archetype override, role ownership,
+   status semantics, workflow notes.
+3. **Codegen manifest** — merge tool produces the manifest consumed by
+   `generate_admin`. Operator workflow intent controls generated admin behavior:
+   dashboards render read-only, forms get inline editing, lists get
+   search-first UX.
+
+### Admin quality bar
+
+- **Status workflows:** mark-as-* actions, status transition validation.
+- **Role-appropriate views:** field_manager sees their forms; operations sees
+  dashboards; admin sees everything.
+- **Time-scoped filtering:** year/week picker, current-season default.
+- **FK navigation:** clickable admin links, inline related records.
+- **Import year selector** for bundled historical data.
+
+### Full historical import loop
+
+`pull_bundle` → per-year CSV directories → import command iterates
+year directories, resolves per-year paths, injects `source_bundle_year`.
+`make import-historical` target wraps the loop. Proven across 5+ years
+of real farm data.
+
+### View manifest and discovery on real data
+
+scaffold → interview → merge → regenerate admin. The merged manifest
+changes admin output meaningfully — not just cosmetic field reordering.
+
+### Gate
+
+- Generated admin passes a workflow audit: a stakeholder can complete
+  their weekly cycle without touching the spreadsheet.
+- All historical years import with zero unexpected errors.
+- `make chassis-gate` is green.
+
+---
+
+## 0.3.0+ — Consultant accelerant
 
 Each version encodes more consultant judgment into the agent harness,
 making the operator faster. Not a feature list — a judgment-compounding system.
 
-### 0.2.0 — Vertical migration templates
+### 0.3.0 — Vertical migration templates
 
 After N engagements in a vertical (farm, school, clinic), extract reusable presets:
 domain context vocabulary, entity defaults, scoring heuristics, schema contract templates,
 interaction contract defaults, and import error patterns. The 10th farm migration should
 be 5x faster than the 1st because the agent starts with learned defaults.
 
-### 0.3.0 — Interaction contract: consultant decision support
+### 0.4.0 — Interaction contract: consultant decision support
 
 The profiler extracts how the data is USED, not just what it IS. UI archetype
 classification (form / list / dashboard / reference) tells the consultant how to
@@ -254,7 +277,7 @@ decisions produce better admin defaults as a side effect.
 
 See [Interaction Contract](interaction-contract.md) for the three-layer design.
 
-### 0.4.0+ — Platform (conditional)
+### 0.5.0+ — Platform (conditional)
 
 Only after the judgment taxonomy is dense enough to make the agent reliably correct:
 
@@ -275,7 +298,7 @@ is provably near-zero.
   many mistakes on messy real-world data. Human judgment is mandatory until the
   judgment taxonomy is dense enough to make the agent provably correct.
 - **GUI for contract authoring (today).** YAML is the consultant interface for now.
-  A hosted consultant UI is a 0.5.0+ possibility, not 0.2.0.
+  A hosted consultant UI is a 0.5.0+ possibility, not 0.3.0.
 - **Real-time sync back to source.** One-way pipeline (source → Django). Bidirectional
   sync requires conflict resolution and change tracking.
 - **Arbitrary ETL.** Pipeline is opinionated: tabular → normalized CSV → Django models.

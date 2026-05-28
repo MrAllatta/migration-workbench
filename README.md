@@ -132,11 +132,12 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 ## Status and roadmap
 
-**0.0.x — Component assembly (current, v0.0.9)**
+**0.1.0 — Pipeline proven on real data (current)**
 
-All pipeline stages exist in isolation: profiler, schema contract system, codegen,
-import runtime, view manifest, discovery interview, deployment CLI. Each works on
-its own. The full end-to-end chain is being exercised on the farm engagement.
+The profile→model→codegen→import→deploy pipeline has been exercised
+end-to-end on a real product engagement (farm). PipelineState checkpointing,
+schema contract scaffolding, codegen, import runtime, view manifest generation,
+discovery interviews, and Fly.io deployment all function on real data.
 
 - Google Sheets profiler: Phase 0–3 corpus pipeline with domain context integration, tab scoring, column enrichment, computed field and FK candidate detection.
 - Coda profiler: doc enumeration, table profiling, formula scanning, canvas extraction, relationship map.
@@ -161,44 +162,64 @@ its own. The full end-to-end chain is being exercised on the farm engagement.
   resume with guard clauses, deterministic YAML checkpoint output.
   See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
 
-**0.1.0 sprint — Pipeline proven on real data**
+0.1.0 is not the handoff — it is the prerequisite. The pipeline turns
+on real data. Now the work of turning that data into a working
+application begins.
 
-Next milestone: one product repo (farm) through the full end-to-end pipeline.
-Not a demo — the whole machine turns on real data.
+**0.2.0 — Spreadsheet replacement (next milestone)**
 
-The goal is not just "pipeline runs." It is "consultant can complete a paid
-engagement in under two days with this tool."
+The goal: a product repo running a generated Django app that operators
+genuinely prefer to the spreadsheet. Not "pipeline runs" but
+"the app replaces the workbook."
 
-1. **Close broken connections** — fix `wb generate manifest` import path bug,
-   build multi-year import loop (import command iterates year directories),
-   validate contract→pipeline_manifest→pull_bundle→import coupling.
+- **Interaction contract Layer 1–3 implemented:**
+  Profiler signals (ui_archetype, formula_density, cross-sheet refs)
+  feed into a human interaction contract via the discovery interview.
+  The merge tool produces a codegen manifest consumed by `generate_admin`.
+  Operator workflow intent (form/list/dashboard/reference) controls
+  generated admin behavior — dashboards render read-only, forms get
+  inline editing, lists get search-first UX.
+  See [Interaction Contract](docs/interaction-contract.md).
 
-2. **Farm execution** — profile farm corpus, scaffold and harden contract, generate
-   code, pull historical bundles, import all years, generate view manifest, conduct
-   discovery interview, deploy to Fly.io with health check passing.
+- **Admin quality bar:**
+  Status workflows (mark-as-* actions, status transition validation).
+  Role-appropriate views (field_manager sees their forms; operations
+  sees dashboards; admin sees everything).
+  Time-scoped filtering (year/week picker, current-season default).
+  FK navigation (clickable admin links, inline related records).
+  Import year selector for bundled historical data.
 
-3. **Gate** — pipeline runs from scratch in <30 min with one documented command
-   sequence, generated code compiles without manual edits, import creates expected
-   rows across all years, deploy passes health check.
+- **Full historical import loop:**
+  `pull_bundle` → per-year CSV directories → import command iterates
+  year directories, resolves per-year paths, injects `source_bundle_year`.
+  `make import-historical` target wraps the loop. Proven across
+  5+ years of real farm data.
 
-0.1.0 is the beta. There is no v1.0 — the version scheme resets so that
-0.1.0 is the first release where the whole machine actually turns.
+- **View manifest/discovery exercised on real data:**
+  scaffold → interview → merge → regenerate admin. The merged
+  manifest changes admin output meaningfully (not just cosmetic).
 
-**0.2.0+ — Consultant accelerant**
+- **Gate:**
+  Generated admin passes a workflow audit: a stakeholder can complete
+  their weekly cycle without touching the spreadsheet.
+  All historical years import with zero unexpected errors.
+  `make chassis-gate` is green.
+
+**0.3.0+ — Consultant accelerant**
 
 Each version encodes more consultant judgment into the agent harness,
 making the operator faster. Not a feature list — a judgment-compounding system.
 
-- **0.2.0 Vertical templates:** After N engagements in a vertical,
+- **0.3.0 Vertical templates:** After N engagements in a vertical,
   extract reusable presets. The 10th farm migration is 5x faster
   than the 1st.
 
-- **0.3.0 Interaction contract:** Agent infers how data is used
-  (form/list/dashboard/reference). Consultant confirms. Generated
-  admin reflects actual business workflows, not generic CRUD.
+- **0.4.0 Interaction contract maturity:** Agent infers how data is used
+  (form/list/dashboard/reference) without interview. Consultant confirms.
+  Generated admin reflects actual business workflows, not generic CRUD.
   See [Interaction Contract](docs/interaction-contract.md).
 
-- **0.4.0+ Platform (conditional):** Only after judgment taxonomy
+- **0.5.0+ Platform (conditional):** Only after judgment taxonomy
   is dense enough to make the agent reliably correct.
   Hosted workbench for consultants, not self-service for end users.
   Self-service is a non-goal until proven safe.
