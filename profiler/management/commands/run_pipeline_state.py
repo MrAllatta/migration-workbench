@@ -177,7 +177,9 @@ class Command(BaseCommand):
             self.stdout.write("[skip] deep_profile already complete")
 
         if state.schema_contract is None:
-            self._run_derive_contracts(state, checkpoint_path)
+            self._run_derive_contracts(
+                state, config, out_dir, date_stamp, checkpoint_path,
+            )
         else:
             self.stdout.write("[skip] derive_contracts already complete")
 
@@ -263,7 +265,11 @@ class Command(BaseCommand):
     def _run_derive_contracts(
         self,
         state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
         checkpoint_path: Path,
+        stop_before_deep: bool = False,
     ) -> None:
         """Phase 4: Derive schema and interaction contracts."""
         if not state.deep_profile_index.entries:

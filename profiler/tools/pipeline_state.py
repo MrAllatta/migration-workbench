@@ -752,11 +752,18 @@ class PipelineState:
             else approved_tabs_raw
         )
 
+        # workbook_index: either a list of record dicts, or a dict with "records" key.
+        raw_index = discovery_raw.get("workbook_index") or []
+        if isinstance(raw_index, dict) and "records" in raw_index:
+            index_data = raw_index["records"]
+        elif isinstance(raw_index, list) and raw_index and isinstance(raw_index[0], dict):
+            index_data = raw_index
+        else:
+            index_data = []
+
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree") or {},
-            workbook_index=list(
-                discovery_raw.get("workbook_index") or []
-            ),
+            workbook_index=list(index_data),
             broad_inventory=list(
                 discovery_raw.get("broad_inventory") or []
             ),
@@ -874,9 +881,16 @@ class PipelineState:
         self.discovery.source_tree = self._load_json_artifact(
             artifact_paths.get("discovery"), {}
         )
-        self.discovery.workbook_index = self._load_json_artifact(
+        # workbook_index JSON may be a dict with "records" key or a plain list.
+        raw_index = self._load_json_artifact(
             artifact_paths.get("index"), []
         )
+        if isinstance(raw_index, dict) and "records" in raw_index:
+            self.discovery.workbook_index = raw_index["records"]
+        elif isinstance(raw_index, list):
+            self.discovery.workbook_index = raw_index
+        else:
+            self.discovery.workbook_index = []
         self.discovery.broad_inventory = self._load_json_artifact(
             artifact_paths.get("broad_coverage"), []
         )
@@ -1071,30 +1085,95 @@ class PipelineState:
         if isinstance(deep_coverage, list):
             self.deep_profile_index.entries = deep_coverage
         elif isinstance(deep_coverage, dict):
-            self.deep_profile_index.entries = list(deep_coverage.values())
+            self.deep_profile_index.entries = deep_coverage.get(
+                "results", list(deep_coverage.values())
+            )
 
         for entry in self.deep_profile_index.entries:
             for fk_candidate in entry.get("fk_candidates") or []:
                 col = fk_candidate.get("column", "unknown")
                 target = fk_candidate.get("target", "unknown")
                 confidence = fk_candidate.get("confidence", 0.5)
+                entry_tab = entry.get("tab_title") or entry.get("tab", "unknown")
                 self.record_decision(
-                    decision_id=f"fk_{entry.get('tab', 'unknown')}_{col}",
+                    decision_id=f"fk_{entry_tab}_{col}",
                     phase="deep_profile",
                     description=(
                         f"FK candidate: "
-                        f"{entry.get('tab', 'unknown')}.{col} -> {target}"
+                        f"{entry_tab}.{col} -> {target}"
                     ),
                     outcome="approved" if confidence >= 0.5 else "deferred",
                     confidence=confidence,
                     metadata={
-                        "tab": entry.get("tab", ""),
+                        "tab": entry_tab,
                         "column": col,
                         "target": target,
                     },
                 )
 
         return self
+
+    def _extract_columns_from_entry(self, entry: dict[str, Any]) -> list[dict]:
+        """Extract column definitions from a deep profile index entry.
+
+        When the entry has inline ``columns`` (the old test-only format),
+        return them directly.  When the entry references an ``out_json``
+        profile file produced by ``cohort_corpus``, load the profile and
+        extract column headers from the raw sheet data.
+
+        Args:
+            entry: A single entry from ``deep_profile_index.entries``.
+
+        Returns:
+            List of column dicts with ``header`` and ``data_type`` keys,
+            or an empty list when no column data is available.
+        """
+        columns = entry.get("columns")
+        if columns:
+            return columns
+        out_json_path = entry.get("out_json")
+        if not out_json_path or self._out_dir is None:
+            return []
+        profile_data = PipelineState._load_json_artifact(
+            self._out_dir / out_json_path, None
+        )
+        if profile_data is None:
+            return []
+        raw = profile_data.get("raw", {})
+        if not raw:
+            return []
+        try:
+            from connectors.spreadsheet import (
+                guess_header_row,
+                raw_sheet_to_row_lists,
+            )
+        except ImportError:
+            logger.warning(
+                "connectors.spreadsheet not available — "
+                "cannot extract columns from profile %s",
+                out_json_path,
+            )
+            return []
+        try:
+            row_lists = raw_sheet_to_row_lists(raw)
+            header_index = guess_header_row(row_lists)
+        except Exception:
+            logger.warning(
+                "failed to parse raw sheet data from profile %s",
+                out_json_path,
+            )
+            return []
+        if header_index is None:
+            return []
+        header_texts = [
+            cell_text.strip()
+            for cell_text in row_lists[header_index]
+            if cell_text.strip()
+        ]
+        return [
+            {"header": header_text, "data_type": "string"}
+            for header_text in header_texts
+        ]
 
     def derive_contracts(self) -> PipelineState:
         """Derive schema and interaction contracts from deep profile data.
@@ -1119,8 +1198,8 @@ class PipelineState:
             )
         tables: list[dict] = []
         for entry in self.deep_profile_index.entries:
-            tab_name = entry.get("tab", "unknown")
-            columns = entry.get("columns") or []
+            tab_name = entry.get("tab_title") or entry.get("tab", "unknown")
+            columns = self._extract_columns_from_entry(entry)
             fields = []
             for col in columns:
                 col_name = col.get("header", "unknown")
@@ -1201,10 +1280,13 @@ class PipelineState:
         # 2. approved_tabs workbook_code cross-reference
         approved = self.discovery.approved_tabs
         if approved is not None and isinstance(approved, dict):
+            index_entries = self.discovery.workbook_index
+            if isinstance(index_entries, dict) and "records" in index_entries:
+                index_entries = index_entries["records"]
             workbook_codes = {
                 str(wb.get("workbook_code", ""))
-                for wb in self.discovery.workbook_index
-                if wb.get("workbook_code")
+                for wb in index_entries
+                if isinstance(wb, dict) and wb.get("workbook_code")
             }
             for wb_code, tab_list in approved.items():
                 if wb_code not in workbook_codes:

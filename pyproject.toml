@@ -75,7 +75,7 @@ release = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*", "workbook*", "deployment*"]
+include = ["migration_workbench*", "connectors*", "profiler*", "importer*", "examples*", "workbook*", "deployment*", "workbench*"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "migration_workbench.settings"

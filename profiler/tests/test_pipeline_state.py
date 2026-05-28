@@ -246,7 +246,7 @@ class TestCheckpointRoundTrip:
                 workbook_index=[{"workbook_code": "101", "year": 2023}],
             ),
             deep_profile_index=DeepProfileIndex(
-                entries=[{"tab": "Crop Planner", "profiled": True}],
+                entries=[{"tab_title": "Crop Planner", "profiled": True}],
             ),
             domain_knowledge=DomainKnowledge(
                 domain="test_domain",
@@ -277,7 +277,7 @@ class TestCheckpointRoundTrip:
             {"workbook_code": "101", "year": 2023}
         ]
         assert loaded.deep_profile_index.entries == [
-            {"tab": "Crop Planner", "profiled": True}
+            {"tab_title": "Crop Planner", "profiled": True}
         ]
         assert loaded.domain_knowledge.domain == "test_domain"
         assert loaded.domain_knowledge.vocabulary == {
@@ -427,7 +427,7 @@ class TestPhaseGuardClauses:
         state.score_and_select()
         state.deep_profile()
         state.deep_profile_index.entries.append(
-            {"tab": "Crop Planner"}
+            {"tab_title": "Crop Planner"}
         )
         state.derive_contracts()
         assert state.discovery.source_tree == {}
@@ -628,7 +628,7 @@ class TestArtifactReferences:
         checkpoint = tmp_path / "pipeline-state.yaml"
         state = PipelineState()
         state.deep_profile_index.entries = [
-            {"tab": "Crop Planner", "columns": 20},
+            {"tab_title": "Crop Planner", "columns": 20},
         ]
         state.save_checkpoint(checkpoint)
 
@@ -641,13 +641,13 @@ class TestArtifactReferences:
         checkpoint = tmp_path / "pipeline-state.yaml"
         state = PipelineState()
         state.deep_profile_index.entries = [
-            {"tab": "Crop Planner", "columns": 20},
+            {"tab_title": "Crop Planner", "columns": 20},
         ]
         state.save_checkpoint(checkpoint)
 
         loaded = PipelineState.load(checkpoint)
         assert loaded.deep_profile_index.entries == [
-            {"tab": "Crop Planner", "columns": 20},
+            {"tab_title": "Crop Planner", "columns": 20},
         ]
 
     def test_source_tree_written_as_artifact(self, tmp_path: Path):
@@ -1037,7 +1037,7 @@ class TestPhaseMethods:
         state = PipelineState(
             deep_profile_index=DeepProfileIndex(entries=[
                 {
-                    "tab": "Crop Planner",
+                    "tab_title": "Crop Planner",
                     "columns": [
                         {"header": "crop_name", "data_type": "string"},
                         {"header": "planting_date", "data_type": "date"},
@@ -1059,6 +1059,35 @@ class TestPhaseMethods:
         state = PipelineState()
         with pytest.raises(RuntimeError, match="deep_profile must run first"):
             state.derive_contracts()
+
+    def test_derive_contracts_old_tab_key_compat(self):
+        """derive_contracts() still resolves tab name from old 'tab' key."""
+        state = PipelineState(
+            deep_profile_index=DeepProfileIndex(entries=[
+                {
+                    "tab": "Legacy Tab Name",
+                    "columns": [
+                        {"header": "legacy_col", "data_type": "string"},
+                    ],
+                },
+            ]),
+        )
+        result = state.derive_contracts()
+        assert result.schema_contract is not None
+        assert result.schema_contract["tables"][0]["model_name"] == "LegacyTabName"
+        assert result.schema_contract["tables"][0]["source_tab"] == "Legacy Tab Name"
+
+    def test_derive_contracts_missing_tab_keys_fallback(self):
+        """derive_contracts() falls back to 'unknown' when neither key exists."""
+        state = PipelineState(
+            deep_profile_index=DeepProfileIndex(entries=[
+                {"workbook_code": "101", "year": 2024, "out_json": "none"},
+            ]),
+        )
+        result = state.derive_contracts()
+        assert result.schema_contract is not None
+        assert result.schema_contract["tables"][0]["model_name"] == "Unknown"
+        assert result.schema_contract["tables"][0]["source_tab"] == "unknown"
 
 
 # ---------------------------------------------------------------------------

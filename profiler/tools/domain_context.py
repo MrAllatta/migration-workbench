@@ -77,6 +77,14 @@ def load_domain_context(path: str | Path) -> DomainContext | None:
     dedup_data = raw.get("deduplication") or {}
     vocab_data = raw.get("vocabulary") or {}
 
+    raw_exceptions = dedup_data.get("exceptions") or []
+    normalized_exceptions: list[dict] = []
+    for entry in raw_exceptions:
+        if isinstance(entry, str):
+            normalized_exceptions.append({"tab_title": entry})
+        elif isinstance(entry, dict):
+            normalized_exceptions.append(entry)
+
     return DomainContext(
         domain=str(raw.get("domain", "")),
         description=str(raw.get("description", "")),
@@ -87,7 +95,7 @@ def load_domain_context(path: str | Path) -> DomainContext | None:
         ),
         deduplication=DomainContext.DeduplicationContext(
             strategy=str(dedup_data.get("strategy", "latest_year")),
-            exceptions=dedup_data.get("exceptions") or [],
+            exceptions=normalized_exceptions,
         ),
         entities=raw.get("entities") or [],
         vocabulary=DomainContext.VocabularyContext(

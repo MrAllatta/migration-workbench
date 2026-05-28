@@ -103,7 +103,7 @@ def test_run_pipeline_state_all_phase(
     deep_file.write_text(
         json.dumps([
             {
-                "tab": "Crop Planner",
+                "tab_title": "Crop Planner",
                 "columns": [
                     {"header": "name", "data_type": "string"},
                 ],
@@ -186,7 +186,7 @@ def test_run_pipeline_state_resume(
     state.discovery.approved_tabs = {"101": ["Sheet1"]}
     state.deep_profile_index.entries = [
         {
-            "tab": "Crop Planner",
+            "tab_title": "Crop Planner",
             "columns": [
                 {"header": "crop_name", "data_type": "string"},
             ],
