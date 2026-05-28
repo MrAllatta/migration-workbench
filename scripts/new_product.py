@@ -406,7 +406,8 @@ def render_makefile(product_kebab: str, provider: str = PROVIDER_GOOGLE_SHEETS) 
         check_env_vars = "WORKBENCH CODA_API_TOKEN"
         export_block = (
             "export WORKBENCH\n"
-            "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS"
+            "export CODA_CORPUS_CONFIG CODA_CORPUS_OUT_DIR CODA_DOC_IDS\n"
+            "export PIPELINE_CHECKPOINT DOMAIN_CONTEXT"
         )
     else:
         check_env_vars = "WORKBENCH DRIVE_FOLDER_ID GOOGLE_IMPERSONATE_SERVICE_ACCOUNT"
@@ -414,7 +415,9 @@ def render_makefile(product_kebab: str, provider: str = PROVIDER_GOOGLE_SHEETS) 
             "export WORKBENCH\n"
             "export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT\n"
             "# Export profile config values loaded from `.env` so recipe shell checks can read them.\n"
-            "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID"
+            "export COHORT_CORPUS_CONFIG COHORT_CORPUS_OUT_DIR DRIVE_FOLDER_OUT DRIVE_FOLDER_ID\n"
+            "# PipelineState checkpoint path; Profile domain context YAML\n"
+            "export PIPELINE_CHECKPOINT DOMAIN_CONTEXT"
         )
 
     return (
@@ -628,6 +631,27 @@ Run after setting up `.env`. These commands inspect source data and produce arti
     return """### Profiling (read-only discovery)
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
+
+Profiling uses the **PipelineState checkpoint system** by default — a single YAML checkpoint file (`build/pipeline-state.yaml`) tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). A `--domain-context` option (reads `config/domain_context.yaml` by default) seeds domain vocabulary for tab scoring.
+
+**Quick start (all phases):**
+```bash
+make profile-phase-discover    # scan workbooks, list tabs
+make profile-phase-score       # score and select tabs
+# Review checkpoint, edit approved_tabs if needed
+make profile-phase-deep        # deep grid fetches + column profiling
+make profile-phase-derive      # generate schema contract drafts
+make profile-phase-validate    # verify checkpoint consistency
+```
+Or run everything at once, skipping completed phases:
+```bash
+make profile-phase-all
+```
+
+Set `PIPELINE_CHECKPOINT` in `.env` to use a non-default checkpoint path.
+Set `DOMAIN_CONTEXT` in `.env` to override the domain context file path.
+
+> **Note:** The older `profile-cohort-corpus-phase{1,2,3}` targets (documented below) remain for backward compatibility but are superseded by PipelineState. New profiling work should use the `profile-phase-*` targets.
 
 Profiling follows a **4-phase workflow** to avoid expensive API calls until heuristic tuning is complete:
 
@@ -1121,7 +1145,7 @@ Profiling uses a **3-phase workflow** to avoid expensive API calls during heuris
 - **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json` (token lists, `tab_exclude_patterns`, `expansion_formula_penalty`), then re-run.
 - **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`. Output includes formula pattern classification per column.
 
-An alternative **PipelineState** checkpoint-based workflow (`make profile-phase-{{discover,score,deep,derive}}`) replaces the phased corpus workflow with a single YAML checkpoint file that tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). Set `PIPELINE_CHECKPOINT` in `.env` to override the default path (`build/pipeline-state.yaml`). See migration-workbench `docs/pipeline-state.md`.
+The **PipelineState** checkpoint-based workflow (`make profile-phase-{{discover,score,deep,derive,validate}}`) replaces the phased corpus workflow with a single YAML checkpoint file that tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). Use `make profile-clean` to wipe all profiling artifacts and start fresh. Run `make profile-phase-validate` to check checkpoint consistency between phases. Pass `DOMAIN_CONTEXT` in `.env` to seed domain vocabulary for tab scoring (defaults to `config/domain_context.yaml` via the CLI). Set `PIPELINE_CHECKPOINT` in `.env` to override the default checkpoint path (`build/pipeline-state.yaml`). See migration-workbench `docs/pipeline-state.md`.
 
 **Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
 
