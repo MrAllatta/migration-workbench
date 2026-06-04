@@ -99,6 +99,12 @@ class Command(BaseCommand):
             "If not provided, falls back to the 'domain_context' key "
             "in the config file, then to config/domain_context.yaml.",
         )
+        parser.add_argument(
+            "--signals-output",
+            default=None,
+            help="Path for profiler-signals YAML artifact "
+            "(default: alongside checkpoint as profiler-signals.yaml).",
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -131,7 +137,12 @@ class Command(BaseCommand):
             out_dir=out_dir,
             date_stamp=date_stamp,
         )
-        state.configure(config=config, out_dir=out_dir, date_stamp=date_stamp)
+        state.configure(
+            config=config,
+            out_dir=out_dir,
+            date_stamp=date_stamp,
+            signals_output_path=options.get("signals_output"),
+        )
 
         if phase == "all":
             self._run_all(

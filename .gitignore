@@ -17,6 +17,6 @@ fly.preview.toml
 fly.toml
 .opencode
 .worktrees/
-.worktrees/
 .omo
 docs/superpowers/
+profiler-signals.yaml

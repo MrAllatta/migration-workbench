@@ -399,6 +399,7 @@ def _generate_admin(args: argparse.Namespace) -> int:
     kwargs = {
         "contract": args.contract,
         "manifest": args.manifest,
+        "codegen_manifest": getattr(args, "codegen_manifest", None),
         "out": args.out,
         "app_label": args.app_label,
         "force": args.force,
@@ -802,6 +803,7 @@ def _build_generate_parser(sub: argparse._SubParsersAction) -> None:
     admin_cmd = gen_sub.add_parser("admin", help="Generate Django admin.py")
     admin_cmd.add_argument("--contract", required=True)
     admin_cmd.add_argument("--manifest", default=None)
+    admin_cmd.add_argument("--codegen-manifest", default=None)
     admin_cmd.add_argument("--out", default=None)
     admin_cmd.add_argument("--app-label", default=None)
     admin_cmd.add_argument("--force", action="store_true")

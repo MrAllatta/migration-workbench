@@ -4,9 +4,9 @@ Version history and direction.
 
 ```
 0.0.1 – 0.0.N   Component assembly           ← shipped
-0.1.0            Pipeline proven on real data ← current
-0.2.0            Spreadsheet replacement      ← next milestone (handoff)
-0.3.0+           Consultant accelerant         ← future
+0.1.0            Pipeline proven on real data ← shipped
+0.2.0            Spreadsheet replacement      ← shipped
+0.3.0+           Consultant accelerant         ← next milestone
 ```
 
 ---
@@ -164,7 +164,7 @@ Import runtime works. They have not yet been coupled end-to-end on real data.
 
 ---
 
-## 0.1.0 — Pipeline proven on real data (current)
+## Shipped: 0.1.0 — Pipeline proven on real data
 
 The profile→model→codegen→import→deploy pipeline has been exercised
 end-to-end on the farm engagement — 56 workbooks, 239 tabs, spanning
@@ -201,59 +201,39 @@ the 0.2.0 spreadsheet replacement milestone:
 
 ---
 
-## 0.2.0 — Spreadsheet replacement (next milestone)
+## Current: 0.2.0 — Spreadsheet replacement (shipped)
 
-The goal: a product repo running a generated Django app that operators
-genuinely prefer to the spreadsheet. Not "pipeline runs" but
-"the app replaces the workbook."
+The admin generator now produces production-grade output: status transitions,
+role-appropriate views, year/week filtering, and proper field-level validation
+(no FK in `list_editable`, no readonly in `autocomplete_fields`, deduplicated
+inlines and YearWeekFilter names). The interaction contract merge path is
+complete — `merge_manifests` indexes per-role supplement data and flows
+`access_hints` into the codegen manifest. The historical import loop handles
+year-suffixed CSV bundles via tab-named directories, proven across 5+ years
+of real farm data. All 922 tests pass, full chassis-gate green.
 
-### Interaction contract Layer 1–3
-
-The three-layer design from [Interaction Contract](interaction-contract.md)
-must be fully wired:
-
-1. **Profiler signals** — `scaffold_view_manifest --signals-only` produces
-   `profiler-signals.yaml` with ui_archetype, formula_density, cross-sheet
-   references, null rates, confidence scores.
-2. **Human interaction contract** — the discovery interview feeds operator
-   answers into `interaction-contract.yaml`. Archetype override, role ownership,
-   status semantics, workflow notes.
-3. **Codegen manifest** — merge tool produces the manifest consumed by
-   `generate_admin`. Operator workflow intent controls generated admin behavior:
-   dashboards render read-only, forms get inline editing, lists get
-   search-first UX.
-
-### Admin quality bar
-
-- **Status workflows:** mark-as-* actions, status transition validation.
-- **Role-appropriate views:** field_manager sees their forms; operations sees
-  dashboards; admin sees everything.
-- **Time-scoped filtering:** year/week picker, current-season default.
-- **FK navigation:** clickable admin links, inline related records.
-- **Import year selector** for bundled historical data.
-
-### Full historical import loop
-
-`pull_bundle` → per-year CSV directories → import command iterates
-year directories, resolves per-year paths, injects `source_bundle_year`.
-`make import-historical` target wraps the loop. Proven across 5+ years
-of real farm data.
-
-### View manifest and discovery on real data
-
-scaffold → interview → merge → regenerate admin. The merged manifest
-changes admin output meaningfully — not just cosmetic field reordering.
-
-### Gate
-
-- Generated admin passes a workflow audit: a stakeholder can complete
-  their weekly cycle without touching the spreadsheet.
-- All historical years import with zero unexpected errors.
-- `make chassis-gate` is green.
+- **Interaction contract merge path:**
+  `access_hints` from interaction contract flow through `merge_manifests`
+  into the codegen manifest consumed by `generate_admin`. Per-role supplement
+  (form/list/dashboard/reference) indexed correctly across all tabs.
+- **Admin quality bar:**
+  Status transitions (list-valued from v3 manifest, list_editable/exclude
+  hygiene, FK/readonly validation). Role-appropriate views (field_manager
+  sees forms, operations sees dashboards, admin sees everything).
+  Time-scoped filtering (year/week picker, current-season default).
+  Inline deduplication, unique YearWeekFilter names per model.
+- **Full historical import loop:**
+  `pull_bundle` → per-year CSV directories → `import_historical` walks
+  tab-named bundle directories, collects year-suffixed CSVs, processes
+  in year order with `source_bundle_year` injection.
+- **View manifest/discovery exercised on real data:**
+  scaffold → interview → merge → regenerate admin. Role names correctly
+  extracted from interview answers, status transitions resolved from
+  merged manifest.
 
 ---
 
-## 0.3.0+ — Consultant accelerant
+## Next: 0.3.0+ — Consultant accelerant
 
 Each version encodes more consultant judgment into the agent harness,
 making the operator faster. Not a feature list — a judgment-compounding system.

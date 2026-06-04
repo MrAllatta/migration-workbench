@@ -65,6 +65,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Show diff against current output instead of overwriting",
         )
+        parser.add_argument(
+            "--codegen-manifest",
+            default=None,
+            help="Optional path to codegen-manifest YAML (Layer 3, enriches admin with archetype-based hints)",
+        )
 
     def handle(self, *args, **options):
         """Load contract and manifest, render admin.py, and write to disk."""
@@ -81,6 +86,23 @@ class Command(BaseCommand):
                 manifest = load_manifest(str(manifest_path))
             except ValueError as exc:
                 raise CommandError(str(exc)) from exc
+
+        codegen_manifest = None
+        if options.get("codegen_manifest"):
+            cg_path = Path(options["codegen_manifest"]).resolve()
+            if not cg_path.is_file():
+                raise CommandError(f"codegen-manifest not found: {cg_path}")
+            try:
+                import yaml  # type: ignore[import-untyped]
+                codegen_manifest = yaml.safe_load(
+                    cg_path.read_text(encoding="utf-8")
+                )
+                if not isinstance(codegen_manifest, dict):
+                    raise CommandError(
+                        f"codegen-manifest is not a YAML mapping: {cg_path}"
+                    )
+            except yaml.YAMLError as exc:
+                raise CommandError(f"codegen-manifest YAML error: {exc}") from exc
 
         contract = load_contract_unvalidated(str(contract_path))
 
@@ -136,7 +158,12 @@ class Command(BaseCommand):
             views = len(manifest.get("views") or [])
             self.stdout.write(self.style.SUCCESS(f"loaded manifest ({views} view(s))"))
 
-        source = render_admin_py(clean_contract, manifest=manifest, app_label=app_label)
+        source = render_admin_py(
+            clean_contract,
+            manifest=manifest,
+            app_label=app_label,
+            codegen_manifest=codegen_manifest,
+        )
 
         if not rejection_collector.is_empty():
             self.stderr.write(self.style.WARNING(rejection_collector.summary()))

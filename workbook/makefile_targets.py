@@ -69,6 +69,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "pull-bundle",
         "load-data",
         "push-data",
+        "import-historical",
         "import-preflight",
         "import-apply",
         "pull-preflight",
@@ -271,6 +272,21 @@ def codegen_tooling_block(ctx: MakeContext) -> str:
             f'--baseline "{ctx.contract}" --new "{ctx.contract}"'
         )
         + "\n"
+    )
+
+
+def import_historical_block(ctx: MakeContext) -> str:
+    """Return the import-historical Makefile target block.
+
+    Iterates year subdirectories under ``data/bundles/`` and imports each
+    year's CSV data via the ``import_historical`` management command.
+    """
+    return (
+        "import-historical:\n"
+        + _indent(
+            "$(MANAGE) import_historical --bundle-dir data/bundles"
+        )
+        + "\n\n"
     )
 
 
@@ -658,6 +674,7 @@ def full_targets_block(ctx: MakeContext) -> str:
         generate_pipeline_manifest_block(ctx),
         generate_all_block(ctx),
         "\n",
+        import_historical_block(ctx),
         import_blocks(ctx),
         "\n",
         profile_blocks(ctx),

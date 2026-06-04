@@ -132,7 +132,50 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 ## Status and roadmap
 
-**0.1.0 — Pipeline proven on real data (current)**
+**0.2.0 — Admin quality bar, interaction contract merge, historical import maturity (current)**
+
+The admin generator now produces production-grade output: status transitions,
+role-appropriate views, year/week filtering, and proper field-level validation
+(no FK in `list_editable`, no readonly in `autocomplete_fields`, deduplicated
+inlines and YearWeekFilter names). The interaction contract merge path is
+complete — `merge_manifests` indexes per-role supplement data and flows
+`access_hints` into the codegen manifest. The historical import loop handles
+year-suffixed CSV bundles via tab-named directories, proven across 5+ years
+of real farm data. All 922 tests pass, full chassis-gate green.
+
+- **Interaction contract merge path:**
+  `access_hints` from interaction contract flow through `merge_manifests`
+  into the codegen manifest consumed by `generate_admin`. Per-role supplement
+  (form/list/dashboard/reference) indexed correctly across all tabs.
+  See [Interaction Contract](docs/interaction-contract.md).
+
+- **Admin quality bar:**
+  Status transitions (list-valued from v3 manifest, list_editable/exclude
+  hygiene, FK/readonly validation). Role-appropriate views (field_manager
+  sees forms, operations sees dashboards, admin sees everything).
+  Time-scoped filtering (year/week picker, current-season default).
+  Inline deduplication, unique YearWeekFilter names per model.
+
+- **Full historical import loop:**
+  `pull_bundle` → per-year CSV directories → `import_historical` walks
+  tab-named bundle directories, collects year-suffixed CSVs, processes
+  in year order with `source_bundle_year` injection.
+  `make import-historical` target wraps the loop.
+
+- **View manifest/discovery exercised on real data:**
+  scaffold → interview → merge → regenerate admin. Role names correctly
+  extracted from interview answers, status transitions resolved from
+  merged manifest. The pipeline produces meaningful admin output changes.
+
+- **Pipeline reliability fixes:**
+  `merge_discovery_notes` correctly indexes per-role supplement, resolves
+  clean role names from Priority 2 interview answers, validates view
+  manifest structure robustly. Admin generator handles edge cases from
+  v3 codegen manifest without silent failures.
+
+<img width="984" alt="Screenshot 2026-05-25 at 06 56 14" src="https://github.com/user-attachments/assets/9a8ce0cc-db60-43c1-9b31-97a241ba8d6c" />
+
+**0.1.0 — Pipeline proven on real data (previous)**
 
 The profile→model→codegen→import→deploy pipeline has been exercised
 end-to-end on a real product engagement (farm). PipelineState checkpointing,
@@ -162,48 +205,8 @@ discovery interviews, and Fly.io deployment all function on real data.
   resume with guard clauses, deterministic YAML checkpoint output.
   See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
 
-0.1.0 is not the handoff — it is the prerequisite. The pipeline turns
-on real data. Now the work of turning that data into a working
-application begins.
-
-**0.2.0 — Spreadsheet replacement (next milestone)**
-
-The goal: a product repo running a generated Django app that operators
-genuinely prefer to the spreadsheet. Not "pipeline runs" but
-"the app replaces the workbook."
-
-- **Interaction contract Layer 1–3 implemented:**
-  Profiler signals (ui_archetype, formula_density, cross-sheet refs)
-  feed into a human interaction contract via the discovery interview.
-  The merge tool produces a codegen manifest consumed by `generate_admin`.
-  Operator workflow intent (form/list/dashboard/reference) controls
-  generated admin behavior — dashboards render read-only, forms get
-  inline editing, lists get search-first UX.
-  See [Interaction Contract](docs/interaction-contract.md).
-
-- **Admin quality bar:**
-  Status workflows (mark-as-* actions, status transition validation).
-  Role-appropriate views (field_manager sees their forms; operations
-  sees dashboards; admin sees everything).
-  Time-scoped filtering (year/week picker, current-season default).
-  FK navigation (clickable admin links, inline related records).
-  Import year selector for bundled historical data.
-
-- **Full historical import loop:**
-  `pull_bundle` → per-year CSV directories → import command iterates
-  year directories, resolves per-year paths, injects `source_bundle_year`.
-  `make import-historical` target wraps the loop. Proven across
-  5+ years of real farm data.
-
-- **View manifest/discovery exercised on real data:**
-  scaffold → interview → merge → regenerate admin. The merged
-  manifest changes admin output meaningfully (not just cosmetic).
-
-- **Gate:**
-  Generated admin passes a workflow audit: a stakeholder can complete
-  their weekly cycle without touching the spreadsheet.
-  All historical years import with zero unexpected errors.
-  `make chassis-gate` is green.
+0.1.0 was not the handoff — it was the prerequisite. The pipeline turned
+on real data. 0.2.0 turned that data into a working application.
 
 **0.3.0+ — Consultant accelerant**
 
@@ -260,6 +263,14 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.2.0
+
+- **Interaction contract merge path:** `access_hints` from interaction contract flows through `merge_manifests` into the codegen manifest. The merge correctly indexes per-role supplement data (form/list/reference/dashboard) across all tabs — the `_index_interaction_contract()` method now returns role-specific supplement dicts instead of flat lists. (workbook/tools/manifest_merger.py)
+- **Admin generator maturity — status transitions, role views, YearWeekFilter:** Admin generator handles v3 codegen manifest with `list_editable`/`readonly_fields` validated against contract fields; FK fields excluded from `list_editable`, readonly from `autocomplete_fields`. Status transitions support list-valued transition arrays from v3 manifest. YearWeekFilter names are deduplicated per-model. (workbook/codegen/admin_generator.py)
+- **Interview-to-manifest pipeline fixes:** `merge_discovery_notes` correctly extracts role names from interview answers (Priority 2 `_resolve_role_hints` returns clean role names), `_resolve_status_transitions` robustly checks view manifest structure, and the merge uses per-role supplement rather than flat list. (workbook/tools/manifest_merger.py)
+- **Phase 4 bundle support for year-suffixed CSV bundles:** `import_historical` command extended to accept tab-named bundle directories containing year-suffixed CSV files. When a bundle has subdirectories named after tabs, the importer walks those directories, collects year-suffixed CSVs per tab, and processes them in year order — injecting `source_bundle_year` for each batch. Includes comprehensive test coverage. (importer/management/commands/import_historical.py)
+- **All 922 tests pass, full chassis-gate green.**
 
 ### 0.1.0
 

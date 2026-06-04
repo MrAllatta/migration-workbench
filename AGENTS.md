@@ -31,6 +31,16 @@ make chassis-gate    # the full CI gate: migrate, test, lint, smoke commands
 
 `make chassis-gate` is the authoritative gate. PRs must pass it. See `docs/contributing.md` for individual test commands.
 
+## Ecosystem
+
+This repo participates in a multi-repo development ecosystem with upstream/downstream product repos (farm, etc.). Three agent types coordinate through a filesystem-based protocol defined in `.omo/design/ecosystem.md`:
+
+- **Meta agent** — orchestrates from this checkout. Merges worktree features to `exercise`, signals product repos, proposes squashes to human.
+- **Workbench agent** — builds features in isolated worktrees, signals completion via `.omo/ready/`. Never merges.
+- **Product agent** — drives quality by running the "app replaces spreadsheet" smoke test suite against generated code. Writes structured issues to `.omo/issues/` when errors are found. Certifies milestone readiness via `.omo/quality-gates/`.
+
+See `.omo/design/ecosystem.md` for: branch model, queue protocol (7 queues), farm-led hardening loop, agent launch prompts, worktree commit rules, and patching boundary.
+
 ## Five apps
 
 | App | Responsibility | Entry points |
@@ -109,10 +119,7 @@ git push origin master && git push origin v0.1.0
 product repo before you commit to a stable release, tag it `v0.1.0a1`. Product
 repos pin exactly (`==0.1.0a1`) to opt in.
 
-**Agents do not commit.** Agents may read `git status`, `git log`, `git diff`
-for context, but `git commit`, `git tag`, `git push`, `git merge`, and
-`git rebase` are human-only. When an agent finishes work, it shows the diff
-and proposes a commit message — you write the commit.
+**Agents do not commit on `master` or `exercise`.** On worktree branches only, agents may commit with conventional commit messages as checkpoints (see Ecosystem section above). Agents must not push, tag, merge, or rebase. Each commit captures a working state. When an agent finishes work, it shows the diff and proposes a squash commit message — you write the merge to `master`.
 
 ### Naming rules
 

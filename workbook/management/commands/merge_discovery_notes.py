@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from workbook.discovery import (
     apply_discovery_patch,
+    build_interaction_contract_from_patch,
     parse_interview,
     render_summary,
 )
@@ -41,6 +42,11 @@ class Command(BaseCommand):
             "--summary-out",
             default=None,
             help="Optional path for a discovery-summary Markdown recap",
+        )
+        parser.add_argument(
+            "--output-interaction-contract",
+            default=None,
+            help="Optional path to write the interaction-contract YAML derived from interview answers",
         )
 
     def handle(self, *args, **options):
@@ -91,3 +97,25 @@ class Command(BaseCommand):
                 encoding="utf-8",
             )
             self.stdout.write(self.style.SUCCESS(f"wrote {summary_path}"))
+
+        contract_out = options.get("output_interaction_contract")
+        if contract_out:
+            interaction_contract = build_interaction_contract_from_patch(
+                patch,
+                updated,
+                source_id=(
+                    (updated.get("source") or {}).get("source_id") or ""
+                ),
+            )
+            contract_path = Path(contract_out).resolve()
+            contract_path.parent.mkdir(parents=True, exist_ok=True)
+            contract_path.write_text(
+                yaml.safe_dump(
+                    interaction_contract,
+                    sort_keys=False,
+                    allow_unicode=True,
+                    default_flow_style=False,
+                ),
+                encoding="utf-8",
+            )
+            self.stdout.write(self.style.SUCCESS(f"wrote {contract_path}"))

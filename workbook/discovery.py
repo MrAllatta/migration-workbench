@@ -16,6 +16,7 @@ Public functions:
 - :func:`parse_interview` — operator-filled Markdown to a patch dict.
 - :func:`apply_discovery_patch` — merges a patch into a fresh manifest copy.
 - :func:`render_summary` — annotated manifest to discovery-summary Markdown.
+- :func:`build_interaction_contract_from_patch` — patch dict to interaction-contract dict.
 """
 
 from __future__ import annotations
@@ -42,6 +43,28 @@ def _format_inferred_fields(fields: list[str]) -> str:
     if not fields:
         return "(none inferred)"
     return ", ".join(fields)
+
+
+def _extract_role_name(full_answer: str) -> str:
+    """Extract a concise role name from a full interview answer.
+    
+    Answers are expected to be in the format:
+    "Role description — explanation" or "Role description. explanation"
+    
+    Returns the role description part, stripped of whitespace.
+    """
+    if not full_answer:
+        return ""
+    
+    # Split on common delimiters: " — " (em dash) or ". " (period + space)
+    # Take the first part as the role name
+    if " — " in full_answer:
+        return full_answer.split(" — ", 1)[0].strip()
+    elif ". " in full_answer:
+        return full_answer.split(". ", 1)[0].strip()
+    else:
+        # If no delimiter found, return the whole answer stripped
+        return full_answer.strip()
 
 
 def _question_marker(kind: str, **kwargs: str) -> str:
@@ -444,3 +467,133 @@ def render_summary(
     lines.append("")
 
     return "\n".join(lines) + "\n"
+
+
+def build_interaction_contract_from_patch(
+    patch: dict[str, Any],
+    manifest: dict[str, Any],
+    *,
+    source_id: str | None = None,
+) -> dict[str, Any]:
+    """Convert a discovery patch dict into an interaction-contract YAML dict.
+
+    Maps the discovery interview patch fields to the interaction contract schema:
+
+    - ``role_hints`` → ``interviews[].role`` entries, grouped by role.
+    - ``view_notes`` with status info → ``interviews[].status_semantics``.
+    - ``weekly_actions`` → ``interviews[].weekly_actions``.
+    - ``status_overrides`` → ``interviews[].status_semantics`` enrichments.
+    - Archetype overrides from manifest ``type`` changes → ``interviews[].archetype_overrides``.
+
+    Args:
+        patch: Patch dict produced by :func:`parse_interview` with keys
+            ``role_hints``, ``weekly_actions``, ``view_notes``,
+            ``weekly_workflow``, ``status_overrides``.
+        manifest: Source manifest dict used to extract view types and
+            tab titles.
+        source_id: Optional source identifier.
+
+    Returns:
+        A valid interaction-contract dict conforming to
+        ``interaction-contract-1``.
+    """
+    from workbook.interaction_contract import build_interaction_contract
+
+    # Build roles → tab mapping from role_hints.
+    # role_hints format: ["Tab: Role name", "Tab2: Role name2"]
+    tab_to_role: dict[str, str] = {}
+    for hint in patch.get("role_hints") or []:
+        if ":" in hint:
+            tab_name, role_name = hint.split(":", 1)
+            # Extract concise role name from the full answer
+            concise_role_name = _extract_role_name(role_name.strip())
+            tab_to_role[tab_name.strip()] = concise_role_name
+
+    # Collect archetype overrides from manifest per-view type annotations.
+    # When the discovery interview changes a view's type from 'list' to
+    # 'form'/'dashboard'/'reference', that is recorded as an override.
+    # For now, we consider manifest type != 'list' as an override signal.
+    archetype_overrides: dict[str, str] = {}
+    for view in manifest.get("views") or []:
+        tab_title = str(view.get("source_tab") or "")
+        view_type = str(view.get("type") or "list")
+        if tab_title and view_type != "list":
+            archetype_overrides[tab_title] = view_type
+
+    # Build status semantics from view_notes. Parse "status[field]: desc" patterns.
+    status_semantics: dict[str, str] = {}
+    for tab_name, notes in (patch.get("view_notes") or {}).items():
+        if isinstance(notes, str) and "status[" in notes:
+            # Extract status semantics from notes like "status[status]: open -> pending -> shipped"
+            import re as _re
+
+            status_match = _re.search(r"status\[([^\]]+)\]:\s*(.*)", notes)
+            if status_match:
+                field_name = status_match.group(1)
+                desc = status_match.group(2)
+                # Convert "open -> pending -> shipped" to individual status mappings
+                if "->" in desc:
+                    status_parts = [s.strip() for s in desc.split("->")]
+                    for status_idx in range(len(status_parts) - 1):
+                        status_semantics[status_parts[status_idx]] = status_parts[status_idx + 1]
+                else:
+                    status_semantics[field_name] = desc
+
+    # Collect unique roles from role_hints.
+    unique_roles = sorted({role for role in tab_to_role.values()})
+
+    # Build interview entries.
+    interviews: list[dict[str, Any]] = []
+    for role_name in unique_roles:
+        # Find tabs owned by this role.
+        role_tabs = [t for t, r in tab_to_role.items() if r == role_name]
+
+        # Build per-role archetype_overrides from tabs owned by this role.
+        role_overrides: dict[str, str] = {}
+        for tab_name in role_tabs:
+            if tab_name in archetype_overrides:
+                role_overrides[tab_name] = archetype_overrides[tab_name]
+
+        entry: dict[str, Any] = {"role": role_name}
+
+        if role_overrides:
+            entry["archetype_overrides"] = role_overrides
+
+        if status_semantics:
+            entry["status_semantics"] = dict(status_semantics)
+
+        workflow_notes = patch.get("weekly_workflow") or ""
+        if workflow_notes:
+            entry["workflow_notes"] = workflow_notes
+
+        weekly_actions = patch.get("weekly_actions") or []
+        if weekly_actions:
+            entry["weekly_actions"] = list(weekly_actions)
+
+        # Access hints from view_notes with "access:" prefix.
+        access_notes = []
+        for tab_name in role_tabs:
+            notes = (patch.get("view_notes") or {}).get(tab_name, "")
+            if isinstance(notes, str) and "access:" in notes:
+                access_notes.append(f"{tab_name}: {notes}")
+        if access_notes:
+            entry["access_hints"] = {"notes": access_notes}
+
+        interviews.append(entry)
+
+        # If no roles were extracted from role_hints but there are weekly_actions
+        # or status_semantics, create a default "operator" interview entry.
+        all_weekly_actions = patch.get("weekly_actions") or []
+        if not interviews and (all_weekly_actions or status_semantics):
+            entry: dict[str, Any] = {"role": "operator"}
+            if status_semantics:
+                entry["status_semantics"] = dict(status_semantics)
+            if all_weekly_actions:
+                entry["weekly_actions"] = list(all_weekly_actions)
+            interviews.append(entry)
+
+    sid = source_id
+    if sid is None:
+        sid = (manifest.get("source") or {}).get("source_id") or ""
+
+    return build_interaction_contract(source_id=sid, interviews=interviews)

@@ -1185,3 +1185,659 @@ def test_generate_admin_skips_invalid_tables(tmp_path, monkeypatch):
     call_command("generate_admin", contract=str(contract), out=str(out), force=True)
     source = out.read_text()
     assert "Valid" in source
+
+
+# ---------------------------------------------------------------------------
+# Codegen manifest integration (Layer 3 → admin)
+# ---------------------------------------------------------------------------
+
+
+def _codegen_manifest_form() -> dict:
+    """Return a codegen manifest with form archetype for a Crop model."""
+    return {
+        "version": 1,
+        "generated_at": "2026-06-01T00:00:00Z",
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "form",
+                "confidence": 0.85,
+                "workflow_hints": {
+                    "editable": True,
+                    "status_field": "status",
+                    "status_transitions": {
+                        "planted": "growing",
+                        "growing": "harvested",
+                    },
+                    "roles": ["field_manager"],
+                    "workflow_notes": "Updated weekly by field managers.",
+                },
+            },
+        ],
+    }
+
+
+def test_admin_with_codegen_manifest_form_archetype():
+    """Form archetype from codegen manifest should set list_editable."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                    {
+                        "suggested_field_name": "crop_type",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 100},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "status", "crop_type"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "status_values": ["Planted", "Growing", "Harvested"],
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    # Without codegen manifest — no list_editable.
+    source_no_cg = render_admin_py(contract, manifest, app_label="core")
+    # With codegen manifest — list_editable should be set for form archetype.
+    source_with_cg = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=_codegen_manifest_form()
+    )
+    assert "list_editable" not in source_no_cg or "list_editable = []" in source_no_cg
+    assert "list_editable" in source_with_cg
+    assert "list_editable = ['name', 'status', 'crop_type']" in source_with_cg
+    _check_compiles(source_with_cg)
+
+
+def test_admin_with_codegen_manifest_dashboard_archetype():
+    """Dashboard archetype should make all fields readonly."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "total_yield",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 10, "decimal_places": 2},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "total_yield"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "dashboard",
+                "confidence": 0.92,
+                "workflow_hints": {"editable": False},
+            },
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    # Dashboard archetype should make name readonly.
+    assert "readonly_fields" in source
+    assert "'name'" in source
+    assert "'total_yield'" in source
+    _check_compiles(source)
+
+
+def test_admin_with_codegen_manifest_status_transitions():
+    """Status transitions from codegen manifest should generate admin actions."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "status"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "form",
+                "confidence": 0.85,
+                "workflow_hints": {
+                    "status_field": "status",
+                    "status_transitions": {
+                        "planted": "growing",
+                        "growing": "harvested",
+                    },
+                },
+            },
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    # Should produce admin actions for planted, growing, harvested.
+    assert "mark_as_planted" in source
+    assert "mark_as_growing" in source
+    assert "mark_as_harvested" in source
+    assert "actions = [" in source
+    _check_compiles(source)
+
+
+def test_status_transition_validation_in_action():
+    """Status transitions generate actions that filter before updating."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                ],
+            }
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "status"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "notes": None,
+            }
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "form",
+                "confidence": 0.85,
+                "workflow_hints": {
+                    "status_field": "status",
+                    "status_transitions": {
+                        "planted": "growing",
+                        "growing": "harvested",
+                    },
+                },
+            }
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    _check_compiles(source)
+    assert "mark_as_harvested" in source
+    # Must filter before updating (validating transition)
+    assert ".filter(" in source or ".exclude(" in source
+    # Must report skipped count
+    assert "message_user" in source
+    assert "WARNING" in source or "skipped" in source
+
+
+def test_role_restricted_get_queryset():
+    """access_hints.restricted_to should generate get_queryset filtering by group."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            }
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            }
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "list",
+                "confidence": 0.85,
+                "access_hints": {"restricted_to": ["field_manager"]},
+            }
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    _check_compiles(source)
+    assert "def get_queryset(self, request):" in source
+    assert "filter(name" in source or "filter(name__in" in source
+
+
+def test_no_get_queryset_when_no_role_restriction():
+    """Without access_hints.restricted_to, no get_queryset override."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    }
+                ],
+            }
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            }
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [{"model_name": "Crop", "ui_archetype": "list", "confidence": 0.5}],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    assert "def get_queryset(self, request):" not in source
+
+
+def test_year_week_filter_generated():
+    """time_scope with week_field should generate a YearWeekFilter class."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "plant_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {"null": True, "blank": True},
+                    },
+                ],
+            }
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "plant_date"],
+                "computed_fields": [],
+                "filterable_by": ["plant_date"],
+                "status_field": None,
+                "notes": None,
+                "time_scope": {
+                    "year_field": "plant_date__year",
+                    "week_field": "plant_date__week",
+                },
+            }
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    _check_compiles(source)
+    assert "class CropYearWeekFilter" in source
+    assert "admin.SimpleListFilter" in source
+    assert "plant_date__year" in source  # year_field in filter field lookups
+
+
+def test_no_week_filter_when_no_week_field():
+    """Without week_field in time_scope, no filter class generated."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    }
+                ],
+            }
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+                "time_scope": {"year_field": "plant_date__year"},
+            }
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "class YearWeekFilter" not in source
+
+
+def test_admin_output_differs_with_codegen_manifest():
+    """Admin output must differ materially when codegen manifest is present."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "status"],
+                "computed_fields": [],
+                "filterable_by": ["status"],
+                "status_field": "status",
+                "status_values": ["Planted", "Growing", "Harvested"],
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = _codegen_manifest_form()
+    source_no_cg = render_admin_py(contract, manifest, app_label="core")
+    source_with_cg = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    assert source_no_cg != source_with_cg, (
+        "Admin output must differ when codegen manifest is provided"
+    )
+    _check_compiles(source_with_cg)
+    _check_compiles(source_no_cg)
+
+
+def test_command_with_codegen_manifest(tmp_path):
+    """End-to-end: generate_admin with --codegen-manifest flag."""
+    from django.core.management import call_command
+
+    contract_path = tmp_path / "contract.yaml"
+    contract_path.write_text(
+        yaml.safe_dump(
+            {
+                "source": {"provider": "google_sheets"},
+                "tables": [
+                    {
+                        "suggested_model_name": "crop",
+                        "model_name": "Crop",
+                        "columns": [
+                            {
+                                "suggested_field_name": "name",
+                                "django_field_class": "models.CharField",
+                                "django_field_kwargs": {"max_length": 200},
+                            },
+                            {
+                                "suggested_field_name": "status",
+                                "django_field_class": "models.CharField",
+                                "django_field_kwargs": {"max_length": 50},
+                            },
+                        ],
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": "view-manifest-draft-1",
+                "source": {"source_id": "test", "provider": "google_sheets"},
+                "views": [
+                    {
+                        "name": "crop",
+                        "entity": "crop",
+                        "source_tab": "Crops",
+                        "type": "list",
+                        "editable_fields": ["name", "status"],
+                        "computed_fields": [],
+                        "filterable_by": ["status"],
+                        "status_field": "status",
+                        "status_values": ["Planted", "Growing", "Harvested"],
+                        "notes": None,
+                    },
+                ],
+                "workflow_hints": {
+                    "tab_sequence": ["Crops"],
+                    "role_hints": [],
+                    "weekly_actions": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    codegen_path = tmp_path / "codegen.yaml"
+    codegen_path.write_text(
+        yaml.safe_dump(_codegen_manifest_form()),
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "admin.py"
+
+    call_command(
+        "generate_admin",
+        contract=str(contract_path),
+        manifest=str(manifest_path),
+        codegen_manifest=str(codegen_path),
+        out=str(out_path),
+        force=True,
+    )
+
+    assert out_path.exists()
+    source = out_path.read_text(encoding="utf-8")
+    assert "@admin.register(Crop)" in source
+    _check_compiles(source)

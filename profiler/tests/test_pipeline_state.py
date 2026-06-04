@@ -1383,3 +1383,67 @@ class TestCheckpointValidation:
         )
         errors = state.validate()
         assert any("must be a dict" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# 9. Profiler signals integration
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineStateSignals:
+    """Profiler signals path storage and lazy-resolution."""
+
+    def test_profiler_signals_path_default_none(self):
+        """Fresh PipelineState has profiler_signals_path=None."""
+        state = PipelineState()
+        assert state.profiler_signals_path is None
+
+    def test_profiler_signals_path_set_and_serialized(self, tmp_path):
+        """profiler_signals_path persists through checkpoint round-trip."""
+        state = PipelineState()
+        state.profiler_signals_path = "/some/path/signals.yaml"
+        checkpoint_path = tmp_path / "checkpoint.yaml"
+        state.save_checkpoint(checkpoint_path)
+
+        loaded = PipelineState.load(checkpoint_path)
+        assert loaded.profiler_signals_path == "/some/path/signals.yaml"
+
+    def test_load_profiler_signals_returns_none_when_no_path(self):
+        """load_profiler_signals returns None when no path is set."""
+        state = PipelineState()
+        assert state.load_profiler_signals() is None
+
+    def test_load_profiler_signals_caches_result(self, tmp_path):
+        """Signals are cached after first load."""
+        state = PipelineState()
+        import yaml
+
+        signals_path = tmp_path / "profiler-signals.yaml"
+        signals_data = {
+            "version": 1,
+            "signals": [
+                {
+                    "tab_title": "Orders",
+                    "workbook_code": "demo",
+                    "ui_archetype": "form",
+                    "formula_density": 0.33,
+                    "cross_sheet_refs": 0,
+                    "null_rates": {},
+                    "confidence_score": 0.75,
+                }
+            ],
+        }
+        signals_path.write_text(
+            yaml.safe_dump(signals_data, sort_keys=False),
+            encoding="utf-8",
+        )
+        state.profiler_signals_path = str(signals_path)
+        state._out_dir = tmp_path
+
+        result = state.load_profiler_signals()
+        assert result is not None
+        assert ("demo", "Orders") in result
+        assert result[("demo", "Orders")]["ui_archetype"] == "form"
+
+        # Second call uses cache
+        assert state.load_profiler_signals() is result

@@ -7,6 +7,7 @@ from django.core.management import call_command
 
 from workbook.discovery import (
     apply_discovery_patch,
+    build_interaction_contract_from_patch,
     parse_interview,
     render_interview,
     render_summary,
@@ -439,3 +440,72 @@ def test_discovery_round_trip_generates_admin():
     source = render_admin_py(contract, merged, app_label="core")
     assert "@admin.register(Crop)" in source
     assert "list_filter" in source
+
+
+# ---------------------------------------------------------------------------
+# build_interaction_contract_from_patch
+# ---------------------------------------------------------------------------
+
+
+def test_build_interaction_contract_from_role_hints():
+    manifest = _orders_manifest()
+    patch = parse_interview(_filled_interview_text(), manifest)
+    contract = build_interaction_contract_from_patch(patch, manifest)
+    assert contract["version"] == "interaction-contract-1"
+    assert len(contract["interviews"]) >= 1
+    # role "Finance team only." should be in the interviews
+    roles = [i["role"] for i in contract["interviews"]]
+    assert any("Finance" in r for r in roles)
+
+
+def test_build_interaction_contract_empty_patch():
+    manifest = _orders_manifest()
+    blank_interview = render_interview(manifest)
+    patch = parse_interview(blank_interview, manifest)
+    contract = build_interaction_contract_from_patch(patch, manifest)
+    assert contract["version"] == "interaction-contract-1"
+    assert contract["interviews"] == []
+
+
+def test_build_interaction_contract_preserves_weekly_actions():
+    manifest = _orders_manifest()
+    patch = parse_interview(_filled_interview_text(), manifest)
+    contract = build_interaction_contract_from_patch(patch, manifest)
+    all_actions: list[str] = []
+    for entry in contract["interviews"]:
+        all_actions.extend(entry.get("weekly_actions") or [])
+    assert "Reconcile orders against CRM." in all_actions
+
+
+def test_build_interaction_contract_with_source_id():
+    manifest = _orders_manifest()
+    patch = parse_interview(_filled_interview_text(), manifest)
+    contract = build_interaction_contract_from_patch(patch, manifest, source_id="custom")
+    assert contract["source_id"] == "custom"
+
+
+def test_merge_discovery_notes_with_interaction_contract_output(tmp_path):
+    """End-to-end: merge_discovery_notes with --output-interaction-contract writes the contract."""
+    from django.core.management import call_command
+
+    import yaml
+
+    manifest_path = tmp_path / "view-manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(_orders_manifest()), encoding="utf-8")
+    interview_path = tmp_path / "interview.md"
+    interview_path.write_text(_filled_interview_text(), encoding="utf-8")
+    out_path = tmp_path / "manifest-out.yaml"
+    contract_path = tmp_path / "interaction-contract.yaml"
+
+    call_command(
+        "merge_discovery_notes",
+        manifest=str(manifest_path),
+        interview=str(interview_path),
+        out=str(out_path),
+        output_interaction_contract=str(contract_path),
+    )
+
+    assert contract_path.exists()
+    contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+    assert contract["version"] == "interaction-contract-1"
+    assert len(contract["interviews"]) >= 1

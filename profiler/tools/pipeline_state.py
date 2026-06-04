@@ -310,10 +310,17 @@ class PipelineState:
     interaction_contract: dict[str, Any] | None = None
     decisions: list[DecisionRecord] = field(default_factory=list)
 
+    # Path to profiler-signals YAML artifact (persisted in checkpoint).
+    profiler_signals_path: str | None = None
+
     # Runtime-only fields (not serialized to checkpoint).
     _config: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _out_dir: Path | None = field(default=None, repr=False, compare=False)
     _date_stamp: str | None = field(default=None, repr=False, compare=False)
+    _signals_output_path: Path | None = field(default=None, repr=False, compare=False)
+    _signals_cache: dict[tuple[str, str], dict[str, Any]] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         """Validate field types on construction."""
@@ -343,6 +350,7 @@ class PipelineState:
         config: dict[str, Any] | None = None,
         out_dir: str | Path | None = None,
         date_stamp: str | None = None,
+        signals_output_path: str | Path | None = None,
     ) -> PipelineState:
         """Set runtime configuration for pipeline execution.
 
@@ -353,6 +361,7 @@ class PipelineState:
             config: Parsed cohort corpus config dict.
             out_dir: Directory for profiler JSON artifacts.
             date_stamp: Timestamp for artifact filenames (ISO date string).
+            signals_output_path: Path for profiler-signals YAML artifact.
 
         Returns:
             PipelineState: Self for chaining.
@@ -364,6 +373,8 @@ class PipelineState:
             else (self._out_dir or Path("data/profile_snapshots"))
         )
         self._date_stamp = date_stamp or self._date_stamp or date.today().isoformat()
+        if signals_output_path:
+            self._signals_output_path = Path(signals_output_path)
         return self
 
     @staticmethod
@@ -410,6 +421,75 @@ class PipelineState:
         drive_service = build_google_service("drive", "v3", scopes)
         sheets_service = build_google_service("sheets", "v4", scopes)
         return drive_service, sheets_service
+
+    # ------------------------------------------------------------------
+    # Profiler signals
+    # ------------------------------------------------------------------
+
+    def load_profiler_signals(
+        self,
+    ) -> dict[tuple[str, str], dict[str, Any]] | None:
+        """Lazy-resolve profiler signals from the checkpoint-relative path.
+
+        The signals artifact is a YAML file referenced by
+        ``profiler_signals_path`` (stored in the checkpoint).  On first call
+        the file is loaded, parsed, and cached as a dict keyed by
+        ``(workbook_code, tab_title)`` for fast lookup.  Subsequent calls
+        return the cached dict.
+
+        Returns:
+            Dict mapping ``(workbook_code, tab_title)`` to the signal entry,
+            or ``None`` if no signals path is configured or the file is
+            missing.
+        """
+        if self._signals_cache is not None:
+            return self._signals_cache
+
+        if not self.profiler_signals_path:
+            return None
+
+        signals_path = Path(self.profiler_signals_path)
+        if not signals_path.is_absolute() and self._out_dir:
+            signals_path = self._out_dir.parent / signals_path
+        if not signals_path.exists():
+            logger.warning(
+                "profiler signals artifact not found at %s",
+                signals_path,
+            )
+            return None
+
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning("PyYAML not available — cannot load profiler signals")
+            return None
+
+        try:
+            raw = yaml.safe_load(signals_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            logger.warning(
+                "failed to load profiler signals from %s: %s",
+                signals_path,
+                exc,
+            )
+            return None
+
+        if not isinstance(raw, dict):
+            return None
+
+        signals_list = raw.get("signals") or []
+        cache: dict[tuple[str, str], dict[str, Any]] = {}
+        for entry in signals_list:
+            if isinstance(entry, dict):
+                key = (
+                    str(entry.get("workbook_code", "")),
+                    str(entry.get("tab_title", "")),
+                )
+                if key[0] or key[1]:
+                    cache[key] = entry
+
+        self._signals_cache = cache
+        return cache
 
     # ------------------------------------------------------------------
     # Decision recording
@@ -665,6 +745,10 @@ class PipelineState:
         else:
             payload["deep_profile_index"] = {"entries": []}
 
+        # Profiler signals path (simple path string, no externalization needed)
+        if self.profiler_signals_path:
+            payload["profiler_signals_path"] = self.profiler_signals_path
+
         # Derived contracts as artifact references
         if self.schema_contract:
             # Write the contract artifact next to the checkpoint and reference it
@@ -801,6 +885,9 @@ class PipelineState:
                 if isinstance(resolved, dict) and resolved:
                     interaction_contract = resolved
 
+        # Profiler signals path — preserved from checkpoint
+        profiler_signals_path = raw.get("profiler_signals_path") or None
+
         return cls(
             version=str(raw.get("version", "0.0.9")),
             discovery=discovery,
@@ -809,6 +896,9 @@ class PipelineState:
             schema_contract=schema_contract,
             interaction_contract=interaction_contract,
             decisions=decisions,
+            profiler_signals_path=str(profiler_signals_path)
+            if profiler_signals_path
+            else None,
         )
 
     # ------------------------------------------------------------------
@@ -1209,7 +1299,90 @@ class PipelineState:
         self.schema_contract = {"tables": tables}
         self.interaction_contract = {"views": []}
 
+        # Emit profiler signals alongside contracts
+        self._emit_profiler_signals()
+
         return self
+
+    def _emit_profiler_signals(self) -> None:
+        """Build and write profiler-signals YAML from deep profile index.
+
+        Constructs a structure-like dict from ``deep_profile_index.entries``,
+        then extracts signals via ``extract_signals`` and writes the result
+        as a YAML artifact.  Sets ``profiler_signals_path`` to the absolute
+        path of the written file.
+        """
+        if not self.deep_profile_index.entries:
+            return
+
+        from workbook.tools.signal_extraction import extract_signals
+
+        # Build a minimal structure dict from deep-profile index entries
+        fake_tabs: list[dict] = []
+        for entry in self.deep_profile_index.entries:
+            tab_title = entry.get("tab_title") or entry.get("tab", "unknown")
+            columns = self._extract_columns_from_entry(entry)
+            cols_out: list[dict] = []
+            for col in columns:
+                cols_out.append(
+                    {
+                        "header_label": col.get("header", "unknown"),
+                        "is_formula": col.get("is_formula", False),
+                    }
+                )
+            fake_tabs.append(
+                {
+                    "worksheet_title": tab_title,
+                    "columns": cols_out,
+                    "total_rows": entry.get("total_rows", 0),
+                    "total_cols": len(cols_out),
+                    "named_ranges": [],
+                    "filter_views": [],
+                }
+            )
+
+        fake_structure: dict[str, Any] = {
+            "schema_version": "structure-draft-1",
+            "source_id": self._config.get("source_id", ""),
+            "provider": self._config.get("provider", "google_sheets"),
+            "tabs": fake_tabs,
+        }
+
+        signals = extract_signals(fake_structure)
+
+        # Determine output path: prefer runtime override, then alongside checkpoint
+        signals_path = self._signals_output_path or (
+            (self._out_dir or Path("build")).parent / "profiler-signals.yaml"
+        )
+        signals_path = Path(signals_path)
+        signals_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            import yaml  # type: ignore[import-untyped]
+        except ImportError:
+            logger.warning("PyYAML not available — skipping signals artifact")
+            return
+
+        try:
+            signals_path.write_text(
+                yaml.safe_dump(
+                    signals,
+                    sort_keys=False,
+                    allow_unicode=True,
+                    default_flow_style=False,
+                ),
+                encoding="utf-8",
+            )
+            self.profiler_signals_path = str(signals_path.resolve())
+            logger.info(
+                "wrote profiler signals to %s", self.profiler_signals_path
+            )
+        except Exception as exc:
+            logger.warning(
+                "failed to write profiler signals to %s: %s",
+                signals_path,
+                exc,
+            )
 
     def validate(self) -> list[str]:
         """Validate checkpoint internal consistency.
