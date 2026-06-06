@@ -12,9 +12,12 @@ from django.core.management import call_command, CommandError
 
 from workbook.tools.signal_extraction import (
     SIGNALS_VERSION,
+    _build_workflow_graph,
     _classify_ui_archetype_v2,
     _compute_avg_null_rate,
-    _extract_cross_sheet_refs,
+    _extract_dependency_edges,
+    _extract_formula_edges_from_text,
+    _extract_sheet_name_from_range,
     extract_signals,
 )
 
@@ -395,51 +398,248 @@ class TestFormulaDensity:
 # ---------------------------------------------------------------------------
 
 
-class TestCrossSheetRefs:
-    """Cross-sheet reference extraction from named_ranges / filter_views."""
+class TestDependencyEdges:
+    """Dependency edge extraction from named_ranges / filter_views / formulas."""
 
     def test_no_refs(self):
-        """No named ranges or filter views → 0."""
-        count = _extract_cross_sheet_refs(
-            {"named_ranges": [], "filter_views": []}
+        """No named ranges or filter views → empty list."""
+        edges = _extract_dependency_edges(
+            {"named_ranges": [], "filter_views": []}, "SourceTab"
         )
-        assert count == 0
+        assert edges == []
 
     def test_named_range_with_cross_sheet(self):
-        """Named range referencing another sheet is counted."""
-        count = _extract_cross_sheet_refs(
+        """Named range referencing another sheet produces an edge."""
+        edges = _extract_dependency_edges(
             {
                 "named_ranges": [
                     {"name": "External", "range": "'Sheet2'!A1:B10"}
                 ],
                 "filter_views": [],
-            }
+            },
+            "SourceTab",
         )
-        assert count == 1
+        assert len(edges) == 1
+        assert edges[0]["to"] == "Sheet2"
+        assert edges[0]["ref_type"] == "named_range"
+        assert edges[0]["confidence"] == 0.95
 
     def test_named_range_same_sheet(self):
-        """Named range only on the same sheet is not counted."""
-        count = _extract_cross_sheet_refs(
+        """Named range only on the same sheet produces no edge."""
+        edges = _extract_dependency_edges(
             {
                 "named_ranges": [
                     {"name": "LocalData", "range": "A1:B10"}
                 ],
                 "filter_views": [],
-            }
+            },
+            "SourceTab",
         )
-        assert count == 0
+        assert len(edges) == 0
 
     def test_filter_view_with_cross_sheet(self):
-        """Filter view referencing another sheet is counted."""
-        count = _extract_cross_sheet_refs(
+        """Filter view referencing another sheet produces an edge."""
+        edges = _extract_dependency_edges(
             {
                 "named_ranges": [],
                 "filter_views": [
                     {"range": "'Summary'!A1:C50"}
                 ],
-            }
+            },
+            "SourceTab",
         )
-        assert count == 1
+        assert len(edges) == 1
+        assert edges[0]["to"] == "Summary"
+        assert edges[0]["ref_type"] == "filter_view"
+        assert edges[0]["confidence"] == 0.80
+
+    def test_only_in_scope_tabs(self):
+        """Tabs outside the current extraction scope are still linked."""
+        edges = _extract_dependency_edges(
+            {
+                "named_ranges": [],
+                "filter_views": [],
+            },
+            "IsolatedTab",
+        )
+        assert len(edges) == 0
+
+
+# ---------------------------------------------------------------------------
+# Sheet name extraction from range strings
+# ---------------------------------------------------------------------------
+
+
+class TestExtractSheetNameFromRange:
+
+    def test_quoted_sheet_name(self):
+        result = _extract_sheet_name_from_range("'Sheet2'!A1:B10")
+        assert result == "Sheet2"
+
+    def test_unquoted_sheet_name(self):
+        result = _extract_sheet_name_from_range("Sheet2!A1:B10")
+        assert result == "Sheet2"
+
+    def test_no_sheet_reference(self):
+        result = _extract_sheet_name_from_range("A1:B10")
+        assert result is None
+
+    def test_sheet_name_with_spaces(self):
+        result = _extract_sheet_name_from_range("'Source Data'!A1")
+        assert result == "Source Data"
+
+
+# ---------------------------------------------------------------------------
+# Formula edge extraction
+# ---------------------------------------------------------------------------
+
+
+class TestExtractFormulaEdgesFromText:
+
+    def test_importrange(self):
+        edges = _extract_formula_edges_from_text(
+            '=IMPORTRANGE("abc123", "Sheet2!A1:B10")', "CurrentTab"
+        )
+        assert len(edges) == 1
+        assert edges[0]["to"] == "Sheet2"
+        assert edges[0]["ref_type"] == "IMPORTRANGE"
+        assert edges[0]["confidence"] == 0.90
+
+    def test_vlookup(self):
+        edges = _extract_formula_edges_from_text(
+            "=VLOOKUP(A2, 'LookupSheet'!A:B, 2, FALSE)", "CurrentTab"
+        )
+        assert len(edges) == 1
+        assert edges[0]["to"] == "LookupSheet"
+        assert edges[0]["ref_type"] == "VLOOKUP"
+        assert edges[0]["confidence"] == 0.85
+
+    def test_hlookup(self):
+        edges = _extract_formula_edges_from_text(
+            "=HLOOKUP(B5, 'Rates'!A1:Z100, 3, FALSE)", "CurrentTab"
+        )
+        assert len(edges) == 1
+        assert edges[0]["to"] == "Rates"
+        assert edges[0]["ref_type"] == "HLOOKUP"
+        assert edges[0]["confidence"] == 0.85
+
+    def test_sum_range(self):
+        edges = _extract_formula_edges_from_text(
+            "=SUM('Monthly Totals'!C2:C50)", "CurrentTab"
+        )
+        assert len(edges) == 1
+        assert edges[0]["to"] == "Monthly Totals"
+        assert edges[0]["ref_type"] == "SUM_range"
+        assert edges[0]["confidence"] == 0.80
+
+    def test_direct_cell_reference(self):
+        edges = _extract_formula_edges_from_text(
+            "='ArchiveSheet'!A1 + B2", "CurrentTab"
+        )
+        assert len(edges) == 1
+        assert edges[0]["to"] == "ArchiveSheet"
+        assert edges[0]["ref_type"] == "cell_ref"
+        assert edges[0]["confidence"] == 0.60
+
+    def test_same_sheet_formula_ignored(self):
+        edges = _extract_formula_edges_from_text(
+            "=SUM(A1:A10)", "CurrentTab"
+        )
+        assert len(edges) == 0
+
+    def test_multiple_formulas_in_one_cell(self):
+        edges = _extract_formula_edges_from_text(
+            "=VLOOKUP(A2, 'SheetA'!A:B, 2, FALSE) + SUM('SheetB'!C1:C10)",
+            "CurrentTab",
+        )
+        assert len(edges) == 2
+        targets = {e["to"] for e in edges}
+        assert targets == {"SheetA", "SheetB"}
+
+
+# ---------------------------------------------------------------------------
+# Workflow graph building
+# ---------------------------------------------------------------------------
+
+
+class TestBuildWorkflowGraph:
+
+    def test_simple_graph(self):
+        edges = [
+            {"from": "CropPlanner", "to": "HarvestRecord",
+             "ref_type": "VLOOKUP", "confidence": 0.85},
+        ]
+        tabs = [
+            {"worksheet_title": "CropPlanner", "tab_position": 0},
+            {"worksheet_title": "HarvestRecord", "tab_position": 1},
+        ]
+        graph = _build_workflow_graph(edges, tabs)
+        assert len(graph["edges"]) == 1
+        assert graph["tab_sequence"] == ["CropPlanner", "HarvestRecord"]
+        assert graph["has_cycles"] is False
+
+    def test_no_edges(self):
+        graph = _build_workflow_graph([], [])
+        assert graph["edges"] == []
+        assert graph["tab_sequence"] == []
+        assert graph["has_cycles"] is False
+        assert graph["tabs"] == {}
+
+    def test_cycle_detection(self):
+        edges = [
+            {"from": "A", "to": "B", "ref_type": "named_range",
+             "confidence": 0.95},
+            {"from": "B", "to": "C", "ref_type": "named_range",
+             "confidence": 0.95},
+            {"from": "C", "to": "A", "ref_type": "named_range",
+             "confidence": 0.95},
+        ]
+        tabs = [
+            {"worksheet_title": "A", "tab_position": 0},
+            {"worksheet_title": "B", "tab_position": 1},
+            {"worksheet_title": "C", "tab_position": 2},
+        ]
+        graph = _build_workflow_graph(edges, tabs)
+        assert graph["has_cycles"] is True
+        assert "cycles" in graph
+        # Should still produce a tab_sequence (cycles are flagged, not rejected)
+        assert len(graph["tab_sequence"]) == 3
+        assert set(graph["tab_sequence"]) == {"A", "B", "C"}
+
+    def test_graph_tabs_include_edge_targets(self):
+        edges = [
+            {"from": "Orders", "to": "Products", "ref_type": "VLOOKUP",
+             "confidence": 0.85},
+        ]
+        tabs = [
+            {"worksheet_title": "Orders", "tab_position": 0},
+        ]
+        graph = _build_workflow_graph(edges, tabs)
+        # Products is not in structure tabs but referenced by edge
+        assert "Products" in graph["tabs"]
+        assert graph["tabs"]["Products"]["position"] == -1
+
+    def test_topological_sort(self):
+        edges = [
+            {"from": "Budget", "to": "Actuals", "ref_type": "VLOOKUP",
+             "confidence": 0.85},
+            {"from": "Actuals", "to": "Report", "ref_type": "named_range",
+             "confidence": 0.95},
+            {"from": "Input", "to": "Budget", "ref_type": "SUM_range",
+             "confidence": 0.80},
+        ]
+        tabs = [
+            {"worksheet_title": "Input", "tab_position": 0},
+            {"worksheet_title": "Budget", "tab_position": 1},
+            {"worksheet_title": "Actuals", "tab_position": 2},
+            {"worksheet_title": "Report", "tab_position": 3},
+        ]
+        graph = _build_workflow_graph(edges, tabs)
+        seq = graph["tab_sequence"]
+        # Input must come before Budget, Budget before Actuals, Actuals before Report
+        assert seq.index("Input") < seq.index("Budget")
+        assert seq.index("Budget") < seq.index("Actuals")
+        assert seq.index("Actuals") < seq.index("Report")
 
 
 # ---------------------------------------------------------------------------
@@ -605,6 +805,12 @@ class TestExtractSignals:
         assert isinstance(entry["row_count"], int)
         assert isinstance(entry["expansion_formula_ratio"], float)
         assert isinstance(entry["merged_cell_ratio"], float)
+        # workflow_graph in top-level output
+        assert "workflow_graph" in signals
+        assert "tabs" in signals["workflow_graph"]
+        assert "edges" in signals["workflow_graph"]
+        assert "tab_sequence" in signals["workflow_graph"]
+        assert "has_cycles" in signals["workflow_graph"]
 
     def test_with_bundle_config(self):
         """Bundle config provides workbook_code per tab."""

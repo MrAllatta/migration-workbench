@@ -419,9 +419,42 @@ def merge_manifests(
             (view_manifest.get("source") or {}).get("source_id") or ""
         )
 
+    # Propagate workflow_graph from profiler signals (read-only, not
+    # human-editable per interaction contract design).  Tab removal
+    # produces empty graph, not an error.
+    workflow_graph: dict[str, Any] = {}
+    if profiler_signals:
+        workflow_graph = profiler_signals.get("workflow_graph") or {}
+        if not isinstance(workflow_graph, dict):
+            workflow_graph = {}
+        # Remove tabs from the graph that are no longer in the manifest.
+        if workflow_graph:
+            active_tabs = set(all_tab_titles)
+            existing_edges = workflow_graph.get("edges") or []
+            filtered_edges = [
+                e for e in existing_edges
+                if e.get("from") in active_tabs or e.get("to") in active_tabs
+            ]
+            existing_tabs = workflow_graph.get("tabs") or {}
+            filtered_tabs = {
+                k: v for k, v in existing_tabs.items()
+                if k in active_tabs
+            }
+            existing_seq = workflow_graph.get("tab_sequence") or []
+            filtered_seq = [t for t in existing_seq if t in active_tabs]
+            workflow_graph = {
+                "tabs": filtered_tabs,
+                "edges": filtered_edges,
+                "tab_sequence": filtered_seq,
+                "has_cycles": workflow_graph.get("has_cycles", False),
+            }
+            if workflow_graph.get("cycles"):
+                workflow_graph["cycles"] = workflow_graph["cycles"]
+
     return {
         "version": CODGEN_MANIFEST_VERSION,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "source_id": source_id,
         "tables": tables,
+        "workflow_graph": workflow_graph,
     }

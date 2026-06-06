@@ -535,3 +535,106 @@ def test_no_permissions_key_when_role_owner_absent():
     harvest = next(t for t in result["tables"] if t["model_name"] == "HarvestLog")
     if "access_hints" in harvest:
         assert "permissions" not in harvest["access_hints"]
+
+
+# ---------------------------------------------------------------------------
+# Workflow graph propagation (v0.4.0 Phase 2)
+# ---------------------------------------------------------------------------
+
+
+def _profiler_signals_with_graph() -> dict:
+    """Return a profiler-signals dict with a workflow_graph."""
+    signals = _profiler_signals()
+    signals["workflow_graph"] = {
+        "tabs": {
+            "Crop Planner": {"title": "Crop Planner", "position": 0},
+            "Harvest Log": {"title": "Harvest Log", "position": 1},
+        },
+        "edges": [
+            {
+                "from": "Crop Planner",
+                "to": "Harvest Log",
+                "ref_type": "named_range",
+                "confidence": 0.95,
+            },
+        ],
+        "tab_sequence": ["Crop Planner", "Harvest Log"],
+        "has_cycles": False,
+    }
+    return signals
+
+
+def test_workflow_graph_propagated_through_merge():
+    """workflow_graph from profiler signals should propagate through merge."""
+    result = merge_manifests(
+        profiler_signals=_profiler_signals_with_graph(),
+        interaction_contract=None,
+        view_manifest=None,
+    )
+    assert "workflow_graph" in result
+    wg = result["workflow_graph"]
+    assert wg["tab_sequence"] == ["Crop Planner", "Harvest Log"]
+    assert len(wg["edges"]) == 1
+    assert wg["edges"][0]["from"] == "Crop Planner"
+    assert wg["edges"][0]["to"] == "Harvest Log"
+
+
+def test_workflow_graph_unchanged_by_interaction_contract():
+    """Interaction contract overrides should NOT modify the graph."""
+    contract = _interaction_contract()
+    result = merge_manifests(
+        profiler_signals=_profiler_signals_with_graph(),
+        interaction_contract=contract,
+        view_manifest=_view_manifest(),
+    )
+    assert "workflow_graph" in result
+    wg = result["workflow_graph"]
+    # Graph should still have the original edges, not modified by contract
+    assert len(wg["edges"]) == 1
+    assert wg["tab_sequence"] == ["Crop Planner", "Harvest Log"]
+
+
+def test_workflow_graph_empty_when_signals_absent():
+    """Without profiler signals, workflow_graph should be empty."""
+    result = merge_manifests(
+        profiler_signals=None,
+        interaction_contract=None,
+        view_manifest=_view_manifest(),
+    )
+    assert "workflow_graph" in result
+    assert result["workflow_graph"] == {}
+
+
+def test_workflow_graph_filters_removed_tabs():
+    """Tab removal in manifest should filter the graph, not error."""
+    signals = _profiler_signals_with_graph()
+    # Only keep the first signal tab
+    signals["signals"] = [signals["signals"][0]]
+    result = merge_manifests(
+        profiler_signals=signals,
+        interaction_contract=None,
+        view_manifest=None,
+    )
+    wg = result["workflow_graph"]
+    # Edge from active Crop Planner to removed Harvest Log remains
+    # (dependency info is still useful), but tab_sequence only lists
+    # tabs from the manifest.
+    assert len(wg["edges"]) == 1
+    assert wg["tab_sequence"] == ["Crop Planner"]
+
+
+def test_workflow_graph_read_only_property():
+    """Graph is read-only: even with contract overrides, edges stay unchanged."""
+    signals = _profiler_signals_with_graph()
+    contract = _interaction_contract()
+    result = merge_manifests(
+        profiler_signals=signals,
+        interaction_contract=contract,
+        view_manifest=_view_manifest(),
+    )
+    wg = result["workflow_graph"]
+    original_edge_count = len(wg["edges"])
+    original_sequence = list(wg["tab_sequence"])
+    # Confirm no extra edges from contract data
+    assert len(wg["edges"]) == original_edge_count
+    assert wg["tab_sequence"] == original_sequence

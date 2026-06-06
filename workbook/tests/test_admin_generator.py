@@ -2035,3 +2035,107 @@ def test_superuser_bypass_in_permission_methods():
     # Count is_superuser occurrences (one per method: change, view, add, delete)
     assert source.count("if request.user.is_superuser:") == 4
     _check_compiles(source)
+
+
+# ---------------------------------------------------------------------------
+# Workflow graph tab sequence comment (v0.4.0 Phase 2)
+# ---------------------------------------------------------------------------
+
+
+def _codegen_manifest_with_graph() -> dict:
+    """Return a codegen manifest with a workflow_graph."""
+    return {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "form",
+                "confidence": 0.85,
+                "workflow_hints": {"editable": True},
+            },
+            {
+                "model_name": "Planting",
+                "ui_archetype": "list",
+                "confidence": 0.72,
+                "workflow_hints": {"editable": False},
+            },
+        ],
+        "workflow_graph": {
+            "tabs": {
+                "Crop Info": {"title": "Crop Info", "position": 0},
+                "Crop Planner": {"title": "Crop Planner", "position": 1},
+            },
+            "edges": [
+                {
+                    "from": "Crop Info",
+                    "to": "Crop Planner",
+                    "ref_type": "named_range",
+                    "confidence": 0.95,
+                },
+            ],
+            "tab_sequence": ["Crop Info", "Crop Planner"],
+            "has_cycles": False,
+        },
+    }
+
+
+def test_tab_sequence_comment_generated_when_graph_present():
+    """Tab sequence comment should appear in generated admin when graph present."""
+    source = render_admin_py(
+        _contract(),
+        _manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_graph(),
+    )
+    assert "Workflow dependency graph" in source
+    assert "1. Crop Info" in source
+    assert "2. Crop Planner" in source
+    _check_compiles(source)
+
+
+def test_no_tab_sequence_comment_when_graph_absent():
+    """Without workflow_graph, no tab sequence comment should appear."""
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "list",
+                "confidence": 0.5,
+            },
+        ],
+    }
+    source = render_admin_py(
+        _contract(),
+        _manifest(),
+        app_label="core",
+        codegen_manifest=codegen,
+    )
+    assert "Workflow dependency graph" not in source
+    _check_compiles(source)
+
+
+def test_no_tab_sequence_comment_when_codegen_manifest_absent():
+    """Without any codegen manifest, no tab sequence comment should appear."""
+    source = render_admin_py(
+        _contract(),
+        _manifest(),
+        app_label="core",
+        codegen_manifest=None,
+    )
+    assert "Workflow dependency graph" not in source
+    _check_compiles(source)
+
+
+def test_tab_sequence_comment_shows_cycle_warning():
+    """When graph has cycles, the comment should include a warning."""
+    codegen = _codegen_manifest_with_graph()
+    codegen["workflow_graph"]["has_cycles"] = True
+    source = render_admin_py(
+        _contract(),
+        _manifest(),
+        app_label="core",
+        codegen_manifest=codegen,
+    )
+    assert "Cycle detected" in source
+    _check_compiles(source)

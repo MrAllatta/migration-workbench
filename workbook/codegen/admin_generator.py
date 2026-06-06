@@ -995,6 +995,23 @@ def render_admin_py(
         ),
     ]
 
+    # Workflow graph comment: tab_sequence from codegen manifest.
+    if codegen_manifest:
+        workflow_graph = codegen_manifest.get("workflow_graph") or {}
+        tab_sequence = workflow_graph.get("tab_sequence") or []
+        if tab_sequence:
+            seq_comment = (
+                "# Workflow dependency graph — tab sequence:\n"
+                + "\n".join(
+                    f"#   {idx + 1}. {tab_name}"
+                    for idx, tab_name in enumerate(tab_sequence)
+                )
+                + "\n#\n"
+            )
+            if workflow_graph.get("has_cycles"):
+                seq_comment += "#   ⚠ Cycle detected in dependency graph\n"
+            parts.append(seq_comment)
+
     # Collect all inline classes (must be defined before admin classes).
     inline_class_defs: list[str] = []
     inline_class_names: set[str] = set()  # Track which inline classes we've already emitted.

@@ -36,6 +36,7 @@ Signal derivation rules
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any
 
 from profiler.tools.enrichment_utils import detect_header_semantic_category
@@ -94,18 +95,313 @@ def _compute_avg_null_rate(null_rates: dict[str, float]) -> float:
     return sum(null_rates.values()) / len(null_rates)
 
 
-def _extract_cross_sheet_refs(tab: dict[str, Any]) -> int:
-    """Count cross-sheet references from a tab's metadata."""
-    count = 0
+def _extract_sheet_name_from_range(range_str: str) -> str | None:
+    """Extract the sheet name from a range string like ``'Sheet2'!A1:B10``.
+
+    Args:
+        range_str: A range string potentially containing a sheet reference.
+
+    Returns:
+        The sheet name (without surrounding quotes), or ``None`` if the
+        range string does not reference another sheet.
+    """
+    if "!" not in range_str:
+        return None
+    sheet_part = range_str.split("!")[0]
+    return sheet_part.strip("'\"")
+
+
+def _extract_formula_edges_from_text(
+    formula_text: str,
+    source_tab: str,
+) -> list[dict[str, Any]]:
+    """Extract dependency edges from a single formula text string.
+
+    Detects IMPORTRANGE, VLOOKUP, HLOOKUP, SUM/SUMIF/SUMIFS range refs,
+    and direct cell references (``'Sheet'!A1``) to other sheets.
+
+    Args:
+        formula_text: The raw formula text.
+        source_tab: Name of the tab containing the formula.
+
+    Returns:
+        List of edge dicts extracted from this formula.
+    """
+    found: list[dict[str, Any]] = []
+    seen_targets: set[str] = set()
+
+    # IMPORTRANGE("key", "'Sheet'!range") or IMPORTRANGE("url", "'Sheet'!range")
+    for match in re.finditer(
+        r"IMPORTRANGE\s*\([^)]+\)", formula_text, re.IGNORECASE
+    ):
+        inner = match.group()
+        # Find the second argument which contains the range
+        parts = re.findall(r'"([^"]+)"', inner)
+        if len(parts) >= 2:
+            range_arg = parts[-1]
+            target = _extract_sheet_name_from_range(range_arg)
+            if target and target != source_tab and target not in seen_targets:
+                seen_targets.add(target)
+                found.append({
+                    "from": source_tab,
+                    "to": target,
+                    "ref_type": "IMPORTRANGE",
+                    "confidence": 0.90,
+                })
+
+    # VLOOKUP(lookup, 'Sheet'!range, ...)
+    for match in re.finditer(
+        r"(?:V|H)LOOKUP\s*\([^,]+,\s*'([^']+)'!",
+        formula_text,
+        re.IGNORECASE,
+    ):
+        target = match.group(1)
+        if target != source_tab and target not in seen_targets:
+            seen_targets.add(target)
+            ref_type = "VLOOKUP" if formula_text[match.start()].upper() == "V" else "HLOOKUP"
+            found.append({
+                "from": source_tab,
+                "to": target,
+                "ref_type": ref_type,
+                "confidence": 0.85,
+            })
+
+    # SUM/SUMIF/SUMIFS('Sheet'!range)
+    for match in re.finditer(
+        r"SUM(?:IF[S]?)?\s*\(\s*'([^']+)'!",
+        formula_text,
+        re.IGNORECASE,
+    ):
+        target = match.group(1)
+        if target != source_tab and target not in seen_targets:
+            seen_targets.add(target)
+            found.append({
+                "from": source_tab,
+                "to": target,
+                "ref_type": "SUM_range",
+                "confidence": 0.80,
+            })
+
+    # Direct cell references: 'Sheet'!A1 (but not already caught above)
+    for match in re.finditer(
+        r"'([^']+)'!\$?[A-Z]+\$?\d+",
+        formula_text,
+    ):
+        target = match.group(1)
+        if target != source_tab and target not in seen_targets:
+            seen_targets.add(target)
+            found.append({
+                "from": source_tab,
+                "to": target,
+                "ref_type": "cell_ref",
+                "confidence": 0.60,
+            })
+
+    return found
+
+
+def _extract_dependency_edges(
+    tab: dict[str, Any],
+    tab_title: str,
+    deep_profiles: dict[str, Any] | None = None,
+    formula_data: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Extract dependency edges from a tab's metadata.
+
+    Extracts edges from:
+    - Named ranges referencing other sheets
+    - Filter views referencing other sheets
+    - Formula patterns (IMPORTRANGE, VLOOKUP, SUM range refs, cell refs)
+      when ``deep_profiles`` or ``formula_data`` is available
+
+    Args:
+        tab: Tab structure dict from the structure artifact.
+        tab_title: Title of the source tab (used as the ``from`` field).
+        deep_profiles: Optional deep-profile data keyed by tab title.
+            When present, checks each column for ``formula_text``.
+        formula_data: Optional pre-scanned formula data keyed by tab
+            title.  Each entry is a list of dicts with a ``formula_text``
+            key.
+
+    Returns:
+        List of edge dicts with keys ``from``, ``to``, ``ref_type``,
+        ``confidence``.
+    """
+    edges: list[dict[str, Any]] = []
+
+    # Named ranges referencing other sheets.
     for named_range in tab.get("named_ranges") or []:
         range_str = str(named_range.get("range", ""))
-        if "!" in range_str:
-            count += 1
+        target = _extract_sheet_name_from_range(range_str)
+        if target and target != tab_title:
+            edges.append({
+                "from": tab_title,
+                "to": target,
+                "ref_type": "named_range",
+                "confidence": 0.95,
+            })
+
+    # Filter views referencing other sheets.
     for fv in tab.get("filter_views") or []:
         fv_range = str(fv.get("range", ""))
-        if "!" in fv_range:
-            count += 1
-    return count
+        target = _extract_sheet_name_from_range(fv_range)
+        if target and target != tab_title:
+            edges.append({
+                "from": tab_title,
+                "to": target,
+                "ref_type": "filter_view",
+                "confidence": 0.80,
+            })
+
+    # Formula patterns from deep_profiles (column-level formula_text).
+    if deep_profiles and tab_title in deep_profiles:
+        tab_profile = deep_profiles[tab_title]
+        if isinstance(tab_profile, dict):
+            for col_name, col_profile in tab_profile.items():
+                if isinstance(col_profile, dict):
+                    formula_text = str(col_profile.get("formula_text") or "")
+                    if formula_text:
+                        edges.extend(
+                            _extract_formula_edges_from_text(
+                                formula_text, tab_title
+                            )
+                        )
+
+    # Formula patterns from optional formula_data parameter.
+    if formula_data and tab_title in formula_data:
+        for formula_entry in formula_data[tab_title]:
+            formula_text = str(formula_entry.get("formula_text") or "")
+            if formula_text:
+                edges.extend(
+                    _extract_formula_edges_from_text(formula_text, tab_title)
+                )
+
+    return edges
+
+
+def _build_workflow_graph(
+    all_edges: list[dict[str, Any]],
+    tabs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build a workflow_graph from dependency edges across all tabs.
+
+    Produces a graph with tab metadata, deduplicated edges, topological
+    tab ordering, and cycle detection flags.
+
+    Args:
+        all_edges: All dependency edges from all tabs.
+        tabs: List of tab dicts from the structure artifact.
+
+    Returns:
+        Workflow graph dict::
+
+            {
+                "tabs": {
+                    "CropPlanner": {"title": "Crop Planner", "position": 0},
+                },
+                "edges": [
+                    {"from": "CropPlanner", "to": "HarvestRecord",
+                     "ref_type": "VLOOKUP", "confidence": 0.85},
+                ],
+                "tab_sequence": ["CropPlanner", "HarvestRecord"],
+                "has_cycles": false,
+            }
+    """
+    # Build tab lookup from structure.
+    tab_lookup: dict[str, dict[str, Any]] = {}
+    for tab in tabs:
+        title = str(tab.get("worksheet_title") or "")
+        if title:
+            tab_lookup[title] = {
+                "title": title,
+                "position": tab.get("tab_position", 0),
+            }
+
+    # Deduplicate edges.
+    unique_edges: list[dict[str, Any]] = []
+    seen_edges: set[tuple[str, str, str]] = set()
+    for edge in all_edges:
+        key = (edge["from"], edge["to"], edge["ref_type"])
+        if key not in seen_edges:
+            seen_edges.add(key)
+            unique_edges.append(edge)
+
+    # Collect all tab names from structure + edges.
+    all_tab_names: set[str] = set(tab_lookup.keys())
+    for edge in unique_edges:
+        all_tab_names.add(edge["from"])
+        all_tab_names.add(edge["to"])
+    all_tabs_sorted = sorted(all_tab_names)
+
+    # Build adjacency list.
+    adjacency: dict[str, list[str]] = {t: [] for t in all_tabs_sorted}
+    for edge in unique_edges:
+        if edge["from"] in adjacency and edge["to"] in adjacency:
+            adjacency[edge["from"]].append(edge["to"])
+
+    # Cycle detection via DFS colouring.
+    WHITE, GRAY, BLACK = 0, 1, 2
+    colour: dict[str, int] = {t: WHITE for t in all_tabs_sorted}
+    cycles_found: list[str] = []
+
+    def _dfs_cycle(node: str, path: list[str]) -> None:
+        colour[node] = GRAY
+        path.append(node)
+        for neighbor in adjacency.get(node, []):
+            if colour.get(neighbor) == GRAY:
+                cycle_start = path.index(neighbor)
+                cycle_path = path[cycle_start:] + [neighbor]
+                cycles_found.append(" -> ".join(cycle_path))
+            elif colour.get(neighbor) == WHITE:
+                _dfs_cycle(neighbor, path)
+        path.pop()
+        colour[node] = BLACK
+
+    for node_name in all_tabs_sorted:
+        if colour.get(node_name) == WHITE:
+            _dfs_cycle(node_name, [])
+
+    has_cycles = len(cycles_found) > 0
+
+    # Topological sort via Kahn's algorithm.
+    in_degree: dict[str, int] = {t: 0 for t in all_tabs_sorted}
+    for edge in unique_edges:
+        if edge["to"] in in_degree:
+            in_degree[edge["to"]] += 1
+
+    queue: list[str] = [t for t in all_tabs_sorted if in_degree[t] == 0]
+    tab_sequence: list[str] = []
+
+    while queue:
+        node = queue.pop(0)
+        tab_sequence.append(node)
+        for neighbor in adjacency.get(node, []):
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    # Add any remaining nodes (in cycles) at the end.
+    remaining = [t for t in all_tabs_sorted if t not in tab_sequence]
+    tab_sequence.extend(remaining)
+
+    # Build tabs dict for graph output.
+    graph_tabs: dict[str, dict[str, Any]] = {}
+    for tab_name in all_tabs_sorted:
+        tab_info = tab_lookup.get(tab_name, {
+            "title": tab_name, "position": -1,
+        })
+        graph_tabs[tab_name] = dict(tab_info)
+
+    workflow_graph: dict[str, Any] = {
+        "tabs": graph_tabs,
+        "edges": unique_edges,
+        "tab_sequence": tab_sequence,
+        "has_cycles": has_cycles,
+    }
+    if cycles_found:
+        workflow_graph["cycles"] = list(cycles_found)
+
+    return workflow_graph
 
 
 def _detect_has_status_column(columns: list[dict[str, Any]]) -> bool:
@@ -236,6 +532,17 @@ def extract_signals(
                         },
                     },
                 ],
+                "workflow_graph": {
+                    "tabs": {
+                        "CropPlanner": {"title": "Crop Planner", "position": 0},
+                    },
+                    "edges": [
+                        {"from": "CropPlanner", "to": "HarvestRecord",
+                         "ref_type": "VLOOKUP", "confidence": 0.85},
+                    ],
+                    "tab_sequence": ["CropPlanner", "HarvestRecord"],
+                    "has_cycles": false,
+                },
             }
     """
     tabs = list(structure.get("tabs") or [])
@@ -249,6 +556,7 @@ def extract_signals(
                 bundle_tabs[title] = tab_entry
 
     signals: list[dict[str, Any]] = []
+    all_edges: list[dict[str, Any]] = []
 
     for tab in tabs:
         title = str(tab.get("worksheet_title") or "")
@@ -272,7 +580,11 @@ def extract_signals(
         formula_count = sum(1 for col in columns if col.get("is_formula"))
         formula_density = formula_count / len(columns) if columns else 0.0
 
-        cross_sheet_refs = _extract_cross_sheet_refs(tab)
+        tab_edges = _extract_dependency_edges(
+            tab, title, deep_profiles=deep_profiles
+        )
+        all_edges.extend(tab_edges)
+        cross_sheet_refs = len(tab_edges)
 
         null_rates: dict[str, float] = {}
         tab_profile: dict[str, Any] = {}
@@ -348,10 +660,13 @@ def extract_signals(
 
         signals.append(entry)
 
+    workflow_graph = _build_workflow_graph(all_edges, tabs)
+
     return {
         "version": SIGNALS_VERSION,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "signals": signals,
+        "workflow_graph": workflow_graph,
     }
 
 
@@ -387,7 +702,9 @@ def explain_archetype(
                     )
                     / max(len(columns), 1),
                     "cross_sheet_ref_count": float(
-                        _extract_cross_sheet_refs(tab)
+                        len(
+                            _extract_dependency_edges(tab, tab_title_candidate)
+                        )
                     ),
                     "avg_null_rate": _compute_avg_null_rate(
                         dict.fromkeys(
