@@ -1,0 +1,390 @@
+# Farm vertical template — v0.1.0
+# Extracted from farm engagement data. Confidence is exploratory until
+# validated against 3+ independent farm engagements.
+name: farm
+version: "0.1.0"
+description: >-
+  Farm vertical template with entity definitions for crop management,
+  field/block tracking, season planning, and planting operations.
+confidence: exploratory
+
+# ---------------------------------------------------------------------------
+# Domain context — vocabulary and glossary for farm operations.
+# Only terms that appear across 2+ farm documents are included.
+# ---------------------------------------------------------------------------
+domain_context:
+  vocabulary:
+    # Primary data-entry tabs
+    operational:
+      - crop
+      - field
+      - block
+      - planting
+      - plan
+      - harvest
+      - variety
+      - seed
+      - bed
+    # Lookup / reference tabs
+    reference:
+      - lookup
+      - type
+      - variety
+      - category
+      - unit
+    # Helper / annotation tabs
+    support:
+      - note
+      - comment
+      - memo
+      - instruction
+    # Summary / derived tabs
+    derived:
+      - total
+      - yield
+      - avg
+      - sum
+      - count
+      - forecast
+  glossary:
+    crop: product_variety
+    block: field_section
+    planting: seeding_event
+  entities:
+    - name: Crop
+      description: "A crop variety or cultivar grown on the farm"
+      keywords: [crop, variety, cultivar, plant, vegetable, fruit, herb]
+    - name: FieldBlock
+      description: "A physical field or block within the farm"
+      keywords: [field, block, paddock, plot, section, bed, row]
+    - name: Season
+      description: "A growing season or production cycle"
+      keywords: [season, cycle, year, growing_period, term]
+    - name: PlantingPlan
+      description: "A planned or completed planting event"
+      keywords:
+        [planting, plan, transplant, seeding, crop_plan, planting_event]
+
+# ---------------------------------------------------------------------------
+# Entity templates — partial schema-contract table definitions.
+# Each template provides columns, admin config, and import defaults.
+# Field types: CharField for names, DateField for dates, DecimalField
+# for quantities, BooleanField for flags, IntegerField for counts.
+# ---------------------------------------------------------------------------
+entity_templates:
+  Crop:
+    model_meta:
+      verbose_name: Crop
+      verbose_name_plural: Crops
+      ordering: ["crop_name"]
+    columns:
+      - name: crop_name
+        data_type: CharField
+        max_length: 200
+        null: false
+        unique: true
+      - name: variety
+        data_type: CharField
+        max_length: 200
+        null: true
+        blank: true
+      - name: days_to_maturity
+        data_type: IntegerField
+        null: true
+        blank: true
+      - name: is_perennial
+        data_type: BooleanField
+        null: false
+        default: false
+    admin:
+      list_display: [crop_name, variety, days_to_maturity, is_perennial]
+      search_fields: [crop_name, variety]
+      list_filter: [is_perennial]
+    import_config:
+      unique_on: [crop_name]
+
+  FieldBlock:
+    model_meta:
+      verbose_name: Field Block
+      verbose_name_plural: Field Blocks
+      ordering: ["name"]
+    columns:
+      - name: name
+        data_type: CharField
+        max_length: 200
+        null: false
+        unique: true
+      - name: code
+        data_type: CharField
+        max_length: 50
+        null: true
+        blank: true
+      - name: acreage
+        data_type: DecimalField
+        max_digits: 10
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: soil_type
+        data_type: CharField
+        max_length: 100
+        null: true
+        blank: true
+      - name: irrigation_type
+        data_type: CharField
+        max_length: 100
+        null: true
+        blank: true
+      - name: is_active
+        data_type: BooleanField
+        null: false
+        default: true
+      - name: rows_count
+        data_type: IntegerField
+        null: true
+        blank: true
+      - name: beds_count
+        data_type: IntegerField
+        null: true
+        blank: true
+      - name: bed_width
+        data_type: DecimalField
+        max_digits: 6
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: bed_length
+        data_type: DecimalField
+        max_digits: 8
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: notes
+        data_type: TextField
+        null: true
+        blank: true
+    admin:
+      list_display: [name, code, acreage, soil_type, irrigation_type, is_active]
+      search_fields: [name, code]
+      list_filter: [is_active, soil_type, irrigation_type]
+    import_config:
+      unique_on: [name]
+
+  Season:
+    model_meta:
+      verbose_name: Season
+      verbose_name_plural: Seasons
+      ordering: ["-start_date"]
+    columns:
+      - name: name
+        data_type: CharField
+        max_length: 200
+        null: false
+        unique: true
+      - name: start_date
+        data_type: DateField
+        null: true
+        blank: true
+      - name: end_date
+        data_type: DateField
+        null: true
+        blank: true
+      - name: is_active
+        data_type: BooleanField
+        null: false
+        default: true
+      - name: notes
+        data_type: TextField
+        null: true
+        blank: true
+    admin:
+      list_display: [name, start_date, end_date, is_active]
+      search_fields: [name]
+      list_filter: [is_active]
+    import_config:
+      unique_on: [name]
+
+  PlantingPlan:
+    model_meta:
+      verbose_name: Planting Plan
+      verbose_name_plural: Planting Plans
+      ordering: ["-plant_date"]
+    columns:
+      # Foreign keys to other entities (referenced by model_name)
+      - name: crop
+        data_type: ForeignKey
+        null: false
+        to: Crop
+        on_delete: CASCADE
+        related_name: planting_plans
+      - name: field_block
+        data_type: ForeignKey
+        null: false
+        to: FieldBlock
+        on_delete: CASCADE
+        related_name: planting_plans
+      - name: season
+        data_type: ForeignKey
+        null: false
+        to: Season
+        on_delete: CASCADE
+        related_name: planting_plans
+      # Core planting dates
+      - name: plant_date
+        data_type: DateField
+        null: false
+      - name: expected_harvest_date
+        data_type: DateField
+        null: true
+        blank: true
+      - name: actual_harvest_date
+        data_type: DateField
+        null: true
+        blank: true
+      # Quantity and units
+      - name: quantity_planted
+        data_type: DecimalField
+        max_digits: 10
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: unit
+        data_type: CharField
+        max_length: 50
+        null: true
+        blank: true
+      - name: row_feet
+        data_type: DecimalField
+        max_digits: 10
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: beds_used
+        data_type: IntegerField
+        null: true
+        blank: true
+      # Seed source
+      - name: seed_source
+        data_type: CharField
+        max_length: 200
+        null: true
+        blank: true
+      - name: seed_lot
+        data_type: CharField
+        max_length: 100
+        null: true
+        blank: true
+      - name: germination_rate
+        data_type: DecimalField
+        max_digits: 5
+        decimal_places: 2
+        null: true
+        blank: true
+      # Status and notes
+      - name: status
+        data_type: CharField
+        max_length: 50
+        null: false
+        default: planned
+      - name: notes
+        data_type: TextField
+        null: true
+        blank: true
+      # Yield tracking
+      - name: yield_expected
+        data_type: DecimalField
+        max_digits: 10
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: yield_actual
+        data_type: DecimalField
+        max_digits: 10
+        decimal_places: 2
+        null: true
+        blank: true
+      # Cost and labor
+      - name: cost_seed
+        data_type: DecimalField
+        max_digits: 8
+        decimal_places: 2
+        null: true
+        blank: true
+      - name: labor_hours
+        data_type: DecimalField
+        max_digits: 8
+        decimal_places: 2
+        null: true
+        blank: true
+      # Growing method flags
+      - name: is_organic
+        data_type: BooleanField
+        null: false
+        default: false
+      - name: is_trellised
+        data_type: BooleanField
+        null: false
+        default: false
+      - name: is_direct_seeded
+        data_type: BooleanField
+        null: false
+        default: true
+      # Spacing and depth
+      - name: succession_number
+        data_type: IntegerField
+        null: true
+        blank: true
+      - name: spacing_inches
+        data_type: IntegerField
+        null: true
+        blank: true
+      - name: depth_inches
+        data_type: DecimalField
+        max_digits: 4
+        decimal_places: 2
+        null: true
+        blank: true
+    admin:
+      list_display:
+        [crop, field_block, season, plant_date, status, beds_used, is_organic]
+      search_fields: [notes, seed_source]
+      list_filter: [status, season, is_organic, is_direct_seeded]
+      raw_id_fields: [crop, field_block, season]
+    import_config:
+      unique_on: [crop, field_block, season, plant_date]
+      fk_lookup:
+        crop:
+          model: Crop
+          "on": crop_name
+        field_block:
+          model: FieldBlock
+          "on": name
+        season:
+          model: Season
+          "on": name
+
+# ---------------------------------------------------------------------------
+# Interaction defaults — role/archetype mappings for farm operations.
+# ---------------------------------------------------------------------------
+interaction_defaults:
+  roles:
+    field_manager:
+      archetype: form
+      tabs: [PlantingPlan, Crop, FieldBlock, Season]
+    operations:
+      archetype: dashboard
+      tabs: [PlantingPlan, Season]
+    viewer:
+      archetype: list
+      tabs: [Crop, FieldBlock, Season]
+
+# ---------------------------------------------------------------------------
+# Signal thresholds — farm-specific overrides for archetype detection.
+# Farm dashboards have different formula density patterns than generic
+# spreadsheets due to yield calculations and cost projections.
+# ---------------------------------------------------------------------------
+signal_thresholds:
+  formula_density_low: 0.05
+  formula_density_high: 0.35
+  cross_sheet_ref_threshold: 0.25
+  expansion_formula_ratio_max: 0.6

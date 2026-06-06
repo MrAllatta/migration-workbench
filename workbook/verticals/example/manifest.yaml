@@ -1,0 +1,69 @@
+name: example
+version: "0.1.0"
+description: "Example vertical template for testing"
+confidence: exploratory
+
+domain_context:
+  domain: example
+  vocabulary:
+    operational: [item, record, log, entry]
+    reference: [lookup, type, category]
+    support: [note, comment, description]
+    derived: [total, average, count]
+  entities:
+    - name: Widget
+      description: "A generic widget record"
+      keywords: [widget, product, sku]
+    - name: Category
+      description: "A lookup category"
+      keywords: [category, type]
+
+entity_templates:
+  Widget:
+    model_meta:
+      verbose_name: Widget
+      verbose_name_plural: Widgets
+      ordering: ["name"]
+    columns:
+      - name: name
+        data_type: CharField
+        max_length: 200
+        null: false
+      - name: quantity
+        data_type: IntegerField
+        null: false
+        default: 0
+    admin:
+      list_display: [name, quantity]
+      search_fields: [name]
+    import_config:
+      unique_on: [name]
+
+  Category:
+    model_meta:
+      verbose_name: Category
+      verbose_name_plural: Categories
+      ordering: ["name"]
+    columns:
+      - name: name
+        data_type: CharField
+        max_length: 200
+        null: false
+        unique: true
+    admin:
+      list_display: [name]
+    import_config:
+      unique_on: [name]
+
+interaction_defaults:
+  roles:
+    operator:
+      archetype: form
+      tabs: [Widget]
+    viewer:
+      archetype: list
+      tabs: [Category]
+
+signal_thresholds:
+  formula_density_low: 0.02
+  cross_sheet_ref_threshold: 0.3

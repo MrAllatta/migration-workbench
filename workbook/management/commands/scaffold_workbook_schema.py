@@ -30,6 +30,14 @@ from workbook.schema_contract import (
     load_json,
 )
 from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case
+from workbook.tools.vertical_registry import (
+    MIN_CONFIDENCE_THRESHOLD,
+    apply_vertical_to_schema,
+    discover_verticals,
+    load_vertical,
+    merge_entity_template,
+    score_tab_against_templates,
+)
 
 
 def _flag_fk_columns(columns: list[dict]) -> None:
@@ -540,12 +548,12 @@ def _harden_contract(contract: dict[str, Any]) -> None:
             table["import_key"].setdefault("fields", ik["fields"])
             table["import_key"].setdefault("confidence", ik["confidence"])
             table["import_key"].setdefault("note", ik["note"])
-        fk_resolutions: dict[str, str] = {}
+        fk_resolutions_dict: dict[str, str] = {}
         for col in columns:
             if col.get("django_field_class") == "models.ForeignKey":
-                fk_resolutions[col["suggested_field_name"]] = "TODO_TargetModel"
-        if fk_resolutions:
-            table["fk_resolutions"] = fk_resolutions
+                fk_resolutions_dict[col["suggested_field_name"]] = "TODO_TargetModel"
+        if fk_resolutions_dict:
+            table["fk_resolutions"] = fk_resolutions_dict
         field_overrides: dict[str, dict[str, Any]] = {}
         for col in columns:
             notes = col.get("notes", [])
@@ -693,6 +701,24 @@ class Command(BaseCommand):
             help="Ratio of numeric column headers that triggers pivot-table rejection "
             "(default: 0.5, set to 1.0 to disable)",
         )
+        parser.add_argument(
+            "--vertical",
+            default=None,
+            help="Name of a vertical template to apply (e.g. 'example')",
+        )
+        parser.add_argument(
+            "--no-vertical",
+            action="store_true",
+            default=False,
+            help="Disable vertical template loading even if --vertical is set",
+        )
+        parser.add_argument(
+            "--apply-template-suggestions",
+            action="store_true",
+            default=False,
+            help="Automatically apply template match suggestions above "
+            "confidence threshold (default: show as YAML comments only)",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out"]).resolve()
@@ -744,6 +770,63 @@ class Command(BaseCommand):
             _merge_domain_knowledge(
                 contract.get("tables", []), domain_knowledge, self.stdout.write
             )
+
+        vertical_name = options.get("vertical")
+        no_vertical = bool(options.get("no_vertical", False))
+        apply_suggestions = bool(options.get("apply_template_suggestions", False))
+        if vertical_name and not no_vertical:
+            try:
+                vertical = load_vertical(vertical_name)
+            except FileNotFoundError:
+                raise CommandError(
+                    f"Vertical template {vertical_name!r} not found. "
+                    f"Available: {', '.join(v['name'] for v in discover_verticals())}"
+                )
+            
+            # Compute template match suggestions for each tab
+            bundle_config = options.get("bundle_config")
+            tab_headers = {}
+            if bundle_config:
+                bundle_path = Path(bundle_config).resolve()
+                if bundle_path.is_file():
+                    bundle_config_data = load_json(bundle_path)
+                    for tab in bundle_config_data.get("tabs", []):
+                        title = tab.get("worksheet_title", "")
+                        cols = tab.get("required_headers", [])
+                        if title:
+                            tab_headers[title] = {"columns": cols}
+             
+            all_suggestions = {}
+            for tab_title, tab_info in tab_headers.items():
+                suggestions = score_tab_against_templates(tab_title, tab_info["columns"], vertical)
+                # Filter suggestions above confidence threshold
+                filtered_suggestions = [s for s in suggestions if s["confidence"] >= MIN_CONFIDENCE_THRESHOLD]
+                if filtered_suggestions:
+                    all_suggestions[tab_title] = filtered_suggestions
+             
+            # Apply suggestions if flag is set, otherwise store for YAML comments
+            if apply_suggestions:
+                # Apply all suggestions above threshold
+                 for tab_title, suggestions in all_suggestions.items():
+                     # For each suggestion, apply the top match (highest confidence)
+                     if suggestions:
+                         top_suggestion = suggestions[0]  # Already sorted by confidence descending
+                         entity_name = top_suggestion["entity_name"]
+                         # Find the table with matching bundle_worksheet_title and apply the template
+                         for table in contract.get("tables", []):
+                             if table.get("bundle_worksheet_title") == tab_title:
+                                 if vertical.entity_templates:
+                                     entity_template = vertical.entity_templates.get(entity_name)
+                                     if entity_template:
+                                         table.update(merge_entity_template(table, entity_template))
+                                 break
+             
+            # Store suggestions in contract for YAML comment generation
+            contract["_template_suggestions"] = all_suggestions
+             
+            contract = apply_vertical_to_schema(contract, vertical)
+        elif no_vertical:
+            self.stdout.write("Vertical templates disabled via --no-vertical")
 
         text = yaml.safe_dump(
             contract,

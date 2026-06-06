@@ -38,11 +38,16 @@ _LIST_ITEM_RE = re.compile(r"^\s*\d+\.\s+(.*)$")
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
-def _format_inferred_fields(fields: list[str]) -> str:
+def _format_inferred_fields(fields: list[str], glossary_hints: list[str] | None = None) -> str:
     """Render an inline reminder of inferred editable fields, comma-separated."""
-    if not fields:
+    if not fields and not glossary_hints:
         return "(none inferred)"
-    return ", ".join(fields)
+    parts = []
+    if fields:
+        parts.extend(fields)
+    if glossary_hints:
+        parts.append(f"(glossary: {', '.join(glossary_hints)})")
+    return ", ".join(parts)
 
 
 def _extract_role_name(full_answer: str) -> str:
@@ -75,8 +80,21 @@ def _question_marker(kind: str, **kwargs: str) -> str:
     return " ".join(parts) + " -->"
 
 
-def _render_view_block(view: dict[str, Any]) -> list[str]:
-    """Render the per-view section of the interview for one view entry."""
+def _render_view_block(
+    view: dict[str, Any],
+    *,
+    tab_role_presets: dict[str, list[str]] | None = None,
+    tab_glossary_hints: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Render the per-view section of the interview for one view entry.
+
+    Args:
+        view: A view manifest entry dict.
+        tab_role_presets: Optional mapping of tab title to list of role
+            names from a vertical template. Pre-fills the role question.
+        tab_glossary_hints: Optional mapping of tab title to list of
+            glossary terms from a vertical template.
+    """
     title = str(view.get("source_tab") or view.get("name") or "")
     hidden = bool(view.get("hidden") or view.get("type") == "hidden")
     # ``hidden`` is not on the manifest view shape directly; we recognise
@@ -98,11 +116,16 @@ def _render_view_block(view: dict[str, Any]) -> list[str]:
     lines.append("")
     lines.append(_question_marker("role", tab=title))
     lines.append(f"- Is **{title}** used by everyone, or a specific role?")
-    lines.append(f"  > {_PLACEHOLDER}")
+    role_presets = (tab_role_presets or {}).get(title)
+    if role_presets:
+        lines.append(f"  > {_PLACEHOLDER} (vertical presets: {', '.join(role_presets)})")
+    else:
+        lines.append(f"  > {_PLACEHOLDER}")
     lines.append("")
     fields = list(view.get("editable_fields") or [])
+    glossary_hints = view.get("_vertical_glossary_hints")
     lines.append("- Which fields does your team edit most frequently?")
-    lines.append(f"  > _Editable fields inferred: {_format_inferred_fields(fields)}_")
+    lines.append(f"  > _Editable fields inferred: {_format_inferred_fields(fields, glossary_hints)}_")
     lines.append("")
     status_field = view.get("status_field")
     if status_field:
@@ -135,12 +158,69 @@ def _annotate_hidden_views(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return annotated
 
 
-def render_interview(manifest: dict[str, Any], *, source_id: str | None = None) -> str:
+def _build_tab_role_presets(
+    vertical_template: dict[str, Any] | None,
+) -> dict[str, list[str]]:
+    """Build tab-to-roles mapping from a vertical template's interaction defaults.
+
+    Args:
+        vertical_template: Optional vertical template dict (e.g. from
+            ``VerticalTemplate`` attributes).
+
+    Returns:
+        Mapping of tab title to list of role names, or empty dict.
+    """
+    presets: dict[str, list[str]] = {}
+    if not vertical_template:
+        return presets
+    roles = (vertical_template.get("interaction_defaults") or {}).get("roles") or {}
+    for role_name, role_config in roles.items():
+        role_tabs = role_config.get("tabs") or []
+        for tab_name in role_tabs:
+            presets.setdefault(str(tab_name), []).append(str(role_name))
+    return presets
+
+
+def _build_tab_glossary_hints(
+    vertical_template: dict[str, Any] | None,
+) -> dict[str, list[str]]:
+    """Build tab-to-glossary-terms mapping from a vertical template's vocabulary.
+
+    Maps each vocabulary category (operational, reference, etc.) to its
+    list of terms.  The caller may use these hints to enrich interview
+    questions about tab content.
+
+    Args:
+        vertical_template: Optional vertical template dict.
+
+    Returns:
+        Mapping of tab title to list of glossary terms, or empty dict.
+    """
+    hints: dict[str, list[str]] = {}
+    if not vertical_template:
+        return hints
+    vocabulary = (
+        (vertical_template.get("domain_context") or {}).get("vocabulary") or {}
+    )
+    for category, terms in vocabulary.items():
+        hints[category] = list(terms) if isinstance(terms, list) else [str(terms)]
+    return hints
+
+
+def render_interview(
+    manifest: dict[str, Any],
+    *,
+    source_id: str | None = None,
+    vertical_template: dict[str, Any] | None = None,
+) -> str:
     """Render a view manifest into a discovery-interview Markdown document.
 
     Args:
         manifest: Parsed view-manifest dict (``view-manifest-draft-1``).
         source_id: Optional override; defaults to ``manifest["source"]["source_id"]``.
+        vertical_template: Optional vertical template dict with
+            ``interaction_defaults.roles`` and/or ``domain_context.vocabulary``
+            to pre-seed role presets and glossary hints.
 
     Returns:
         str: Markdown text terminated with a trailing newline.
@@ -148,6 +228,9 @@ def render_interview(manifest: dict[str, Any], *, source_id: str | None = None) 
     sid = source_id
     if sid is None:
         sid = (manifest.get("source") or {}).get("source_id") or "(unset)"
+
+    tab_role_presets = _build_tab_role_presets(vertical_template)
+    tab_glossary_hints = _build_tab_glossary_hints(vertical_template)
 
     lines: list[str] = [
         _FORMAT_HEADER,
@@ -165,7 +248,13 @@ def render_interview(manifest: dict[str, Any], *, source_id: str | None = None) 
 
     annotated_views = _annotate_hidden_views(manifest)
     for view in annotated_views:
-        lines.extend(_render_view_block(view))
+        lines.extend(
+            _render_view_block(
+                view,
+                tab_role_presets=tab_role_presets,
+                tab_glossary_hints=tab_glossary_hints,
+            )
+        )
 
     lines.extend(
         [

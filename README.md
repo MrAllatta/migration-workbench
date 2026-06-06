@@ -264,6 +264,17 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.3.0
+
+- **Vertical template system:** New `vertical_registry` module with `load_vertical()`, `discover_verticals()`, `apply_vertical_to_schema()`, `apply_vertical_domain_context()`, `score_tab_against_templates()`, `merge_entity_template()`. Templates are versioned YAML manifests shipped under `workbook/verticals/` with overridable paths. (workbook/tools/vertical_registry.py)
+- **Farm vertical content:** 4 entity templates (Crop, FieldBlock, Season, PlantingPlan) with domain vocabulary/glossary, interaction role defaults, and signal thresholds — the first production vertical for migration engagements. (workbook/verticals/farm/)
+- **`--vertical` CLI:** New flag on `scaffold_workbook_schema`, `generate_discovery_interview`, and `merge_interaction_contract` commands. Vertical templates seed schema contracts, role presets, glossary hints, and signal thresholds. (workbook/management/commands/)
+- **`wb vertical list/show`:** New `wb` subcommands for listing available verticals and inspecting template details, with `--json` machine-readable output. (deployment/wb_cli.py)
+- **Template tab scoring:** `score_tab_against_templates()` computes title + field-overlap confidence against entity templates. `--apply-template-suggestions` auto-applies matches above threshold. (workbook/tools/vertical_registry.py)
+- **Discovery interview enrichment:** Vertical role presets and glossary terms flow into interview question rendering, pre-seeding role hints and field descriptions. (workbook/discovery.py)
+- **YAML robustness fixes:** `_normalise_null_keys()` handles PyYAML `null:` → `None` key parsing. Farm manifest quotes boolean-like YAML keys (`on:` → `"on"`). F541 f-string lint violations fixed. (workbook/tools/vertical_registry.py, workbook/codegen/admin_generator.py)
+- **52 new tests** across registry, farm vertical, CLI integration, and deployment — full chassis-gate green (959 passing).
+
 ### 0.2.0
 
 - **Interaction contract merge path:** `access_hints` from interaction contract flows through `merge_manifests` into the codegen manifest. The merge correctly indexes per-role supplement data (form/list/reference/dashboard) across all tabs — the `_index_interaction_contract()` method now returns role-specific supplement dicts instead of flat lists. (workbook/tools/manifest_merger.py)

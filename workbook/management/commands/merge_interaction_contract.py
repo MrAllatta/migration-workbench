@@ -15,6 +15,8 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from workbook.tools.vertical_registry import load_vertical
+
 
 class Command(BaseCommand):
     """Merge profiler signals, interaction contract, and view manifest."""
@@ -41,6 +43,10 @@ class Command(BaseCommand):
             "--view-manifest",
             default=None,
             help="Path to view-manifest YAML (Layer 3 input, optional)",
+        )
+        parser.add_argument(
+            "--vertical",
+            help="Load vertical template to merge signal thresholds and interaction defaults",
         )
         parser.add_argument(
             "--output",
@@ -104,6 +110,62 @@ class Command(BaseCommand):
                 raise CommandError(
                     f"view-manifest is not a YAML mapping: {manifest_path}"
                 )
+
+        vertical_name = options.get("vertical")
+        if vertical_name:
+            try:
+                vertical = load_vertical(vertical_name)
+                # Merge vertical's signal_thresholds as baseline config
+                signal_thresholds = vertical.signal_thresholds or {}
+                if signal_thresholds:
+                    if profiler_signals is None:
+                        profiler_signals = {"signals": []}
+                    elif "signals" not in profiler_signals:
+                        profiler_signals["signals"] = []
+                    
+                    # Create a signal entry for the vertical thresholds
+                    vertical_signal = {
+                        "tab_title": "__vertical_thresholds__",
+                        "ui_archetype": "list",
+                        "confidence_score": 1.0,
+                        "_vertical_signal_thresholds": signal_thresholds
+                    }
+                    profiler_signals["signals"].append(vertical_signal)
+                    
+                    # Also merge vertical's interaction_defaults.roles into role mapping
+                    interaction_defaults = vertical.interaction_defaults or {}
+                    roles = interaction_defaults.get("roles", {})
+                    if roles:
+                        if interaction_contract is None:
+                            interaction_contract = {"interviews": []}
+                        elif "interviews" not in interaction_contract:
+                            interaction_contract["interviews"] = []
+                        
+                        # Add role presets from vertical (existing user hints win on conflict)
+                        for role_name, role_data in roles.items():
+                            tabs = role_data.get("tabs", [])
+                            # Check if this role already exists in interaction_contract
+                            existing_role = None
+                            for interview in interaction_contract["interviews"]:
+                                if interview.get("role") == role_name:
+                                    existing_role = interview
+                                    break
+                            
+                            if existing_role is None:
+                                # Create new interview entry for this role
+                                new_interview = {
+                                    "role": role_name,
+                                    "tabs": tabs
+                                }
+                                interaction_contract["interviews"].append(new_interview)
+                            else:
+                                # Merge tabs: existing tabs win, add missing ones from vertical
+                                existing_tabs = set(existing_role.get("tabs", []))
+                                vertical_tabs = set(tabs)
+                                merged_tabs = list(existing_tabs.union(vertical_tabs))
+                                existing_role["tabs"] = merged_tabs
+            except Exception as e:
+                raise CommandError(f"Failed to load vertical '{vertical_name}': {e}")
 
         codegen_manifest = merge_manifests(
             profiler_signals=profiler_signals,

@@ -370,20 +370,20 @@ def _render_year_week_filter(
                 break
 
     if year_is_integer:
-        lookup_lines = f"""        years = qs.values_list(base_year_field, flat=True).distinct().order_by(base_year_field)
+        lookup_lines = """        years = qs.values_list(base_year_field, flat=True).distinct().order_by(base_year_field)
         items = []
         for y in years:
-            items.append((f"{{y}}", f"{{y}}"))
+            items.append((f"{y}", f"{y}"))
             for w in range(1, 54):
-                items.append((f"{{y}}-W{{w:02d}}", f"Year {{y}} \u2014 Week {{w}}"))
+                items.append((f"{y}-W{w:02d}", f"Year {y} \u2014 Week {w}"))
         return items"""
     else:
-        lookup_lines = f"""        years = qs.datetimes(base_year_field, 'year') if hasattr(qs, 'datetimes') else []
+        lookup_lines = """        years = qs.datetimes(base_year_field, 'year') if hasattr(qs, 'datetimes') else []
         items = []
         for y in years:
-            items.append((f"{{y.year}}", f"{{y.year}}"))
+            items.append((f"{y.year}", f"{y.year}"))
             for w in range(1, 54):
-                items.append((f"{{y.year}}-W{{w:02d}}", f"Year {{y.year}} \u2014 Week {{w}}"))
+                items.append((f"{y.year}-W{w:02d}", f"Year {y.year} \u2014 Week {w}"))
         return items"""
 
     return f"""

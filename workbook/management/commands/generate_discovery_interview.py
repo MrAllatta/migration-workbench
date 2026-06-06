@@ -7,6 +7,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from workbook.discovery import render_interview
+from workbook.tools.vertical_registry import load_vertical
 
 
 class Command(BaseCommand):
@@ -31,6 +32,10 @@ class Command(BaseCommand):
             required=True,
             help="Output Markdown path",
         )
+        parser.add_argument(
+            "--vertical",
+            help="Load vertical template to seed interview presets",
+        )
 
     def handle(self, *args, **options):
         """Read the view-manifest YAML and render the interview Markdown to disk."""
@@ -47,7 +52,49 @@ class Command(BaseCommand):
         if not isinstance(manifest, dict):
             raise CommandError(f"manifest is not a YAML mapping: {manifest_path}")
 
+        vertical_name = options.get("vertical")
+        if vertical_name:
+            try:
+                vertical = load_vertical(vertical_name)
+                manifest = self._enrich_manifest_with_vertical(manifest, vertical)
+            except Exception as e:
+                raise CommandError(f"Failed to load vertical '{vertical_name}': {e}")
+
         out_path = Path(options["out"]).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(render_interview(manifest), encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote {out_path}"))
+
+    def _enrich_manifest_with_vertical(self, manifest: dict, vertical) -> dict:
+        """Enrich manifest with vertical data for interview presets."""
+        import copy
+
+        enriched = copy.deepcopy(manifest)
+
+        interaction_defaults = vertical.interaction_defaults or {}
+        roles = interaction_defaults.get("roles", {})
+        if roles:
+            workflow_hints = enriched.setdefault("workflow_hints", {})
+            existing_role_hints = list(workflow_hints.get("role_hints") or [])
+
+            vertical_role_hints = []
+            for role_name, role_data in roles.items():
+                tabs = role_data.get("tabs", [])
+                for tab in tabs:
+                    vertical_role_hints.append(f"{tab}: {role_name}")
+
+            merged_role_hints = existing_role_hints + [
+                hint for hint in vertical_role_hints if hint not in existing_role_hints
+            ]
+            workflow_hints["role_hints"] = merged_role_hints
+
+        domain_context = vertical.domain_context or {}
+        vocabulary = domain_context.get("vocabulary", {})
+        if vocabulary:
+            glossary_terms = []
+            for category, terms in vocabulary.items():
+                if isinstance(terms, list):
+                    glossary_terms.extend(terms)
+            enriched["_vertical_glossary_hints"] = glossary_terms
+
+        return enriched

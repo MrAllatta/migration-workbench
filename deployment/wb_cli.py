@@ -52,12 +52,15 @@ from deployment.manifest import (
     load_manifest,
 )
 
+from workbook.tools.vertical_registry import discover_verticals, load_vertical
+
 
 ERROR_CODES = {
     "manifest_invalid": "WB-MANIFEST-1001",
     "space_not_found": "WB-DEPLOY-2001",
     "environment_not_found": "WB-DEPLOY-2002",
     "unexpected": "WB-GENERAL-9001",
+    "vertical_not_found": "WB-VERTICAL-4001",
 }
 
 
@@ -364,13 +367,14 @@ def _contract_safety(args: argparse.Namespace) -> int:
 def _contract_validate(args: argparse.Namespace) -> int:
     _setup_django(getattr(args, "django_settings", None))
     from django.core.management import call_command
-    from workbook.management.commands.validate_contract import Command
 
     kwargs = {"contract": args.contract}
     if getattr(args, "strict", False):
         kwargs["strict"] = True
+    if getattr(args, "dump_json", False):
+        kwargs["dump_json"] = True
     try:
-        call_command(Command, **kwargs)
+        call_command("validate_contract", **kwargs)
         return 0
     except SystemExit as exc:
         return exc.code if isinstance(exc.code, int) else 1
@@ -522,6 +526,156 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
         },
         args.json,
     )
+
+
+def _vertical_list(args: argparse.Namespace) -> int:
+    """List available vertical templates."""
+    try:
+        verticals = discover_verticals()
+        if args.json:
+            return _render_output(
+                {
+                    "ok": True,
+                    "error_code": None,
+                    "message": f"Found {len(verticals)} vertical(s).",
+                    "verticals": verticals,
+                },
+                args.json,
+            )
+        
+        if not verticals:
+            print("No vertical templates found.")
+            return 0
+            
+        # Print table header
+        print(f"{'Name':<15} {'Version':<10} {'Confidence':<12} {'Description'}")
+        print("-" * 80)
+        for v in verticals:
+            name = v.get("name", "")
+            version = v.get("version", "")
+            confidence = v.get("confidence", "")
+            description = v.get("description", "")
+            # Truncate description if too long
+            if len(description) > 50:
+                description = description[:47] + "..."
+            print(f"{name:<15} {version:<10} {confidence:<12} {description}")
+        return 0
+    except Exception as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+
+def _vertical_show(args: argparse.Namespace) -> int:
+    """Show details of a vertical template."""
+    try:
+        vertical = load_vertical(args.name)
+        if args.json:
+            # Convert VerticalTemplate to dict for JSON output
+            from dataclasses import asdict
+            return _render_output(
+                {
+                    "ok": True,
+                    "error_code": None,
+                    "message": f"Vertical '{args.name}' details.",
+                    "vertical": asdict(vertical),
+                },
+                args.json,
+            )
+        
+        # Pretty print vertical details
+        print(f"Name: {vertical.name}")
+        print(f"Version: {vertical.version}")
+        print(f"Description: {vertical.description}")
+        print(f"Confidence: {vertical.confidence}")
+        
+        if vertical.domain_context:
+            print("\nDomain Context:")
+            if vertical.domain_context.get("vocabulary"):
+                print("  Vocabulary:")
+                for category, terms in vertical.domain_context["vocabulary"].items():
+                    print(f"    {category}: {', '.join(terms)}")
+            if vertical.domain_context.get("glossary"):
+                print("  Glossary:")
+                for term, definition in vertical.domain_context["glossary"].items():
+                    print(f"    {term}: {definition}")
+            if vertical.domain_context.get("entities"):
+                print("  Entities:")
+                for entity in vertical.domain_context["entities"]:
+                    print(f"    - {entity.get('name', 'Unknown')}: {entity.get('description', '')}")
+        
+        if vertical.entity_templates:
+            print("\nEntity Templates:")
+            for entity_name, template in vertical.entity_templates.items():
+                print(f"  {entity_name}:")
+                if template.get("model_meta"):
+                    meta = template["model_meta"]
+                    if meta.get("verbose_name"):
+                        print(f"    verbose_name: {meta['verbose_name']}")
+                    if meta.get("verbose_name_plural"):
+                        print(f"    verbose_name_plural: {meta['verbose_name_plural']}")
+                    if meta.get("ordering"):
+                        print(f"    ordering: {meta['ordering']}")
+                if template.get("columns"):
+                    print(f"    Columns ({len(template['columns'])}):")
+                    for col in template["columns"]:
+                        col_name = col.get("name", "unknown")
+                        data_type = col.get("data_type", "unknown")
+                        nullable = "NULL" if col.get("null", True) else "NOT NULL"
+                        print(f"      - {col_name} ({data_type}, {nullable})")
+                if template.get("admin"):
+                    admin = template["admin"]
+                    if admin.get("list_display"):
+                        print(f"    list_display: {admin['list_display']}")
+                    if admin.get("search_fields"):
+                        print(f"    search_fields: {admin['search_fields']}")
+                    if admin.get("list_filter"):
+                        print(f"    list_filter: {admin['list_filter']}")
+                if template.get("import_config"):
+                    import_config = template["import_config"]
+                    if import_config.get("unique_on"):
+                        print(f"    unique_on: {import_config['unique_on']}")
+                    if import_config.get("fk_lookup"):
+                        print(f"    fk_lookup: {import_config['fk_lookup']}")
+        
+        if vertical.interaction_defaults:
+            print("\nInteraction Defaults:")
+            if vertical.interaction_defaults.get("roles"):
+                print("  Roles:")
+                for role, config in vertical.interaction_defaults["roles"].items():
+                    print(f"    {role}:")
+                    print(f"      archetype: {config.get('archetype', 'unknown')}")
+                    print(f"      tabs: {config.get('tabs', [])}")
+        
+        if vertical.signal_thresholds:
+            print("\nSignal Thresholds:")
+            for key, value in vertical.signal_thresholds.items():
+                print(f"  {key}: {value}")
+                
+        return 0
+    except FileNotFoundError:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": "WB-VERTICAL-4001",
+                "message": f"Vertical template '{args.name}' not found.",
+            },
+            args.json,
+        )
+    except Exception as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": ERROR_CODES["unexpected"],
+                "message": str(exc),
+            },
+            args.json,
+        )
 
 
 def _deploy_live(args: argparse.Namespace) -> int:
@@ -953,6 +1107,28 @@ def build_parser() -> argparse.ArgumentParser:
     deploy_cmd.set_defaults(func=_deploy_dry_run)
 
     _build_generate_parser(sub)
+
+    # Vertical subcommands
+    vertical_cmd = sub.add_parser("vertical", help="Vertical template operations")
+    vertical_sub = vertical_cmd.add_subparsers(dest="vertical_command", required=True)
+
+    # wb vertical list
+    list_cmd = vertical_sub.add_parser("list", help="List available vertical templates")
+    list_cmd.add_argument(
+        "--json", action="store_true", help="Return machine-readable JSON output."
+    )
+    list_cmd.set_defaults(func=_vertical_list)
+
+    # wb vertical show <name>
+    show_cmd = vertical_sub.add_parser(
+        "show", help="Show details of a vertical template"
+    )
+    show_cmd.add_argument("name", help="Name of the vertical template to show")
+    show_cmd.add_argument(
+        "--json", action="store_true", help="Return machine-readable JSON output."
+    )
+    show_cmd.set_defaults(func=_vertical_show)
+
     return parser
 
 
