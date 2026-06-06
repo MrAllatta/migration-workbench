@@ -25,6 +25,7 @@ from workbook.codegen.contract import (
     get_model_name,
 )
 from workbook.codegen.manifest import find_view_for_entity
+from workbook.codegen.stub_writer import MARKER
 
 
 class _ClassRef:
@@ -784,11 +785,34 @@ def _pick_computed_display_fields(
     return hints.get("computed_fields") or []
 
 
+def extract_custom_sections(source: str) -> list[str]:
+    """Extract all lines below the custom-models marker.
+
+    Parses *source* looking for the marker line defined in
+    ``workbook.codegen.stub_writer.MARKER`` and returns every line
+    that follows it (the hand-written custom section).
+
+    Returns:
+        Empty list when the marker is not found.
+    """
+    lines = source.splitlines(keepends=True)
+    marker_found = False
+    custom: list[str] = []
+    for line in lines:
+        if line.strip() == MARKER.strip():
+            marker_found = True
+            custom.append(line)
+        elif marker_found:
+            custom.append(line)
+    return custom
+
+
 def render_admin_py(
     contract: dict[str, Any],
     manifest: dict[str, Any] | None,
     app_label: str = "core",
     codegen_manifest: dict[str, Any] | None = None,
+    existing_source: str | None = None,
 ) -> str:
     """Render a complete ``admin.py`` file from a contract and optional manifest.
 
@@ -803,6 +827,10 @@ def render_admin_py(
             provided, archetype-based ``list_editable``, status transition
             actions from ``workflow_hints.status_transitions``, role hints,
             and workflow notes enrich the generated admin.
+        existing_source: Optional source text from a previously-generated
+            ``admin.py``.  When provided, any hand-written custom sections
+            below the marker line (``# --- custom models below this line ---``)
+            are preserved and appended after the newly generated content.
 
     Returns:
         Complete ``admin.py`` source text.
@@ -1110,4 +1138,12 @@ def render_admin_py(
     parts.extend(inline_class_defs)
     parts.extend(admin_class_parts)
     parts.append("")
-    return "\n".join(parts)
+    result = "\n".join(parts)
+
+    # Preserve hand-written custom sections from the existing file.
+    if existing_source is not None:
+        custom_sections = extract_custom_sections(existing_source)
+        if custom_sections:
+            result += "\n" + "".join(custom_sections)
+
+    return result

@@ -158,11 +158,17 @@ class Command(BaseCommand):
             views = len(manifest.get("views") or [])
             self.stdout.write(self.style.SUCCESS(f"loaded manifest ({views} view(s))"))
 
+        existing_source = None
+        if out_path and out_path.exists():
+            existing_source = out_path.read_text(encoding="utf-8")
+            self.stdout.write(self.style.SUCCESS(f"read existing {out_path} to preserve custom sections"))
+
         source = render_admin_py(
             clean_contract,
             manifest=manifest,
             app_label=app_label,
             codegen_manifest=codegen_manifest,
+            existing_source=existing_source,
         )
 
         if not rejection_collector.is_empty():
