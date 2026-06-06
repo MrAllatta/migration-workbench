@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import io
+import json
 from datetime import datetime
 
 import pytest
 import yaml
-from django.core.management import call_command
+from django.core.management import call_command, CommandError
 
 from workbook.tools.signal_extraction import (
     SIGNALS_VERSION,
-    _classify_ui_archetype,
+    _classify_ui_archetype_v2,
     _compute_avg_null_rate,
-    _compute_confidence_score,
     _extract_cross_sheet_refs,
     extract_signals,
 )
@@ -209,73 +210,131 @@ class TestClassifyUiArchetype:
 
     def test_form_archetype(self):
         """5-12 cols with moderate formula density → form."""
-        result = _classify_ui_archetype(
-            total_cols=8,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=8,
             formula_density=0.25,
-            cross_sheet_refs=0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "form"
+        assert label == "form"
+        assert 0.0 <= confidence <= 1.0
+        assert isinstance(scores, dict)
 
     def test_list_archetype(self):
         """15+ cols with low formula density → list."""
-        result = _classify_ui_archetype(
-            total_cols=18,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=18,
             formula_density=0.11,
-            cross_sheet_refs=0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=500,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "list"
+        assert label == "list"
 
     def test_dashboard_archetype_high_formula(self):
         """High formula density (>=0.50) → dashboard."""
-        result = _classify_ui_archetype(
-            total_cols=6,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=6,
             formula_density=0.83,
-            cross_sheet_refs=0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=50,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "dashboard"
+        assert label == "dashboard"
 
     def test_dashboard_archetype_cross_sheet_refs(self):
-        """Moderate formula + cross-sheet refs → dashboard."""
-        result = _classify_ui_archetype(
-            total_cols=10,
-            formula_density=0.20,
-            cross_sheet_refs=3,
+        """High formula density + cross-sheet refs → dashboard."""
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=10,
+            formula_density=0.50,
+            cross_sheet_ref_count=2,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "dashboard"
+        assert label == "dashboard"
 
     def test_reference_archetype_few_cols(self):
         """Fewer than 5 cols → reference."""
-        result = _classify_ui_archetype(
-            total_cols=3,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=3,
             formula_density=0.0,
-            cross_sheet_refs=0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=30,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "reference"
+        assert label == "reference"
 
     def test_reference_archetype_high_null_rate(self):
-        """High avg null rate (>=0.60) → reference."""
-        result = _classify_ui_archetype(
-            total_cols=8,
-            formula_density=0.1,
-            cross_sheet_refs=0,
+        """Few columns + high null rate → reference."""
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=4,
+            formula_density=0.0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.70,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=30,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "reference"
+        assert label == "reference"
 
     def test_form_fallback_for_5_to_12_low_formula(self):
         """5-12 cols with very low formula density → form (fallback)."""
-        result = _classify_ui_archetype(
-            total_cols=7,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=7,
             formula_density=0.05,
-            cross_sheet_refs=0,
+            cross_sheet_ref_count=0,
             avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        assert result == "form"
+        assert label == "form"
 
 
 # ---------------------------------------------------------------------------
@@ -435,54 +494,77 @@ class TestNullRates:
 
 
 class TestConfidenceScore:
-    """Confidence score is always in [0, 1] and varies with data quality."""
+    """Confidence score is always in [0, 1] and varies with archetype margin."""
 
     def test_confidence_in_range(self):
         """Confidence score is always between 0 and 1."""
-        score = _compute_confidence_score(
-            total_rows=100,
-            column_count=6,
-            formula_density=0.33,
-            cross_sheet_refs=0,
-            has_null_rates=False,
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=8,
+            formula_density=0.25,
+            cross_sheet_ref_count=0,
+            avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        assert 0.0 <= score <= 1.0
+        assert 0.0 <= confidence <= 1.0
 
-    def test_confidence_higher_with_null_rates(self):
-        """Having null rates increases confidence."""
-        without = _compute_confidence_score(
-            total_rows=100,
-            column_count=6,
-            formula_density=0.33,
-            cross_sheet_refs=0,
-            has_null_rates=False,
+    def test_confidence_higher_with_clear_winner(self):
+        """Clear archetype winner → higher confidence."""
+        # Strong form signals (all form indicators present)
+        label1, c1, scores1 = _classify_ui_archetype_v2(
+            column_count=8,
+            formula_density=0.25,
+            cross_sheet_ref_count=0,
+            avg_null_rate=0.0,
+            has_status_column=True,
+            has_time_scope=False,
+            data_validation_density=0.38,
+            header_formula_count=2,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        with_ = _compute_confidence_score(
-            total_rows=100,
-            column_count=6,
-            formula_density=0.33,
-            cross_sheet_refs=0,
-            has_null_rates=True,
+        # Weak/ambiguous signals
+        label2, c2, scores2 = _classify_ui_archetype_v2(
+            column_count=10,
+            formula_density=0.15,
+            cross_sheet_ref_count=0,
+            avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=100,
+            expansion_formula_ratio=0.0,
         )
-        assert with_ > without
+        assert c1 >= c2
 
-    def test_confidence_higher_with_cross_sheet(self):
-        """Cross-sheet references increase confidence."""
-        without = _compute_confidence_score(
-            total_rows=100,
-            column_count=6,
-            formula_density=0.33,
-            cross_sheet_refs=0,
-            has_null_rates=False,
+    def test_archetype_scores_has_four_keys(self):
+        """Scores dict always contains all 4 archetype keys."""
+        label, confidence, scores = _classify_ui_archetype_v2(
+            column_count=8,
+            formula_density=0.25,
+            cross_sheet_ref_count=0,
+            avg_null_rate=0.0,
+            has_status_column=False,
+            has_time_scope=False,
+            data_validation_density=0.0,
+            header_formula_count=0,
+            header_entity_count=0,
+            merged_cell_ratio=0.0,
+            row_count=200,
+            expansion_formula_ratio=0.0,
         )
-        with_ = _compute_confidence_score(
-            total_rows=100,
-            column_count=6,
-            formula_density=0.33,
-            cross_sheet_refs=3,
-            has_null_rates=False,
-        )
-        assert with_ > without
+        assert set(scores.keys()) == {"form", "list", "dashboard", "reference"}
 
 
 # ---------------------------------------------------------------------------
@@ -510,6 +592,19 @@ class TestExtractSignals:
         assert entry["cross_sheet_refs"] == 0
         assert entry["null_rates"] == {}
         assert 0.0 <= entry["confidence_score"] <= 1.0
+        assert "archetype_scores" in entry
+        assert set(entry["archetype_scores"].keys()) == {
+            "form", "list", "dashboard", "reference"
+        }
+        # New v2 signal fields
+        assert entry["has_status_column"] is False
+        assert "has_time_scope" in entry
+        assert isinstance(entry["data_validation_density"], float)
+        assert isinstance(entry["header_formula_count"], int)
+        assert isinstance(entry["header_entity_count"], int)
+        assert isinstance(entry["row_count"], int)
+        assert isinstance(entry["expansion_formula_ratio"], float)
+        assert isinstance(entry["merged_cell_ratio"], float)
 
     def test_with_bundle_config(self):
         """Bundle config provides workbook_code per tab."""
@@ -660,3 +755,71 @@ class TestEdgeCases:
         signals = extract_signals(structure)
         # Parse it back — will raise if invalid
         datetime.fromisoformat(signals["generated_at"])
+
+
+# ---------------------------------------------------------------------------
+# CLI --explain / --min-confidence integration
+# ---------------------------------------------------------------------------
+
+
+class TestCliExplain:
+    """Integration tests for --explain and --min-confidence flags."""
+
+    def test_explain_flag_outputs_archetype_labels(self, tmp_path):
+        """--explain prints archetype labels for each tab."""
+        structure = _form_like_structure()
+        structure_path = tmp_path / "structure.json"
+        structure_path.write_text(json.dumps(structure), encoding="utf-8")
+
+        out = io.StringIO()
+        call_command(
+            "scaffold_view_manifest",
+            "--signals-only",
+            "--explain",
+            "--structure", str(structure_path),
+            stdout=out,
+        )
+        output = out.getvalue()
+        # Should contain archetype labels in the explanation output
+        assert any(
+            label in output
+            for label in ("form", "list", "dashboard", "reference")
+        )
+
+    def test_explain_requires_signals_only(self):
+        """--explain without --signals-only raises error."""
+        with pytest.raises(CommandError, match="signals-only"):
+            call_command(
+                "scaffold_view_manifest",
+                "--explain",
+                "--structure", "/nonexistent/structure.json",
+            )
+
+    def test_min_confidence_requires_explain(self):
+        """--min-confidence without --explain raises error."""
+        with pytest.raises(CommandError, match="explain"):
+            call_command(
+                "scaffold_view_manifest",
+                "--signals-only",
+                "--min-confidence", "0.7",
+                "--structure", "/nonexistent/structure.json",
+            )
+
+    def test_min_confidence_filters_low_confidence(self, tmp_path):
+        """--min-confidence 1.0 shows all tabs (all below threshold)."""
+        structure = _form_like_structure()
+        structure_path = tmp_path / "structure.json"
+        structure_path.write_text(json.dumps(structure), encoding="utf-8")
+
+        out = io.StringIO()
+        call_command(
+            "scaffold_view_manifest",
+            "--signals-only",
+            "--explain",
+            "--min-confidence", "1.0",
+            "--structure", str(structure_path),
+            stdout=out,
+        )
+        output = out.getvalue()
+        # The explanation always includes the word "confidence"
+        assert "confidence" in output

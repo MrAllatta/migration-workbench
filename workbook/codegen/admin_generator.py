@@ -57,6 +57,13 @@ def _to_snake_case(pascal: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", pascal).lower()
 
 
+def _to_pascal_case(snake: str) -> str:
+    """Convert snake_case to PascalCase."""
+    if not snake:
+        return snake
+    return "".join(word.capitalize() for word in snake.split("_"))
+
+
 _MODEL_CLASSES_WITH_SEARCH = {
     "CharField",
     "TextField",
@@ -696,6 +703,54 @@ def _render_admin_class(
             items = ", ".join(custom_action_names)
             lines.append(f"    actions = [{items}]")
 
+    # Permission override methods from access_hints.permissions.
+    _access_permissions: dict[str, Any] | None = None
+    if access_hints:
+        _access_permissions = access_hints.get("permissions")
+    if _access_permissions:
+        _owner_role_pascal = _to_pascal_case(
+            _access_permissions.get("owner_role", "")
+        )
+        _reviewer_roles_pascal = [
+            _to_pascal_case(r)
+            for r in (_access_permissions.get("reviewer_roles") or [])
+        ]
+        _all_roles = [_owner_role_pascal] + [
+            r for r in _reviewer_roles_pascal if r != _owner_role_pascal
+        ]
+
+        lines.append("")
+        lines.append("    def has_change_permission(self, request, obj=None):")
+        lines.append("        if request.user.is_superuser:")
+        lines.append("            return True")
+        lines.append(
+            f"        return request.user.groups.filter(name__in=[{', '.join(repr(r) for r in [_owner_role_pascal])}]).exists()"
+        )
+
+        lines.append("")
+        lines.append("    def has_view_permission(self, request, obj=None):")
+        lines.append("        if request.user.is_superuser:")
+        lines.append("            return True")
+        lines.append(
+            f"        return request.user.groups.filter(name__in=[{', '.join(repr(r) for r in _all_roles)}]).exists()"
+        )
+
+        lines.append("")
+        lines.append("    def has_add_permission(self, request, obj=None):")
+        lines.append("        if request.user.is_superuser:")
+        lines.append("            return True")
+        lines.append(
+            f"        return request.user.groups.filter(name__in=[{', '.join(repr(r) for r in [_owner_role_pascal])}]).exists()"
+        )
+
+        lines.append("")
+        lines.append("    def has_delete_permission(self, request, obj=None):")
+        lines.append("        if request.user.is_superuser:")
+        lines.append("            return True")
+        lines.append(
+            f"        return request.user.groups.filter(name__in=[{', '.join(repr(r) for r in [_owner_role_pascal])}]).exists()"
+        )
+
     if all(
         not x
         for x in [
@@ -713,11 +768,72 @@ def _render_admin_class(
             or (time_scope and time_scope.get("year_field"))
             or (status_values and status_field)
             or editable_fields
+            or _access_permissions
         )
         if not has_new_content:
             lines.append("    pass")
 
     lines.append("")
+    return "\n".join(lines)
+
+
+def _render_ensure_groups(
+    model_name: str,
+    owner_role: str,
+    reviewer_roles: list[str],
+) -> str:
+    """Render a ``_ensure_groups()`` function for a model with permissions.
+
+    Args:
+        model_name: PascalCase model name (e.g. ``CropPlan``).
+        owner_role: Snake_case owner role name (e.g. ``field_manager``).
+        reviewer_roles: List of snake_case reviewer role names.
+
+    Returns:
+        Python source for the ``_ensure_groups`` function.
+    """
+    model_snake = _to_snake_case(model_name)
+    owner_group_pascal = _to_pascal_case(owner_role)
+    owner_codenames = [
+        f"change_{model_snake}",
+        f"view_{model_snake}",
+        f"add_{model_snake}",
+        f"delete_{model_snake}",
+    ]
+    lines = [
+        "",
+        "",
+        "# Generated — run once via ``_ensure_groups()`` or management command",
+        f"def _ensure_{model_snake}_groups():",
+        "    from django.contrib.auth.models import Group, Permission",
+        "    from django.contrib.contenttypes.models import ContentType",
+        f"    content_type = ContentType.objects.get_for_model({model_name})",
+        "",
+        f'    owner_group, _ = Group.objects.get_or_create(name="{owner_group_pascal}")',
+        "    for codename in [",
+    ]
+    for cn in owner_codenames:
+        lines.append(f'            "{cn}",')
+    lines.append("        ]:")
+    lines.append("        perm, _ = Permission.objects.get_or_create(")
+    lines.append("            codename=codename, content_type=content_type,")
+    lines.append("        )")
+    lines.append("        owner_group.permissions.add(perm)")
+    lines.append("")
+    for reviewer_role in reviewer_roles:
+        reviewer_pascal = _to_pascal_case(reviewer_role)
+        lines.append(
+            f'    group, _ = Group.objects.get_or_create(name="{reviewer_pascal}")'
+        )
+        lines.append(
+            f'    view_perm = Permission.objects.get('
+        )
+        lines.append(
+            f'        codename="view_{model_snake}", content_type=content_type,'
+        )
+        lines.append("    )")
+        lines.append("    group.permissions.add(view_perm)")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -882,6 +998,7 @@ def render_admin_py(
     # Collect all inline classes (must be defined before admin classes).
     inline_class_defs: list[str] = []
     inline_class_names: set[str] = set()  # Track which inline classes we've already emitted.
+    ensure_groups_defs: list[str] = []  # _ensure_*_groups() functions for permission-based access.
     admin_class_parts: list[str] = []
 
     for table in tables:
@@ -902,6 +1019,23 @@ def render_admin_py(
             source_tab: str | None = view.get("source_tab")
             if source_tab:
                 codegen_entry = codegen_index.get(source_tab)
+
+        # _ensure_groups() for permission-based access control.
+        if codegen_entry:
+            cg_access_hints = codegen_entry.get("access_hints") or {}
+            cg_permissions = cg_access_hints.get("permissions")
+            if cg_permissions:
+                ensure_groups_defs.append(
+                    _render_ensure_groups(
+                        model_name=model_name,
+                        owner_role=str(
+                            cg_permissions.get("owner_role", "")
+                        ),
+                        reviewer_roles=list(
+                            cg_permissions.get("reviewer_roles") or []
+                        ),
+                    )
+                )
 
         # Inline classes for *this* model's reverse FK relationships.
         # admin.inlines can override default field lists per inline source.
@@ -1136,6 +1270,7 @@ def render_admin_py(
         )
 
     parts.extend(inline_class_defs)
+    parts.extend(ensure_groups_defs)
     parts.extend(admin_class_parts)
     parts.append("")
     result = "\n".join(parts)

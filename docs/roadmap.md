@@ -3,10 +3,12 @@
 Version history and direction.
 
 ```
-0.0.1 – 0.0.N   Component assembly           ← shipped
-0.1.0            Pipeline proven on real data ← shipped
-0.2.0            Spreadsheet replacement      ← shipped
-0.3.0+           Consultant accelerant         ← next milestone
+0.0.1 – 0.0.N   Component assembly              ← shipped
+0.1.0            Pipeline proven on real data    ← shipped
+0.2.0            Admin generation maturity       ← shipped
+0.3.0            User-facing UI codegen           ← next milestone
+0.4.0            Role-based interfaces            ← next milestone
+0.5.0+           Consultant accelerant (platform) ← conditional
 ```
 
 ---
@@ -201,16 +203,15 @@ the 0.2.0 spreadsheet replacement milestone:
 
 ---
 
-## Current: 0.2.0 — Spreadsheet replacement (shipped)
+## Shipped: 0.2.0 — Admin generation maturity
 
-The admin generator now produces production-grade output: status transitions,
-role-appropriate views, year/week filtering, and proper field-level validation
-(no FK in `list_editable`, no readonly in `autocomplete_fields`, deduplicated
-inlines and YearWeekFilter names). The interaction contract merge path is
-complete — `merge_manifests` indexes per-role supplement data and flows
-`access_hints` into the codegen manifest. The historical import loop handles
-year-suffixed CSV bundles via tab-named directories, proven across 5+ years
-of real farm data. All 922 tests pass, full chassis-gate green.
+The admin generator now produces production-grade Django admin configuration: status transitions,
+role-appropriate views, year/week filtering, and proper field-level validation. The interaction
+contract merge path is complete. The historical import loop handles year-suffixed CSV bundles,
+proven across 5+ years of real farm data. All 922 tests pass, full chassis-gate green.
+
+This milestone improves what the workbench generates — higher-quality Django admin code. It does
+not deliver a spreadsheet replacement. See the carry-forward note below for what remains unmet.
 
 - **Interaction contract merge path:**
   `access_hints` from interaction contract flow through `merge_manifests`
@@ -226,38 +227,86 @@ of real farm data. All 922 tests pass, full chassis-gate green.
   `pull_bundle` → per-year CSV directories → `import_historical` walks
   tab-named bundle directories, collects year-suffixed CSVs, processes
   in year order with `source_bundle_year` injection.
-- **View manifest/discovery exercised on real data:**
-  scaffold → interview → merge → regenerate admin. Role names correctly
-  extracted from interview answers, status transitions resolved from
-  merged manifest.
 
 ---
 
-## Next: 0.3.0+ — Consultant accelerant
+### Gate criteria carried forward
 
-Each version encodes more consultant judgment into the agent harness,
-making the operator faster. Not a feature list — a judgment-compounding system.
+The 0.1.0 milestone carried three gate criteria for spreadsheet replacement
+into 0.2.0. Two were met; one was not:
 
-### 0.3.0 — Vertical migration templates
+| Criterion | 0.1.0 carried | 0.2.0 result |
+|-----------|---------------|--------------|
+| Full historical import loop | Yes | ✅ Delivered |
+| 30-minute gate from scratch | Yes | ✅ Delivered |
+| Admin that replaces the spreadsheet — stakeholder can complete weekly cycle without the source workbook | Yes | ❌ Carried to 0.3.0 |
 
-After N engagements in a vertical (farm, school, clinic), extract reusable presets:
-domain context vocabulary, entity defaults, scoring heuristics, schema contract templates,
-interaction contract defaults, and import error patterns. The 10th farm migration should
-be 5x faster than the 1st because the agent starts with learned defaults.
+**Why the third criterion was not met:** "Spreadsheet replacement" is a product
+outcome, not a workbench feature. It requires (a) a quality gate with
+repeatable smoke tests that verify a domain user's workflow, (b) product agent
+certification via 3 consecutive clean passes, and (c) generated user-facing UI
+code (views, templates, interactive components) — none of which existed in the
+workbench at 0.2.0. The gap is formally documented in `.omo/issues/04`.
 
-### 0.4.0 — Interaction contract: consultant decision support
+The workbench's role is to ship generic code generation capabilities that
+product repos (like farm) consume to achieve spreadsheet replacement. This
+milestone delivered admin codegen maturity. User-facing UI codegen is the
+next milestone.
 
-The profiler extracts how the data is USED, not just what it IS. UI archetype
-classification (form / list / dashboard / reference) tells the consultant how to
-configure the generated admin. Workflow dependency graphs reveal operational sequences.
-Role boundaries inform permission design.
+---
 
-The immediate value is consultant decision support, not frontend codegen. Better
-decisions produce better admin defaults as a side effect.
+## Next: 0.3.0 — User-facing UI codegen
 
-See [Interaction Contract](interaction-contract.md) for the three-layer design.
+The workbench ships generic code generation for user-facing Django views,
+templates, and interactive components — not just admin.
 
-### 0.5.0+ — Platform (conditional)
+- **Carried forward from 0.2.0:** Generate views, templates, and URL routing
+  that let a domain user complete a read/update workflow without the source
+  spreadsheet. The farm engagement validates this capability.
+
+- **HTMX interactive components:** Generate inline editing (status toggles,
+  boolean checklists), modal forms, and live-update fields using HTMX.
+  Archetype-aware: `form` archetypes get editable forms, `list` archetypes
+  get sortable tables, `dashboard` archetypes get summary cards.
+
+- **Admin functional improvements (validated on farm data):**
+  Computed columns in admin list_display (PlantingPlan.planted, etc.).
+  list_editable for nursery boolean fields (seeded/germinated/thinned).
+  Conditional row highlighting via CSS rules. Custom admin actions
+  (record planting event, mark as ordered). FK autocomplete tuning.
+
+- **Quality gate required:** The `app-replaces-spreadsheet` quality gate
+  must include tests that verify user-facing views render with real data,
+  not just admin pages. (The current gate tests admin rendering only —
+  see issue #04).
+
+See the farm engagement design at
+`docs/superpowers/specs/2026-06-04-app-replaces-spreadsheet-design.md`
+for the validating example.
+
+## Next: 0.4.0 — Role-based interfaces
+
+The workbench ships codegen for role-aware views, dashboards, and
+permission scaffolding.
+
+- **Role-based views:** Generate landing pages per role archetype
+  (planner: crop planning dashboard, operations: field task list,
+  admin: full CRUD). Group-based routing with automatic queryset scoping.
+
+- **Dashboard views:** Generate summary cards, aggregate counts, and
+  status breakdowns from schema contract metadata. Archetype-aware
+  rendering (dashboard archetype → card layout, list archetype → table).
+
+- **Permission scaffolding:** Generate Django Group creation, permission
+  checks (has_change/view/add/delete_permission), and row-level access
+  from interaction contract roles.
+
+- **Print-friendly outputs:** Generate list views optimized for printing
+  (weekly field task lists, inventory sheets).
+
+See `.omo/next/v0.4.0-phase1-archetype-matrix.yaml` and related plans.
+
+## Conditional: 0.5.0+ — Consultant accelerant / Platform
 
 Only after the judgment taxonomy is dense enough to make the agent reliably correct:
 
@@ -288,11 +337,35 @@ is provably near-zero.
 
 ---
 
+## Milestone certification
+
+Milestones in this roadmap describe **workbench capabilities** — what the
+migration-workbench package can generate. A milestone is **shipped** when:
+
+1. All code is merged to `master` and released to PyPI
+2. `make chassis-gate` passes (migrate, test, lint, doc coverage)
+3. The roadmap document is updated
+
+A milestone that describes a **product outcome** (e.g., "user can complete
+a workflow without the source spreadsheet") requires additional certification:
+
+4. A quality gate definition in `.omo/quality-gates/<milestone>.yaml` with
+   deterministic pass/fail criteria
+5. 3 consecutive clean passes of the quality gate smoke tests, certified by
+   the product agent
+6. Manual verification where the milestone specifies it
+
+Outcome milestones are validated against product repos (e.g., farm). The
+workbench ships generic capabilities; the product repo proves they work.
+
+---
+
 ## How the farm exercise shaped this roadmap
 
 Every item in "Shipped" has a direct line to something discovered while building
-the first product repo. The exercise that informed the current design was profiling
-a 56-workbook, 239-tab Google Sheets corpus and designing an 11-model schema.
+the first product repo (farm). The exercise that informed the current design was profiling
+a 56-workbook, 239-tab Google Sheets corpus and designing an 11-model schema. Farm validates what the workbench
+generates; it does not define what the workbench ships.
 
 | Discovery | Response |
 |-----------|----------|

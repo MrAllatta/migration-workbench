@@ -307,6 +307,28 @@ def get_admin_config(table: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def get_auth_config(table: dict[str, Any]) -> dict[str, Any]:
+    """Return the ``codegen.auth`` configuration block for *table*, or ``{}``.
+
+    The v1.4+ auth block is stored under ``codegen.auth``::
+
+        codegen:
+          auth:
+            mechanism: django_groups
+            default_owner_role: field_manager
+
+    Returns:
+        Dict with ``mechanism``, ``default_owner_role``, and optional
+        ``permissions`` keys.  Empty dict ``{}`` when absent.
+    """
+    codegen = table.get("codegen")
+    if codegen and isinstance(codegen, dict):
+        auth = codegen.get("auth")
+        if auth and isinstance(auth, dict):
+            return auth
+    return {}
+
+
 def get_model_base(table: dict[str, Any]) -> str:
     """Return the model base class for *table*.
 

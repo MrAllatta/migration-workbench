@@ -1,0 +1,108 @@
+feature: v0.4.0-phase1-archetype-matrix
+worktree_branch: feat/v0.4.0-phase1-archetype-matrix
+worktree_path: .worktrees/wt-v0.4.0-phase1-archetype-matrix
+based_on: exercise
+summary: 'Replace the sequential 4-signal classifier (_classify_ui_archetype) with
+  the weighted heuristic matrix (Approach A from the v0.4.0 design doc). Adds 8 new
+  signals, margin-based confidence scoring, a full archetype_scores vector per tab,
+  and the explain_archetype() utility. The new classification lives in a dedicated
+  archetype_matrix.py module with the scoring matrix as a declarative constant, keeping
+  signal_extraction.py focused on data plumbing.
+
+  '
+tasks:
+- task: NEW module — workbook/tools/archetype_matrix.py
+  details: 'Define SCORING_MATRIX constant (dict of archetype → signal → weight or
+    weight_fn), ArchetypeProfile dataclass, and classify_archetype(signals_dict) →
+    (label, confidence, archetype_scores) using the weighted matrix. Include vertical_override
+    mechanism for adjusting weights per vertical (v0.3.0 integration, P2 this phase).
+
+    '
+  files:
+  - workbook/tools/archetype_matrix.py (CREATE)
+  success:
+  - SCORING_MATRIX defined with all 12 signals × 4 archetypes
+  - classify_archetype returns (label, confidence, scores_vector)
+  - confidence = (top_score - second_score) / max_possible_score
+  - Vertical weight overrides accepted as optional param, P2 priority
+- task: MODIFY signal_extraction.py — new classifier, 8 new signals, margin confidence
+  details: 'Replace _classify_ui_archetype with _classify_ui_archetype_v2 that delegates
+    to archetype_matrix.classify_archetype(). Add 8 new signals to extract_signals()
+    output: has_status_column (bool), has_time_scope (bool), data_validation_density
+    (float), header_formula_count (int), header_entity_count (int), row_count (int),
+    expansion_formula_ratio (float). Replace _compute_confidence_score with margin-based
+    calculation. Add archetype_scores dict {form: float, list: float, dashboard: float,
+    reference: float} to signals output. Add explain_archetype() function returning
+    human-readable rationale.
+
+    '
+  files:
+  - workbook/tools/signal_extraction.py (MODIFY)
+  success:
+  - All existing signal_extraction tests pass (adapted to new score ranges)
+  - 8 new signal fields in extract_signals() output
+  - archetype_scores vector in each tab signal entry
+  - confidence_score is margin-based (winner minus runner-up)
+  - explain_archetype() returns formatted string with top signals
+- task: MODIFY enrichment_utils.py — header semantic category detection
+  details: 'Add detect_header_semantic_category(header_name) function that classifies
+    a column header into formula_keyword, entity_keyword, time_scope_keyword, status_keyword,
+    or generic using regex patterns. Used by signal_extraction to compute header_formula_count
+    and header_entity_count. Use keyword sets from the design doc: formula = {total,
+    sum, avg, net, gross, qty, count, subtotal}, entity from enrichment_utils existing
+    entity_keywords, time scope = {year, week, date, month, season, period, fy, q1,
+    q2, q3, q4}.
+
+    '
+  files:
+  - profiler/tools/enrichment_utils.py (MODIFY)
+  success:
+  - detect_header_semantic_category returns correct category for known headers
+  - Formula keywords map to formula_keyword category
+  - Entity keywords map to entity_keyword category
+  - Time scope patterns map to time_scope_keyword category
+  - Detects "Status"/"stage"/"state" headers as status_keyword
+- task: NEW + UPDATE tests
+  details: 'Create workbook/tests/test_archetype_matrix.py with scoring matrix verification,
+    weight normalization, classification boundaries, and vertical override tests.
+    Update workbook/tests/test_signal_extraction.py for new signals, margin confidence,
+    archetype_scores, explain_archetype. Update workbook/tests/test_manifest_merger.py
+    for updated signal format in mock fixtures. Update workbook/tests/test_admin_generator.py
+    for new confidence ranges in archetype-based behavior.
+
+    '
+  files:
+  - workbook/tests/test_archetype_matrix.py (CREATE)
+  - workbook/tests/test_signal_extraction.py (MODIFY)
+  - workbook/tests/test_manifest_merger.py (MODIFY)
+  - workbook/tests/test_admin_generator.py (MODIFY)
+  success:
+  - test_archetype_matrix.py: ≥30 tests covering matrix, classification, boundaries
+  - test_signal_extraction.py: updated existing tests pass, new tests for all 8 signals
+  - test_manifest_merger.py: archetype_scores propagation tested
+  - test_admin_generator.py: no regression on existing admin output
+reference_doc: .omo/design/v0.4.0-interaction-contract-maturity.md
+design_section: 'Phase 1 (§6), Approach A (§3.2), File Change Summary (Appendix A),
+  Testing Strategy per Phase (§7 Phase 1), Concrete Example (§3.6)
+
+  '
+completion_protocol:
+- Run make chassis-gate — must pass (all tests, lint, doc-coverage ≥80%, migrations)
+- Verify existing test_signal_extraction.py tests pass with adapted score ranges
+- Write .omo/ready/v0.4.0-phase1-archetype-matrix.yaml with phase, commit hash, test
+  count, and any caveats
+notes: 'v0.3.0 ecosystem status: exercise signal written (.omo/exercise/v0.3.0-vertical-templates-phase1.yaml)
+  but farm validation results not yet received. This is non-blocking — workbench builds
+  in isolated worktree from exercise, which already has v0.3.0 code (vertical registry
+  module, farm vertical content). The P2 vertical-override feature within Phase 1
+  can wait for farm validation to complete, but the base weighted matrix has no v0.3.0
+  dependency and should proceed.
+
+  Three adjacent ecosystem tasks remain open (not workbench concerns): 1. Farm validates
+  v0.3.0 (smoke suite on --vertical flags) 2. Meta squashes v0.3.0 to master after
+  farm certifies 3. v0.4.0 Phase 2+3+4 queued after Phase 1 completes'
+lifecycle:
+  status: active
+  created_at: '2026-06-04T00:00:00Z'
+  activated_at: '2026-06-05T15:14:29.716519+00:00'
+  actor: user

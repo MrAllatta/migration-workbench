@@ -1299,10 +1299,79 @@ class PipelineState:
         self.schema_contract = {"tables": tables}
         self.interaction_contract = {"views": []}
 
+        # --- Tab Classification ---
+        self._classify_deep_profiled_tabs()
+
         # Emit profiler signals alongside contracts
         self._emit_profiler_signals()
 
         return self
+
+    def _classify_deep_profiled_tabs(self) -> None:
+        """Classify deep-profiled tabs and store results in the interaction contract.
+
+        Uses ``classify_tabs_batch`` from the tab classifier module. Collects
+        classification signals, records a decision with the summary, and stores
+        per-tab classification in the interaction contract.
+        """
+        try:
+            from profiler.tools.tab_classifier import (
+                classify_tabs_batch,
+                classification_summary,
+            )
+        except ImportError:
+            logger.warning("tab_classifier not available — skipping classification")
+            return
+
+        tab_entries: list[dict] = []
+        for entry in self.deep_profile_index.entries:
+            tab_title = entry.get("tab_title") or entry.get("tab", "unknown")
+            tab_entries.append(
+                {
+                    "tab_title": tab_title,
+                    "rows": entry.get("total_rows", 0),
+                    "cols": entry.get("total_cols", 0),
+                    "score": entry.get("score", 0),
+                    "reasons": entry.get("scoring_reasons", []),
+                    "breakdown": entry.get("breakdown", {}),
+                }
+            )
+
+        if not tab_entries:
+            return
+
+        classifications = classify_tabs_batch(tab_entries)
+        summary = classification_summary(classifications)
+
+        self.record_decision(
+            decision_id="tab_classification",
+            phase="derive_contracts",
+            description=(
+                f"Classified {summary['total']} tabs: "
+                f"{summary['classified']} classified, "
+                f"{summary['coverage_pct']}% coverage"
+            ),
+            outcome="approved",
+            confidence=summary["coverage_pct"] / 100.0 if summary["total"] > 0 else 0.0,
+            metadata={
+                "total": summary["total"],
+                "classified": summary["classified"],
+                "coverage_pct": summary["coverage_pct"],
+                "counts": summary["counts"],
+            },
+        )
+
+        # Store per-tab classification in interaction contract
+        if self.interaction_contract is None:
+            self.interaction_contract = {"views": []}
+        self.interaction_contract["tab_classifications"] = {
+            c.tab_title: {
+                "category": c.category,
+                "confidence": c.confidence,
+                "rationale": c.rationale,
+            }
+            for c in classifications
+        }
 
     def _emit_profiler_signals(self) -> None:
         """Build and write profiler-signals YAML from deep profile index.
@@ -1348,7 +1417,15 @@ class PipelineState:
             "tabs": fake_tabs,
         }
 
-        signals = extract_signals(fake_structure)
+        # Pass tab classifications into signal extraction if available
+        tab_classifications = None
+        if self.interaction_contract and "tab_classifications" in self.interaction_contract:
+            tab_classifications = self.interaction_contract["tab_classifications"]
+
+        signals = extract_signals(
+            fake_structure,
+            tab_classifications=tab_classifications,
+        )
 
         # Determine output path: prefer runtime override, then alongside checkpoint
         signals_path = self._signals_output_path or (

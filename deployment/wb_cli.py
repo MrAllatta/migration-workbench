@@ -54,6 +54,10 @@ from deployment.manifest import (
 
 from workbook.tools.vertical_registry import discover_verticals, load_vertical
 
+try:
+    from workbook.tools.queue_protocol import QUEUE_LABELS as _QUEUE_LABELS
+except ImportError:
+    _QUEUE_LABELS = {}
 
 ERROR_CODES = {
     "manifest_invalid": "WB-MANIFEST-1001",
@@ -61,6 +65,10 @@ ERROR_CODES = {
     "environment_not_found": "WB-DEPLOY-2002",
     "unexpected": "WB-GENERAL-9001",
     "vertical_not_found": "WB-VERTICAL-4001",
+    "ecosystem_health": "WB-ECOSYSTEM-3001",
+    "ecosystem_not_found": "WB-ECOSYSTEM-3002",
+    "ecosystem_invalid": "WB-ECOSYSTEM-3003",
+    "ecosystem_failed": "WB-ECOSYSTEM-3004",
 }
 
 
@@ -678,6 +686,156 @@ def _vertical_show(args: argparse.Namespace) -> int:
         )
 
 
+def _ecosystem_health(args: argparse.Namespace) -> int:
+    """Check health of the filesystem queue protocol.
+
+    Reports entry counts, stale entries, and malformed entries per queue.
+    """
+    from workbook.tools.queue_protocol import check_queue_health
+
+    try:
+        reports = check_queue_health()
+    except FileNotFoundError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": "WB-ECOSYSTEM-3001",
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+    if args.json:
+        return _render_output(
+            {
+                "ok": True,
+                "error_code": None,
+                "message": f"Checked {len(reports)} queue(s).",
+                "queues": [r.to_dict() for r in reports],
+            },
+            args.json,
+        )
+
+    total_stale = 0
+    total_malformed = 0
+    for report in reports:
+        label = _QUEUE_LABELS.get(report.queue_name, report.queue_name)
+
+        if report.by_status:
+            status_parts = " | ".join(
+                f"{s}: {c}" for s, c in sorted(report.by_status.items())
+            )
+        else:
+            status_parts = "empty"
+
+        print(f"{report.queue_name:<12} {status_parts}")
+        print(f"  {label}")
+        print(f"  {report.total_entries} total")
+
+        if report.oldest_unconsumed_name and report.oldest_unconsumed_hours is not None:
+            print(
+                f"  Oldest unconsumed: {report.oldest_unconsumed_name} "
+                f"({report.oldest_unconsumed_hours:.1f}h)"
+            )
+
+        if report.stale_entries:
+            total_stale += len(report.stale_entries)
+            print(f"  STALE ({len(report.stale_entries)}):")
+            for entry in report.stale_entries:
+                print(
+                    f"    - {entry['filename']} ({entry['status']}, "
+                    f"{entry['age_hours']}h / {entry['timeout_hours']}h timeout)"
+                )
+
+        if report.malformed_entries:
+            total_malformed += len(report.malformed_entries)
+            print(f"  MALFORMED ({len(report.malformed_entries)}):")
+            for malformed in report.malformed_entries:
+                print(f"    - {malformed}")
+
+        if report.validation_errors:
+            print(f"  CONSISTENCY ERRORS ({len(report.validation_errors)}):")
+            for validation_error in report.validation_errors:
+                print(f"    - {validation_error}")
+
+        print()
+
+    if total_stale:
+        print(f"Total stale: {total_stale}")
+    if total_malformed:
+        print(f"Total malformed: {total_malformed}")
+    return 0
+
+
+def _ecosystem_ack(args: argparse.Namespace) -> int:
+    """Acknowledge a queue entry as consumed (or active).
+
+    Usage: wb ecosystem ack <queue> <filename> [--status active|consumed]
+    """
+    from workbook.tools.queue_protocol import (
+        acknowledge_activation,
+        acknowledge_consumption,
+        find_omo_root,
+    )
+
+    try:
+        omo_root = find_omo_root()
+    except FileNotFoundError as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": "WB-ECOSYSTEM-3001",
+                "message": str(exc),
+            },
+            args.json,
+        )
+
+    queue_dir = omo_root / args.queue
+    target_path = queue_dir / args.filename
+
+    if not target_path.is_file():
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": "WB-ECOSYSTEM-3002",
+                "message": f"File not found: {target_path}",
+            },
+            args.json,
+        )
+
+    new_status = getattr(args, "status", "consumed")
+    try:
+        if new_status == "active":
+            acknowledge_activation(target_path, actor=getpass.getuser())
+        elif new_status == "consumed":
+            acknowledge_consumption(target_path, actor=getpass.getuser())
+        else:
+            return _render_output(
+                {
+                    "ok": False,
+                    "error_code": "WB-ECOSYSTEM-3003",
+                    "message": f"Invalid status '{new_status}'. Use 'active' or 'consumed'.",
+                },
+                args.json,
+            )
+    except Exception as exc:
+        return _render_output(
+            {
+                "ok": False,
+                "error_code": "WB-ECOSYSTEM-3004",
+                "message": f"Failed to acknowledge: {exc}",
+            },
+            args.json,
+        )
+
+    return _render_output(
+        {
+            "ok": True,
+            "error_code": None,
+            "message": f"Acknowledged '{args.filename}' in '{args.queue}' as {new_status}.",
+        },
+        args.json,
+    )
 def _deploy_live(args: argparse.Namespace) -> int:
     """Perform a live deploy: validate manifest, deploy, health-check, record."""
     from deployment.health import wait_for_healthy
@@ -1129,6 +1287,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     show_cmd.set_defaults(func=_vertical_show)
 
+    # Ecosystem subcommands
+    ecosystem_cmd = sub.add_parser("ecosystem", help="Ecosystem protocol operations")
+    ecosystem_sub = ecosystem_cmd.add_subparsers(dest="ecosystem_command", required=True)
+
+    health_cmd = ecosystem_sub.add_parser(
+        "health", help="Check queue protocol health"
+    )
+    health_cmd.set_defaults(func=_ecosystem_health)
+
+    ack_cmd = ecosystem_sub.add_parser(
+        "ack", help="Acknowledge a queue entry (mark as consumed or active)"
+    )
+    ack_cmd.add_argument("queue", help="Queue name (next, ready, exercise, results, etc.)")
+    ack_cmd.add_argument("filename", help="Queue entry filename")
+    ack_cmd.add_argument(
+        "--status",
+        choices=["active", "consumed"],
+        default="consumed",
+        help="Lifecycle status to set (default: consumed)",
+    )
+    ack_cmd.set_defaults(func=_ecosystem_ack)
     return parser
 
 

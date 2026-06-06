@@ -1841,3 +1841,197 @@ def test_command_with_codegen_manifest(tmp_path):
     source = out_path.read_text(encoding="utf-8")
     assert "@admin.register(Crop)" in source
     _check_compiles(source)
+
+
+# ---------------------------------------------------------------------------
+# Permission-based access control (v0.4.0 Phase 3)
+# ---------------------------------------------------------------------------
+
+
+def _codegen_manifest_with_permissions() -> dict:
+    """Return a codegen manifest with access_hints.permissions."""
+    return {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "form",
+                "confidence": 0.85,
+                "access_hints": {
+                    "permissions": {
+                        "owner_role": "field_manager",
+                        "reviewer_roles": ["operations", "auditor"],
+                        "mechanism": "django_groups",
+                    },
+                },
+            },
+        ],
+    }
+
+
+def _permissions_contract() -> dict:
+    """Return a minimal contract for permission tests."""
+    return {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "status",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 50},
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def _permissions_manifest() -> dict:
+    """Return a minimal view manifest for permission tests."""
+    return {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crop",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name", "status"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Crops"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+
+
+def test_has_change_permission_generated():
+    """Admin class should have has_change_permission for owner role."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    assert "def has_change_permission(self, request, obj=None):" in source
+    assert "is_superuser" in source
+    assert "FieldManager" in source
+    _check_compiles(source)
+
+
+def test_has_view_permission_generated():
+    """Admin class should have has_view_permission for owner + reviewer roles."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    assert "def has_view_permission(self, request, obj=None):" in source
+    assert "is_superuser" in source
+    # Owner + all reviewer roles
+    assert "FieldManager" in source
+    assert "Operations" in source
+    assert "Auditor" in source
+    _check_compiles(source)
+
+
+def test_has_add_permission_generated():
+    """Admin class should have has_add_permission for owner role."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    assert "def has_add_permission(self, request, obj=None):" in source
+    assert "is_superuser" in source
+    assert "FieldManager" in source
+    _check_compiles(source)
+
+
+def test_has_delete_permission_generated():
+    """Admin class should have has_delete_permission for owner role."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    assert "def has_delete_permission(self, request, obj=None):" in source
+    assert "is_superuser" in source
+    assert "FieldManager" in source
+    _check_compiles(source)
+
+
+def test_no_permission_methods_when_permissions_absent():
+    """Without access_hints.permissions, no has_*_permission methods."""
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "list",
+                "confidence": 0.5,
+            },
+        ],
+    }
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=codegen,
+    )
+    assert "def has_change_permission" not in source
+    assert "def has_view_permission" not in source
+    assert "def has_add_permission" not in source
+    assert "def has_delete_permission" not in source
+    _check_compiles(source)
+
+
+def test_ensure_groups_function_generated():
+    """_ensure_*_groups() should be generated for models with permissions."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    assert "def _ensure_crop_groups():" in source
+    assert "ContentType.objects.get_for_model(Crop)" in source
+    assert "Group.objects.get_or_create(name=\"FieldManager\")" in source
+    assert "Group.objects.get_or_create(name=\"Operations\")" in source
+    assert "Group.objects.get_or_create(name=\"Auditor\")" in source
+    assert "change_crop" in source
+    assert "view_crop" in source
+    assert "add_crop" in source
+    assert "delete_crop" in source
+    _check_compiles(source)
+
+
+def test_superuser_bypass_in_permission_methods():
+    """All permission methods should check is_superuser first."""
+    source = render_admin_py(
+        _permissions_contract(),
+        _permissions_manifest(),
+        app_label="core",
+        codegen_manifest=_codegen_manifest_with_permissions(),
+    )
+    # Count is_superuser occurrences (one per method: change, view, add, delete)
+    assert source.count("if request.user.is_superuser:") == 4
+    _check_compiles(source)

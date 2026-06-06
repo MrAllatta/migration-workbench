@@ -1,0 +1,9 @@
+# Exercise Entry: v0.3.0 Vertical Templates — Phase 1
+# Workbench → Product (farm)
+# Date: 2026-06-04
+# Purpose: Signal farm to integrate v0.3.0 vertical templates and run smoke validation
+feature: v0.3.0-vertical-templates
+lifecycle:
+  status: active
+  created_at: '2026-06-04T15:45:00Z'
+  activated_at: '2026-06-04T15:45:00Z'

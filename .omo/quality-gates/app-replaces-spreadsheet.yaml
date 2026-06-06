@@ -1,0 +1,175 @@
+# App Replaces Spreadsheet — Deterministic Quality Gate
+# Version: 0.2
+# Date: 2026-06-05
+# Run by: Product agent (farm)
+# Exit: ALL tests PASS for 3 consecutive rounds
+
+meta:
+  name: app-replaces-spreadsheet
+  version: 0.2
+  milestone: v0.3.0
+  rounds_required: 3
+tests:
+- id: 1
+  name: All admin changelists render without error
+  description: Every ModelAdmin.get_changelist_instance() loads without 500
+  command: python manage.py shell -c 'from django.apps import apps; ...'
+  expected: Each changelist page returns 200
+  severity: blocking
+- id: 2
+  name: All admin change forms render without error
+  description: Every ModelAdmin.get_changeform_initial_data() loads without 500 for
+    existing objects
+  expected: Each change form page returns 200
+  severity: blocking
+- id: 3
+  name: All admin actions execute without error
+  description: Every mark_as_* action runs without crashing when called with valid
+    queryset
+  expected: Each action completes with success message, no 500
+  severity: blocking
+- id: 4
+  name: All list_filters render without error
+  description: Every SimpleListFilter.lookups() returns without exception
+  expected: Each filter dropdown populates correctly
+  severity: blocking
+- id: 5
+  name: FK link methods resolve correctly
+  description: Every admin change list FK link renders a clickable link to the correct
+    target admin page
+  expected: FK links navigate to the related object's change form
+  severity: non-blocking
+- id: 6
+  name: Status transitions match status-workflow.md
+  description: For each status_field, the allowed transitions match the design doc
+  expected: admin actions only show transitions allowed by the workflow spec
+  severity: blocking
+- id: 7
+  name: UI archetypes match ui-archetypes.md
+  description: Each model's list_display, readonly_fields, list_editable match its
+    archetype
+  expected: Archetype-consistent field layout per design doc
+  severity: non-blocking
+- id: 08
+  name: Role access matches role-model.md
+  description: Each model's get_queryset respects the role CRUD matrix
+  expected: Users see only rows their role permits
+  severity: non-blocking
+- id: 09
+  name: YearWeekFilter produces valid lookups
+  description: YearWeekFilter.lookups() returns valid year/week pairs without crashing
+  expected: Lookups return without FieldError; datetimes() receives plain DateField
+    name
+  severity: blocking
+- id: 10
+  name: Current-season default filter activates correctly
+  description: get_queryset default filter correctly scopes to current year when no
+    year filter selected
+  expected: Default year filter applies; explicit year selection overrides it
+  severity: non-blocking
+- id: 11
+  name: All profiled tabs have a classification
+  description: >
+    Runs classification_summary from checkpoint and fails if any unknown
+    tabs exist (indicating a profiled tab was not classified).
+  command: >
+    python manage.py shell -c '
+    import yaml, json;
+    from pathlib import Path;
+    ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+    from profiler.tools.tab_classifier import classification_summary, TabClassification;
+    tcs = ckpt.get("interaction_contract", {}).get("tab_classifications", {});
+    classifications = [
+      TabClassification(tab_title=k, category=v["category"], confidence=v["confidence"], rationale=v.get("rationale", ""))
+      for k, v in tcs.items()
+    ];
+    summary = classification_summary(classifications);
+    print(f"Total: {summary[\"total\"]}, Unknown: {len(summary[\"unknown_tabs\"])}");
+    assert len(summary["unknown_tabs"]) == 0, f"Unknown tabs: {summary[\"unknown_tabs\"]}";
+    print("PASS: All tabs classified");
+    '
+  expected: classification_summary returns zero unknown tabs
+  severity: blocking
+- id: 12
+  name: No UI config tabs were accidentally modeled
+  description: >
+    Checks that ui_config-classified tabs do not have entries in
+    schema_contract.tables. UI config tabs should not be modeled as
+    Django models.
+  command: >
+    python manage.py shell -c '
+    import yaml;
+    from pathlib import Path;
+    ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+    tcs = ckpt.get("interaction_contract", {}).get("tab_classifications", {});
+    tables = ckpt.get("schema_contract", {}).get("tables", []);
+    ui_config_titles = {k for k, v in tcs.items() if v.get("category") == "ui_config"};
+    modeled_titles = {t.get("source_tab", "") for t in tables};
+    accidental = ui_config_titles & modeled_titles;
+    print(f"UI config tabs: {len(ui_config_titles)}, Modeled: {len(accidental)}");
+    assert len(accidental) == 0, f"UI config tabs found in schema_contract: {accidental}";
+    print("PASS: No UI config tabs modeled");
+    '
+  expected: No ui_config tabs appear in schema_contract.tables
+  severity: blocking
+- id: 13
+  name: Data tab coverage ratio meets threshold
+  description: >
+    Checks that data-classified tabs exist in the interaction contract.
+    At least one data tab must be present (tab_classification.category
+    == "data").
+  command: >
+    python manage.py shell -c '
+    import yaml;
+    from pathlib import Path;
+    ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+    tcs = ckpt.get("interaction_contract", {}).get("tab_classifications", {});
+    data_tabs = [k for k, v in tcs.items() if v.get("category") == "data"];
+    print(f"Data-classified tabs: {len(data_tabs)}");
+    assert len(data_tabs) > 0, "No data-classified tabs found in interaction contract";
+    print("PASS: Data tabs present");
+    '
+  expected: At least one data-classified tab in the interaction contract
+  severity: non-blocking
+- id: 14
+  name: Zero unknown tabs after human review pass
+  description: >
+    Warns if any unknown-classified tabs remain after a human review
+    pass. Unknown tabs should be either reclassified or explicitly
+    excluded.
+  command: >
+    python manage.py shell -c '
+    import yaml;
+    from pathlib import Path;
+    ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+    tcs = ckpt.get("interaction_contract", {}).get("tab_classifications", {});
+    unknown = [k for k, v in tcs.items() if v.get("category") == "unknown"];
+    if unknown:
+        print(f"WARNING: {len(unknown)} unknown tabs remain: {unknown}");
+    else:
+        print("PASS: No unknown tabs remain");
+    '
+  expected: Zero unknown tabs after review (non-blocking warning)
+  severity: non-blocking
+- id: 15
+  name: Classification coverage improvement tracking
+  description: >
+    Informational — outputs classification coverage percentage for
+    tracking over time.
+  command: >
+    python manage.py shell -c '
+    import yaml;
+    from pathlib import Path;
+    ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+    tcs = ckpt.get("interaction_contract", {}).get("tab_classifications", {});
+    total = len(tcs);
+    classified = sum(1 for v in tcs.values() if v.get("category") != "unknown");
+    pct = round(classified / total * 100, 1) if total > 0 else 0.0;
+    print(f"Classification coverage: {classified}/{total} = {pct}%");
+    print("INFO: coverage tracking output");
+    '
+  expected: Prints coverage percentage (informational, always passes)
+  severity: non-blocking
+lifecycle:
+  status: active
+  created_at: '2026-06-03T00:00:00Z'

@@ -43,46 +43,60 @@ Codegen manifest (derived, deterministic, consumed by generators)
 **Generator:** `scaffold_view_manifest --signals-only`  
 **Policy:** Safe to overwrite on every profile run. Contains no human decisions.
 
+The output format is a flat list of signal entries (one per tab) with 12
+heuristic signals used for archetype classification:
+
 ```yaml
-version: profiler-signals-1
-source:
-  provider: google_sheets
-  source_id: farm_corpus
-  generated_at: "2026-05-26T14:00:00Z"
+version: 2
+generated_at: "2026-06-01T12:00:00+00:00"
+signals:
+  - tab_title: Crop Planner
+    workbook_code: farm_corpus
+    ui_archetype: form
+    confidence_score: 0.87                # 0.0–1.0 margin-based confidence
+    column_count: 12                      # total columns in the tab
+    avg_null_rate: 0.23                   # average null rate across columns
+    formula_density: 0.02                 # formula cell count / total cells
+    cross_sheet_refs: 2                   # count of cross-sheet references
+    null_rates:
+      notes: 0.45
+      planting_date: 0.0
+    has_status_column: true               # inferred from header + data validation
+    has_time_scope: true                  # year/week/date columns detected
+    data_validation_density: 0.38         # fraction of columns with validation
+    header_formula_count: 2               # columns with formula-keyword headers
+    header_entity_count: 4                # columns with entity-keyword headers
+    merged_cell_ratio: 0.0                # fraction of merged header cells
+    row_count: 152
+    expansion_formula_ratio: 0.0          # fraction of expansion-formula columns
+    archetype_scores:                     # score vector for all 4 archetypes
+      form: 0.87
+      list: 0.20
+      dashboard: 0.10
+      reference: 0.03
 
-views:
-  CropPlanner:
-    signals:
-      ui_archetype: form              # form | list | dashboard | reference
-      confidence: 0.87                # 0.0–1.0; how strongly signals converge
-      formula_density: 0.02           # formula cell count / total cells
-      data_validation_columns: [Crop, Quantity, Block]
-      cross_sheet_refs:
-        - target_tab: HarvestRecord
-          ref_type: VLOOKUP
-        - target_tab: FieldRecord
-          ref_type: IMPORTRANGE
-      null_rates:
-        notes: 0.45
-        planting_date: 0.0
-      row_count: 152
-      col_count: 12
-      has_status_column: true         # inferred from header + data validation
-      has_time_scope: true            # year/week/date columns detected
-
-  WeeklySales:
-    signals:
-      ui_archetype: dashboard
-      confidence: 0.92
-      formula_density: 0.78
-      data_validation_columns: []
-      cross_sheet_refs:
-        - target_tab: HarvestRecord
-          ref_type: SUM_range
-        - target_tab: PackRecord
-          ref_type: SUM_range
-      row_count: 52
-      col_count: 8
+  - tab_title: Weekly Sales
+    workbook_code: farm_corpus
+    ui_archetype: dashboard
+    confidence_score: 0.92
+    column_count: 8
+    avg_null_rate: 0.05
+    formula_density: 0.78
+    cross_sheet_refs: 2
+    null_rates: {}
+    has_status_column: false
+    has_time_scope: false
+    data_validation_density: 0.0
+    header_formula_count: 0
+    header_entity_count: 1
+    merged_cell_ratio: 0.25
+    row_count: 52
+    expansion_formula_ratio: 0.12
+    archetype_scores:
+      form: 0.05
+      list: 0.10
+      dashboard: 0.92
+      reference: 0.02
 ```
 
 ### Layer 2: Human Interaction Contract
@@ -206,7 +220,75 @@ It answers operational questions that guide the consultant's configuration:
 The consultant uses these answers to configure the generated admin
 and to advise the client on workflow changes.
 
+### CLI Decision Surface: `--explain` and `--min-confidence`
+
+The `scaffold_view_manifest --signals-only` command supports two flags that
+expose the archetype classification reasoning to the consultant:
+
+**`--explain`**
+Print a human-readable explanation for each tab's archetype classification.
+Shows the winning label, confidence margin, top contributing signals (with
+their raw values and contribution scores), and a low-confidence
+RECOMMENDATION when the winning margin is slim.
+
+Required: `--signals-only` must also be set.
+
+**`--min-confidence <float>`**
+Only show explanations for tabs with a confidence score *below* the given
+threshold. For example, `--min-confidence 0.7` hides tabs whose archetype
+is clearly established and shows only the ambiguous ones. Requires
+`--explain`.
+
+```bash
+python manage.py scaffold_view_manifest             \
+    --structure build/structure.json                  \
+    --signals-only                                    \
+    --explain                                         \
+    --min-confidence 0.7
+```
+
+Example output:
+
+```
+Crop Planner — form (confidence 0.87, margin 0.67 over list at 0.20)
+  Description: Structured data-entry form with moderate column count,
+    data validation, and status tracking.
+  Top contributing signals:
+    - has_status_column: 1.0 → +3.0
+    - data_validation_density: 0.38 → +3.0
+    - column_count: 12.0 → +2.0
+    - formula_density: 0.02 → +2.0
+    - header_entity_count: 4.0 → +2.0
+
 ---
+
+Weekly Sales — dashboard (confidence 0.92, margin 0.82 over list at 0.10)
+  Description: High-formula summary view with cross-sheet references
+    and chart-like layout.
+  Top contributing signals:
+    - formula_density: 0.78 → +4.0
+    - expansion_formula_ratio: 0.12 → +2.0
+    - merged_cell_ratio: 0.25 → +2.0
+    - cross_sheet_ref_count: 2 → +2.0
+  Signals against:
+    - avg_null_rate: 0.05 → -2.0
+
+---
+
+2/3 tabs below --min-confidence 0.7
+```
+
+The "Signals against" section shows which signal values *weaken* the
+winning archetype's score — these are the dimensions the consultant should
+investigate if the classification feels wrong.
+
+The summary line at the end (visible with `--min-confidence`) tells the
+consultant how many tabs need attention, so they can focus their review
+on the ambiguous cases rather than reading every tab's explanation.
+
+---
+
+## Dependency Graph (Workflow Sequence)
 
 ## Dependency Graph (Workflow Sequence)
 

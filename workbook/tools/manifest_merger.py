@@ -401,6 +401,16 @@ def merge_manifests(
         if ic_entry and ic_entry.get("access_hints"):
             table_entry["access_hints"] = ic_entry["access_hints"]
 
+        permissions: dict[str, Any] = {}
+        if ic_entry and ic_entry.get("role_owner"):
+            permissions["owner_role"] = ic_entry["role_owner"]
+            permissions["reviewer_roles"] = list(
+                ic_entry.get("role_reviewers") or []
+            )
+            permissions["mechanism"] = "django_groups"
+        if permissions:
+            table_entry.setdefault("access_hints", {})["permissions"] = permissions
+
         tables.append(table_entry)
 
     source_id = ""

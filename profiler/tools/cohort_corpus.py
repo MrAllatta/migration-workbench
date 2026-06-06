@@ -664,6 +664,39 @@ def select_tabs_from_inventory(
             }
         )
 
+    # --- Tab Classification ---
+    from profiler.tools.tab_classifier import classify_tabs_batch
+
+    # Build domain hits map from breakdown token_matches
+    domain_hits_map: dict[str, dict[str, int]] = {}
+    for entry in scored:
+        title = entry["tab_title"]
+        breakdown = entry.get("breakdown", {})
+        token_matches = breakdown.get("token_matches", [])
+        hits: dict[str, int] = {}
+        for tm in token_matches:
+            cat = tm.get("category", "unknown")
+            hits[cat] = hits.get(cat, 0) + 1
+        if hits:
+            domain_hits_map[title] = hits
+
+    classifications = classify_tabs_batch(
+        scored,
+        domain_category_hits_map=domain_hits_map if domain_hits_map else None,
+    )
+    class_map = {c.tab_title: c for c in classifications}
+
+    for entry in scored:
+        cl = class_map.get(entry["tab_title"])
+        if cl:
+            entry["classification"] = cl.category
+            entry["classification_confidence"] = cl.confidence
+            entry["classification_rationale"] = cl.rationale
+        else:
+            entry["classification"] = "unknown"
+            entry["classification_confidence"] = 0.0
+            entry["classification_rationale"] = "Missing classification"
+
     aggregate: dict[tuple[str, str], dict] = {}
     for entry in scored:
         key = (entry["workbook_code"], entry["tab_title"])
@@ -672,6 +705,9 @@ def select_tabs_from_inventory(
             {
                 "workbook_code": entry["workbook_code"],
                 "tab_title": entry["tab_title"],
+                "classification": entry.get("classification", "unknown"),
+                "classification_confidence": entry.get("classification_confidence", 0.0),
+                "classification_rationale": entry.get("classification_rationale", ""),
                 "occurrences": 0,
                 "years": set(),
                 "scores": [],
@@ -731,6 +767,13 @@ def select_tabs_from_inventory(
             {
                 "workbook_code": bucket["workbook_code"],
                 "tab_title": bucket["tab_title"],
+                "classification": bucket.get("classification", "unknown"),
+                "classification_confidence": bucket.get(
+                    "classification_confidence", 0.0
+                ),
+                "classification_rationale": bucket.get(
+                    "classification_rationale", ""
+                ),
                 "years": sorted(year for year in bucket["years"] if year is not None),
                 "occurrences": bucket["occurrences"],
                 "avg_score": round(avg_score, 2),

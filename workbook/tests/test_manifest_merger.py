@@ -457,3 +457,81 @@ def test_merge_command_rejects_missing_file(tmp_path):
             profiler_signals=str(tmp_path / "nonexistent.yaml"),
             output=str(tmp_path / "out.yaml"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Permissions propagation (v0.4.0 Phase 3)
+# ---------------------------------------------------------------------------
+
+
+def _contract_with_permissions() -> dict:
+    """Return an interaction contract with role_owner and role_reviewers."""
+    return {
+        "version": "interaction-contract-1",
+        "generated_at": "2026-06-01T00:00:00Z",
+        "source_id": "farm",
+        "interviews": [
+            {
+                "role": "field_manager",
+                "archetype_overrides": {
+                    "Crop Planner": "form",
+                },
+                "role_reviewers": ["operations", "auditor"],
+            },
+        ],
+    }
+
+
+def test_permissions_propagated_to_access_hints():
+    """role_owner and role_reviewers should propagate to access_hints.permissions."""
+    result = merge_manifests(
+        profiler_signals=None,
+        interaction_contract=_contract_with_permissions(),
+        view_manifest=_view_manifest(),
+    )
+    planner = next(t for t in result["tables"] if t["model_name"] == "CropPlanner")
+    assert "access_hints" in planner
+    assert "permissions" in planner["access_hints"]
+    perms = planner["access_hints"]["permissions"]
+    assert perms["owner_role"] == "field_manager"
+    assert perms["reviewer_roles"] == ["operations", "auditor"]
+    assert perms["mechanism"] == "django_groups"
+
+
+def test_permissions_multiple_reviewers_preserved():
+    """Multiple role_reviewers should be preserved as a list."""
+    result = merge_manifests(
+        profiler_signals=None,
+        interaction_contract=_contract_with_permissions(),
+        view_manifest=_view_manifest(),
+    )
+    planner = next(t for t in result["tables"] if t["model_name"] == "CropPlanner")
+    perms = planner["access_hints"]["permissions"]
+    assert isinstance(perms["reviewer_roles"], list)
+    assert len(perms["reviewer_roles"]) == 2
+    assert "operations" in perms["reviewer_roles"]
+    assert "auditor" in perms["reviewer_roles"]
+
+
+def test_no_permissions_key_when_role_owner_absent():
+    """When a tab has no role_owner, no permissions key should appear."""
+    # A tab from view_manifest with no interaction contract entry
+    # and no role_hints pointing to it should not get permissions.
+    contract = {
+        "version": "interaction-contract-1",
+        "interviews": [
+            {
+                "role": "viewer",
+                "archetype_overrides": {},
+            },
+        ],
+    }
+    result = merge_manifests(
+        profiler_signals=None,
+        interaction_contract=contract,
+        view_manifest=_view_manifest(),
+    )
+    # HarvestLog has no interaction contract entry (no archetype_overrides for it)
+    harvest = next(t for t in result["tables"] if t["model_name"] == "HarvestLog")
+    if "access_hints" in harvest:
+        assert "permissions" not in harvest["access_hints"]

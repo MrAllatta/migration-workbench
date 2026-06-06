@@ -19,7 +19,7 @@
 | [Interaction Contract](interaction-contract.md) | adopter | Three-layer UI/workflow contract: profiler signals, human contract, codegen manifest |
 | [Pipeline State](pipeline-state.md) | implementer | Layered profiler runtime state and checkpoint design |
 | [Pipeline Manifest Reference](pipeline-manifest.md) | operator | Machine-generated execution plan format |
-| [Roadmap](roadmap.md) | all | Milestone history and direction (0.2.0 shipped, 0.3.0+ next) |
+| [Roadmap](roadmap.md) | all | Milestone history and direction (0.2.0 shipped, 0.3.0 next) |
 | [Agent Harness](agent-harness.md) | all | Design philosophy: agent does everything that does not require judgment, alerting the human for the judgment |
 
 ## Operations

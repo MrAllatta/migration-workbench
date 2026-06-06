@@ -81,8 +81,28 @@ class Command(BaseCommand):
             help="Output path for --signals-only YAML "
             "(default: build/profiler-signals.yaml).",
         )
+        parser.add_argument(
+            "--explain",
+            action="store_true",
+            default=False,
+            help="Print human-readable archetype explanation for each tab "
+                 "(only in --signals-only mode).",
+        )
+        parser.add_argument(
+            "--min-confidence",
+            type=float,
+            default=0.0,
+            help="Only show explanations for tabs with confidence below this "
+                 "threshold (default: 0.0 = show all). Requires --explain.",
+        )
 
     def handle(self, *args, **options):
+        # Validate argument combinations
+        if options.get("min_confidence", 0.0) > 0.0 and not options.get("explain"):
+            raise CommandError("--min-confidence requires --explain.")
+        if options.get("explain") and not options.get("signals_only"):
+            raise CommandError("--explain requires --signals-only.")
+
         structure_path = Path(options["structure"]).resolve()
         if not structure_path.is_file():
             raise CommandError(f"structure not found: {structure_path}")
@@ -185,3 +205,87 @@ class Command(BaseCommand):
         )
         out_path.write_text(text, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote profiler signals {out_path}"))
+
+        if options.get("explain"):
+            self._print_explain_output(signals, options)
+
+    def _print_explain_output(
+        self,
+        signals: dict[str, Any],
+        options: dict[str, Any],
+    ) -> None:
+        """Print human-readable archetype explanations for each tab."""
+        from workbook.tools.signal_extraction import explain_archetype
+
+        min_confidence = float(options.get("min_confidence", 0.0))
+        low_count = 0
+
+        for tab_signal in signals.get("signals", []):
+            tab_title = tab_signal.get("tab_title", "")
+            confidence = float(tab_signal.get("confidence_score", 0.0))
+
+            if min_confidence > 0 and confidence >= min_confidence:
+                continue
+
+            null_rates = tab_signal.get("null_rates", {})
+            signal_dict = {
+                "column_count": int(tab_signal.get("column_count", 0)),
+                "formula_density": float(
+                    tab_signal.get("formula_density", 0.0)
+                ),
+                "cross_sheet_ref_count": int(
+                    tab_signal.get("cross_sheet_refs", 0)
+                ),
+                "avg_null_rate": sum(null_rates.values())
+                / max(len(null_rates), 1)
+                if null_rates
+                else float(tab_signal.get("avg_null_rate", 0.0)),
+                "has_status_column": float(
+                    tab_signal.get("has_status_column", False)
+                ),
+                "has_time_scope": float(
+                    tab_signal.get("has_time_scope", False)
+                ),
+                "data_validation_density": float(
+                    tab_signal.get("data_validation_density", 0.0)
+                ),
+                "header_formula_count": int(
+                    tab_signal.get("header_formula_count", 0)
+                ),
+                "header_entity_count": int(
+                    tab_signal.get("header_entity_count", 0)
+                ),
+                "merged_cell_ratio": float(
+                    tab_signal.get("merged_cell_ratio", 0.0)
+                ),
+                "row_count": int(tab_signal.get("row_count", 0)),
+                "expansion_formula_ratio": float(
+                    tab_signal.get("expansion_formula_ratio", 0.0)
+                ),
+            }
+
+            label = tab_signal.get("ui_archetype", "")
+            archetype_scores = tab_signal.get("archetype_scores", {})
+
+            explanation = explain_archetype(
+                tab_title,
+                signals_dict=signal_dict,
+                label=label,
+                confidence=confidence,
+                archetype_scores=archetype_scores,
+            )
+            self.stdout.write("")
+            self.stdout.write(explanation)
+            self.stdout.write("---")
+
+            if min_confidence > 0 and confidence < min_confidence:
+                low_count += 1
+
+        if min_confidence > 0:
+            total = len(signals.get("signals", []))
+            self.stdout.write(
+                self.style.WARNING(
+                    f"\n{low_count}/{total} tabs below "
+                    f"--min-confidence {min_confidence}"
+                )
+            )

@@ -426,7 +426,10 @@ class TestPhaseGuardClauses:
         assert state.schema_contract is not None
         assert len(state.schema_contract["tables"]) == 1
         assert state.schema_contract["tables"][0]["model_name"] == "CropPlanner"
-        assert state.interaction_contract == {"views": []}
+        assert state.interaction_contract is not None
+        assert "views" in state.interaction_contract
+        assert "tab_classifications" in state.interaction_contract
+        assert "Crop Planner" in state.interaction_contract["tab_classifications"]
 
 
 # ---------------------------------------------------------------------------
@@ -1035,8 +1038,9 @@ class TestPhaseMethods:
         assert len(result.schema_contract["tables"]) == 1
         assert result.schema_contract["tables"][0]["model_name"] == "CropPlanner"
         assert len(result.schema_contract["tables"][0]["fields"]) == 2
-        assert len(result.decisions) == 1
+        assert len(result.decisions) == 2
         assert result.decisions[0].phase == "derive_contracts"
+        assert result.decisions[1].decision_id == "tab_classification"
         assert result.interaction_contract is not None
 
     def test_derive_contracts_guard_raises(self):

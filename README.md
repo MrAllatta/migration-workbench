@@ -132,7 +132,7 @@ GitHub repository secret `**FLY_API_TOKEN`** is required for Deploy. Product rep
 
 ## Status and roadmap
 
-**0.2.0 — Admin quality bar, interaction contract merge, historical import maturity (current)**
+**0.2.0 — Admin generation maturity (shipped)**
 
 The admin generator now produces production-grade output: status transitions,
 role-appropriate views, year/week filtering, and proper field-level validation
@@ -206,21 +206,22 @@ discovery interviews, and Fly.io deployment all function on real data.
   See [Pipeline State](docs/pipeline-state.md) and [Agent Harness](docs/agent-harness.md).
 
 0.1.0 was not the handoff — it was the prerequisite. The pipeline turned
-on real data. 0.2.0 turned that data into a working application.
+on real data. 0.2.0 turned that data into production-grade admin configuration — a foundation for user-facing application codegen in 0.3.0.
 
-**0.3.0+ — Consultant accelerant**
+**0.3.0 — User-facing UI codegen (next)**
 
-Each version encodes more consultant judgment into the agent harness,
-making the operator faster. Not a feature list — a judgment-compounding system.
+The workbench ships generic code generation for Django views, templates,
+and HTMX interactive components — not just admin. Role-aware archetypes
+produce editable forms for field workers, sortable tables for operations,
+and summary dashboards for managers. Validated on the farm engagement.
 
-- **0.3.0 Vertical templates:** After N engagements in a vertical,
-  extract reusable presets. The 10th farm migration is 5x faster
-  than the 1st.
+**0.4.0 — Role-based interfaces (next)**
 
-- **0.4.0 Interaction contract maturity:** Agent infers how data is used
-  (form/list/dashboard/reference) without interview. Consultant confirms.
-  Generated admin reflects actual business workflows, not generic CRUD.
-  See [Interaction Contract](docs/interaction-contract.md).
+Codegen for role-aware landing pages, dashboard views with summary cards,
+permission scaffolding from interaction contract roles, and print-friendly
+list outputs.
+
+**0.5.0+ — Consultant accelerant / Platform (conditional)**
 
 - **0.5.0+ Platform (conditional):** Only after judgment taxonomy
   is dense enough to make the agent reliably correct.
