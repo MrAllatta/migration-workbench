@@ -1,13 +1,13 @@
 # App Replaces Spreadsheet — Deterministic Quality Gate
-# Version: 0.2
+# Version: 0.3
 # Date: 2026-06-05
 # Run by: Product agent (farm)
 # Exit: ALL tests PASS for 3 consecutive rounds
 
 meta:
   name: app-replaces-spreadsheet
-  version: 0.2
-  milestone: v0.3.0
+  version: 0.3
+  milestone: v0.4.0
   rounds_required: 3
 tests:
 - id: 1
@@ -170,6 +170,116 @@ tests:
     '
   expected: Prints coverage percentage (informational, always passes)
   severity: non-blocking
+- id: 16
+  name: "Database row coverage meets minimum threshold"
+  description: >
+    Compares total database records against total source spreadsheet rows.
+    Requires the coverage ratio to exceed configurable minimum (default: 50%).
+  command: >
+    python manage.py shell -c '
+    import json, yaml;
+    from pathlib import Path;
+    from django.apps import apps;
+    total_db = sum(m.objects.count() for m in apps.get_app_config("core").get_models());
+    structure_path = Path("build/bundle/structure.json");
+    if structure_path.exists():
+        structure = json.loads(structure_path.read_text());
+        total_source = sum(t.get("total_rows", 0) for t in structure.get("tabs", []));
+    else:
+        ckpt = yaml.safe_load(Path("checkpoint.yaml").read_text());
+        total_source = ckpt.get("interaction_contract", {}).get("source_row_count", 0);
+    ratio = round(total_db / total_source * 100, 1) if total_source > 0 else 0;
+    min_threshold = float("{{MIN_COVERAGE_PCT|50}}");
+    print(f"Database records: {total_db}");
+    print(f"Source rows: {total_source}");
+    print(f"Coverage: {ratio}% (threshold: {min_threshold}%)");
+    assert ratio >= min_threshold, (f"FAIL: Coverage {ratio}% below minimum {min_threshold}%");
+    print("PASS: Data coverage meets minimum threshold");
+    '
+  expected: "Coverage ratio >= MIN_COVERAGE_PCT (default 50%)"
+  severity: blocking
+  config:
+    min_coverage_pct: 50
+- id: 17
+  name: "Last import run had zero errors"
+  description: >
+    Reads most recent import summary JSON, verifies zero error rows.
+  command: >
+    python manage.py shell -c '
+    import json, glob;
+    from pathlib import Path;
+    summaries = sorted(Path("build/imports/").glob("import-summary*.json"));
+    assert len(summaries) > 0, "No import summary found — run import first";
+    latest = max(summaries, key=lambda p: p.stat().st_mtime);
+    summary = json.loads(latest.read_text());
+    total_errors = summary.get("escalation_summary", {}).get("total_errors", -1);
+    print(f"Import summary: {latest.name}");
+    print(f"Total errors: {total_errors}");
+    assert total_errors == 0, f"FAIL: {total_errors} import errors found";
+    print("PASS: Last import had zero errors");
+    '
+  expected: "Zero errors in most recent import summary"
+  severity: blocking
+- id: 18
+  name: "All foreign key references are valid"
+  description: >
+    Checks every FK field references an existing row. Orphans indicate import ordering issues.
+  command: >
+    python manage.py shell -c '
+    from django.apps import apps;
+    from django.db import connection;
+    problematic = [];
+    for model in apps.get_app_config("core").get_models():
+        for field in model._meta.fields:
+            if field.is_relation and field.many_to_one and field.remote_field:
+                fk_field = field.column;
+                related_table = field.remote_field.model._meta.db_table;
+                sql = f"""
+                    SELECT COUNT(*) FROM {model._meta.db_table} t
+                    LEFT JOIN {related_table} r ON t.{fk_field}_id = r.id
+                    WHERE t.{fk_field}_id IS NOT NULL AND r.id IS NULL
+                """;
+                with connection.cursor() as cursor:
+                    cursor.execute(sql);
+                    orphan_count = cursor.fetchone()[0];
+                    if orphan_count > 0:
+                        problematic.append(f"{model.__name__}.{field.name}: {orphan_count} orphans");
+    if problematic:
+        for p in problematic:
+            print(f"ORPHAN: {p}");
+        assert False, f"FAIL: {len(problematic)} FK fields have orphaned references";
+    else:
+        print("PASS: All FK references are valid");
+    '
+  expected: "Zero orphaned FK references across all models"
+  severity: blocking
+- id: 19
+  name: "Data coverage improved since last validation (tracking)"
+  description: >
+    Informational — reads previous coverage metric, reports change.
+  command: >
+    python manage.py shell -c '
+    from pathlib import Path;
+    import yaml;
+    metrics_path = Path(".spreadsheet-replacement-metrics.yaml");
+    if metrics_path.exists():
+        prev = yaml.safe_load(metrics_path.read_text());
+        prev_coverage = prev.get("coverage_ratio", 0);
+        prev_records = prev.get("records", 0);
+        print(f"Previous coverage: {prev_coverage}% ({prev_records} records)");
+    else:
+        print("No previous metrics found — first run");
+    '
+  expected: "Prints improvement (informational, always passes)"
+  severity: non-blocking
+- id: 20
+  name: "All operator workflow tests pass"
+  description: >
+    Runs automated workflow test suite, requires 100% pass rate.
+  command: >
+    python -m pytest backend/apps/core/tests/test_workflows.py -v --tb=short -q 2>&1 | tail -10
+  expected: "All workflow tests pass (exit code 0)"
+  severity: blocking
 lifecycle:
   status: active
   created_at: '2026-06-03T00:00:00Z'

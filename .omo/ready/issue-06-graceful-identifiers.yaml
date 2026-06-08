@@ -1,0 +1,29 @@
+issue: "06"
+title: "scaffold_workbook_schema should gracefully handle invalid Python identifiers"
+status: completed
+lifecycle:
+  status: consumed
+  created_at: "2026-06-07T00:00:00Z"
+  consumed_at: "2026-06-07T22:30:00Z"
+  actor: workbench (built) -> meta (ack)
+changes:
+  - file: workbook/management/commands/scaffold_workbook_schema.py
+    summary: |
+      - Added _sanitize_python_identifier() to convert arbitrary strings to valid Python identifiers
+      - Added _sanitize_table_identifiers() to fix model_name and suggested_field_name in-place
+      - Modified _validate_tables_for_scaffold() to sanitize identifiers by default instead of aborting
+      - Added --strict-identifiers flag to restore old abort behavior (opt-in)
+      - Wired strict_identifiers through handle → _handle_bundle_config / _handle_cohort_corpus → _build_cohort_contract
+      - Uses logging.warning() for each sanitization event
+      - Records original→sanitized mapping in table _meta.sanitized_identifiers
+  - file: workbook/tests/test_scaffold_workbook_schema.py
+    summary: |
+      - Added 10 new tests covering:
+        - _sanitize_python_identifier edge cases (leading digits, special chars, valid, empty)
+        - _sanitize_table_identifiers in-place modification and _meta recording
+        - _validate_tables_for_scaffold default sanitization behavior
+        - _validate_tables_for_scaffold strict mode (raises CommandError)
+        - _validate_tables_for_scaffold strict + continue_on_error (skips table)
+        - Existing 28 tests remain unchanged and pass
+gate: make chassis-gate
+gate_result: passed (1160 tests, all smoke commands)

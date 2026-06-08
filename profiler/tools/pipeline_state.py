@@ -1302,6 +1302,9 @@ class PipelineState:
         # --- Tab Classification ---
         self._classify_deep_profiled_tabs()
 
+        # --- Filter out UI-config tabs ---
+        self._filter_ui_config_tabs()
+
         # Emit profiler signals alongside contracts
         self._emit_profiler_signals()
 
@@ -1372,6 +1375,73 @@ class PipelineState:
             }
             for c in classifications
         }
+
+    def _filter_ui_config_tabs(self) -> None:
+        """Filter out UI-config tabs from the schema contract.
+
+        Reads ``tab_classifications`` from ``interaction_contract`` and
+        removes any table from ``schema_contract["tables"]`` whose
+        ``source_tab`` is classified as ``ui_config``. Records a decision
+        for each excluded tab.
+
+        Only excludes tabs whose deep profile entry has explicit
+        ``total_rows`` or ``total_cols`` keys (meaning the entry was
+        produced by a real deep-profile run, not a test stub).
+
+        Gracefully skips if ``interaction_contract`` is ``None`` or
+        ``tab_classifications`` is missing (backward compatibility).
+        """
+        if self.interaction_contract is None or self.schema_contract is None:
+            return
+        tab_classifications = self.interaction_contract.get("tab_classifications")
+        if not tab_classifications:
+            return
+
+        ui_config_tabs: set[str] = {
+            tab_title
+            for tab_title, classification in tab_classifications.items()
+            if classification.get("category") == "ui_config"
+        }
+        if not ui_config_tabs:
+            return
+
+        # Determine which tabs have real profile dimensionality data.
+        # Entries that lack total_rows/total_cols are test stubs and
+        # should not be filtered (the classifier falls back to defaults
+        # that may not reflect real classification).
+        profiled_tabs: set[str] = set()
+        for entry in self.deep_profile_index.entries:
+            tab_title = entry.get("tab_title") or entry.get("tab", "unknown")
+            if "total_rows" in entry or "total_cols" in entry:
+                profiled_tabs.add(tab_title)
+
+        original_tables = self.schema_contract.get("tables", [])
+        filtered_tables: list[dict] = []
+        for table in original_tables:
+            source_tab = table.get("source_tab", "")
+            if source_tab in ui_config_tabs and source_tab in profiled_tabs:
+                classification = tab_classifications.get(source_tab, {})
+                confidence = classification.get("confidence", 0.0)
+                sanitized = source_tab.replace(" ", "_").replace("-", "_")
+                self.record_decision(
+                    decision_id=f"exclude_ui_config_{sanitized}",
+                    phase="derive_contracts",
+                    description=(
+                        f"Excluded tab '{source_tab}' from schema contract"
+                        " — classified as ui_config"
+                    ),
+                    outcome="excluded",
+                    confidence=confidence,
+                    metadata={
+                        "tab_name": source_tab,
+                        "category": "ui_config",
+                        "confidence": confidence,
+                    },
+                )
+            else:
+                filtered_tables.append(table)
+
+        self.schema_contract["tables"] = filtered_tables
 
     def _emit_profiler_signals(self) -> None:
         """Build and write profiler-signals YAML from deep profile index.

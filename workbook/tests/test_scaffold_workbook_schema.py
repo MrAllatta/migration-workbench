@@ -1,6 +1,8 @@
 """Tests for the scaffold_workbook_schema management command."""
 
+import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from workbook.management.commands.scaffold_workbook_schema import (
     _to_pascal_case,
@@ -13,6 +15,8 @@ from workbook.management.commands.scaffold_workbook_schema import (
     _check_null_model_names,
     _check_pivot_tables,
     _check_invalid_identifiers,
+    _sanitize_python_identifier,
+    _sanitize_table_identifiers,
     _validate_tables_for_scaffold,
 )
 from workbook.schema_contract import build_contract
@@ -509,3 +513,138 @@ def test_validate_tables_skips_designed_models():
     valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=True)
     assert len(valid) == 1
     assert collector.is_empty()
+
+
+# ── Identifier sanitization ──────────────────────────────────────────────
+
+
+def test_sanitize_python_identifier_prepends_field_for_leading_digit():
+    """Leading digits get field_ prefix."""
+    assert _sanitize_python_identifier("0_00") == "field_0_00"
+    assert _sanitize_python_identifier("201_unit") == "field_201_unit"
+
+
+def test_sanitize_python_identifier_replaces_invalid_chars():
+    """Non-alphanumeric, non-underscore characters are replaced with _."""
+    assert _sanitize_python_identifier("has space") == "has_space"
+    assert _sanitize_python_identifier("dash-ed") == "dash_ed"
+    assert _sanitize_python_identifier("special!char") == "special_char"
+
+
+def test_sanitize_python_identifier_preserves_valid():
+    """Already valid identifiers pass through unchanged."""
+    assert _sanitize_python_identifier("valid_name") == "valid_name"
+    assert _sanitize_python_identifier("name") == "name"
+    assert _sanitize_python_identifier("field_0_00") == "field_0_00"
+
+
+def test_sanitize_python_identifier_empty_or_underscores():
+    """Empty or all-underscore input falls back to 'field'."""
+    assert _sanitize_python_identifier("") == "field"
+    assert _sanitize_python_identifier("___") == "field"
+
+
+def test_sanitize_table_identifiers_sanitizes_invalid():
+    """Invalid model_name and field names are sanitized in-place."""
+    table = {
+        "bundle_worksheet_title": "Sales Channels",
+        "model_name": "0_00",
+        "columns": [
+            {"suggested_field_name": "valid_name"},
+            {"suggested_field_name": "201_unit"},
+        ],
+    }
+    result = _sanitize_table_identifiers(table)
+    assert table["model_name"] == "field_0_00"
+    assert table["columns"][1]["suggested_field_name"] == "field_201_unit"
+    assert table["columns"][0]["suggested_field_name"] == "valid_name"
+    assert len(result) == 2
+    assert ("0_00", "field_0_00") in result
+    assert ("201_unit", "field_201_unit") in result
+
+
+def test_sanitize_table_identifiers_records_meta():
+    """Sanitized identifiers are recorded in table _meta."""
+    table = {
+        "bundle_worksheet_title": "Test",
+        "model_name": "Test",
+        "columns": [
+            {"suggested_field_name": "0_00"},
+        ],
+    }
+    _sanitize_table_identifiers(table)
+    meta = table.get("_meta", {})
+    sanitized = meta.get("sanitized_identifiers", [])
+    assert len(sanitized) == 1
+    assert sanitized[0]["original"] == "0_00"
+    assert sanitized[0]["sanitized"] == "field_0_00"
+
+
+def test_sanitize_table_identifiers_noop_for_valid():
+    """No sanitization happens when all identifiers are valid."""
+    table = {
+        "bundle_worksheet_title": "Test",
+        "model_name": "TestModel",
+        "columns": [
+            {"suggested_field_name": "name"},
+            {"suggested_field_name": "count"},
+        ],
+    }
+    result = _sanitize_table_identifiers(table)
+    assert len(result) == 0
+    assert "_meta" not in table
+
+
+def test_validate_tables_sanitizes_by_default():
+    """Without --strict-identifiers, invalid identifiers are sanitized, not aborted."""
+    tables = [
+        {
+            "bundle_worksheet_title": "Sales Channels",
+            "model_name": "SalesChannel",
+            "columns": [
+                {"suggested_field_name": "0_00", "source_column": "0_00"},
+            ],
+        },
+    ]
+    valid, collector = _validate_tables_for_scaffold(tables, continue_on_error=False)
+    assert len(valid) == 1
+    assert valid[0]["columns"][0]["suggested_field_name"] == "field_0_00"
+    assert collector.is_empty()
+
+
+def test_validate_tables_strict_identifiers_raises():
+    """With --strict-identifiers, invalid identifiers raise CommandError."""
+    tables = [
+        {
+            "bundle_worksheet_title": "Sales Channels",
+            "model_name": "SalesChannel",
+            "columns": [
+                {"suggested_field_name": "0_00"},
+            ],
+        },
+    ]
+    with pytest.raises(CommandError, match="SCAFFOLD_INVALID_IDENTIFIER"):
+        _validate_tables_for_scaffold(tables, strict_identifiers=True)
+
+
+def test_validate_tables_strict_identifiers_continue_on_error():
+    """With strict + continue_on_error, invalid identifiers skip the table."""
+    tables = [
+        {
+            "bundle_worksheet_title": "Good",
+            "model_name": "Good",
+            "columns": [{"suggested_field_name": "name"}],
+        },
+        {
+            "bundle_worksheet_title": "Bad",
+            "model_name": "Bad",
+            "columns": [{"suggested_field_name": "0_00"}],
+        },
+    ]
+    valid, collector = _validate_tables_for_scaffold(
+        tables, continue_on_error=True, strict_identifiers=True
+    )
+    assert len(valid) == 1
+    assert valid[0]["model_name"] == "Good"
+    assert len(collector.rejected) == 1
+    assert collector.rejected[0].check_id == "SCAFFOLD_INVALID_IDENTIFIER"

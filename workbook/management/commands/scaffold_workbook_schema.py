@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -161,10 +164,85 @@ def _inject_designed_models(tables: list[dict]) -> list[dict]:
     return tables
 
 
+def _sanitize_python_identifier(name: str) -> str:
+    """Convert *name* into a valid Python identifier.
+
+    - Prepends ``field_`` if the name starts with a digit.
+    - Replaces any character that is not alphanumeric or underscore with ``_``.
+    - Collapses consecutive underscores.
+    - Falls back to ``"field"`` if the result is empty.
+
+    Args:
+        name: The candidate identifier string.
+
+    Returns:
+        str: A valid Python identifier.
+    """
+    s = str(name)
+    result = "".join(c if c.isalnum() or c == "_" else "_" for c in s)
+    result = "_".join(part for part in result.split("_") if part)
+    if result and result[0].isdigit():
+        result = "field_" + result
+    if not result:
+        result = "field"
+    return result
+
+
+def _sanitize_table_identifiers(table: dict) -> list[tuple[str, str]]:
+    """Sanitize invalid Python identifiers in *table* in-place.
+
+    Logs a warning for each identifier that was changed and records the
+    original → sanitized mapping in ``table["_meta"]["sanitized_identifiers"]``.
+
+    Args:
+        table: A schema-contract table dict (mutated in-place).
+
+    Returns:
+        list[tuple[str, str]]: Pairs of ``(original_name, sanitized_name)``
+        for every identifier that was modified.
+    """
+    sanitized: list[tuple[str, str]] = []
+    tab_title = table.get("bundle_worksheet_title", "?")
+
+    model_name = str(table.get("model_name", "")).strip()
+    if model_name and not is_valid_python_identifier(model_name):
+        clean = _sanitize_python_identifier(model_name)
+        table["model_name"] = clean
+        sanitized.append((model_name, clean))
+        logger.warning(
+            "[SCAFFOLD_SANITIZED_IDENTIFIER] model_name %r → %r (Table: %s)",
+            model_name,
+            clean,
+            tab_title,
+        )
+
+    for col in table.get("columns", []):
+        field_name = col.get("suggested_field_name", "")
+        if field_name and not is_valid_python_identifier(field_name):
+            clean = _sanitize_python_identifier(field_name)
+            col["suggested_field_name"] = clean
+            sanitized.append((field_name, clean))
+            logger.warning(
+                "[SCAFFOLD_SANITIZED_IDENTIFIER] Field %r → %r (Table: %s)",
+                field_name,
+                clean,
+                tab_title,
+            )
+
+    if sanitized:
+        meta = table.setdefault("_meta", {})
+        meta["sanitized_identifiers"] = [
+            {"original": orig, "sanitized": clean} for orig, clean in sanitized
+        ]
+
+    return sanitized
+
+
 def _validate_tables_for_scaffold(
     tables: list[dict[str, Any]],
     continue_on_error: bool = False,
     pivot_detection_threshold: float = 0.5,
+    strict_identifiers: bool = False,
 ) -> tuple[list[dict[str, Any]], PartialOutputCollector]:
     collector = PartialOutputCollector()
     valid_tables: list[dict[str, Any]] = []
@@ -207,18 +285,21 @@ def _validate_tables_for_scaffold(
             else:
                 raise CommandError(pivot_errors[0])
 
-        id_errors = _check_invalid_identifiers(table)
-        if id_errors:
-            if continue_on_error:
-                collector.add(
-                    table,
-                    check_id="SCAFFOLD_INVALID_IDENTIFIER",
-                    message=id_errors[0].split(":", 1)[1].strip(),
-                    action="Rename the source column header or add a column alias in the bundle config",
-                )
-                continue
-            else:
-                raise CommandError(id_errors[0])
+        if strict_identifiers:
+            id_errors = _check_invalid_identifiers(table)
+            if id_errors:
+                if continue_on_error:
+                    collector.add(
+                        table,
+                        check_id="SCAFFOLD_INVALID_IDENTIFIER",
+                        message=id_errors[0].split(":", 1)[1].strip(),
+                        action="Rename the source column header or add a column alias in the bundle config",
+                    )
+                    continue
+                else:
+                    raise CommandError(id_errors[0])
+        else:
+            _sanitize_table_identifiers(table)
 
         valid_tables.append(table)
 
@@ -330,6 +411,7 @@ def _build_cohort_contract(
     hardened: bool = False,
     continue_on_error: bool = False,
     pivot_detection_threshold: float = 0.5,
+    strict_identifiers: bool = False,
 ) -> tuple[dict[str, Any], PartialOutputCollector]:
     """Build a schema contract from a cohort corpus ``deep_profile_coverage`` payload.
 
@@ -439,6 +521,7 @@ def _build_cohort_contract(
         tables,
         continue_on_error=continue_on_error,
         pivot_detection_threshold=pivot_detection_threshold,
+        strict_identifiers=strict_identifiers,
     )
 
     tab_headers = {}
@@ -719,6 +802,13 @@ class Command(BaseCommand):
             help="Automatically apply template match suggestions above "
             "confidence threshold (default: show as YAML comments only)",
         )
+        parser.add_argument(
+            "--strict-identifiers",
+            action="store_true",
+            default=False,
+            help="Abort on invalid Python identifiers instead of sanitizing "
+            "(default: sanitize and warn)",
+        )
 
     def handle(self, *args, **options):
         out_path = Path(options["out"]).resolve()
@@ -735,6 +825,7 @@ class Command(BaseCommand):
         bundle_config_path = options.get("bundle_config")
         continue_on_error = bool(options.get("continue_on_error", False))
         pivot_detection_threshold = float(options.get("pivot_detection_threshold", 0.5))
+        strict_identifiers = bool(options.get("strict_identifiers", False))
 
         if cohort_dir:
             contract, collector = self._handle_cohort_corpus(
@@ -742,11 +833,13 @@ class Command(BaseCommand):
                 hardened=bool(options.get("hardened")),
                 continue_on_error=continue_on_error,
                 pivot_detection_threshold=pivot_detection_threshold,
+                strict_identifiers=strict_identifiers,
             )
         elif bundle_config_path:
             contract, collector = self._handle_bundle_config(
                 options,
                 pivot_detection_threshold=pivot_detection_threshold,
+                strict_identifiers=strict_identifiers,
             )
         else:
             raise CommandError(
@@ -856,7 +949,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"wrote {stub_path}"))
 
     def _handle_bundle_config(
-        self, options: dict[str, Any], *, pivot_detection_threshold: float = 0.5
+        self,
+        options: dict[str, Any],
+        *,
+        pivot_detection_threshold: float = 0.5,
+        strict_identifiers: bool = False,
     ) -> tuple[dict[str, Any], PartialOutputCollector]:
         bundle_path = Path(options["bundle_config"]).resolve()
         if not bundle_path.is_file():
@@ -901,6 +998,7 @@ class Command(BaseCommand):
             tables,
             continue_on_error=continue_on_error,
             pivot_detection_threshold=pivot_detection_threshold,
+            strict_identifiers=strict_identifiers,
         )
         contract["tables"] = tables
 
@@ -922,6 +1020,7 @@ class Command(BaseCommand):
         hardened: bool,
         continue_on_error: bool = False,
         pivot_detection_threshold: float = 0.5,
+        strict_identifiers: bool = False,
     ) -> tuple[dict[str, Any], PartialOutputCollector]:
         coverage_files = sorted(cohort_dir.glob("deep_profile_coverage_*.json"))
         if not coverage_files:
@@ -940,5 +1039,6 @@ class Command(BaseCommand):
             hardened=hardened,
             continue_on_error=continue_on_error,
             pivot_detection_threshold=pivot_detection_threshold,
+            strict_identifiers=strict_identifiers,
         )
         return contract, collector

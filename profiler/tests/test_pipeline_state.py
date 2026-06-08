@@ -1082,6 +1082,161 @@ class TestPhaseMethods:
         assert result.schema_contract["tables"][0]["model_name"] == "Unknown"
         assert result.schema_contract["tables"][0]["source_tab"] == "unknown"
 
+    def test_derive_contracts_excludes_ui_config(self):
+        """ui_config tabs are excluded from schema contract with decision record."""
+        from unittest.mock import patch
+        from profiler.tools.tab_classifier import TabClassification
+
+        mock_classifications = [
+            TabClassification(
+                tab_title="Crop Planner",
+                category="data",
+                confidence=0.6,
+                rationale="Data tab",
+            ),
+            TabClassification(
+                tab_title="Configure",
+                category="ui_config",
+                confidence=0.85,
+                rationale="UI config tab",
+            ),
+        ]
+        with patch(
+            "profiler.tools.tab_classifier.classify_tabs_batch",
+            return_value=mock_classifications,
+        ):
+            state = PipelineState(
+                deep_profile_index=DeepProfileIndex(
+                    entries=[
+                        {
+                            "tab_title": "Crop Planner",
+                            "total_rows": 100,
+                            "total_cols": 10,
+                            "columns": [
+                                {"header": "crop_name", "data_type": "string"},
+                            ],
+                        },
+                        {
+                            "tab_title": "Configure",
+                            "total_rows": 3,
+                            "total_cols": 20,
+                            "columns": [
+                                {"header": "setting", "data_type": "string"},
+                                {"header": "value", "data_type": "string"},
+                            ],
+                        },
+                    ]
+                ),
+            )
+            result = state.derive_contracts()
+
+        assert result.schema_contract is not None
+        assert len(result.schema_contract["tables"]) == 1
+        assert result.schema_contract["tables"][0]["model_name"] == "CropPlanner"
+        assert result.schema_contract["tables"][0]["source_tab"] == "Crop Planner"
+
+        # Verify excluded decision was recorded
+        excluded_decisions = [
+            d for d in result.decisions if d.outcome == "excluded"
+        ]
+        assert len(excluded_decisions) == 1
+        assert excluded_decisions[0].decision_id == "exclude_ui_config_Configure"
+        assert excluded_decisions[0].phase == "derive_contracts"
+        assert excluded_decisions[0].confidence == 0.85
+        assert excluded_decisions[0].metadata["tab_name"] == "Configure"
+        assert excluded_decisions[0].metadata["category"] == "ui_config"
+
+    def test_derive_contracts_keeps_unknown_and_reference(self):
+        """Only ui_config tabs are excluded; unknown/reference/data tabs remain."""
+        from unittest.mock import patch
+        from profiler.tools.tab_classifier import TabClassification
+
+        mock_classifications = [
+            TabClassification(
+                tab_title="Crop Planner",
+                category="data",
+                confidence=0.6,
+                rationale="Data tab",
+            ),
+            TabClassification(
+                tab_title="Varieties",
+                category="reference",
+                confidence=0.7,
+                rationale="Reference tab",
+            ),
+            TabClassification(
+                tab_title="Configure",
+                category="ui_config",
+                confidence=0.85,
+                rationale="UI config tab",
+            ),
+            TabClassification(
+                tab_title="UnknownSheet",
+                category="unknown",
+                confidence=0.0,
+                rationale="Could not classify",
+            ),
+        ]
+        with patch(
+            "profiler.tools.tab_classifier.classify_tabs_batch",
+            return_value=mock_classifications,
+        ):
+            state = PipelineState(
+                deep_profile_index=DeepProfileIndex(
+                    entries=[
+                        {
+                            "tab_title": "Crop Planner",
+                            "total_rows": 100,
+                            "total_cols": 10,
+                            "columns": [
+                                {"header": "crop_name", "data_type": "string"},
+                            ],
+                        },
+                        {
+                            "tab_title": "Varieties",
+                            "total_rows": 200,
+                            "total_cols": 8,
+                            "columns": [
+                                {"header": "variety", "data_type": "string"},
+                            ],
+                        },
+                        {
+                            "tab_title": "Configure",
+                            "total_rows": 3,
+                            "total_cols": 20,
+                            "columns": [
+                                {"header": "setting", "data_type": "string"},
+                            ],
+                        },
+                        {
+                            "tab_title": "Unknown Sheet",
+                            "total_rows": 50,
+                            "total_cols": 5,
+                            "columns": [
+                                {"header": "data", "data_type": "string"},
+                            ],
+                        },
+                    ]
+                ),
+            )
+            result = state.derive_contracts()
+
+        assert result.schema_contract is not None
+        assert len(result.schema_contract["tables"]) == 3
+        model_names = [
+            t["model_name"] for t in result.schema_contract["tables"]
+        ]
+        assert "CropPlanner" in model_names
+        assert "Varieties" in model_names
+        assert "UnknownSheet" in model_names
+        assert "Configure" not in model_names
+        assert "Configure" not in model_names
+
+        # Verify only one exclusion decision (ui_config)
+        excluded = [d for d in result.decisions if d.outcome == "excluded"]
+        assert len(excluded) == 1
+        assert excluded[0].metadata["tab_name"] == "Configure"
+
 
 # ---------------------------------------------------------------------------
 # 10. Version migration
