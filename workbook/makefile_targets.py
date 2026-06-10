@@ -83,6 +83,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "profile-cohort-corpus-phase1",
         "profile-cohort-corpus-phase2",
         "profile-cohort-corpus-phase3",
+        "clean-profile",
         "profile-phase-discover",
         "profile-phase-score",
         "profile-phase-deep",
@@ -419,7 +420,12 @@ def profile_blocks(ctx: MakeContext) -> str:
             '--out-dir "$${CODA_CORPUS_OUT_DIR:-build/coda_corpus}"'
         )
         + "\n\n"
+        + "# [DEPRECATED] Use profile-phase-all instead.\n"
         + "profile-cohort-corpus:\n"
+        + _indent(
+            '@echo "DEPRECATED: Use make profile-phase-all instead"'
+        )
+        + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
@@ -430,7 +436,12 @@ def profile_blocks(ctx: MakeContext) -> str:
         + "\n\n"
         + "# Phase 1: discovery + tab selection only (no deep API calls). "
         "Inspect tab_selection_<date>.json, then configure heuristics.\n"
+        + "# [DEPRECATED] Use profile-phase-discover instead.\n"
         + "profile-cohort-corpus-phase1:\n"
+        + _indent(
+            '@echo "DEPRECATED: Use make profile-phase-discover instead"'
+        )
+        + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--folder "$${DRIVE_FOLDER_ID:?DRIVE_FOLDER_ID required}" '
@@ -441,7 +452,12 @@ def profile_blocks(ctx: MakeContext) -> str:
         + "\n\n"
         + "# Phase 2: re-run heuristics from broad coverage (no API calls). "
         "Iterate on cohort_corpus.json, then re-run.\n"
+        + "# [DEPRECATED] Use profile-phase-score instead.\n"
         + "profile-cohort-corpus-phase2:\n"
+        + _indent(
+            '@echo "DEPRECATED: Use make profile-phase-score instead"'
+        )
+        + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
@@ -453,12 +469,25 @@ def profile_blocks(ctx: MakeContext) -> str:
         "Run after heuristics are final.\n"
         + "# Available tab_score heuristics: tab_exclude_patterns (regex block list), "
         "expansion_formula_penalty, expansion_formula_threshold, plus token lists.\n"
+        + "# [DEPRECATED] Use profile-phase-deep instead.\n"
         + "profile-cohort-corpus-phase3:\n"
+        + _indent(
+            '@echo "DEPRECATED: Use make profile-phase-deep instead"'
+        )
+        + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
             '--config "$${COHORT_CORPUS_CONFIG:?COHORT_CORPUS_CONFIG required}" '
             '--out-dir "$${COHORT_CORPUS_OUT_DIR:-data/profile_snapshots/cohort_corpus}" '
             '--date-stamp "$(DATE_STAMP)" --resume-from-tab-selection'
+        )
+        + "\n\n"
+        + "# Remove profiling data (profile snapshots and pipeline state) without confirmation.\n"
+        + "# Use profile-clean (with confirmation prompt) for interactive use.\n"
+        + "clean-profile:\n"
+        + _indent(
+            r"""@echo "WARNING: This will remove ALL profiling data (data/profile_snapshots/ and build/pipeline-state*)." && \
+	rm -rf data/profile_snapshots/ build/pipeline-state*"""
         )
         + "\n"
     )

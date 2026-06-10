@@ -629,6 +629,7 @@ class PipelineState:
         domain_context: DomainContext | None = None,
         out_dir: str | Path | None = None,
         date_stamp: str | None = None,
+        force: bool = False,
     ) -> PipelineState:
         """Load existing checkpoint or create fresh from config.
 
@@ -645,6 +646,8 @@ class PipelineState:
             Output directory for profiler artifacts.
         date_stamp : str | None
             ISO date string for artifact filenames.
+        force : bool
+            If ``True``, suppress the stale-artifact warning and proceed.
 
         Returns
         -------
@@ -677,6 +680,27 @@ class PipelineState:
                 state.domain_knowledge.domain = str(domain_val)
 
         state.configure(config=config, out_dir=out_dir, date_stamp=date_stamp)
+
+        # Stale-artifact detection: warn when pre-existing discover-phase
+        # artifacts exist in the output directory and no checkpoint is
+        # being resumed.  Old artifacts can silently corrupt ``discover()``
+        # by supplying stale discovery data instead of performing a fresh
+        # run.  Pass ``--force`` (or ``force=True``) to suppress.
+        if not checkpoint_path.exists() and not force:
+            resolved_out = state._out_dir or Path("data/profile_snapshots")
+            if resolved_out.exists() and resolved_out.is_dir():
+                stale_artifacts = sorted(resolved_out.glob("tab_selection_*.json"))
+                if stale_artifacts:
+                    logger.warning(
+                        "Stale discover-phase artifacts found in %s "
+                        "(e.g. %s). These may cause PipelineState to load "
+                        "stale discovery data instead of performing a fresh "
+                        "discovery.  Run 'make clean-profile' or pass "
+                        "--force to suppress this warning.",
+                        resolved_out,
+                        stale_artifacts[0].name,
+                    )
+
         return state
 
     # ------------------------------------------------------------------

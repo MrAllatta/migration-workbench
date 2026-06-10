@@ -1,6 +1,6 @@
 import json
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 
@@ -233,3 +233,21 @@ def test_profile_drive_folder_reads_folder_id_from_config(tmp_path):
     assert "- tab[ 0] 'Tab A' rows=10 cols=5" in rendered
     assert "- Folder: Nested Folder (truncated, id=child-folder-1)" in rendered
     assert "- Other file: Notes.txt (text/plain)" in rendered
+
+
+def test_run_pipeline_state_force_flag(tmp_path):
+    """run_pipeline_state --force doesn't error and passes flag through."""
+    config_path = tmp_path / "config.json"
+    config_path.write_text('{"domain": "test", "folder_id": "test"}')
+    with patch(
+        "profiler.management.commands.run_pipeline_state.PipelineState.load_or_create",
+        return_value=MagicMock(),
+    ) as mock_load:
+        call_command(
+            "run_pipeline_state",
+            config=str(config_path),
+            phase="discover",
+            force=True,
+        )
+    _, call_kwargs = mock_load.call_args
+    assert call_kwargs.get("force") is True

@@ -105,6 +105,11 @@ class Command(BaseCommand):
             help="Path for profiler-signals YAML artifact "
             "(default: alongside checkpoint as profiler-signals.yaml).",
         )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Suppress stale-artifact warning and proceed with profiling.",
+        )
 
     def handle(self, *args, **options):
         config_path = Path(options["config"]).resolve()
@@ -136,6 +141,7 @@ class Command(BaseCommand):
             domain_context=domain_context,
             out_dir=out_dir,
             date_stamp=date_stamp,
+            force=options.get("force", False),
         )
         state.configure(
             config=config,

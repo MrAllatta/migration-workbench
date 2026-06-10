@@ -1,5 +1,6 @@
 """Tests for PipelineState — dataclass, checkpoint I/O, phase methods, artifacts."""
 
+import logging
 import tomllib
 from pathlib import Path
 from unittest.mock import patch
@@ -361,6 +362,68 @@ class TestLoadOrCreate:
             checkpoint_path=checkpoint,
         )
         assert loaded.discovery.approved_tabs == {"101": ["Crop Planner"]}
+
+
+# ---------------------------------------------------------------------------
+# Stale artifact warning tests
+# ---------------------------------------------------------------------------
+
+
+class TestStaleArtifactWarning:
+    """Verify stale discover-phase artifact detection in load_or_create."""
+
+    def test_load_or_create_stale_artifact_warning(self, tmp_path, caplog):
+        """Stale tab_selection_*.json triggers a warning."""
+        (tmp_path / "tab_selection_20260101.json").write_text(
+            '{"approved_tabs": {}}'
+        )
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "test"}')
+
+        caplog.set_level(logging.WARNING)
+        PipelineState.load_or_create(
+            config_path=config_path,
+            checkpoint_path=tmp_path / "nonexistent.yaml",
+            out_dir=tmp_path,
+        )
+        assert "Stale discover-phase artifacts" in caplog.text
+
+    def test_load_or_create_force_suppresses_warning(self, tmp_path, caplog):
+        """force=True suppresses the stale artifact warning."""
+        (tmp_path / "tab_selection_20260101.json").write_text(
+            '{"approved_tabs": {}}'
+        )
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "test"}')
+
+        caplog.set_level(logging.WARNING)
+        PipelineState.load_or_create(
+            config_path=config_path,
+            checkpoint_path=tmp_path / "nonexistent.yaml",
+            out_dir=tmp_path,
+            force=True,
+        )
+        assert "Stale discover-phase artifacts" not in caplog.text
+
+    def test_load_or_create_checkpoint_exists_no_warning(self, tmp_path, caplog):
+        """Existing checkpoint suppresses the stale artifact warning (resume)."""
+        checkpoint_path = tmp_path / "pipeline-state.yaml"
+        state = PipelineState()
+        state.save_checkpoint(checkpoint_path)
+
+        (tmp_path / "tab_selection_20260101.json").write_text(
+            '{"approved_tabs": {}}'
+        )
+        config_path = tmp_path / "config.json"
+        config_path.write_text('{"domain": "test"}')
+
+        caplog.set_level(logging.WARNING)
+        PipelineState.load_or_create(
+            config_path=config_path,
+            checkpoint_path=checkpoint_path,
+            out_dir=tmp_path,
+        )
+        assert "Stale discover-phase artifacts" not in caplog.text
 
 
 # ---------------------------------------------------------------------------
