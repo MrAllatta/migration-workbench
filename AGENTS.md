@@ -33,13 +33,14 @@ make chassis-gate    # the full CI gate: migrate, test, lint, smoke commands
 
 ## Ecosystem
 
-This repo participates in a multi-repo development ecosystem with upstream/downstream product repos (farm, etc.). Three agent types coordinate through a filesystem-based protocol defined in `.omo/design/ecosystem.md`:
+This repo operates as a two-person team: human + orchestrator agent. The orchestrator delegates to role-specific subagents (builder, reviewer, investigator, writer) via `task()` calls. The coordination protocol between human and orchestrator is defined in `.omo/protocol.md`:
 
-- **Meta agent** — orchestrates from this checkout. Merges worktree features to `exercise`, signals product repos, proposes squashes to human.
-- **Workbench agent** — builds features in isolated worktrees, signals completion via `.omo/ready/`. Never merges.
-- **Product agent** — drives quality by running the "app replaces spreadsheet" smoke test suite against generated code. Writes structured issues to `.omo/issues/` when errors are found. Certifies milestone readiness via `.omo/quality-gates/`.
+| Queue | Writer → Reader | Purpose |
+|-------|----------------|---------|
+| `brief/<slug>.md` | Human → Orchestrator | "Build this." |
+| `done/<slug>.yaml` | Orchestrator → Human | "Done. Here's the diff and squash message." |
 
-See `.omo/design/ecosystem.md` for: branch model, queue protocol (7 queues), farm-led hardening loop, agent launch prompts, worktree commit rules, and patching boundary.
+Subagent roles are defined by capability (not by repo). A builder may work in migration-workbench or farm as the task requires. See `.omo/protocol.md` for: subagent roles, workspace model, workflow, farm relationship, release model.
 
 ## Five apps
 
@@ -119,7 +120,7 @@ git push origin master && git push origin v0.1.0
 product repo before you commit to a stable release, tag it `v0.1.0a1`. Product
 repos pin exactly (`==0.1.0a1`) to opt in.
 
-**Agents do not commit on `master` or `exercise`.** On worktree branches only, agents may commit with conventional commit messages as checkpoints (see Ecosystem section above). Agents must not push, tag, merge, or rebase. Each commit captures a working state. When an agent finishes work, it shows the diff and proposes a squash commit message — you write the merge to `master`.
+**Agents do not commit on `master`.** On feature branches only, agents commit freely with conventional commit messages as checkpoints. Agents must not push, tag, or rebase. After `make chassis-gate` passes, the agent squash-merges to master (`git merge --squash`), proposes a squash message, and shows the diff. The operator reviews, amends if needed, then pushes.
 
 ### Naming rules
 

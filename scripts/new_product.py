@@ -724,6 +724,8 @@ This skips Drive discovery and tab listing, going straight to deep profiling of 
 def render_agents_md(provider: str) -> str:
     return f"""# Agent notes
 
+> **Generated file.** Do not edit directly. To update, modify `scripts/new_product.py` in migration-workbench and regenerate.
+
 ## Repo identity
 
 This is a **scaffolded product repository** built on [migration-workbench](https://pypi.org/project/migration-workbench/). It embeds the workbench as a PyPI dependency and provides its own Django project at `backend/` (`config.settings`, `manage.py`, `apps/core/`). The workbench apps (`connectors`, `profiler`, `importer`, `workbook`) are listed in `INSTALLED_APPS`.
@@ -749,168 +751,23 @@ To run the full workbench CI gate against that checkout:
 make chassis-gate
 ```
 
-## Ecosystem
+## Workbench relationship
 
-This repo is a **product agent** in the migration-workbench development ecosystem. Its primary role is building farm — profiling data, designing schema contracts, generating code, and deploying. The agent uses the latest workbench tools on the `exercise` branch. When new workbench features ship to exercise, the agent integrates and validates them as part of ongoing farm development.
+This repo consumes **migration-workbench** as a PyPI dependency. The development protocol (team structure, subagent roles, coordination, release model) is defined in the workbench checkout's `.omo/protocol.md` — see `../migration-workbench/.omo/protocol.md`.
 
-The product agent is one of three agent types (meta, workbench, product) — see `../migration-workbench/.omo/design/ecosystem.md` for the full architecture.
+This file describes what an agent can do **in this checkout**: setup, profiling, code generation, import, deployment. It does not define multi-repo agent protocols — those live upstream.
 
-### Editable install context
+## Branch discipline
 
-The workbench checkout is installed in **editable mode** at a fixed path:
+This is a **product repo**. Agents commit directly to `main` — no feature branches, no worktrees. The human works in this same checkout; isolation is not needed.
 
-```bash
-# The WORKBENCH env var (set in .env) points to the workbench checkout:
-echo "$WORKBENCH"             # e.g., ~/projects/migration-workbench
+When the brief says `repo: <product>` (e.g. `repo: farm`), the workflow is:
+1. Implement changes.
+2. `git add` and `git commit -m "type(area): message"` directly on `main`.
+3. Run `make check` (or equivalent smoke test) if applicable.
+4. The orchestrator writes the done file in the workbench checkout.
 
-# The editable install is already live — no re-install needed for exercise:
-python -c "import migration_workbench; print(migration_workbench.__file__)"
-# Output: $WORKBENCH/migration_workbench/__init__.py
-```
-
-The workbench's main checkout lives on the `exercise` branch permanently. Features are merged to `exercise` before validation. Because the editable install points at this checkout, farm always imports whatever is on `exercise`. **The install is never re-pointed or re-installed** for the exercise cycle — the exercise branch is the single source of truth.
-
-For patches and upstream fixes (not the exercise cycle), use `make install-dev-workbench` as documented in "Patching upstream" below.
-
-### Exercise cycle
-
-The exercise cycle is how new workbench features flow into farm development. When a feature merges to exercise, farm adopts it by running the consumption plan and validating the output before the workbench human squashes to master:
-
-```
-1. Meta merges a completed feature worktree → exercise branch
-2. Meta writes .omo/exercise/<feature>.yaml → signals farm to validate
-3. Farm agent reads the exercise file → identifies the feature and exercise plan
-4. Farm runs validation commands from the consumption plan
-5. Farm writes .omo/results/<feature>.yaml → PASS or FAIL with structured detail
-6. Meta reads the result → writes squash proposal (PASS) or repair instruction (FAIL)
-```
-
-Farm exercises **one feature at a time**. The exercise file (at `../migration-workbench/.omo/exercise/<feature>.yaml`) contains:
-
-```yaml
-feature: <feature-name>
-commit: <sha-on-exercise>
-exercise_plan: .omo/plans/v0.2.0-consumption.md   # relative to workbench
-phase_tag: v0.2.0a1                                 # optional pre-release tag marker
-```
-
-Resolve the exercise plan path as `../migration-workbench/<exercise_plan_path>`. The consumption plan contains the exact validation commands for each phase tag.
-
-### Queue protocol
-
-All inter-agent communication is filesystem-based. The workbench checkout's `.omo/` directory contains the queue directories. This repo reaches them at `../migration-workbench/.omo/` (stable relative path — both repos are siblings under the same parent).
-
-| Queue | Writer → Reader | This repo's role |
-|-------|----------------|------------------|
-| `exercise/<feature>.yaml` | Meta → Product | Read exercise signal. Identify feature, commit, and exercise plan path. |
-| `results/<feature>.yaml` | Product → Meta | Write exercise result with structured checklist. |
-| `issues/<NN>-<desc>.md` | Product → Meta | Write structured failure reports for gaps. |
-
-All paths above are relative to `../migration-workbench/.omo/`.
-
-#### Result file format
-
-Write results to `../migration-workbench/.omo/results/<feature>.yaml`:
-
-```yaml
-feature: <feature-name-from-exercise-file>
-commit: <commit-sha-from-exercise-file>
-result: PASS                                       # or FAIL
-exercised_at: "2026-06-01T16:00:00Z"               # ISO 8601
-summary: "15 signals validated, 0 failures"
-checklist:
-  signals_command_exits_0: true
-  all_signal_fields_populated: true
-errors: []                                         # populated on FAIL
-```
-
-On FAIL, populate `errors` with structured entries:
-
-```yaml
-errors:
-  - criterion: "signals_command_exits_0"
-    command: "python manage.py scaffold_view_manifest --signals-only ..."
-    exit_code: 1
-    stderr: "KeyError: 'bundle_config'"
-```
-
-#### Issue file format
-
-For structured failures, write to `../migration-workbench/.omo/issues/<NN>-<short-description>.md`:
-
-````markdown
-# <NN>: <Short description>
-
-## Feature
-<feature-name>
-
-## Area
-<workbench module or command affected>
-
-## Symptom
-What happened — exact error, unexpected output, missing artifact.
-
-## Expected
-What should have happened — correct behavior per the exercise plan.
-
-## Reproduction
-```bash
-exact commands to reproduce from a clean state
-```
-
-## Environment
-- Workbench commit: <sha>
-- Phase tag: <tag>
-````
-
-Number issues sequentially: `001`, `002`, etc. Check existing issue files in `../migration-workbench/.omo/issues/` to find the next available number.
-
-### Agent protocol
-
-When launched as a product agent, the prompt is:
-
-> "You are a product agent. Build farm using the latest workbench tools. If `../migration-workbench/.omo/exercise/<feature>.yaml` exists, a new feature is on the exercise branch — integrate it. Run the consumption plan, write results to `../migration-workbench/.omo/results/<feature>.yaml`, file upstream gaps to `../migration-workbench/.omo/issues/<NN>-<desc>.md`."
-
-The agent has **two modes**:
-
-**Build mode** (no exercise file): Profile farm data, design schema contracts, generate code, run imports, deploy. Follow `AUTONOMOUS_RUN_PROMPT.md` or human instruction. Use workbench commands via the editable install at `$WORKBENCH`.
-
-**Integration mode** (exercise file present): A new workbench feature is on the exercise branch. Integrate it:
-
-1. **Read the exercise file** — `../migration-workbench/.omo/exercise/<feature>.yaml`. Extract `feature`, `commit`, and `exercise_plan` path.
-2. **Resolve the consumption plan** — `../migration-workbench/<exercise_plan_path>`. Read the plan and locate the section matching the feature or `phase_tag`.
-3. **Source environment** — `set -a; . .env; set +a` (or `make bash`) to load `.env` vars including `$WORKBENCH`.
-4. **Run integration commands** — Execute the commands specified in the consumption plan for this feature. This is production work — the feature generates artifacts farm will use.
-5. **Validate output** — Check each criterion in the consumption plan's checklist.
-6. **Write result** — PASS or FAIL YAML to `../migration-workbench/.omo/results/<feature>.yaml`.
-7. **File issues** — On FAIL, also write an issue file to `../migration-workbench/.omo/issues/<NN>-<desc>.md`. The feature may still be usable — signal exactly what gap was found.
-8. **Stop** — Do not modify workbench code. Do not merge, push, or tag. Do not re-install anything.
-
-### Error handling
-
-| Situation | Action |
-|-----------|--------|
-| No exercise file | No new features to integrate. Build farm normally per `AUTONOMOUS_RUN_PROMPT.md` or human instruction. |
-| Consumption plan not found at resolved path | FAIL: `"exercise plan missing at <path>"` plus issue file. |
-| Validation command fails (non-zero exit) | FAIL result with `exit_code` + captured `stderr` in errors list. |
-| Expected artifact not produced | FAIL result: `"expected artifact <path> not found after command"`. |
-| Workbench import crashes | FAIL result: `"import migration_workbench failed"`. Check `$WORKBENCH` path, suggest `make install-dev-workbench`. |
-| Checklist criterion fails | FAIL result per criterion with observed value vs expected. |
-| Exercise cycle already in progress | Check `../migration-workbench/.omo/results/` for existing result for this feature. If present, compare commit. |
-
-### Workspace pattern (optional)
-
-For development context, a workspace root can be created with symlinks to both repos:
-
-```bash
-mkdir -p ../workbench-workspace && cd ../workbench-workspace
-ln -s ../migration-workbench platform
-ln -s ../<product-name> product
-```
-
-This provides a shared context for multi-repo agents without changing anything about either repo.
-
-See the canonical design at `../migration-workbench/.omo/design/ecosystem.md` for the full protocol.
+For upstream workbench changes (not product config), follow "Patching upstream" below — those use feature branches in the workbench checkout.
 
 ## Environment basics
 
@@ -1401,6 +1258,9 @@ dist/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+build/
+*.bak
+.omo/
 """
 
 
