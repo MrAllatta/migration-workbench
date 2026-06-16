@@ -3,386 +3,328 @@
 Version history and direction.
 
 ```
-0.0.1 – 0.0.N   Component assembly              ← shipped
-0.1.0            Pipeline proven on real data    ← shipped
-0.2.0            Admin generation maturity       ← shipped
-0.3.0            User-facing UI codegen           ← next milestone
-0.4.0            Role-based interfaces            ← next milestone
-0.5.0+           Consultant accelerant (platform) ← conditional
+0.0.x             Component assembly              ← shipped
+0.1.0             Pipeline proven on real data    ← shipped
+0.2.0             Spreadsheet replacement         ← shipped
+0.3.0             Vertical migration templates    ← shipped
+────────────────────────────────────────────────────────
+0.4.0 – 0.5.0     Product validation + moat       ← current work
+1.0.0             Cold-client ready               ← target
 ```
+
+## Definition of 1.0.0
+
+**A solo consultant can offer service to a cold client with a repeatable, promisable contract.**
+
+This means:
+
+1. **Process is documented end-to-end** — a consultant can follow a written runbook from first client call to deployed app.
+2. **Delivery time is predictable** — the consultant can promise a timeline and hit it (±20%).
+3. **Quality is certified** — the smoke test suite passes for the delivered app, and the consultant can point to a certification process.
+4. **Each engagement makes the next one faster** — judgment taxonomy accumulates patterns; the archetype classifier improves with every vertical.
+5. **Tooling supports the consultant, not replaces them** — confidence gates enforce human review at appropriate thresholds.
+6. **Second vertical is validated** — the chassis has been exercised on at least two distinct domains (farm + one other), proving generality.
+
+**Non-goals for 1.0.0:** self-service migration, multi-tenant hosting, real-time sync, non-Django targets, Postgres at scale, plugin ecosystem.
 
 ---
 
-## Shipped: 0.0.x — Component assembly
+## Shipped
+
+### 0.0.x — Component assembly
 
 Every piece of the pipeline exists in isolation. Profiler works. Codegen works.
 Import runtime works. They have not yet been coupled end-to-end on real data.
 
-### Profiler pipeline
+Contents unchanged from previous version. See git history for full 0.0.x changelog.
 
-- **Phase 0 preflight:** validate auth, credentials, drive access — Google Sheets and Coda.
-- **Phase 1 discovery:** enumerate Drive folder tree, build workbook index, broad profile,
-  heuristic tab scoring with domain context integration.
-- **Phase 2 refinement:** re-run scoring with adjusted config — no API calls.
-- **Phase 3 deep profiling:** fetch full grid data, classify formula taxonomy
-  (raw / row_formula / expansion_formula / hybrid / empty), detect cross-sheet
-  and cross-workbook references, extract data validation rules.
-- **Domain context artifact:** `domain_context.yaml` with vocabulary (operational /
-  reference / support / derived), glossary synonyms, entity definitions, year scope
-  with active/archived/forward periods, and tab deduplication strategy.
-  - Vocabulary feeds tab scoring tokens and column priority scores.
-  - Glossary expands tab titles and column headers for synonym matching.
-  - Year-aware coverage bonus and deduplication (latest year only per tab).
-  - Validation gate: `validate_domain_context --strict` blocks pipeline on empty vocabulary.
-  - `draft_domain_context` command infers starter YAML from drive tree + raw notes.
-- **Column enrichment:** computed field detection, FK candidate suggestion, import key
-  identification, entity grouping — propagated through profiler JSON artifacts and
-  consumed by `scaffold_workbook_schema`.
-- **Tab selection overrides:** human-editable `tab_selection_*.json` supports
-  add/remove/replace per workbook code; `--resume-from-tab-selection` preserves edits.
-- **Coda corpus:** doc enumeration, broad profile, table scoring (with Coda-specific
-  heuristics for relation columns and formula column density), deep profiling,
-  relationship summary, optional canvas extraction.
-- **PipelineState:** Layered checkpoint model (`PipelineState` dataclass, `.yaml` I/O)
-  with 4-phase dispatch (discover → score_and_select → deep_profile → derive_contracts),
-  resume with guard clauses, and deterministic artifact externalization. Each phase
-  records a gate closure preventing re-entry. See [Pipeline State](pipeline-state.md)
-  for the full design and [Agent Harness](agent-harness.md) for the philosophy.
-- **Auxiliary commands:** `scan_formula_patterns`, `extract_workbook_codes`,
-  `snapshot_bundle`, `pull_bundle`.
+### 0.1.0 — Pipeline proven on real data
 
-### Schema contract system
+The profile→model→codegen→import→deploy pipeline exercised end-to-end on 56 workbooks, 239 tabs, 11-model schema contract. PipelineState checkpointing, schema contract scaffolding, codegen, import runtime, view manifest, discovery interviews, and Fly.io deployment all function on real data.
 
-- **Contract YAML format (v1.0–1.3):** `columns[]` with source-to-field mapping,
-  profiler format type inference, field class derivation (DecimalField, DateField,
-  BooleanField, ForeignKey, TextField), nullability hardening.
-- **v1.1 hardening blocks:** `model_meta` (verbose_name, ordering, db_table,
-  unique_together, indexes, constraints, abstract), `str_template`, `extra_fields`,
-  `computed_fields`, `fk_resolutions`, `field_overrides`, `hooks` (after_model /
-  after_meta / extra_methods), `import_config`, `admin`, `source_tab: null` for
-  designed models.
-- **`scaffold_workbook_schema`:** dual code path — from `--bundle-config` with
-  optional profiler JSONs, or from `--cohort-corpus-out-dir` reading raw grid samples.
-  Post-processing: designed model detection via column overlap analysis, FK column
-  flagging, computed field detection, contract hardening, domain knowledge merge.
-- **Designed model detection:** `find_column_overlap_groups()` — Jaccard-like ratio
-  >= 0.5 between tab column sets produces suggested aggregate entities.
-- **Contract validation:** `validate_contract --strict` checks valid Python identifiers,
-  no duplicate model names, no null model names, FK target existence, import_config
-  field resolution.
-- **Contract review:** `review_contract()` — CharField max_length, nullable FK on_delete,
-  str_template, FK lookup targets, admin inline targets, computed field naming.
-- **Contract diff and migration safety:** `diff_contracts()` + `migration_safety_checks()`
-  — detect removed fields, type changes, nullability changes with DANGER/WARNING levels.
-- **Contract composition:** `!include` / `!include_list` YAML tags with cyclic detection.
-- **`scaffold_designed_model`:** CLI helper emitting single-table YAML skeletons from
-  `--fields` specs.
+### 0.2.0 — Spreadsheet replacement
 
-### Codegen
+Admin generator produces production-grade output: status transitions, role-appropriate views, year/week filtering, proper field-level validation. Interaction contract merge path complete. Historical import loop proven across 5+ years. 922+ tests pass.
 
-- **`generate_models`:** renders `models_auto.py` with FK resolution, `class Meta`
-  (indexes, constraints, unique_together, ordering, verbose_name, abstract),
-  `__str__` from template, `@property` computed fields, hooks injection at
-  after_model / after_meta / extra_methods, enum choice classes from `enums` block.
-- **`generate_admin`:** renders `admin_auto.py` with `@admin.register(Model)` classes,
-  list_display/list_filter/search_fields auto-detection, FK link methods (clickable
-  admin links via `reverse()` + `format_html()`), TabularInline for reverse FK
-  relationships, status action methods (mark-as-*), time-scope filtering via
-  date_hierarchy + get_queryset year filter, AbstractUser support with BaseUserAdmin.
-- **`generate_import`:** renders `BaseImportCommand` subclass with topological-tiered
-  pipeline, per-model `_import_<Model>()` methods, column_map resolution, FK lookup,
-  field parser inference, field-level `_prepare_<field>()` stubs, `_prepare_row()`
-  and `_before_save()` hooks.
-- **Stub convention:** `models.py` / `admin.py` re-export from `*_auto.py` with
-  a `# --- custom models below this line ---` marker preserving hand edits.
-- **Resilience:** `PartialOutputCollector` + `--continue-on-error` on all generators
-  — rejects invalid tables without aborting the full run.
-- **Identifier safety:** `to_python_identifier()` sanitizes field names; warnings
-  emitted when names are modified.
-- **`--diff` flag:** all generators support diff output instead of overwrite.
+### 0.3.0 — Vertical migration templates
 
-### Import runtime
-
-- **`BaseImportCommand`:** tier system with atomic savepoints, validate-only / dry-run
-  / apply modes, error recording per row per model with failure signatures,
-  summary JSON (created / updated / skipped / error counts).
-- **Bundle reader:** CSV header detection, column_map application, alias resolution,
-  default value injection, multi-source column concatenation.
-- **FK resolution:** two-pass exact then normalized matching with LRU cache.
-- **Type parsing:** `to_int`, `to_decimal`, `to_bool`, `parse_iso_date` (ISO + US
-  date formats). Handles None, whitespace-only, sentinel values per `AGENTS.md` conventions.
-
-### View manifest & discovery
-
-- **View manifest scaffolding:** from `structure.json` + optional schema contract.
-  Infers editable vs computed fields, status field (regex on headers with data validation),
-  time scope (year_field / week_field / default_scope), tab sequence, filterable fields.
-- **Discovery interview:** generates Markdown questionnaire with HTML-comment markers
-  for role ownership, status semantics, status overrides, weekly actions, access control.
-- **Answer merging:** `merge_discovery_notes` parses answers, patches view manifest
-  with role_hints, weekly_actions, view notes, status overrides.
-- **Discovery summary:** `render_summary()` produces stakeholder-ready Markdown recap.
-
-### Build system
-
-- **Shared `makefile_targets.py` module:** all generate, validate, deploy targets
-  produced by a single Python module; consumed by product repo Makefiles via
-  `new_product.py` scaffold.
-- **Preflight gate:** `make preflight` validates env vars, domain context, runtime.
-- **Product scaffold:** `new_product.py` generates full Django project with Makefile,
-  Dockerfile, fly.toml, deploy/spaces.yml, CI/CD workflows, AGENTS.md.
-
-### wb CLI
-
-- `wb manifest lint` — validate `deploy/spaces.yml` against manifest schema.
-- `wb deploy --dry-run` / `--live` — record release event, optionally deploy to
-  Fly.io with health gate polling and release event recording.
-- `wb contract {review,diff,safety,validate}` — contract analysis commands.
-- `wb drift check` — baseline vs new contract comparison with migration risk assessment.
-- `wb generate {models,admin,import,manifest}` — delegate to Django management commands.
-
-### Deployment
-
-- Fly.io deploy: Docker build, fly deploy, health gate polling (`wait_for_healthy`),
-  RELEASE_ID secret setting, outcome recording (deploy_succeeded_healthy / failed).
-- Release store: `ReleaseRecord` DB table + `release-events.jsonl` (append-only).
-- Manifest validation: full schema check for spaces.yml (profiles, replication,
-  build config, secrets, environments).
-- Deploy smoke tests: integration tests with mocked fly CLI and real HTTP health endpoint.
-
-### Documentation
-
-- README, architecture, deployment (Fly / Litestream / Tigris), google-auth,
-  troubleshooting FAQ, schema contract reference, end-to-end tutorial, contributor guide.
-- AGENTS.md with domain vocabulary, naming rules, patching boundary, human judgment points.
-- Full doc map at `docs/INDEX.md`.
-- Docstring coverage at 80% (interrogate gate in CI).
-
-### CI/CD
-
-- `make chassis-gate`: migrate, test, lint, ruff format check, doc coverage.
-- PyPI trusted publishing via GitHub workflow.
-- Fly deploy workflow.
+Template system for extracting reusable presets per vertical: domain context vocabulary, entity defaults, scoring heuristics, schema contract templates, interaction contract defaults, import error patterns. First vertical template (farm) extracted at v0.1.0 exploratory confidence. 959 chassis-gate tests pass.
 
 ---
 
-## Shipped: 0.1.0 — Pipeline proven on real data
+## Current Work: 0.4.0–0.5.0 — Product validation + moat
 
-The profile→model→codegen→import→deploy pipeline has been exercised
-end-to-end on the farm engagement — 56 workbooks, 239 tabs, spanning
-an 11-model schema contract. PipelineState checkpointing,
-schema contract scaffolding, codegen, import runtime, view manifest
-generation, discovery interviews, and Fly.io deployment all function
-on real data.
+The chassis runs. The first product (farm) is partially built but not yet a complete, validated reference. The judgment taxonomy exists only as a concept. The queue protocol coordinates agents but has no lifecycle enforcement.
 
-Fixes discovered during farm execution have been collected in the
-`pipeline-maturity` branch. These address coupling issues between
-pipeline stages, import path bugs, and multi-year import scaffolding
-that the 0.0.x isolation work did not surface.
+These milestones close those gaps. They are ordered by dependency — each phase produces something the next phase needs.
 
-### What shipped
+### Phase 0: Harden ecosystem protocol
 
-The full 0.0.x component catalog operated as a coupled system on a
-production corpus. Breakages found mid-pipeline were fixed upstream
-with test coverage, validating the patching boundary defined in AGENTS.md.
-All pipeline commands can be invoked in sequence on a real source.
+**Before any feature work, the coordination layer must be reliable.**
 
-### Carried to 0.2.0
+The current queue protocol (ecosystem.md) defines *what* the queues are but not *how* entries get created, consumed, archived, or monitored. This causes silent failures: a `next/` signal written but never read, a `ready/` signal never noticed, a stale `exercise/` signal hanging indefinitely.
 
-Farm execution revealed that "pipeline runs" is the prerequisite, not
-the terminal milestone. The gate criteria below carry forward into
-the 0.2.0 spreadsheet replacement milestone:
+**Deliverables:**
 
-- **Full historical import loop** — year directory iteration,
-  `source_bundle_year` injection across 5+ years of data.
-- **30-minute gate from scratch** — single command sequence, zero
-  manual edits.
-- **Admin that replaces the spreadsheet** — view manifest and
-  discovery interview meaningfully change admin output; stakeholder
-  can complete weekly cycle without the source workbook.
+1. **Queue entry lifecycle** — every queue entry has four states with timestamps:
+   ```
+   created → active → consumed → archived
+   ```
+   Each transition is recorded. Timeouts for each state are configurable. Stale entries are flagged, not silently ignored.
 
----
+2. **Validation gate on write** — writing to any queue validates the entry format against its schema (required fields, allowed values, reference integrity). Malformed entries are rejected, not silently dropped.
 
-## Shipped: 0.2.0 — Admin generation maturity
+3. **Health check command** — `wb ecosystem health` inspects all queues and reports:
+   - Number of entries per queue
+   - Age of oldest unconsumed entry
+   - Stale entries past timeout
+   - Last successful write time per queue
+   - Cross-queue consistency (e.g., every `results/` has a matching `exercise/`)
 
-The admin generator now produces production-grade Django admin configuration: status transitions,
-role-appropriate views, year/week filtering, and proper field-level validation. The interaction
-contract merge path is complete. The historical import loop handles year-suffixed CSV bundles,
-proven across 5+ years of real farm data. All 922 tests pass, full chassis-gate green.
+4. **Consumption acknowledgement** — readers must acknowledge consumption of queue entries. Entries that go unacknowledged past timeout are escalated.
 
-This milestone improves what the workbench generates — higher-quality Django admin code. It does
-not deliver a spreadsheet replacement. See the carry-forward note below for what remains unmet.
+5. **Updated ecosystem.md** — protocol documented with lifecycle states, validation rules, health check.
 
-- **Interaction contract merge path:**
-  `access_hints` from interaction contract flow through `merge_manifests`
-  into the codegen manifest consumed by `generate_admin`. Per-role supplement
-  (form/list/dashboard/reference) indexed correctly across all tabs.
-- **Admin quality bar:**
-  Status transitions (list-valued from v3 manifest, list_editable/exclude
-  hygiene, FK/readonly validation). Role-appropriate views (field_manager
-  sees forms, operations sees dashboards, admin sees everything).
-  Time-scoped filtering (year/week picker, current-season default).
-  Inline deduplication, unique YearWeekFilter names per model.
-- **Full historical import loop:**
-  `pull_bundle` → per-year CSV directories → `import_historical` walks
-  tab-named bundle directories, collects year-suffixed CSVs, processes
-  in year order with `source_bundle_year` injection.
+**Why this comes first:** If the orchestration layer is unreliable, every feature built on top of it is untrustworthy. The feedback loop (Phase 3) depends on reliable queue transitions.
 
 ---
 
-### Gate criteria carried forward
+### Phase 1: Ship farm as a complete product
 
-The 0.1.0 milestone carried three gate criteria for spreadsheet replacement
-into 0.2.0. Two were met; one was not:
+Farm is the reference product. Until it ships end-to-end, the chassis is unvalidated and the taxonomy has no training data.
 
-| Criterion | 0.1.0 carried | 0.2.0 result |
-|-----------|---------------|--------------|
-| Full historical import loop | Yes | ✅ Delivered |
-| 30-minute gate from scratch | Yes | ✅ Delivered |
-| Admin that replaces the spreadsheet — stakeholder can complete weekly cycle without the source workbook | Yes | ❌ Carried to 0.3.0 |
+**Deliverables:**
 
-**Why the third criterion was not met:** "Spreadsheet replacement" is a product
-outcome, not a workbench feature. It requires (a) a quality gate with
-repeatable smoke tests that verify a domain user's workflow, (b) product agent
-certification via 3 consecutive clean passes, and (c) generated user-facing UI
-code (views, templates, interactive components) — none of which existed in the
-workbench at 0.2.0. The gap is formally documented in `.omo/issues/04`.
+1. **Fix farm test suite** — the 5 failing feature tests (issue #01 fallout) are repaired. All 7 feature tests + 10 smoke tests pass.
 
-The workbench's role is to ship generic code generation capabilities that
-product repos (like farm) consume to achieve spreadsheet replacement. This
-milestone delivered admin codegen maturity. User-facing UI codegen is the
-next milestone.
+2. **Farm v0.3.0 admin functional** — smoke tests pass, admin renders correctly, status transitions work, role views show correct fields. Emit `ready/` signal for vertical templates.
+
+3. **Farm v0.4.0 user-facing UI** — HTMX-based landing pages per role, dashboard views, navigation. Full app-replaces-spreadsheet experience for farm operators.
+
+4. **Validation cycle closes** — exercise signal → integrate → smoke test → results signal. First complete pass of the hardening loop on a real product.
+
+5. **Updated farm documentation** — reflect current state, not stale v0.1.0 assumptions.
+
+**Why this comes before moat infrastructure:** The moat needs data. Farm is the first source of judgment taxonomy entries. Without a shipping product, the taxonomy has nothing to catalog.
 
 ---
 
-## Next: 0.3.0 — User-facing UI codegen
+### Phase 2: Judgment taxonomy registry
 
-The workbench ships generic code generation for user-facing Django views,
-templates, and interactive components — not just admin.
+The accumulated pattern library of which signals → which archetypes → which admin behaviors work for which verticals. This is the defensible moat.
 
-- **Carried forward from 0.2.0:** Generate views, templates, and URL routing
-  that let a domain user complete a read/update workflow without the source
-  spreadsheet. The farm engagement validates this capability.
+**Design principles:**
+- **Capture, don't dictate** — records consultant decisions without prescribing them. The taxonomy grows organically from real decisions.
+- **Queriable, not just logged** — a consultant can ask "what happened last time we saw this signal pattern?"
+- **Confidence-gated** — every entry has a confidence score. Low-confidence entries require human review before reuse.
 
-- **HTMX interactive components:** Generate inline editing (status toggles,
-  boolean checklists), modal forms, and live-update fields using HTMX.
-  Archetype-aware: `form` archetypes get editable forms, `list` archetypes
-  get sortable tables, `dashboard` archetypes get summary cards.
+**Deliverables:**
 
-- **Admin functional improvements (validated on farm data):**
-  Computed columns in admin list_display (PlantingPlan.planted, etc.).
-  list_editable for nursery boolean fields (seeded/germinated/thinned).
-  Conditional row highlighting via CSS rules. Custom admin actions
-  (record planting event, mark as ordered). FK autocomplete tuning.
+1. **Taxonomy schema** — what gets captured:
+   ```yaml
+   vertical: farm                          # domain
+   source_signals:                         # profiler input
+     ui_archetype: form
+     formula_density: 0.23
+     cross_sheet_refs: 3
+     null_rates: { "Crop Name": 0.0 }
+   archetype_chosen: form                  # decision
+   confidence: 0.85                        # how sure we were
+   outcome: successful                     # did it work? (awaiting feedback)
+   consultant_notes: "Field managers needed inline editing"
+   deployed_at: "2026-06-01"
+   feedback_received: null                 # populated by feedback loop
+   ```
 
-- **Quality gate required:** The `app-replaces-spreadsheet` quality gate
-  must include tests that verify user-facing views render with real data,
-  not just admin pages. (The current gate tests admin rendering only —
-  see issue #04).
+2. **Taxonomy CLI** — `wb taxonomy {add,query,review,export}`:
+   - `add` — record a new pattern from a completed engagement
+   - `query` — search patterns by vertical, signal, archetype, outcome
+   - `review` — show patterns pending human review (confidence < 0.50)
+   - `export` — produce a training set for the archetype classifier
 
-See the farm engagement design at
-`docs/superpowers/specs/2026-06-04-app-replaces-spreadsheet-design.md`
-for the validating example.
+3. **Taxonomy storage** — YAML file at `.omo/taxonomy/registry.yaml`, versioned alongside code. This makes the taxonomy part of the repo — reviewable, diffable, mergeable.
 
-## Next: 0.4.0 — Role-based interfaces
+4. **Integration with v0.4.0 archetype matrix** — the weighted 12-signal classifier writes its decisions to the taxonomy. Every archetype assignment is captured.
 
-The workbench ships codegen for role-aware views, dashboards, and
-permission scaffolding.
-
-- **Role-based views:** Generate landing pages per role archetype
-  (planner: crop planning dashboard, operations: field task list,
-  admin: full CRUD). Group-based routing with automatic queryset scoping.
-
-- **Dashboard views:** Generate summary cards, aggregate counts, and
-  status breakdowns from schema contract metadata. Archetype-aware
-  rendering (dashboard archetype → card layout, list archetype → table).
-
-- **Permission scaffolding:** Generate Django Group creation, permission
-  checks (has_change/view/add/delete_permission), and row-level access
-  from interaction contract roles.
-
-- **Print-friendly outputs:** Generate list views optimized for printing
-  (weekly field task lists, inventory sheets).
-
-See `.omo/next/v0.4.0-phase1-archetype-matrix.yaml` and related plans.
-
-## Conditional: 0.5.0+ — Consultant accelerant / Platform
-
-Only after the judgment taxonomy is dense enough to make the agent reliably correct:
-
-- Hosted workbench for consultants who prefer a web UI to CLI
-- Self-service assessment for prospects ("Upload your spreadsheet, get a migration feasibility report")
-- Provider plugin system (only after 10+ verticals prove the model)
-- Postgres mode at scale
-- Multi-model transaction safety in import pipeline
-
-Self-service end-user migration remains a non-goal until the agent error rate
-is provably near-zero.
+**Why this is the moat:** AI can generate Django admin code. It cannot know that farm field managers need inline editing while guitar shop inventory managers need location-based dashboards. That knowledge comes from doing, and the taxonomy captures it.
 
 ---
 
-## Non-goals
+### Phase 3: Feedback loop from deployed apps
 
-- **Self-service end-user migration without consultant review.** The agent makes too
-  many mistakes on messy real-world data. Human judgment is mandatory until the
-  judgment taxonomy is dense enough to make the agent provably correct.
-- **GUI for contract authoring (today).** YAML is the consultant interface for now.
-  A hosted consultant UI is a 0.5.0+ possibility, not 0.3.0.
-- **Real-time sync back to source.** One-way pipeline (source → Django). Bidirectional
-  sync requires conflict resolution and change tracking.
-- **Arbitrary ETL.** Pipeline is opinionated: tabular → normalized CSV → Django models.
-  JSON APIs and unstructured data are out of scope.
-- **Non-Django targets.** Codegen is Django-specific. Extracting a generic ORM layer
-  is premature.
+A one-time interview (interaction contract) captures intent. A feedback loop captures reality — how operators actually use the generated app, and where it falls short.
+
+**Deliverables:**
+
+1. **Deploy-time instrumentation** — every deployed app includes a lightweight feedback endpoint (`/healthz` extended with usage signals). On deploy, the consultant console registers the app for monitoring.
+
+2. **Usage signal schema** — what gets reported back:
+   ```yaml
+   app: farm
+   environment: production
+   period: "2026-W24"
+   archetype_usage:
+     form: { views: 1240, edits: 312, errors: 3 }
+     list: { views: 4200, filters_applied: 890, exports: 45 }
+     dashboard: { views: 580, avg_time_seconds: 45 }
+   taxonomy_corrections:
+     - tab: "Crop Planner"
+       assigned_archetype: form
+       observed_usage: "list-heavy"   # users treat it as a list view
+       suggested_archetype: list
+   ```
+
+3. **Feedback ingestion** — `wb feedback ingest` reads signals, compares against taxonomy predictions, flags mismatches as curation entries for the consultant.
+
+4. **Curation workflow** — mismatches appear in the consultant console as "pending review." The consultant can:
+   - Accept the correction → taxonomy updated
+   - Reject as noise → taxonomy annotated
+   - Escalate to design change → new issue
+
+**Why this matters:** The interaction contract captures what operators *say* they do. Usage data captures what they *actually* do. The gap between them is where the taxonomy gets refined.
 
 ---
 
-## Milestone certification
+### Phase 4: Consultant console
 
-Milestones in this roadmap describe **workbench capabilities** — what the
-migration-workbench package can generate. A milestone is **shipped** when:
+A tool for the solo consultant to manage clients, review confidence decisions, curate the taxonomy, and run deployments. Not a GUI for end-users — a cockpit for the operator.
 
-1. All code is merged to `master` and released to PyPI
-2. `make chassis-gate` passes (migrate, test, lint, doc coverage)
-3. The roadmap document is updated
+**Deliverables:**
 
-A milestone that describes a **product outcome** (e.g., "user can complete
-a workflow without the source spreadsheet") requires additional certification:
+1. **Client registry** — `wb client {list,show,add}` with:
+   - Name, vertical, deployment status, last smoke test date
+   - Link to product repo and deployed URL
+   - Taxonomy patterns contributed by this engagement
 
-4. A quality gate definition in `.omo/quality-gates/<milestone>.yaml` with
-   deterministic pass/fail criteria
-5. 3 consecutive clean passes of the quality gate smoke tests, certified by
-   the product agent
-6. Manual verification where the milestone specifies it
+2. **Confidence review queue** — views all taxonomy entries with confidence < 0.50 or pending feedback correction. The consultant can review in batch, approve/reject, or write notes.
 
-Outcome milestones are validated against product repos (e.g., farm). The
-workbench ships generic capabilities; the product repo proves they work.
+3. **Dashboard view** — summary:
+   - Number of active clients
+   - Number of taxonomy entries
+   - Pending reviews
+   - Queue health (from Phase 0)
+   - Latest smoke test results
+
+4. **Integration with quality gate** — before marking a client as "certified," the console checks that the smoke test suite passes and the judgment taxonomy has ≥1 entry for this vertical.
+
+**Implementation approach:** CLI-first (extending `wb`), with the option of a web dashboard later. Phase 4 delivers the CLI. A web UI is post-1.0.0.
+
+---
+
+### Phase 5: Validate on a second vertical
+
+The chassis is exercised on **vizcarra-guitars** (from spaces.yml). This proves generality and seeds the taxonomy with a second domain.
+
+**Deliverables:**
+
+1. **Scaffold vizcarra-guitars product repo** — run `new_product.py` with the vizcarra-guitars vertical template.
+
+2. **Full pipeline on guitar shop data** — profile → schema contract → codegen → import → deploy. Use the consultant console to manage the engagement.
+
+3. **Cross-vertical taxonomy** — guitar shop patterns are distinct from farm patterns. The taxonomy now has two domains, making cross-vertical queries meaningful.
+
+4. **Chassis refinements** — any chassis gap found during vertical #2 is fixed upstream (following the patching boundary in AGENTS.md).
+
+5. **Updated delivery time estimate** — vertical #2 takes N hours. The difference between vertical #1 (farm, ad-hoc) and vertical #2 (repeatable process) is the productivity improvement from the ecosystem.
+
+**Why not skip to vertical #2 immediately:** Without the moat infrastructure (Phases 2-4), vertical #2 is just another ad-hoc engagement. The point is to *validate the repeatable process*, not just build another app.
+
+---
+
+### Phase 6: 1.0.0 release
+
+**Definition of done — cold-client ready:**
+
+| Criterion | How verified |
+|-----------|-------------|
+| Farm is a complete product | Admin + user UI deployed, smoke tests pass, feedback endpoint live |
+| Second vertical is scaffolded | Full pipeline run on vizcarra-guitars, all steps documented |
+| Ecosystem protocol is reliable | Queue lifecycle enforced, health check passes, stale entries caught |
+| Judgment taxonomy is seeded | ≥50 entries across 2+ verticals, ≥1 feedback correction absorbed |
+| Consultant console operates | Client registry, confidence review, quality gate integration all work |
+| Chassis-gate passes | 959+ tests green on migration-workbench |
+| Onboarding runbook exists | Written process from cold call to deployed app, with time estimates per phase |
+| All smoke tests pass | 10-test suite passes on farm |
+| Documentation is current | roadmap.md, ecosystem.md, AGENTS.md, all design docs reflect reality |
+| Second vertical validates repeatability | vizcarra-guitars is built, deployed, and passes its own smoke tests |
+
+**Non-goals for 1.0.0 (deferred to post-1.0.0):**
+- Self-service prospect assessment ("upload your spreadsheet")
+- Hosted multi-tenant consultant console (web UI)
+- Third vertical (jewelry)
+- Postgres support
+- Real-time sync back to source
+- Plugin ecosystem for providers
+
+---
+
+## Dependency Graph
+
+```
+Phase 0 (ecosystem hardening)
+    │
+    ▼
+Phase 1 (ship farm)
+    │
+    ├─────────────────────┐
+    ▼                     ▼
+Phase 2 (taxonomy)   Phase 3 (feedback loop)
+    │                     │
+    └─────────┬───────────┘
+              ▼
+      Phase 4 (consultant console)
+              │
+              ▼
+      Phase 5 (second vertical)
+              │
+              ▼
+      Phase 6 (1.0.0 release)
+```
+
+Phases 2 and 3 can proceed in parallel after Phase 1 is underway.
+
+---
+
+## Risk Register
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Farm data is too messy for clean product | Medium | High | Already profiled 56 workbooks — the hard part is done. Remaining risk is admin polish. |
+| Chassis has hidden farm-specific assumptions | Medium | High | Second vertical (Phase 5) exists specifically to catch this. |
+| Taxonomy has too few entries to be useful | High | Medium | Even 50 entries across 2 verticals are enough to start seeing patterns. The value compounds. |
+| Feedback loop reveals nobody uses the app | Low | Very High | If farm operators don't use the generated app, the approach is wrong. Mitigation: validate early with real users. |
+| Solo consultant time is the bottleneck | Certain | High | The entire ecosystem exists to amplify consultant time. Console + taxonomy are force multipliers. |
+| AI codegen improves faster than taxonomy grows | Medium | Very High | The moat is experiential knowledge (what to build, not how). AI codegen helps, doesn't threaten, this. |
+
+---
+
+## Post-1.0.0 Horizons
+
+These are not commitments — they are directions the roadmap points toward after cold-client readiness is proven:
+
+- **1.x** — Third vertical (jewelry), prospecting assessment tool, repeatable sales process
+- **2.x** — Hosted web console, multi-client dashboard, feedback loop fully automated
+- **3.x** — Self-service feasibility report for prospects, referral network
 
 ---
 
 ## How the farm exercise shaped this roadmap
 
-Every item in "Shipped" has a direct line to something discovered while building
-the first product repo (farm). The exercise that informed the current design was profiling
-a 56-workbook, 239-tab Google Sheets corpus and designing an 11-model schema. Farm validates what the workbench
-generates; it does not define what the workbench ships.
+Every item in "Shipped" and every phase in "Current Work" has a direct line to something discovered while building the first product repo.
 
 | Discovery | Response |
 |-----------|----------|
 | Hand-authored 663-line contract was repetitive | Contract scaffolding, hooks system, designed model helpers |
-| `make generate-admin` blocked by missing manifest | Makefile flag fix, `generate-admin-light` target |
-| unique_together required hand-edit after generation | Added to model_meta block |
-| Properties/methods required hand-edit | `contract.hooks` block (after_model, extra_methods) |
-| Designed models with no source tab had no scaffolding | `source_tab: null`, `scaffold_designed_model` |
-| No way to validate contract before codegen | `validate_contract --strict`, codegen-time validation |
-| Couldn't tell what codegen changed across runs | `--diff` flag, `git diff` workflow |
-| Upstream renderer bugs found mid-pipeline | Fixes committed with test coverage |
-| Import generator untested | Import pipeline foundation (tiers, FK resolution, error recording) |
-| View manifest / discovery not exercised | 0.0.x end-to-end tests, deploy smoke test |
+| Issue #01: admin regeneration overwrites customizations | Stub convention with `# --- custom models below this line ---` |
+| Queue protocol has no lifecycle enforcement | Phase 0: ecosystem hardening |
+| No systematic capture of consultant decisions | Phase 2: judgment taxonomy registry |
+| No way to know if deployed apps work well | Phase 3: feedback loop |
+| Solo consultant needs a cockpit, not just CLI | Phase 4: consultant console |
+| One vertical doesn't prove the chassis | Phase 5: second vertical validation |
 
 ---
 
 ## Tracking
 
-Individual items are tracked as GitHub issues with `roadmap/` label.
+Individual items are tracked in `.omo/plans/` as implementation plan documents.
 This document is updated when milestones ship or priorities shift.

@@ -524,7 +524,7 @@ FLY_APP ?="""
 
 def render_domain_knowledge_example_yaml() -> str:
     return """# docs/domain-knowledge.yaml — Entity definitions for contract generation
-# Used by: scaffold_workbook_schema --domain-knowledge docs/domain-knowledge.yaml
+# Used by: scaffold_workbook_schema --bundle-config ... --table-profile data/profiles/tables/combined_profile.json --domain-knowledge docs/domain-knowledge.yaml
 
 entities:
   Season:
@@ -1194,7 +1194,7 @@ Living document for entities, attributes, and sheet/tab mapping. Align with the 
 This document is paired with `docs/domain-knowledge.yaml`.
 Run the scaffold to merge domain knowledge with profiler data:
 
-    scaffold_workbook_schema --bundle-config ... --domain-knowledge docs/domain-knowledge.yaml
+    scaffold_workbook_schema --bundle-config ... --table-profile data/profiles/tables/combined_profile.json --domain-knowledge docs/domain-knowledge.yaml
 
 ## Sources
 
