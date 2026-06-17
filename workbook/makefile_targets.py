@@ -58,6 +58,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "generate",
         "generate-view-manifest",
         "generate-pipeline-manifest",
+        "generate-source-config",
         "generate-all",
         "diff-generated",
         "generate-admin-light",
@@ -76,6 +77,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "pull-apply",
         "generate-discovery-interview",
         "merge-discovery-notes",
+        "merge-interaction-contract",
         "profile-preflight",
         "profile-drive-folder",
         "profile-coda-corpus",
@@ -136,18 +138,14 @@ def generate_models_block(ctx: MakeContext) -> str:
 
 
 def generate_admin_block(ctx: MakeContext) -> str:
-    """Return the generate-admin Makefile target block (with optional manifest)."""
+    """Return the generate-admin Makefile target block (with optional manifests)."""
     return (
         "generate-admin:\n"
         + _indent(
-            '@if [ -f "$(VIEW_MANIFEST)" ]; then \\\n'
             'wb generate admin --contract "$(CONTRACT)" '
-            '--manifest "$(VIEW_MANIFEST)" '
-            '--out "$(CORE)/admin.py" --app-label core --force; \\\n'
-            "else \\\n"
-            'wb generate admin --contract "$(CONTRACT)" '
-            '--out "$(CORE)/admin.py" --app-label core --force; \\\n'
-            "fi"
+            '$(shell if [ -f "$(VIEW_MANIFEST)" ]; then echo "--manifest $(VIEW_MANIFEST)"; fi) '
+            '$(shell if [ -f "build/codegen-manifest.yaml" ]; then echo "--codegen-manifest build/codegen-manifest.yaml"; fi) '
+            '--out "$(CORE)/admin.py" --app-label core --force'
         )
         + "\n"
     )
@@ -203,11 +201,24 @@ def generate_pipeline_manifest_block(ctx: MakeContext) -> str:
     )
 
 
+def generate_source_config_block(ctx: MakeContext) -> str:
+    """Return the generate-source-config Makefile target block."""
+    return (
+        "generate-source-config:\n"
+        + _indent(
+            "$(MANAGE) generate_source_config "
+            '--contract "$(CONTRACT)" '
+            "--out $${SOURCE_CONFIG:-source_config.json}"
+        )
+        + "\n"
+    )
+
+
 def generate_all_block(ctx: MakeContext) -> str:
     """Return the generate-all Makefile target block (runs every generator)."""
     return (
-        "generate-all: generate-models generate-view-manifest generate-admin "
-        "generate-import generate-pipeline-manifest\n"
+        "generate-all: generate-models generate-view-manifest merge-interaction-contract "
+        "generate-admin generate-import generate-pipeline-manifest\n"
         + _indent(
             '@echo "All code generation complete. '
             "Run 'make check-generated' to verify.\""
@@ -389,6 +400,18 @@ def import_blocks(ctx: MakeContext) -> str:
             "--interview build/discovery-interview.md "
             '--out "$(VIEW_MANIFEST)" '
             "--summary-out build/discovery-summary.md"
+        )
+        + "\n\n"
+        + "merge-interaction-contract:\n"
+        + _indent(
+            '@if [ -f "build/view-manifest.yaml" ]; then \\\n'
+            '$(MANAGE) merge_interaction_contract '
+            '--contract "$(CONTRACT)" '
+            '--manifest "build/view-manifest.yaml" '
+            '--out "build/codegen-manifest.yaml"; \\\n'
+            'else \\\n'
+            '@echo "Skipping merge-interaction-contract: build/view-manifest.yaml not found"; \\\n'
+            'fi'
         )
         + "\n"
     )
@@ -696,6 +719,7 @@ def full_targets_block(ctx: MakeContext) -> str:
         extract_workbook_codes_block(ctx),
         orient_block(ctx),
         generate_models_block(ctx),
+        generate_source_config_block(ctx),
         generate_admin_block(ctx),
         generate_import_block(ctx),
         generate_block(ctx),

@@ -632,7 +632,7 @@ Run after setting up `.env`. These commands inspect source data and produce arti
 
 Run after setting up `.env`. These commands inspect source data and produce artifacts that inform schema design — they never mutate Django models.
 
-Profiling uses the **PipelineState checkpoint system** by default — a single YAML checkpoint file (`build/pipeline-state.yaml`) tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). A `--domain-context` option (reads `config/domain_context.yaml` by default) seeds domain vocabulary for tab scoring.
+Profiling uses the **PipelineState checkpoint system** by default — a single YAML checkpoint file (`build/pipeline-state.yaml`) tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). A `--domain-context` option (reads `config/domain_context.yaml` by default) seeds domain vocabulary for tab scoring. Use the `--force` flag (or `FORCE=true` with Make) to suppress stale artifact warnings and re-run completed phases.
 
 **Quick start (all phases):**
 ```bash
@@ -657,7 +657,7 @@ Profiling follows a **4-phase workflow** to avoid expensive API calls until heur
 
 #### Phase 0 — Orient
 
-Run these commands in order. Each is safe to re-run.
+Run these commands in order. Each is safe to re-run. Alternatively, use the `make orient` shortcut to run steps 1-5 sequentially.
 
 1. **Draft domain context** (optional seed from drive tree):
    ```bash
@@ -740,6 +740,10 @@ make migrate          # makemigrations + migrate
 make check            # Django system check
 ```
 
+Time-saving shortcuts:
+- `make generate-all` — Runs all code generators sequentially (models, manifest, interaction-merge, admin, imports, pipeline).
+- `make orient` — Phase 0 shortcut: validates context, profiles drive, extracts codes.
+
 To use an editable workbench checkout instead of PyPI (for chassis co-development):
 ```bash
 # Set WORKBENCH=/path/to/migration-workbench in .env, then:
@@ -804,9 +808,24 @@ The governing workflow is the **Schema Design Loop** (see migration-workbench `d
 
 After profiling, the schema design loop requires human judgment at several points. The agent's job is to facilitate — never silently decide.
 
+### Vertical migration templates
+
+Verticals are domain-specific template packs (vocabulary, entity templates, role defaults, signal thresholds) that seed the schema contract and discovery interview.
+
+- **List available:** `wb vertical list`
+- **Inspect template:** `wb vertical show <name> --json`
+- **Usage:** Use the `--vertical <name>` flag on `scaffold_workbook_schema` or `generate_discovery_interview`. The `--apply-template-suggestions` flag auto-applies matches above threshold.
+
 ### Draft schema contract
 
 Review profiler output, then build a schema contract YAML (`config/contract.yaml`) that maps source tabs to Django models and columns to fields. The workbench `scaffold_workbook_schema` command can produce a v1.0 draft from profile artifacts.
+
+**Source Config Generation:** Once a contract is drafted, use it to generate a provider-agnostic source config for pulling bundles:
+```bash
+make generate-source-config
+```
+
+**Designed Model Detection:** The scaffold automatically clusters tabs with overlapping columns to suggest aggregate entities with `source_tab: null`. Use `scaffold_designed_model` to emit contract skeletons for manual aggregates.
 
 **Decisions to bring to the human:**
 - Which source tabs become Django models? What names?
@@ -836,45 +855,32 @@ make migrate
 make check
 ```
 
-### Generate view manifest
+### Interaction Contract (3-Layer Pipeline)
 
-After the contract is hardened and a bundle has been pulled from the source:
+UI and workflow configuration follows a three-layer merge path:
 
-```bash
-make pull-bundle           # produces build/bundle/structure.json
-make generate-view-manifest  # config/view-manifest.yaml
-```
-
-The view-manifest YAML captures UI/workflow metadata per source tab:
-`editable_fields` (non-formula columns), `computed_fields` (formula columns),
-`filterable_by` (dropdown-validated columns), and an inferred `status_field`.
-It also records `workflow_hints.tab_sequence` from tab position.
-
-**Review the view manifest** before proceeding — verify entity binding, editable
-vs computed splits, and status field detection. The manifest can be hand-edited.
-
-Regenerate the admin to incorporate manifest hints:
+1. **Profiler Signals:** Machine-derived archetypes from `scaffold_view_manifest --signals-only`.
+2. **Interaction Contract:** Human-answered `discovery-interview.md` containing role hints, status semantics, and access notes.
+3. **Codegen Manifest:** The final merge of signals + human contract + view manifest, consumed by `generate-admin`.
 
 ```bash
-make generate-admin   # now produces richer admin.py
+make generate-view-manifest      # config/view-manifest.yaml
+make generate-discovery-interview # build/discovery-interview.md
+# ... (Human fills in the interview) ...
+make merge-discovery-notes       # patches manifest with role/status hints
+make merge-interaction-contract  # produces build/codegen-manifest.yaml
+make generate-admin              # uses the codegen manifest if present
 ```
 
-### Discovery interview (optional)
+For the full design, see `docs/interaction-contract.md`.
 
-To capture role ownership, status semantics, and weekly actions from operators:
+### Pipeline Manifest
+
+The pipeline manifest is a machine-generated execution plan for the full migration. Generate it after the contract is hardened:
 
 ```bash
-make generate-discovery-interview   # writes build/discovery-interview.md
+make generate-pipeline-manifest
 ```
-
-Have the operator fill in the Markdown answers, then:
-
-```bash
-make merge-discovery-notes  # patches view-manifest.yaml, writes build/discovery-summary.md
-```
-
-The merged manifest feeds `make generate-admin` for richer admin configuration
-(role-appropriate `list_filter`, per-view notes in `readonly_fields`, etc.).
 
 ## Import pipeline
 
@@ -1165,9 +1171,21 @@ Profiling uses a **3-phase workflow** to avoid expensive API calls during heuris
 - **Phase 2** (`make profile-cohort-corpus-phase2`): re-run heuristics from broad coverage with no API calls. Iterate on `cohort_corpus.json` (token lists, `tab_exclude_patterns`, `expansion_formula_penalty`), then re-run.
 - **Phase 3** (`make profile-cohort-corpus-phase3`): deep profile from hand-edited `tab_selection_<date>.json`. Output includes formula pattern classification per column.
 
-The **PipelineState** checkpoint-based workflow (`make profile-phase-{{discover,score,deep,derive,validate}}`) replaces the phased corpus workflow with a single YAML checkpoint file that tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). Use `make clean-profile` to wipe all profiling artifacts and start fresh. Run `make profile-phase-validate` to check checkpoint consistency between phases. Pass `DOMAIN_CONTEXT` in `.env` to seed domain vocabulary for tab scoring (defaults to `config/domain_context.yaml` via the CLI). Set `PIPELINE_CHECKPOINT` in `.env` to override the default checkpoint path (`build/pipeline-state.yaml`). See migration-workbench `docs/pipeline-state.md`.
+    The **PipelineState** checkpoint-based workflow (`make profile-phase-{{discover,score,deep,derive,validate,all}}`) replaces the phased corpus workflow with a single YAML checkpoint file that tracks progress across phases, resumes where you left off, and records human decisions (`approved_tabs`, alerts). Use `make clean-profile` to wipe all profiling artifacts and start fresh. Run `make profile-phase-validate` to check checkpoint consistency between phases. Pass `DOMAIN_CONTEXT` in `.env` to seed domain vocabulary for tab scoring (defaults to `config/domain_context.yaml` via the CLI). Set `PIPELINE_CHECKPOINT` in `.env` to override the default checkpoint path (`build/pipeline-state.yaml`). See migration-workbench `docs/pipeline-state.md`.
+
+**Verticals:** use `--vertical <name>` (e.g. `farm`) with `scaffold_workbook_schema` or `generate_discovery_interview` to seed domain knowledge and role presets. Run `wb vertical list` to see available packs and `wb vertical show <name>` to inspect them.
 
 **Coda:** migration-workbench **`docs/coda.md`**; set `CODA_CORPUS_CONFIG` and `CODA_DOC_IDS` in `.env`, then run `make profile-coda-corpus`.
+
+## Interaction Contract (3-Layer Pipeline)
+
+UI and workflow configuration follows a three-layer merge path (Signals → Interaction Contract → Codegen Manifest) to enrich the generated admin.
+
+1. **Signals:** `make generate-view-manifest` (machine-derived archetypes).
+2. **Contract:** `make generate-discovery-interview` → Human answers → `make merge-discovery-notes`.
+3. **Manifest:** `make merge-interaction-contract` → `make generate-admin`.
+
+See migration-workbench `docs/interaction-contract.md` for the architecture.
 
 ## Imports
 
