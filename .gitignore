@@ -19,6 +19,7 @@ fly.toml
 .worktrees/
 .omo
 .omo.bak
+*.bak
 docs/superpowers/
 profiler-signals.yaml
 .coverage
