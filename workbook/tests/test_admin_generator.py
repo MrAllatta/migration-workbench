@@ -165,6 +165,46 @@ def test_find_view_for_entity_not_found():
     assert find_view_for_entity(_manifest(), "nonexistent") is None
 
 
+def test_find_view_for_entity_merges_multiple_views():
+    """Multiple views for same entity are merged, richer view wins for time_scope."""
+    manifest = _manifest()
+    # Add a second "crop" view with time_scope and extra editable_fields.
+    manifest["views"].append({
+        "name": "crop_audit",
+        "entity": "crop",
+        "source_tab": "Crop Audit",
+        "type": "list",
+        "editable_fields": ["organic", "notes"],
+        "computed_fields": ["age"],
+        "filterable_by": ["status"],
+        "status_field": "status",
+        "time_scope": {"year_field": "harvest_year", "week_field": "harvest_week"},
+        "notes": "Second crop view",
+    })
+    merged = find_view_for_entity(manifest, "crop")
+    assert merged is not None
+    # First view's scalar field preserved.
+    assert merged["name"] == "crop_info"
+    assert merged["source_tab"] == "Crop Info"
+    # time_scope from richer view (second view has one, first doesn't).
+    assert merged["time_scope"] == {"year_field": "harvest_year", "week_field": "harvest_week"}
+    # editable_fields unioned.
+    editable = merged.get("editable_fields") or []
+    assert "name" in editable
+    assert "organic" in editable
+    assert "notes" in editable
+    assert len(editable) >= 4  # union of both lists
+    # filterable_by unioned.
+    filt = merged.get("filterable_by") or []
+    assert "crop_type" in filt
+    assert "status" in filt
+    # computed_fields unioned.
+    computed = merged.get("computed_fields") or []
+    assert "age" in computed
+    # status_field from richer view.
+    assert merged.get("status_field") == "status"
+
+
 # ---------------------------------------------------------------------------
 # render_admin_py — inline detection
 # ---------------------------------------------------------------------------
@@ -190,6 +230,393 @@ def test_no_inline_when_no_reverse_fk():
     assert "inlines" not in source
 
 
+def test_inline_fields_from_codegen_manifest():
+    """Codegen manifest inline_fields should override auto-detected field list."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "model_name": "Nursery",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+            {
+                "model_name": "SeedingSchedule",
+                "columns": [
+                    {
+                        "suggested_field_name": "nursery",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"},
+                    },
+                    {
+                        "suggested_field_name": "variety",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "seeding_week",
+                        "django_field_class": "models.PositiveSmallIntegerField",
+                        "django_field_kwargs": {"blank": True, "null": True},
+                    },
+                    {
+                        "suggested_field_name": "trays_to_seed",
+                        "django_field_class": "models.DecimalField",
+                        "django_field_kwargs": {"max_digits": 8, "decimal_places": 1},
+                    },
+                    {
+                        "suggested_field_name": "seeded",
+                        "django_field_class": "models.BooleanField",
+                        "django_field_kwargs": {"default": False},
+                    },
+                    {
+                        "suggested_field_name": "germinated",
+                        "django_field_class": "models.BooleanField",
+                        "django_field_kwargs": {"default": False},
+                    },
+                    {
+                        "suggested_field_name": "thinned",
+                        "django_field_class": "models.BooleanField",
+                        "django_field_kwargs": {"default": False},
+                    },
+                    {
+                        "suggested_field_name": "notes",
+                        "django_field_class": "models.TextField",
+                        "django_field_kwargs": {"blank": True},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Nursery",
+                "ui_archetype": "reference",
+                "workflow_hints": {},
+            },
+            {
+                "model_name": "SeedingSchedule",
+                "ui_archetype": "list",
+                "workflow_hints": {
+                    "inline_fields": [
+                        "variety", "seeding_week", "trays_to_seed",
+                        "seeded", "germinated", "thinned", "notes",
+                    ],
+                },
+            },
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    # Should generate the inline with all 7 fields (no truncation to 6).
+    assert "class SeedingScheduleInline(admin.TabularInline):" in source
+    assert "variety" in source
+    assert "seeding_week" in source
+    assert "trays_to_seed" in source
+    assert "seeded" in source
+    assert "germinated" in source
+    assert "thinned" in source
+    assert "notes" in source
+    _check_compiles(source)
+
+
+def test_inline_show_change_link():
+    """All TabularInline classes get show_change_link = True for UX."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "nursery",
+                "model_name": "Nursery",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+            {
+                "suggested_model_name": "seeding_schedule",
+                "model_name": "SeedingSchedule",
+                "columns": [
+                    {
+                        "suggested_field_name": "nursery",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"},
+                    },
+                ],
+                "fk_resolutions": {"nursery": "Nursery"},
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "show_change_link = True" in source
+    _check_compiles(source)
+
+
+def test_inline_config_editable_grid_archetype():
+    """inline_config with archetype=editable_grid renders extra rows, can_delete, show_change_link."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "model_name": "Nursery",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+            {
+                "model_name": "SeedingSchedule",
+                "columns": [
+                    {"suggested_field_name": "nursery", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"}},
+                    {"suggested_field_name": "variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "seeding_week", "django_field_class": "models.PositiveSmallIntegerField", "django_field_kwargs": {"blank": True, "null": True}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {"model_name": "Nursery", "ui_archetype": "reference", "workflow_hints": {}},
+            {
+                "model_name": "SeedingSchedule",
+                "ui_archetype": "list",
+                "workflow_hints": {
+                    "inline_config": {
+                        "archetype": "editable_grid",
+                        "show_change_link": False,
+                        "can_delete": True,
+                        "extra": 2,
+                    },
+                },
+            },
+        ],
+    }
+    source = render_admin_py(contract, manifest, app_label="core", codegen_manifest=codegen)
+    assert "class SeedingScheduleInline(admin.TabularInline):" in source
+    assert "extra = 2" in source
+    assert "show_change_link = False" in source
+    assert "can_delete = True" in source
+    _check_compiles(source)
+
+
+def test_inline_config_reference_archetype():
+    """inline_config with archetype=reference renders readonly_fields on inline."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "model_name": "Nursery",
+                "columns": [
+                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                ],
+            },
+            {
+                "model_name": "SeedingSchedule",
+                "columns": [
+                    {"suggested_field_name": "nursery", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"}},
+                    {"suggested_field_name": "variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {"suggested_field_name": "seeded", "django_field_class": "models.BooleanField", "django_field_kwargs": {"default": False}},
+                    {"suggested_field_name": "notes", "django_field_class": "models.TextField", "django_field_kwargs": {"blank": True}},
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {"model_name": "Nursery", "ui_archetype": "reference", "workflow_hints": {}},
+            {
+                "model_name": "SeedingSchedule",
+                "ui_archetype": "list",
+                "workflow_hints": {
+                    "inline_config": {
+                        "archetype": "reference",
+                        "show_change_link": True,
+                        "can_delete": False,
+                        "extra": 0,
+                    },
+                },
+            },
+        ],
+    }
+    source = render_admin_py(contract, manifest, app_label="core", codegen_manifest=codegen)
+    assert "class SeedingScheduleInline(admin.TabularInline):" in source
+    assert "readonly_fields" in source
+    assert "show_change_link = True" in source
+    _check_compiles(source)
+
+
+def test_ordering_from_model_meta():
+    """Explicit ordering is set on the admin class from model_meta."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "model_meta": {"verbose_name": "Crop", "ordering": ["name"]},
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crops",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "ordering = ['name']" in source
+    _check_compiles(source)
+
+
+def test_no_ordering_when_model_meta_has_no_ordering():
+    """No ordering attribute when model_meta has no ordering."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "model_meta": {"verbose_name": "Crop"},
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crops",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "ordering" not in source
+    _check_compiles(source)
+    """FK reverse count methods are auto-generated in list_display."""
+    source = render_admin_py(_contract(), _manifest(), app_label="core")
+    # Crop has FK reverse from Planting (no related_name → "planting_set").
+    assert "planting_count" in source
+    assert "def planting_count(self, obj):" in source
+    assert "obj.planting_set.count()" in source
+    _check_compiles(source)
+
+
+def test_auto_fk_reverse_count_skips_when_manifest_provides():
+    """Auto-count is skipped when codegen manifest already defines it."""
+    contract = _contract()
+    manifest = _manifest()
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Crop",
+                "ui_archetype": "reference",
+                "workflow_hints": {
+                    "computed_fields": [
+                        {
+                            "name": "planting_count",
+                            "description": "Plantings",
+                            "expression": "obj.planting_set.count()",
+                        },
+                    ],
+                },
+            },
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    # Only ONE method definition for planting_count (not duplicated).
+    assert source.count("def planting_count") == 1
+    # The description matches the manifest, not the auto-generated default.
+    assert "description='Plantings'" in source
+    _check_compiles(source)
+
+
 # ---------------------------------------------------------------------------
 # render_admin_py — list_display
 # ---------------------------------------------------------------------------
@@ -197,7 +624,9 @@ def test_no_inline_when_no_reverse_fk():
 
 def test_list_display_from_manifest():
     source = render_admin_py(_contract(), _manifest(), app_label="core")
-    assert "list_display = ['name', 'crop_type']" in source
+    assert "list_display = ['name', 'crop_type', 'planting_count']" in source
+    assert "def planting_count(self, obj):" in source
+    assert "obj.planting_set.count()" in source
 
 
 def test_list_display_no_manifest():
@@ -991,6 +1420,196 @@ def test_date_hierarchy_for_date_fields():
     _check_compiles(source)
 
 
+def test_date_hierarchy_auto_detect_when_time_scope_absent():
+    """Fall back to the first DateField/DateTimeField in contract columns."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "seed_order",
+                "model_name": "SeedOrder",
+                "columns": [
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "order_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {"null": True},
+                    },
+                    {
+                        "suggested_field_name": "received_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {"null": True},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "seed_orders",
+                "entity": "seed_order",
+                "source_tab": "SeedOrders",
+                "type": "list",
+                "editable_fields": ["crop"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    # Should pick the FIRST DateField (order_date, not received_date)
+    assert "date_hierarchy = 'order_date'" in source
+    _check_compiles(source)
+
+
+def test_date_hierarchy_auto_detect_no_date_fields():
+    """No date_hierarchy when contract has no DateField/DateTimeField columns."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crops",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "date_hierarchy" not in source
+    _check_compiles(source)
+
+
+def test_list_select_related_for_fk_fields_in_display():
+    """FK fields in list_display get list_select_related for N+1 prevention."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "planting",
+                "model_name": "Planting",
+                "columns": [
+                    {
+                        "suggested_field_name": "crop",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "Crop",
+                            "on_delete": "models.CASCADE",
+                        },
+                    },
+                    {
+                        "suggested_field_name": "plant_date",
+                        "django_field_class": "models.DateField",
+                        "django_field_kwargs": {},
+                    },
+                ],
+                "fk_resolutions": {"crop": "Crop"},
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "planting",
+                "entity": "planting",
+                "source_tab": "Planting",
+                "type": "list",
+                "editable_fields": ["crop", "plant_date"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    # FK field 'crop' is in display (as crop_link), so select_related should appear
+    assert "list_select_related" in source
+    assert "list_select_related = ['crop']" in source
+    _check_compiles(source)
+
+
+def test_no_select_related_when_no_fk_in_display():
+    """No list_select_related when no FK fields appear in list_display."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "crop",
+                "model_name": "Crop",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "demo", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "crops",
+                "entity": "crop",
+                "source_tab": "Crops",
+                "type": "list",
+                "editable_fields": ["name"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "time_scope": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
+    }
+    source = render_admin_py(contract, manifest, app_label="core")
+    assert "list_select_related" not in source
+    _check_compiles(source)
+
+
 def test_current_season_queryset_filter():
     contract = {
         "source": {"provider": "google_sheets"},
@@ -1343,6 +1962,107 @@ def test_admin_with_codegen_manifest_dashboard_archetype():
     assert "readonly_fields" in source
     assert "'name'" in source
     assert "'total_yield'" in source
+    _check_compiles(source)
+
+
+def test_admin_with_codegen_manifest_dashboard_summary_cards():
+    """Dashboard archetype with summary_cards generates changelist_view override."""
+    contract = {
+        "source": {"provider": "google_sheets"},
+        "tables": [
+            {
+                "suggested_model_name": "inventory",
+                "model_name": "Inventory",
+                "columns": [
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "quantity_on_hand",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"default": 0},
+                    },
+                    {
+                        "suggested_field_name": "threshold",
+                        "django_field_class": "models.IntegerField",
+                        "django_field_kwargs": {"default": 5},
+                    },
+                ],
+            },
+        ],
+    }
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "source": {"source_id": "test", "provider": "google_sheets"},
+        "views": [
+            {
+                "name": "inventory",
+                "entity": "inventory",
+                "source_tab": "Inventory",
+                "type": "list",
+                "editable_fields": ["name", "quantity_on_hand"],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+        ],
+        "workflow_hints": {
+            "tab_sequence": ["Inventory"],
+            "role_hints": [],
+            "weekly_actions": [],
+        },
+    }
+    codegen = {
+        "version": 1,
+        "tables": [
+            {
+                "model_name": "Inventory",
+                "ui_archetype": "dashboard",
+                "workflow_hints": {
+                    "dashboard": {
+                        "summary_cards": [
+                            {
+                                "label": "Zero Stock",
+                                "color": "#ffcdd2",
+                                "expression": "qs.filter(quantity_on_hand=0).count()",
+                            },
+                            {
+                                "label": "Low Stock",
+                                "color": "#fff3e0",
+                                "expression": "qs.filter(quantity_on_hand__gt=0, quantity_on_hand__lt=db_models.F('threshold')).count()",
+                            },
+                            {
+                                "label": "Total Items",
+                                "color": "#e3f2fd",
+                                "expression": "qs.count()",
+                            },
+                        ],
+                    },
+                },
+            },
+        ],
+    }
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
+    # Should set change_list_template
+    assert "change_list_template" in source
+    assert "workbench_dashboard/change_list.html" in source
+    # Should generate changelist_view with context injection
+    assert "def changelist_view" in source
+    assert "dashboard_cards" in source
+    assert "from django.db import models as db_models" in source
+    # Should generate card expressions
+    assert "Zero Stock" in source
+    assert "Low Stock" in source
+    assert "Total Items" in source
+    assert "qs.filter(quantity_on_hand=0).count()" in source
+    assert "db_models.F('threshold')" in source
+    # All fields should be readonly for dashboard archetype
+    assert "readonly_fields" in source
     _check_compiles(source)
 
 

@@ -59,7 +59,17 @@ def load_manifest(path: str | Path) -> dict[str, Any]:
 def find_view_for_entity(
     manifest: dict[str, Any], entity_name: str
 ) -> dict[str, Any] | None:
-    """Return the first view entry whose ``entity`` matches *entity_name*.
+    """Return a merged view dict for all views matching *entity_name*.
+
+    When multiple view entries share the same entity (e.g. two views of
+    ``nursery_plan``), the first entry is used as the base and additional
+    entries contribute their metadata via a merge strategy:
+
+    * ``time_scope``, ``status_field``, ``status_values`` — first non-empty
+      wins (not overwritten by later entries that lack them).
+    * ``editable_fields``, ``computed_fields``, ``filterable_by`` — union
+      across all matching views (order-preserving dedup).
+    * Remaining scalar fields — first non-``None`` wins.
 
     Args:
         manifest: Normalised view-manifest dict.
@@ -67,10 +77,41 @@ def find_view_for_entity(
             (e.g. ``"crop"``).
 
     Returns:
-        The matching view dict, or ``None`` if no view is bound to that
-        entity.
+        A merged view dict, or ``None`` if no view is bound to that entity.
     """
-    for view in manifest.get("views") or []:
-        if str(view.get("entity") or "") == entity_name:
-            return view
-    return None
+    matching = [
+        v for v in (manifest.get("views") or [])
+        if str(v.get("entity") or "") == entity_name
+    ]
+    if not matching:
+        return None
+
+    merged = dict(matching[0])
+
+    # Fields that should be unioned (order-preserving dedup).
+    _UNION_FIELDS = {"editable_fields", "computed_fields", "filterable_by"}
+
+    for view in matching[1:]:
+        for key, value in view.items():
+            if key in _UNION_FIELDS and isinstance(value, list):
+                existing = merged.get(key) or []
+                seen = set(existing)
+                merged[key] = existing + [v for v in value if v not in seen]
+                seen.update(value)
+            elif key in ("time_scope",) and isinstance(value, dict):
+                # Pick the first non-empty time_scope.
+                existing = merged.get(key) or {}
+                if not existing:
+                    merged[key] = value
+            elif key in ("status_field",) and value is not None:
+                if merged.get(key) is None:
+                    merged[key] = value
+            elif key in ("status_values",) and isinstance(value, list) and value:
+                existing = merged.get(key) or []
+                if not existing:
+                    merged[key] = value
+            elif key in ("notes",) and value is not None:
+                if merged.get(key) is None and value is not None:
+                    merged[key] = value
+
+    return merged

@@ -1,0 +1,40 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+.workbench-cards {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.workbench-card {
+  padding: 15px;
+  border-radius: 4px;
+  min-width: 150px;
+  flex: 1;
+}
+.workbench-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.workbench-card-value {
+  font-size: 2em;
+  line-height: 1.2;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="workbench-cards">
+    {% for card in dashboard_cards %}
+    <div class="workbench-card" style="background: {{ card.color }};">
+      <strong>{{ card.label }}</strong>
+      <div class="workbench-card-value">{{ card.value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {{ block.super }}
+{% endblock %}

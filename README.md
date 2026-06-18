@@ -265,6 +265,22 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.4.2
+
+- **Dashboard archetype:** New `workbook/codegen/admin_generator.py` dashboard archetype generates summary cards and `changelist_view` override for role-based dashboard views. (workbook/codegen/admin_generator.py, workbook/templates/admin/workbench_dashboard/change_list.html, workbook/tests/test_admin_generator.py)
+- **View entity merge:** Merged view entity lookup in `workbook/codegen/manifest.py` picks the richest metadata from multi-view manifests — FK reverse count fields, date_hierarchy, and archetype hints merge correctly. (workbook/codegen/manifest.py, workbook/tests/test_admin_generator.py)
+- **inline_fields override:** `inline_fields` from codegen manifest override auto-truncation in admin TabularInline — only specified fields appear in the inline. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **FK reverse count fields:** `list_display` auto-generates reverse count fields (`{related_name}_count`) for FK relationships with a `related_name`. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **DateField date_hierarchy:** `date_hierarchy` auto-detected from the first DateField column in the contract. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **list_select_related for FKs:** Auto-generated `list_select_related` for all FK fields in `list_display`, preventing N+1 queries on admin list views. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **TabularInline show_change_link:** `show_change_link=True` set on all generated TabularInline classes for inline-edit navigation. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **Admin ordering from model_meta:** Explicit `ordering` set on admin classes from `model_meta.ordering` in the schema contract. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
+- **save_on_top:** `save_on_top=True` added to all ModelAdmin classes. (workbook/codegen/admin_generator.py)
+- **Base audit command chassis:** New `importer/base_audit.py` module extracting shared audit infrastructure (CSV helpers, CsvMapping dataclass, BaseAuditCommand with completeness/accuracy phases) from product-repo duplication. Product repos extend `BaseAuditCommand` and supply only farm-specific CSV_MAPPINGS, `_resolve_record()`, and `_run_custom_phases()`. (importer/base_audit.py, importer/tests/test_base_audit.py)
+- **Farm audit-imports refactored:** Farm's `audit_imports.py` reduced from 941 to ~390 lines by removing duplicated helpers/CsvMapping/handle/add_arguments/phase logic — now extends `BaseAuditCommand` and imports shared infrastructure from `importer.base_audit`. (farm backend/apps/core/management/commands/audit_imports.py)
+- **Completeness phase robustness:** Fixed `_phase_completeness` in base command to handle read-back CSV row counts, natural-key dedup, and expected-gap-reason escalation (fail→warn instead of pass). (importer/base_audit.py)
+- **All tests pass, full chassis-gate green.**
+
 ### 0.3.0
 
 - **Vertical template system:** New `vertical_registry` module with `load_vertical()`, `discover_verticals()`, `apply_vertical_to_schema()`, `apply_vertical_domain_context()`, `score_tab_against_templates()`, `merge_entity_template()`. Templates are versioned YAML manifests shipped under `workbook/verticals/` with overridable paths. (workbook/tools/vertical_registry.py)
@@ -275,6 +291,24 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 - **Discovery interview enrichment:** Vertical role presets and glossary terms flow into interview question rendering, pre-seeding role hints and field descriptions. (workbook/discovery.py)
 - **YAML robustness fixes:** `_normalise_null_keys()` handles PyYAML `null:` → `None` key parsing. Farm manifest quotes boolean-like YAML keys (`on:` → `"on"`). F541 f-string lint violations fixed. (workbook/tools/vertical_registry.py, workbook/codegen/admin_generator.py)
 - **52 new tests** across registry, farm vertical, CLI integration, and deployment — full chassis-gate green (959 passing).
+
+### 0.4.1
+
+- **resolve_field_mapping() accessor:** Public function in `workbook.codegen.contract` returning the effective field-name to source-column mapping from columns[] + import_config.column_map. Enables audit and drift-detection tools to trace model fields back to source headers without re-deriving mappings. (cb10934)
+- **Three scaffold template briefs completed:** Interaction contract pipeline docs, missing Make targets (`merge-interaction-contract`, `generate-source-config`), workflow docs (pipeline manifest, `generate-all`, `orient`, `profile-phase-validate`, `--force`, `--vertical`), vertical template awareness, and designed model detection workflow. All in commit 14fdbae.
+- **Farm contract columns[] populated for two models:** NurserySeedingSchedule and NurseryPotUpSchedule via `--table-profile` scaffold; farm `audit-imports`/`audit-imports-ci` Make targets added. (farm e55665a)
+- **All 1166+ tests pass, full chassis-gate green.**
+
+### 0.4.0
+
+- **Tab classification and archetype matrix:** New `workbook/tools/archetype_matrix.py` — columns classified by archetype (editable, computed, status, filter). Archetype signals flow into view manifest and interaction contract scaffolding. (862b84e)
+- **Workflow dependency graph:** `wb generate manifest` now extracts forward dependencies between columns (computed → source) for ordering and validation. (865fbf3)
+- **Quality gate expansion v0.3:** CI gate expanded to v0.3 bar covering contract validation, scaffolding, and codegen. Admin generator preserves hand-written custom sections on regeneration via `preserve_custom_sections` logic. (87dbd38)
+- **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions for combining columns (default: space join). (retroactively documented)
+- **Contract composition:** Custom `!include` YAML tag resolves relative to including file's directory with cyclic-include detection.
+- **Import tier auto-assignment:** `assign_import_tiers()` topological-sorts FK dependency chains.
+- **Contract diff/review/safety tools:** New `wb contract diff`, `wb contract review`, `wb contract safety` CLI subcommands.
+- **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` for regression detection.
 
 ### 0.2.0
 

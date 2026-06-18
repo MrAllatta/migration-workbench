@@ -423,6 +423,8 @@ def _render_inline_class(
     source_fields: list[dict[str, Any]],
     fk_field_name: str,
     override_fields: list[str] | None = None,
+    inline_fields: list[str] | None = None,
+    inline_config: dict[str, Any] | None = None,
 ) -> str:
     """Render a ``TabularInline`` class for a reverse FK relationship.
 
@@ -432,22 +434,48 @@ def _render_inline_class(
         fk_field_name: FK field linking back to the parent model.
         override_fields: Optional explicit field list from ``admin.inlines``
             in the contract.  When set, use these instead of auto-picking.
+        inline_fields: Optional explicit field list from the codegen manifest's
+            ``workflow_hints.inline_fields``.  When set, all specified fields
+            are shown (no auto-truncation).
+        inline_config: Optional dict from the codegen manifest's
+            ``workflow_hints.inline_config``.  Supported keys:
+            - ``archetype`` (``"editable_grid"`` or ``"reference"``):
+              ``"reference"`` makes all inline fields read-only.
+            - ``show_change_link`` (bool): default ``True``.
+            - ``can_delete`` (bool): default ``False``.
+            - ``extra`` (int): default ``0``.
     """
     inline_name = f"{source_name}Inline"
-    if override_fields:
+    if inline_fields:
+        display = inline_fields
+    elif override_fields:
         display = override_fields
     else:
         display = _inline_field_names(source_fields, fk_field_name)
-    field_list = ", ".join(repr(f) for f in display[:6])
+    if inline_fields:
+        field_list = ", ".join(repr(f) for f in display)
+    else:
+        field_list = ", ".join(repr(f) for f in display[:6])
+
+    icfg = inline_config or {}
+    show_change_link = icfg.get("show_change_link", True)
+    can_delete = icfg.get("can_delete", False)
+    extra_rows = icfg.get("extra", 0)
+    archetype = icfg.get("archetype", "editable_grid")
 
     lines = [
         "",
         f"class {inline_name}(admin.TabularInline):",
         f"    model = {source_name}",
-        "    extra = 0",
+        f"    extra = {extra_rows}",
+        f"    show_change_link = {str(show_change_link)}",
     ]
+    if can_delete:
+        lines.append("    can_delete = True")
     if display:
         lines.append(f"    fields = [{field_list}]")
+    if archetype == "reference" and display:
+        lines.append(f"    readonly_fields = [{field_list}]")
     lines.append("")
     return "\n".join(lines)
 
@@ -474,6 +502,9 @@ def _render_admin_class(
     extra_display_fields: list[dict[str, Any]] | None = None,
     css_rules: list[dict[str, Any]] | None = None,
     custom_actions: list[dict[str, str]] | None = None,
+    dashboard_config: dict[str, Any] | None = None,
+    select_related_fk_fields: list[str] | None = None,
+    ordering_fields: list[str] | None = None,
 ) -> str:
     """Render a ``ModelAdmin`` class with ``@admin.register``."""
     lines: list[str] = []
@@ -504,12 +535,23 @@ def _render_admin_class(
             "",
             f"@admin.register({model_name})",
             f"class {model_name}Admin({admin_base_class}):",
+            "    save_on_top = True",
         ]
     )
 
     if display_fields:
         items = ", ".join(repr(f) for f in display_fields)
         lines.append(f"    list_display = [{items}]")
+
+    # list_select_related for FK fields in list_display
+    if select_related_fk_fields:
+        items = ", ".join(repr(f) for f in select_related_fk_fields)
+        lines.append(f"    list_select_related = [{items}]")
+
+    # Explicit ordering from model_meta (avoids implicit model.Meta.ordering)
+    if ordering_fields:
+        items = ", ".join(repr(f) for f in ordering_fields)
+        lines.append(f"    ordering = [{items}]")
 
     if link_methods:
         lines.append("")
@@ -565,9 +607,19 @@ def _render_admin_class(
         items = ", ".join(inline_classes)
         lines.append(f"    inlines = [{items}]")
 
-    # date_hierarchy from time_scope
+    # date_hierarchy — prefer explicit time_scope.date_field, then
+    # auto-detect the first DateField/DateTimeField from the contract.
+    date_hierarchy_field: str | None = None
     if time_scope and time_scope.get("date_field"):
-        lines.append(f"    date_hierarchy = '{time_scope['date_field']}'")
+        date_hierarchy_field = str(time_scope["date_field"])
+    elif contract_fields:
+        for f in contract_fields:
+            fclass = f.get("class", "")
+            if fclass in ("models.DateField", "models.DateTimeField"):
+                date_hierarchy_field = f["name"]
+                break
+    if date_hierarchy_field:
+        lines.append(f"    date_hierarchy = '{date_hierarchy_field}'")
 
     # fields (change form) from editable_fields
     if editable_fields:
@@ -751,6 +803,33 @@ def _render_admin_class(
             f"        return request.user.groups.filter(name__in=[{', '.join(repr(r) for r in [_owner_role_pascal])}]).exists()"
         )
 
+    # Dashboard summary cards — changelist_view override
+    if dashboard_config:
+        summary_cards = dashboard_config.get("summary_cards") or []
+        if summary_cards:
+            lines.append("")
+            lines.append("    change_list_template = \"admin/workbench_dashboard/change_list.html\"")
+            lines.append("")
+            lines.append("    def changelist_view(self, request, extra_context=None):")
+            lines.append("        from django.db import models as db_models")
+            lines.append("        response = super().changelist_view(request, extra_context)")
+            lines.append("        try:")
+            lines.append("            qs = response.context_data[\"cl\"].queryset")
+            lines.append("        except (AttributeError, KeyError):")
+            lines.append("            return response")
+            lines.append("        cards = []")
+            for card in summary_cards:
+                label = card.get("label", "")
+                color = card.get("color", "#e0e0e0")
+                expression = card.get("expression", "qs.count()")
+                lines.append(f"        cards.append({{")
+                lines.append(f'            "label": "{label}",')
+                lines.append(f'            "color": "{color}",')
+                lines.append(f'            "value": {expression},')
+                lines.append(f"        }})")
+            lines.append('        response.context_data["dashboard_cards"] = cards')
+            lines.append("        return response")
+
     if all(
         not x
         for x in [
@@ -769,6 +848,7 @@ def _render_admin_class(
             or (status_values and status_field)
             or editable_fields
             or _access_permissions
+            or dashboard_config
         )
         if not has_new_content:
             lines.append("    pass")
@@ -1026,6 +1106,7 @@ def render_admin_py(
         view = find_view_for_entity(manifest, raw_entity) if manifest else None
         meta = get_model_meta(table)
         verbose_name = meta.get("verbose_name")
+        model_ordering: list[str] | None = meta.get("ordering")
         admin_cfg = get_admin_config(table)
 
         # Codegen manifest entry for this model (may be None).
@@ -1069,15 +1150,58 @@ def render_admin_py(
             inline_name = f"{ref['source_name']}Inline"
             if inline_name not in inline_class_names:
                 inline_class_names.add(inline_name)
+                # Check codegen manifest for inline configuration on the child model.
+                child_codegen = codegen_index.get(ref["source_name"])
+                child_inline_fields: list[str] | None = None
+                child_inline_config: dict[str, Any] | None = None
+                if child_codegen:
+                    child_hints = child_codegen.get("workflow_hints") or {}
+                    child_inline_fields = child_hints.get("inline_fields")
+                    child_inline_config = child_hints.get("inline_config")
                 inline_class_defs.append(
                     _render_inline_class(
                         ref["source_name"],
                         source_fields,
                         ref["field_name"],
                         override_fields=override_fields,
+                        inline_fields=child_inline_fields,
+                        inline_config=child_inline_config,
                     )
                 )
             inline_names.append(inline_name)
+
+        # Auto-generate FK reverse count fields for list_display.
+        # For each child model that FK's to this model, add a count
+        # method (e.g. "planting_plan_count → obj.planting_plans.count()")
+        # unless the codegen manifest already provides it.
+        auto_count_fields: list[dict[str, Any]] = []
+        existing_computed = {
+            f["name"]
+            for f in (_pick_computed_display_fields(codegen_entry, contract_fields))
+        }
+        for ref in rev_fks:
+            ref_table = next(
+                t for t in tables if get_model_name(t) == ref["source_name"]
+            )
+            child_fk = next(
+                (f for f in get_fields(ref_table) if f["name"] == ref["field_name"]),
+                None,
+            )
+            rel_name = (
+                child_fk["kwargs"].get("related_name") if child_fk else None
+            )
+            if not rel_name:
+                rel_name = f"{_to_snake_case(ref['source_name'])}_set"
+            count_name = f"{_to_snake_case(ref['source_name'])}_count"
+            if count_name not in existing_computed:
+                auto_count_fields.append({
+                    "name": count_name,
+                    "description": " ".join(
+                        w.capitalize() for w in _to_snake_case(ref["source_name"]).split("_")
+                    ),
+                    "expression": f"obj.{rel_name}.count()",
+                    "boolean": False,
+                })
 
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
@@ -1229,12 +1353,15 @@ def render_admin_py(
             autocomplete = [f for f in autocomplete if f not in readonly]
 
         # FK link display methods — generate _link methods and swap into list_display.
+        # Also collect FK field names for list_select_related (N+1 prevention).
         link_methods: list[str] = []
+        select_related_fk_fields: list[str] = []
         for field in contract_fields:
             if _is_fk_field(field):
                 target = field["kwargs"].get("to", "")
                 if target and isinstance(target, str) and target != "self":
                     if field["name"] in display:
+                        select_related_fk_fields.append(field["name"])
                         link_methods.append(
                             _render_fk_link_method(field["name"], target, app_label)
                         )
@@ -1245,10 +1372,14 @@ def render_admin_py(
                         needs_fk_links = True
 
         computed_fields = _pick_computed_display_fields(codegen_entry, contract_fields)
+        # Merge auto-generated FK reverse count fields.
+        # These are appended AFTER manifest computed_fields so manifest wins
+        # for same-named entries (auto generation skips duplicates above).
+        extra_display_fields = list(computed_fields) + auto_count_fields
         # Merge computed display field names into list_display so they appear
         # as columns in the changelist view alongside their generated methods.
-        if computed_fields:
-            computed_names = [f["name"] for f in computed_fields if "name" in f]
+        if extra_display_fields:
+            computed_names = [f["name"] for f in extra_display_fields if "name" in f]
             # De-duplicate while preserving insertion order (Python 3.7+).
             display = list(dict.fromkeys(display + computed_names))
 
@@ -1257,6 +1388,16 @@ def render_admin_py(
         if codegen_entry:
             cg_hints = codegen_entry.get("workflow_hints") or {}
             cg_custom_actions = cg_hints.get("actions") or []
+
+        # Dashboard config from codegen manifest: summary cards + changelist_view override.
+        cg_dashboard_config: dict[str, Any] | None = None
+        if codegen_entry:
+            cg_hints = codegen_entry.get("workflow_hints") or {}
+            archetype = str(codegen_entry.get("ui_archetype") or "list")
+            if archetype == "dashboard":
+                raw_dashboard = cg_hints.get("dashboard") or {}
+                if raw_dashboard.get("summary_cards"):
+                    cg_dashboard_config = raw_dashboard
 
         admin_class_parts.append(
             _render_admin_class(
@@ -1280,9 +1421,12 @@ def render_admin_py(
                 if codegen_entry
                 else None,
                 contract_fields=contract_fields,
-                extra_display_fields=computed_fields,
+                extra_display_fields=extra_display_fields,
                 css_rules=cg_css_rules,
                 custom_actions=cg_custom_actions,
+                dashboard_config=cg_dashboard_config,
+                select_related_fk_fields=select_related_fk_fields,
+                ordering_fields=model_ordering,
             )
         )
 
