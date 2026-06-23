@@ -1,7 +1,7 @@
 """Profiler enrichment utilities for FK detection, computed fields, and entity grouping."""
 
 import re
-from typing import Literal
+from typing import Any, Literal
 
 _ENTITY_KEYWORDS = {"channel", "season", "crop", "block", "farm", "field", "variety"}
 _IDENTIFIER_SUFFIXES = {"_id", "_code", "_key"}
@@ -77,3 +77,59 @@ def glossary_expand(text: str, glossary: dict[str, str]) -> set[str]:
         if abbr.lower() in lowered:
             expansions.add(full_form.lower())
     return expansions
+
+
+def enrich_from_dependency_graph(
+    column_profiles: dict[str, dict[str, Any]],
+    dependency_artifact: dict[str, Any],
+    high_value_threshold: int = 3,
+) -> None:
+    """Augment column profiles with dependency-derived signals.
+
+    Mutates *column_profiles* in place, adding:
+        ``is_computed`` (bool): True when every cell in the column is a formula.
+        ``suggested_fk_target`` (str): Tab name when the column's formulas
+            contain cross-sheet INDEX/MATCH or other FK-like references.
+
+    Args:
+        column_profiles: Dict mapping column letter/name to profile dict.
+            Each profile dict should have a ``column_cells`` key with
+            a list of cell dicts containing ``kind`` and ``text``.
+        dependency_artifact: Output from ``build_dependency_artifact()``.
+        high_value_threshold: Minimum references to flag as high-value.
+    """
+    if not column_profiles or not dependency_artifact.get("nodes"):
+        return
+
+    cross_sheet_sources: set[str] = set()
+    for edge in dependency_artifact.get("edges", []):
+        if edge.get("is_cross_sheet"):
+            cross_sheet_sources.add(edge["source"].split("!")[0])
+
+    for _col_key, profile in column_profiles.items():
+        cells = profile.get("column_cells", [])
+        if not cells:
+            continue
+
+        formula_count = sum(
+            1 for c in cells if c.get("kind") == "formula"
+        )
+        total = len(cells)
+
+        if formula_count == total and total > 0:
+            profile["is_computed"] = True
+
+        if formula_count > 0:
+            for cell in cells:
+                formula_text = cell.get("text", "")
+                if not formula_text.startswith("="):
+                    continue
+                for sheet_name in cross_sheet_sources:
+                    if sheet_name in formula_text and (
+                        "INDEX" in formula_text.upper()
+                        or "MATCH" in formula_text.upper()
+                    ):
+                        profile["suggested_fk_target"] = sheet_name
+                        break
+                if profile.get("suggested_fk_target"):
+                    break

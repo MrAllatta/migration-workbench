@@ -15,7 +15,6 @@ from profiler.tools.pipeline_state import (
     PipelineState,
 )
 
-
 # ---------------------------------------------------------------------------
 # 1. Dataclass defaults
 # ---------------------------------------------------------------------------
@@ -374,9 +373,7 @@ class TestStaleArtifactWarning:
 
     def test_load_or_create_stale_artifact_warning(self, tmp_path, caplog):
         """Stale tab_selection_*.json triggers a warning."""
-        (tmp_path / "tab_selection_20260101.json").write_text(
-            '{"approved_tabs": {}}'
-        )
+        (tmp_path / "tab_selection_20260101.json").write_text('{"approved_tabs": {}}')
         config_path = tmp_path / "config.json"
         config_path.write_text('{"domain": "test"}')
 
@@ -390,9 +387,7 @@ class TestStaleArtifactWarning:
 
     def test_load_or_create_force_suppresses_warning(self, tmp_path, caplog):
         """force=True suppresses the stale artifact warning."""
-        (tmp_path / "tab_selection_20260101.json").write_text(
-            '{"approved_tabs": {}}'
-        )
+        (tmp_path / "tab_selection_20260101.json").write_text('{"approved_tabs": {}}')
         config_path = tmp_path / "config.json"
         config_path.write_text('{"domain": "test"}')
 
@@ -411,9 +406,7 @@ class TestStaleArtifactWarning:
         state = PipelineState()
         state.save_checkpoint(checkpoint_path)
 
-        (tmp_path / "tab_selection_20260101.json").write_text(
-            '{"approved_tabs": {}}'
-        )
+        (tmp_path / "tab_selection_20260101.json").write_text('{"approved_tabs": {}}')
         config_path = tmp_path / "config.json"
         config_path.write_text('{"domain": "test"}')
 
@@ -1003,9 +996,9 @@ class TestVersionIndependence:
         """Assert PipelineState.version is a valid semver string."""
         import re
 
-        assert re.match(r"^\d+\.\d+\.\d+$", PipelineState.version), (
-            f"PipelineState.version ({PipelineState.version}) is not valid semver"
-        )
+        assert re.match(
+            r"^\d+\.\d+\.\d+$", PipelineState.version
+        ), f"PipelineState.version ({PipelineState.version}) is not valid semver"
 
     def test_pipeline_state_version_not_tied_to_pyproject(self) -> None:
         """Assert PipelineState.version is independent of pyproject.toml."""
@@ -1199,9 +1192,7 @@ class TestPhaseMethods:
         assert result.schema_contract["tables"][0]["source_tab"] == "Crop Planner"
 
         # Verify excluded decision was recorded
-        excluded_decisions = [
-            d for d in result.decisions if d.outcome == "excluded"
-        ]
+        excluded_decisions = [d for d in result.decisions if d.outcome == "excluded"]
         assert len(excluded_decisions) == 1
         assert excluded_decisions[0].decision_id == "exclude_ui_config_Configure"
         assert excluded_decisions[0].phase == "derive_contracts"
@@ -1286,9 +1277,7 @@ class TestPhaseMethods:
 
         assert result.schema_contract is not None
         assert len(result.schema_contract["tables"]) == 3
-        model_names = [
-            t["model_name"] for t in result.schema_contract["tables"]
-        ]
+        model_names = [t["model_name"] for t in result.schema_contract["tables"]]
         assert "CropPlanner" in model_names
         assert "Varieties" in model_names
         assert "UnknownSheet" in model_names
@@ -1669,3 +1658,155 @@ class TestPipelineStateSignals:
 
         # Second call uses cache
         assert state.load_profiler_signals() is result
+
+
+# ---------------------------------------------------------------------------
+# 10. Formula dependency integration
+# ---------------------------------------------------------------------------
+
+
+class TestFormulaDependencyWiring:
+    """Formula dependency analysis wired into PipelineState deep_profile."""
+
+    def test_col_index_to_letter_utility(self):
+        """_col_index_to_letter converts 1-based column indices to Excel letters."""
+        from profiler.tools.pipeline_state import _col_index_to_letter
+
+        assert _col_index_to_letter(1) == "A"
+        assert _col_index_to_letter(2) == "B"
+        assert _col_index_to_letter(26) == "Z"
+        assert _col_index_to_letter(27) == "AA"
+        assert _col_index_to_letter(28) == "AB"
+        assert _col_index_to_letter(52) == "AZ"
+        assert _col_index_to_letter(53) == "BA"
+        assert _col_index_to_letter(703) == "AAA"
+        assert _col_index_to_letter(704) == "AAB"
+
+    def test_formula_dependency_functions_importable(self):
+        """build_dependency_artifact and parse_cells are importable from formula_dependency."""
+        from profiler.tools.formula_dependency import (
+            build_dependency_artifact,
+            parse_cells,
+        )
+
+        cells = [
+            {"sheet": "Orders", "cell": "D2", "formula": "=B2*C2"},
+            {"sheet": "Orders", "cell": "D3", "formula": "=B3*C3"},
+            {"sheet": "Orders", "cell": "E2", "formula": "=SUM(D2:D100)"},
+        ]
+        parsed = parse_cells(cells)
+        artifact = build_dependency_artifact(parsed, workbook_key="test")
+
+        assert artifact["summary"]["total_formula_cells"] == 3
+        assert len(artifact["nodes"]) >= 3
+        assert len(artifact["edges"]) >= 2
+        d_ref_edges = [e for e in artifact["edges"] if e["target"] == "Orders!E2"]
+        assert len(d_ref_edges) >= 1
+
+    def test_enrich_entry_with_formula_dependencies_integration(self, tmp_path):
+        """_enrich_entry_with_formula_dependencies populates computed_fields from raw formula data."""
+        import json
+
+        from profiler.tools.pipeline_state import PipelineState
+
+        # Create a profile artifact with raw sheet data containing formulas.
+        # This must match the Google Sheets API format that raw_sheet_to_row_lists expects:
+        # {"sheets": [{"data": [{"startRow": 0, "rowData": [{"values": [{"formattedValue": ...}]}]}]}]}
+        def _make_row(values: list) -> dict:
+            return {"values": [{"formattedValue": str(v)} for v in values]}
+
+        raw_data = {
+            "sheets": [
+                {
+                    "data": [
+                        {
+                            "startRow": 0,
+                            "rowData": [
+                                _make_row(
+                                    ["Product", "Price", "Qty", "Total", "GrandTotal"]
+                                ),
+                                _make_row(["Widget", "10", "5", "=B2*C2", ""]),
+                                _make_row(["Gadget", "20", "3", "=B3*C3", ""]),
+                                _make_row(
+                                    ["Doohickey", "15", "7", "=B4*C4", "=SUM(D2:D4)"]
+                                ),
+                            ],
+                        }
+                    ]
+                }
+            ]
+        }
+        profile_artifact = {
+            "raw": raw_data,
+        }
+        profile_path = tmp_path / "profile_test_sheet.json"
+        profile_path.write_text(
+            json.dumps(profile_artifact, indent=2),
+            encoding="utf-8",
+        )
+
+        # Build an entry referencing this profile
+        entry = {
+            "tab_title": "Orders",
+            "tab": "Orders",
+            "out_json": (
+                str(profile_path.relative_to(tmp_path))
+                if profile_path.relative_to(tmp_path)
+                else "profile_test_sheet.json"
+            ),
+        }
+
+        # The out_json must be relative so it can be joined with out_dir
+        entry["out_json"] = "profile_test_sheet.json"
+
+        state = PipelineState()
+        state._out_dir = tmp_path
+        state._date_stamp = "2026-06-23"
+
+        # Run the enrichment
+        state._enrich_entry_with_formula_dependencies(
+            entry, out_dir=tmp_path, date_stamp="2026-06-23"
+        )
+
+        # The Total column (D) has formulas in ALL data rows -> is_computed.
+        # GrandTotal (E) has only 1 formula cell out of 3 -> not is_computed
+        # (the enrich function requires every cell in a column to be a formula).
+        assert "computed_fields" in entry
+        computed_headers = {cf["header"] for cf in entry["computed_fields"]}
+        assert (
+            "Total" in computed_headers
+        ), f"Expected 'Total' in computed_fields, got {computed_headers}"
+        assert "GrandTotal" not in computed_headers, (
+            f"Expected GrandTotal NOT in computed_fields since it has mixed "
+            f"empty/formula cells, got {computed_headers}"
+        )
+
+        # Verify dependency artifact was saved
+        assert "dependency_json" in entry
+        dep_path = tmp_path / entry["dependency_json"]
+        assert dep_path.exists()
+        dep_data = json.loads(dep_path.read_text(encoding="utf-8"))
+        assert dep_data["summary"]["total_formula_cells"] >= 3
+
+    def test_enrich_entry_skips_when_no_raw_data(self, tmp_path):
+        """_enrich_entry_with_formula_dependencies silently skips entries without raw data."""
+        from profiler.tools.pipeline_state import PipelineState
+
+        entry = {"tab_title": "Empty", "out_json": None}
+        state = PipelineState()
+        state._enrich_entry_with_formula_dependencies(
+            entry, out_dir=tmp_path, date_stamp="2026-06-23"
+        )
+        assert "dependency_json" not in entry
+        assert "computed_fields" not in entry or entry["computed_fields"] == []
+
+    def test_enrich_entry_skips_when_no_out_json(self, tmp_path):
+        """_enrich_entry_with_formula_dependencies silently skips entries without out_json."""
+        from profiler.tools.pipeline_state import PipelineState
+
+        entry = {"tab_title": "NoProfile"}
+        state = PipelineState()
+        state._enrich_entry_with_formula_dependencies(
+            entry, out_dir=tmp_path, date_stamp="2026-06-23"
+        )
+        assert "dependency_json" not in entry
