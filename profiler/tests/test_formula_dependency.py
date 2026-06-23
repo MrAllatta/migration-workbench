@@ -1,5 +1,7 @@
 """Tests for cell-level formula dependency analysis."""
 
+import networkx as nx
+
 from profiler.tools.formula_dependency import (
     Ref,
     ParsedFormula,
@@ -9,6 +11,10 @@ from profiler.tools.formula_dependency import (
     parse_cells,
     build_dependency_artifact,
     compute_dependency_signals,
+    build_cell_graph,
+    build_sheet_dependency_graph,
+    compute_sheet_signals,
+    build_dependency_report,
 )
 
 
@@ -195,3 +201,323 @@ def test_compute_dependency_signals_pattern_clusters():
     hashes = set(p.pattern_hash for p in parsed)
     assert len(hashes) == 1, f"Expected 1 pattern hash, got {hashes}"
     assert signals["pattern_clusters"][0]["count"] == 2
+
+
+# ---------------------------------------------------------------------------
+# build_cell_graph tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_cell_graph_empty():
+    """Empty list returns empty nx.DiGraph."""
+    G = build_cell_graph([])
+    assert G.number_of_nodes() == 0
+    assert G.number_of_edges() == 0
+
+
+def test_build_cell_graph_single_formula():
+    """Single formula with one reference creates correct nodes and edges."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=A1"},
+    ]
+    parsed = parse_cells(cells)
+    G = build_cell_graph(parsed)
+    assert G.number_of_nodes() == 2
+    assert G.number_of_edges() == 1
+    assert G.nodes["Sheet1!B2"]["node_type"] == "formula"
+    assert G.nodes["Sheet1!A1"]["node_type"] == "data"
+
+
+def test_build_cell_graph_self_reference():
+    """Self-referencing formula does not create an edge."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "A1", "formula": "=A1"},
+    ]
+    parsed = parse_cells(cells)
+    G = build_cell_graph(parsed)
+    # Only one node (the formula cell itself) — no edge for self-ref
+    assert G.number_of_nodes() == 1
+    assert G.number_of_edges() == 0
+    # Node exists (type is overwritten to "data" since the formula's
+    # own ref re-adds the same node with node_type="data")
+    assert "Sheet1!A1" in G.nodes
+
+
+def test_build_cell_graph_cross_sheet():
+    """Cross-sheet reference has is_cross_sheet=True on the edge."""
+    cells = [
+        {"sheet": "Summary", "cell": "C4", "formula": "=Data!A1"},
+    ]
+    parsed = parse_cells(cells)
+    G = build_cell_graph(parsed)
+    edges = list(G.edges(data=True))
+    assert len(edges) == 1
+    _, _, edge_data = edges[0]
+    assert edge_data["is_cross_sheet"] is True
+
+
+# ---------------------------------------------------------------------------
+# build_sheet_dependency_graph tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_sheet_graph_empty():
+    """Empty cell graph produces empty sheet graph."""
+    G_cell = build_cell_graph([])
+    G_sheet = build_sheet_dependency_graph(G_cell)
+    assert G_sheet.number_of_nodes() == 0
+    assert G_sheet.number_of_edges() == 0
+
+
+def test_build_sheet_graph_single_sheet():
+    """All refs on same sheet produce a single node with correct counts."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=A1"},
+        {"sheet": "Sheet1", "cell": "C2", "formula": "=B1"},
+    ]
+    parsed = parse_cells(cells)
+    G_cell = build_cell_graph(parsed)
+    G_sheet = build_sheet_dependency_graph(G_cell)
+    assert G_sheet.number_of_nodes() == 1
+    assert G_sheet.number_of_edges() == 0
+    assert G_sheet.nodes["Sheet1"]["formula_count"] == 2
+    assert G_sheet.nodes["Sheet1"]["node_count"] >= 2
+
+
+def test_build_sheet_graph_cross_sheet():
+    """Cross-sheet refs produce weighted edges between sheets."""
+    cells = [
+        {"sheet": "Summary", "cell": "C4", "formula": "=Data!A1"},
+        {"sheet": "Summary", "cell": "D4", "formula": "=Data!B2"},
+        {"sheet": "Data", "cell": "A1", "formula": "=Lookup!X1"},
+    ]
+    parsed = parse_cells(cells)
+    G_cell = build_cell_graph(parsed)
+    G_sheet = build_sheet_dependency_graph(G_cell)
+
+    # Summary → Summary!C4 (formula), Summary!D4 (formula) -> 2 formulas, 2 nodes
+    assert G_sheet.nodes["Summary"]["formula_count"] == 2
+    assert G_sheet.nodes["Summary"]["node_count"] == 2
+    # Data → Data!A1 (formula), Data!B2 (data) -> 1 formula, 2 nodes
+    assert G_sheet.nodes["Data"]["formula_count"] == 1
+    assert G_sheet.nodes["Data"]["node_count"] == 2
+    # Lookup → Lookup!X1 (data) -> 0 formulas, 1 node
+    assert G_sheet.nodes["Lookup"]["formula_count"] == 0
+    assert G_sheet.nodes["Lookup"]["node_count"] == 1
+
+    # Edge weight from Data to Summary = 2 (Data!A1→Summary!C4, Data!B2→Summary!D4)
+    assert G_sheet.edges[("Data", "Summary")]["weight"] == 2
+    # Edge weight from Lookup to Data = 1 (Lookup!X1→Data!A1)
+    assert G_sheet.edges[("Lookup", "Data")]["weight"] == 1
+
+
+# ---------------------------------------------------------------------------
+# compute_sheet_signals tests
+# ---------------------------------------------------------------------------
+
+
+def test_compute_sheet_signals_no_orphans():
+    """Sheets with cross-sheet edges are not orphaned."""
+    cells = [
+        {"sheet": "Summary", "cell": "C4", "formula": "=Data!A1"},
+        {"sheet": "Data", "cell": "A1", "formula": "=Lookup!X1"},
+    ]
+    parsed = parse_cells(cells)
+    G_cell = build_cell_graph(parsed)
+    G_sheet = build_sheet_dependency_graph(G_cell)
+    signals = compute_sheet_signals(G_cell, G_sheet)
+    # All sheets with formulas (Summary, Data) have cross-sheet edges
+    orphaned_sheets = {o["sheet"] for o in signals["orphaned_sheets"]}
+    assert "Summary" not in orphaned_sheets
+    assert "Data" not in orphaned_sheets
+
+
+def test_compute_sheet_signals_orphan_detected():
+    """Orphaned sheet detection — sheets with formulas but no cross-sheet edges."""
+    cells = [
+        # MainSheet has cross-sheet refs to OtherSheet
+        {"sheet": "MainSheet", "cell": "A1", "formula": "=B1+OtherSheet!C1"},
+        {"sheet": "MainSheet", "cell": "D1", "formula": "=E1"},
+        # OrphanSheet has only local refs
+        {"sheet": "OrphanSheet", "cell": "X1", "formula": "=Y1"},
+        {"sheet": "OrphanSheet", "cell": "X2", "formula": "=Z1"},
+    ]
+    parsed = parse_cells(cells)
+    G_cell = build_cell_graph(parsed)
+    signals = compute_sheet_signals(G_cell)
+    orphaned_sheets = {o["sheet"] for o in signals["orphaned_sheets"]}
+    assert "OrphanSheet" in orphaned_sheets
+    assert "MainSheet" not in orphaned_sheets
+    assert "OtherSheet" not in orphaned_sheets
+
+
+# ---------------------------------------------------------------------------
+# External / IMPORTRANGE reference parsing tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_importrange_reference():
+    """IMPORTRANGE() detected as external reference alongside regular refs."""
+    refs = parse_references('=IMPORTRANGE("url", "Other!A1")+Data!B2', "Sheet1")
+    importrange_refs = [r for r in refs if r.type == "importrange"]
+    assert len(importrange_refs) >= 1
+    assert importrange_refs[0].is_external is True
+    assert importrange_refs[0].type == "importrange"
+    # Also has the regular sheet-qualified ref for Data!B2
+    data_refs = [r for r in refs if r.sheet == "Data"]
+    assert len(data_refs) >= 1
+
+
+def test_parse_external_workbook_reference():
+    """External workbook bracket ref [Workbook.xlsx] is detected."""
+    refs = parse_references('=[Workbook.xlsx]Sheet1!A1', "Home")
+    ext_refs = [r for r in refs if r.type == "external_workbook"]
+    assert len(ext_refs) >= 1
+    assert ext_refs[0].type == "external_workbook"
+    assert ext_refs[0].is_external is True
+
+
+# ---------------------------------------------------------------------------
+# Pattern → cell membership tests
+# ---------------------------------------------------------------------------
+
+
+def test_pattern_cluster_cells_membership():
+    """Pattern clusters include cell IDs in the cells list."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "A1", "formula": "=B1+C1"},
+        {"sheet": "Sheet1", "cell": "A2", "formula": "=B2+C2"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    signals = compute_dependency_signals(artifact)
+    cluster = signals["pattern_clusters"][0]
+    assert "cells" in cluster
+    assert len(cluster["cells"]) == 2
+    assert "Sheet1!A1" in cluster["cells"]
+    assert "Sheet1!A2" in cluster["cells"]
+    # Also verify other expected keys
+    assert "pattern_hash" in cluster
+    assert "count" in cluster
+    assert cluster["count"] == 2
+    assert "example_formula" in cluster
+
+
+# ---------------------------------------------------------------------------
+# Artifact new-key tests
+# ---------------------------------------------------------------------------
+
+
+def test_artifact_has_sheet_graph_key():
+    """Dependency artifact includes sheet_graph with nodes and edges."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=Data!A1"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    assert "sheet_graph" in artifact
+    sg = artifact["sheet_graph"]
+    assert "nodes" in sg
+    assert "edges" in sg
+    assert len(sg["nodes"]) >= 1
+    node = sg["nodes"][0]
+    assert "id" in node
+    assert "formula_count" in node
+    assert "node_count" in node
+
+
+def test_artifact_has_sheet_signals_key():
+    """Artifact includes sheet_signals with orphaned_sheets."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=Data!A1"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    assert "sheet_signals" in artifact
+    ss = artifact["sheet_signals"]
+    assert "orphaned_sheets" in ss
+
+
+def test_artifact_has_report_key():
+    """Artifact includes report with all 7 expected sections."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=Data!A1"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    assert "report" in artifact
+    report = artifact["report"]
+    expected_sections = [
+        "formula_totals",
+        "external_references",
+        "high_value_nodes",
+        "top_most_referenced",
+        "orphaned_sheets",
+        "sheet_dependency_table",
+        "pattern_clusters",
+    ]
+    for section in expected_sections:
+        assert section in report, f"Missing report section: {section}"
+
+
+def test_artifact_has_cross_workbook_deps():
+    """Summary includes cross_workbook_deps with expected sub-keys."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=Data!A1"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    summary = artifact["summary"]
+    assert "cross_workbook_deps" in summary
+    cwd = summary["cross_workbook_deps"]
+    assert "workbook_key" in cwd
+    assert "external_ref_count" in cwd
+    assert "importrange_count" in cwd
+
+
+def test_report_top_most_referenced():
+    """Report includes top_most_referenced list sorted by out-degree."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B1", "formula": "=A1"},
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=A1"},
+        {"sheet": "Sheet1", "cell": "B3", "formula": "=A1"},
+        {"sheet": "Sheet1", "cell": "C1", "formula": "=A2"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    report = artifact["report"]
+    assert "top_most_referenced" in report
+    assert len(report["top_most_referenced"]) > 0
+    # Verify sorted by out_degree descending
+    top = report["top_most_referenced"]
+    for i in range(len(top) - 1):
+        assert top[i]["out_degree"] >= top[i + 1]["out_degree"]
+    # Sheet1!A1 should be most referenced (3 formulas reference it)
+    assert top[0]["cell_id"] == "Sheet1!A1"
+    assert top[0]["out_degree"] >= 3
+
+
+# ---------------------------------------------------------------------------
+# Backwards compatibility tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_dependency_artifact_still_returns_old_keys():
+    """Existing consumers still get the original keys unchanged."""
+    cells = [
+        {"sheet": "Sheet1", "cell": "B2", "formula": "=A1"},
+    ]
+    parsed = parse_cells(cells)
+    artifact = build_dependency_artifact(parsed)
+    # Old keys must still be present
+    assert "workbook_key" in artifact
+    assert "summary" in artifact
+    assert "nodes" in artifact
+    assert "edges" in artifact
+    assert "cross_sheet_edges" in artifact
+    # Nodes and edges have the same format as before
+    assert len(artifact["nodes"]) >= 1
+    assert "id" in artifact["nodes"][0]
+    assert len(artifact["edges"]) >= 1
+    assert "source" in artifact["edges"][0]
+    assert "target" in artifact["edges"][0]
