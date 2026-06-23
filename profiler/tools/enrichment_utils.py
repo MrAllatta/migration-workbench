@@ -79,6 +79,62 @@ def glossary_expand(text: str, glossary: dict[str, str]) -> set[str]:
     return expansions
 
 
+def enrich_fk_from_sheet_graph(
+    column_profiles: dict[str, dict[str, Any]],
+    dependency_artifact: dict[str, Any],
+    weight_threshold: int = 3,
+) -> None:
+    """Suggest FK targets from sheet-level dependency graph edges.
+
+    For each column profile whose tab has a high-weight outgoing edge
+    to another tab in the sheet graph, sets ``suggested_fk_target``
+    if the column doesn't already have one.
+
+    Args:
+        column_profiles: Dict mapping column letter/name to profile dict.
+            Each profile should have a ``tab_name`` or ``worksheet`` key
+            identifying which tab it belongs to.
+        dependency_artifact: Output from ``build_dependency_artifact()``,
+            must contain a ``sheet_graph`` key.
+        weight_threshold: Minimum edge weight to consider as FK signal.
+    """
+    sheet_graph = dependency_artifact.get("sheet_graph")
+    if not sheet_graph:
+        return
+
+    edges = sheet_graph.get("edges", [])
+    if not edges:
+        return
+
+    # Build map: sheet -> outgoing edges with weight >= threshold, sorted desc
+    sheet_out_edges: dict[str, list[dict[str, Any]]] = {}
+    for edge in edges:
+        from_sheet = edge.get("from_sheet")
+        to_sheet = edge.get("to_sheet")
+        weight = edge.get("weight", 0)
+        if not from_sheet or not to_sheet or weight < weight_threshold:
+            continue
+        sheet_out_edges.setdefault(from_sheet, []).append(edge)
+
+    # Sort each sheet's edges by weight descending
+    for sheet in sheet_out_edges:
+        sheet_out_edges[sheet].sort(key=lambda e: e.get("weight", 0), reverse=True)
+
+    for _col_key, profile in column_profiles.items():
+        if profile.get("suggested_fk_target"):
+            continue
+        tab_name = profile.get("tab_name") or profile.get("worksheet")
+        if not tab_name:
+            continue
+        outgoing = sheet_out_edges.get(tab_name)
+        if not outgoing:
+            continue
+        target_sheet = outgoing[0].get("to_sheet")
+        if target_sheet:
+            profile["suggested_fk_target"] = target_sheet
+            profile["_fk_from_sheet_graph"] = True
+
+
 def enrich_from_dependency_graph(
     column_profiles: dict[str, dict[str, Any]],
     dependency_artifact: dict[str, Any],

@@ -1,6 +1,9 @@
 """Tests for profiler enrichment utilities."""
 
-from profiler.tools.enrichment_utils import enrich_from_dependency_graph
+from profiler.tools.enrichment_utils import (
+    enrich_fk_from_sheet_graph,
+    enrich_from_dependency_graph,
+)
 
 
 def test_enrich_from_dependency_graph_empty():
@@ -102,3 +105,100 @@ def test_enrich_from_dependency_graph_missing_column_cells():
     profiles = {"A": {"header": "Name"}}
     enrich_from_dependency_graph(profiles, artifact)
     # Should not raise
+
+
+def test_enrich_fk_from_sheet_graph_empty_artifact():
+    """No sheet_graph, no crash, no modification."""
+    profiles = {
+        "A": {"header": "Name", "tab_name": "Summary"},
+    }
+    artifact = {"nodes": [], "edges": [], "summary": {}}
+    enrich_fk_from_sheet_graph(profiles, artifact)
+    assert profiles["A"].get("suggested_fk_target") is None
+
+
+def test_enrich_fk_from_sheet_graph_suggests_fk():
+    """Column with tab 'Summary' gets suggested_fk_target when Summary->Data weight 7 >= threshold 3."""
+    profiles = {
+        "A": {"header": "Name", "tab_name": "Summary", "column_cells": []},
+    }
+    artifact = {
+        "sheet_graph": {
+            "nodes": [
+                {"id": "Summary", "formula_count": 5, "node_count": 3},
+                {"id": "Data", "formula_count": 2, "node_count": 1},
+            ],
+            "edges": [
+                {"from_sheet": "Summary", "to_sheet": "Data", "weight": 7},
+            ],
+        },
+    }
+    enrich_fk_from_sheet_graph(profiles, artifact)
+    assert profiles["A"]["suggested_fk_target"] == "Data"
+    assert profiles["A"].get("_fk_from_sheet_graph") is True
+
+
+def test_enrich_fk_from_sheet_graph_skips_existing():
+    """Column that already has suggested_fk_target is not overridden."""
+    profiles = {
+        "A": {
+            "header": "Name",
+            "tab_name": "Summary",
+            "suggested_fk_target": "Products",
+            "column_cells": [],
+        },
+    }
+    artifact = {
+        "sheet_graph": {
+            "nodes": [
+                {"id": "Summary", "formula_count": 5, "node_count": 3},
+                {"id": "Data", "formula_count": 2, "node_count": 1},
+            ],
+            "edges": [
+                {"from_sheet": "Summary", "to_sheet": "Data", "weight": 7},
+            ],
+        },
+    }
+    enrich_fk_from_sheet_graph(profiles, artifact)
+    assert profiles["A"]["suggested_fk_target"] == "Products"
+    assert profiles["A"].get("_fk_from_sheet_graph") is None
+
+
+def test_enrich_fk_from_sheet_graph_below_threshold():
+    """Low-weight edge doesn't produce suggestion."""
+    profiles = {
+        "A": {"header": "Name", "tab_name": "Summary", "column_cells": []},
+    }
+    artifact = {
+        "sheet_graph": {
+            "nodes": [
+                {"id": "Summary", "formula_count": 5, "node_count": 3},
+                {"id": "Data", "formula_count": 2, "node_count": 1},
+            ],
+            "edges": [
+                {"from_sheet": "Summary", "to_sheet": "Data", "weight": 2},
+            ],
+        },
+    }
+    enrich_fk_from_sheet_graph(profiles, artifact, weight_threshold=3)
+    assert profiles["A"].get("suggested_fk_target") is None
+
+
+def test_enrich_fk_from_sheet_graph_no_tab_name():
+    """Column without tab_name/worksheet key is skipped gracefully."""
+    profiles = {
+        "A": {"header": "Name", "column_cells": []},
+    }
+    artifact = {
+        "sheet_graph": {
+            "nodes": [
+                {"id": "Summary", "formula_count": 5, "node_count": 3},
+                {"id": "Data", "formula_count": 2, "node_count": 1},
+            ],
+            "edges": [
+                {"from_sheet": "Summary", "to_sheet": "Data", "weight": 7},
+            ],
+        },
+    }
+    enrich_fk_from_sheet_graph(profiles, artifact)
+    assert profiles["A"].get("suggested_fk_target") is None

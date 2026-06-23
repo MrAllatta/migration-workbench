@@ -11,6 +11,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import networkx as nx
+
 from workbook.codegen.validation_pipeline import ValidationResult
 
 
@@ -574,7 +576,10 @@ def validate_contract_tables(
     return warnings
 
 
-def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
+def review_contract(
+    contract: dict[str, Any],
+    dependency_artifact: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     """Run a design-review checklist on a schema contract.
 
     Checks intended for schema designers before codegen — catches common
@@ -667,6 +672,26 @@ def review_contract(contract: dict[str, Any]) -> list[dict[str, str]]:
                     f"fk_lookup references '{target_model}' which is not a table in the contract",
                 )
 
+        # Check: fk_lookup on a tab with no cross-sheet edges.
+        if dependency_artifact:
+            sheet_graph = dependency_artifact.get("sheet_graph", {})
+            sheet_edges = sheet_graph.get("edges", [])
+            if sheet_edges and fk_lookup:
+                this_tab = table.get("bundle_worksheet_title", "")
+                if this_tab:
+                    tab_has_edges = any(
+                        e.get("from_sheet") == this_tab
+                        or e.get("to_sheet") == this_tab
+                        for e in sheet_edges
+                    )
+                    if not tab_has_edges:
+                        add_issue(
+                            "fk_lookup_no_cross_sheet_edge",
+                            ", ".join(fk_lookup.keys()),
+                            f"tab '{this_tab}' declares fk_lookup but has no"
+                            f" cross-sheet edges in the dependency graph",
+                        )
+
         # Check: admin.inlines target a model not in the contract.
         admin_config = table.get("admin") or {}
         for inline_name in admin_config.get("inlines") or []:
@@ -726,27 +751,22 @@ def assign_import_tiers(
                 targets.add(target)
         deps[name] = targets
 
-    # Topological sort via Kahn's algorithm.
-    in_degree: dict[str, int] = {n: 0 for n in table_names}
+    G = nx.DiGraph()
     for name in table_names:
-        for dep in deps[name]:
-            in_degree[dep] = in_degree.get(dep, 0) + 1
+        G.add_node(name)
+    for name, targets in deps.items():
+        for dep in targets:
+            G.add_edge(dep, name)
 
-    queue: list[str] = [n for n, d in in_degree.items() if d == 0]
     tier_map: dict[str, int] = {}
-    current_tier = 1
-
-    while queue:
-        next_queue: list[str] = []
-        for name in queue:
-            tier_map[name] = current_tier
-            for dep_name, dep_set in deps.items():
-                if name in dep_set:
-                    in_degree[dep_name] -= 1
-                    if in_degree[dep_name] == 0:
-                        next_queue.append(dep_name)
-        queue = next_queue
-        current_tier += 1
+    try:
+        for tier, generation in enumerate(
+            nx.topological_generations(G), start=1
+        ):
+            for name in generation:
+                tier_map[name] = tier
+    except nx.NetworkXUnfeasible:
+        pass
 
     # Apply explicit tiers as overrides.
     result: dict[str, int] = {}

@@ -1312,6 +1312,7 @@ class PipelineState:
                 column_cells[col_letter] = {
                     "header": header,
                     "column_cells": col_cells,
+                    "tab_name": tab_title,
                 }
 
         if not formula_cells:
@@ -1323,6 +1324,7 @@ class PipelineState:
             parse_cells,
         )
         from profiler.tools.enrichment_utils import (
+            enrich_fk_from_sheet_graph,
             enrich_from_dependency_graph,
         )
 
@@ -1342,6 +1344,7 @@ class PipelineState:
         entry["dependency_json"] = str(dep_path.relative_to(out_dir))
 
         enrich_from_dependency_graph(column_cells, artifact)
+        enrich_fk_from_sheet_graph(column_cells, artifact)
 
         computed_fields = entry.setdefault("computed_fields", [])
         for col_key, profile in column_cells.items():

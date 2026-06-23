@@ -189,3 +189,147 @@ class TestReviewContract:
         assert not any(
             i.get("rule_id") == "multiple_fk_without_unique" for i in suppressed_issues
         )
+
+
+class TestReviewContractFkDependencyArtifact:
+    """Checks that review_contract validates fk_lookup against a dependency artifact."""
+
+    def test_review_contract_fk_no_dep_artifact(self):
+        """Existing behavior preserved when no artifact is passed."""
+        contract = {
+            "tables": [
+                {
+                    "suggested_model_name": "inventory",
+                    "model_name": "Inventory",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                    "bundle_worksheet_title": "Inventory",
+                    "import_config": {
+                        "fk_lookup": {
+                            "crop": {"model": "Crop", "on": "name"},
+                        },
+                    },
+                },
+            ],
+        }
+        issues_without = review_contract(contract)
+        issues_with_none = review_contract(contract, dependency_artifact=None)
+        assert issues_without == issues_with_none
+
+    def test_review_contract_fk_with_graph_no_issues(self):
+        """Tab has cross-sheet edges matching its fk_lookup — no issue raised."""
+        contract = {
+            "tables": [
+                {
+                    "suggested_model_name": "inventory",
+                    "model_name": "Inventory",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                    "bundle_worksheet_title": "Inventory",
+                    "import_config": {
+                        "fk_lookup": {
+                            "crop": {"model": "Crop", "on": "name"},
+                        },
+                    },
+                },
+            ],
+        }
+        artifact = {
+            "sheet_graph": {
+                "edges": [
+                    {"from_sheet": "Inventory", "to_sheet": "Crop", "weight": 1},
+                ],
+            },
+        }
+        issues = review_contract(contract, dependency_artifact=artifact)
+        assert not any(
+            i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
+        )
+
+    def test_review_contract_fk_with_graph_missing_edge(self):
+        """Tab has no cross-sheet edges despite declaring fk_lookup — issue raised."""
+        contract = {
+            "tables": [
+                {
+                    "suggested_model_name": "inventory",
+                    "model_name": "Inventory",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                    "bundle_worksheet_title": "Inventory",
+                    "import_config": {
+                        "fk_lookup": {
+                            "crop": {"model": "Crop", "on": "name"},
+                        },
+                    },
+                },
+            ],
+        }
+        artifact = {
+            "sheet_graph": {
+                "edges": [
+                    {"from_sheet": "OtherTab", "to_sheet": "Crop", "weight": 1},
+                ],
+            },
+        }
+        issues = review_contract(contract, dependency_artifact=artifact)
+        assert any(
+            i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
+        )
+
+    def test_review_contract_fk_with_empty_sheet_graph(self):
+        """Empty sheet_graph yields no crash and no issue."""
+        contract = {
+            "tables": [
+                {
+                    "suggested_model_name": "inventory",
+                    "model_name": "Inventory",
+                    "columns": [
+                        {
+                            "source_column": "Crop",
+                            "suggested_field_name": "crop",
+                            "django_field_class": "models.ForeignKey",
+                            "django_field_kwargs": {"to": "Crop"},
+                        },
+                    ],
+                    "str_template": "{self.crop}",
+                    "bundle_worksheet_title": "Inventory",
+                    "import_config": {
+                        "fk_lookup": {
+                            "crop": {"model": "Crop", "on": "name"},
+                        },
+                    },
+                },
+            ],
+        }
+        artifact = {"sheet_graph": {"edges": []}}
+        issues = review_contract(contract, dependency_artifact=artifact)
+        assert not any(
+            i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
+        )
+
+        artifact_no_graph = {}
+        issues = review_contract(contract, dependency_artifact=artifact_no_graph)
+        assert not any(
+            i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
+        )

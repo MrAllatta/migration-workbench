@@ -157,7 +157,12 @@ def _contract_review(args: argparse.Namespace) -> int:
             args.json,
         )
 
-    issues = review_contract(contract)
+    dependency_artifact = None
+    if args.dependency_artifact:
+        with open(args.dependency_artifact) as f:
+            dependency_artifact = json.load(f)
+
+    issues = review_contract(contract, dependency_artifact=dependency_artifact)
     if not issues:
         return _render_output(
             {
@@ -1182,6 +1187,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--django-settings",
         default=None,
         help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
+    review_cmd.add_argument(
+        "--dependency-artifact",
+        type=str,
+        default=None,
+        help="Path to a dependency artifact JSON from the profiler, for FK validation",
     )
     review_cmd.set_defaults(func=_contract_review)
 
