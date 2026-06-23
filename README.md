@@ -208,22 +208,30 @@ discovery interviews, and Fly.io deployment all function on real data.
 0.1.0 was not the handoff — it was the prerequisite. The pipeline turned
 on real data. 0.2.0 turned that data into production-grade admin configuration — a foundation for user-facing application codegen in 0.3.0.
 
-**0.3.0 — User-facing UI codegen (next)**
+**0.5.0 — Formula dependency graph intelligence (shipped)**
+
+The profiler now builds cell-level and sheet-level formula dependency
+graphs (networkx). `enrich_fk_from_sheet_graph()` suggests FK targets
+from actual cross-sheet formula references. `assign_import_tiers()` uses
+topological generations from the dependency graph instead of hand-rolled
+Kahn. Contract review validates FK lookups against dependency edges.
+
+**0.6.0 — User-facing UI codegen (next)**
 
 The workbench ships generic code generation for Django views, templates,
 and HTMX interactive components — not just admin. Role-aware archetypes
 produce editable forms for field workers, sortable tables for operations,
 and summary dashboards for managers. Validated on the farm engagement.
 
-**0.4.0 — Role-based interfaces (next)**
+**0.7.0 — Role-based interfaces (next)**
 
 Codegen for role-aware landing pages, dashboard views with summary cards,
 permission scaffolding from interaction contract roles, and print-friendly
 list outputs.
 
-**0.5.0+ — Consultant accelerant / Platform (conditional)**
+**0.8.0+ — Consultant accelerant / Platform (conditional)**
 
-- **0.5.0+ Platform (conditional):** Only after judgment taxonomy
+- **0.8.0+ Platform (conditional):** Only after judgment taxonomy
   is dense enough to make the agent reliably correct.
   Hosted workbench for consultants, not self-service for end users.
   Self-service is a non-goal until proven safe.
@@ -264,6 +272,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 
 ## Changelog
+
+### 0.5.0
+
+- **Formula dependency graph:** New `profiler/tools/formula_dependency.py` with `build_cell_graph()`, `build_sheet_dependency_graph()`, `compute_sheet_signals()`, and `build_dependency_report()` — cell-level and sheet-level dependency analysis using networkx. Orphaned-sheet detection, IMPORTRANGE/external workbook ref tracking, pattern→cell membership, and structured 7-signal reports. (profiler/tools/formula_dependency.py, profiler/tests/test_formula_dependency.py)
+- **networkx refactor:** Formula dependency graph internals refactored to `nx.DiGraph` — `assign_import_tiers()` in workbook.codegen.contract uses `nx.topological_generations` instead of hand-rolled Kahn. (workbook/codegen/contract.py)
+- **FK enrichment from sheet graph:** `enrich_fk_from_sheet_graph()` in profiler enrichment suggests FK targets on column profiles using weighted cross-sheet formula reference edges, wired into PipelineState enrichment. (profiler/tools/enrichment_utils.py, profiler/tools/pipeline_state.py)
+- **Contract review with dependency validation:** `wb contract review --dependency-artifact` validates `fk_lookup` targets against actual sheet-level edges from the dependency graph. (deployment/wb_cli.py, workbook/codegen/contract.py, workbook/tests/test_contract_review.py)
+- **networkx>=3.0 dependency** added to pyproject.toml.
+- **All 1280 tests pass, full chassis-gate green.**
 
 ### 0.4.2
 
