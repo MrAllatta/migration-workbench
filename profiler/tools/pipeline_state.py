@@ -21,6 +21,8 @@ from typing import Any
 from django.core.management.base import CommandError
 
 from profiler.tools.domain_context import DomainContext
+from profiler.tools.operational_model import Capability, OperationalModel
+from profiler.tools.validation_framework import CoverageReport, ValidationRecord
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,7 @@ def _col_index_to_letter(col_index: int) -> str:
     return letters
 
 
-_CHECKPOINT_CURRENT_VERSION = "0.0.9"
+_CHECKPOINT_CURRENT_VERSION = "0.1.0"
 
 
 # Registry: version_string -> list of migration functions.
@@ -127,10 +129,44 @@ def _migrate_v0_0_8_to_v0_0_9(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
+def _migrate_v0_0_9_to_v0_1_0(raw: dict[str, Any]) -> dict[str, Any]:
+    """Migrate legacy checkpoint to BPRS unified pipeline.
+
+    Preserves old schema_contract and interaction_contract as legacy artifacts.
+    Populates operational_model by deriving from existing discovery and domain
+    knowledge fields.
+
+    Args:
+        raw: Deserialized checkpoint dictionary.
+
+    Returns:
+        Migrated checkpoint dictionary with version bumped and BPRS fields
+        populated.
+    """
+    raw["legacy_schema_contract"] = raw.pop("schema_contract", None)
+    raw["legacy_interaction_contract"] = raw.pop("interaction_contract", None)
+
+    # Derive minimal operational model from existing fields
+    domain = ""
+    domain_raw = raw.get("domain_knowledge") or {}
+    if isinstance(domain_raw, dict):
+        domain = str(domain_raw.get("domain", ""))
+
+    raw["operational_model"] = OperationalModel(
+        source_id=domain,
+        capabilities=[
+            Capability(id="discovered_operations", owner=domain or "unknown")
+        ],
+    ).to_dict()
+
+    return raw
+
+
 _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
     # Migrations keyed by the target version; when upgrading from a(version) < key
     # and the key is <= current, apply the migrations to upgrade payloads.
     "0.0.9": [_migrate_v0_0_8_to_v0_0_9],
+    "0.1.0": [_migrate_v0_0_9_to_v0_1_0],
 }
 
 
@@ -291,6 +327,70 @@ class DecisionRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+def _parse_raw_deep_profile(deep_data: dict) -> list[dict]:
+    """Parse raw Google Sheets API response into enriched column entries.
+
+    Farm's deep profile JSON files contain raw API response data without
+    pre-enriched ``columns``.  This function extracts headers from the first
+    row, collects non-empty values from subsequent rows, and computes null
+    rate and distinct values for each column.
+
+    Args:
+        deep_data: Raw deep profile JSON dict with ``raw.sheets[0].data[0].rowData``.
+
+    Returns:
+        List of column dicts with ``header_label``, ``null_rate``, and
+        ``distinct_values`` keys.
+    """
+    columns: list[dict] = []
+    try:
+        sheet = deep_data["raw"]["sheets"][0]
+        data = sheet["data"][0]
+        row_data = data.get("rowData", [])
+        if not row_data:
+            return columns
+
+        # First row is headers
+        header_row = row_data[0]
+        headers: list[str] = []
+        for cell in header_row.get("values", []):
+            headers.append(
+                cell.get("formattedValue")
+                or cell.get("effectiveValue", {}).get("stringValue", "")
+            )
+
+        # Collect data for each column from subsequent rows
+        col_values: list[list[str]] = [[] for _ in headers]
+        for row in row_data[1:]:
+            for col_index, cell in enumerate(row.get("values", [])):
+                if col_index >= len(headers):
+                    break
+                val = cell.get("formattedValue") or cell.get("effectiveValue", {}).get(
+                    "stringValue", ""
+                )
+                if val:
+                    col_values[col_index].append(val)
+
+        total_data_rows = len(row_data) - 1
+        for col_index, header in enumerate(headers):
+            values = col_values[col_index]
+            null_rate = (
+                (total_data_rows - len(values)) / total_data_rows
+                if total_data_rows > 0
+                else 0.0
+            )
+            columns.append(
+                {
+                    "header_label": header,
+                    "null_rate": null_rate,
+                    "distinct_values": values[:50],
+                }
+            )
+    except (KeyError, IndexError):
+        pass
+    return columns
+
+
 @dataclass
 class PipelineState:
     """Layered profiler runtime state.
@@ -307,11 +407,17 @@ class PipelineState:
             — read-only in checkpoint.
         interaction_contract: Derived UI/workflow contract — read-only
             in checkpoint.
+        operational_model: Derived BPRS operational model (capabilities,
+            workflows, commands, events, invariants).
+        validation_record: Human review gate output with approvals per
+            layer.
+        coverage_report: Auto-computed coverage metrics for the
+            operational model.
     """
 
     # Schema version for checkpoint migration. Independent of the package version in pyproject.toml
     # -- see Agents.md "Schema versions".
-    version: str = "0.0.9"
+    version: str = "0.1.0"
     discovery: DiscoveryState = field(default_factory=DiscoveryState)
     deep_profile_index: DeepProfileIndex = field(default_factory=DeepProfileIndex)
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
@@ -321,6 +427,13 @@ class PipelineState:
 
     # Path to profiler-signals YAML artifact (persisted in checkpoint).
     profiler_signals_path: str | None = None
+
+    # BPRS unified pipeline fields.
+    operational_model: OperationalModel | None = None
+    validation_record: ValidationRecord | None = None
+    coverage_report: CoverageReport | None = None
+    test_scaffold: str | None = field(default=None, repr=False)
+    doc_scaffold: str | None = field(default=None, repr=False)
 
     # Runtime-only fields (not serialized to checkpoint).
     _config: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
@@ -799,6 +912,43 @@ class PipelineState:
             }
             _write_contract_artifact(self.interaction_contract, contract_artifact_path)
 
+        # BPRS: operational model as artifact reference
+        if self.operational_model:
+            op_model_path = base_dir / "operational-model.json"
+            op_model_path.write_text(
+                json.dumps(self.operational_model.to_dict(), indent=2),
+                encoding="utf-8",
+            )
+            payload["operational_model"] = {
+                "_artifact": str(op_model_path.relative_to(base_dir))
+            }
+        else:
+            payload["operational_model"] = None
+
+        # BPRS: validation record inline (small)
+        if self.validation_record:
+            payload["validation_record"] = self.validation_record.to_dict()
+        else:
+            payload["validation_record"] = None
+
+        # BPRS: coverage report inline (small)
+        if self.coverage_report:
+            payload["coverage_report"] = self.coverage_report.to_dict()
+        else:
+            payload["coverage_report"] = None
+
+        # BPRS: test_scaffold inline (string, not an artifact)
+        if self.test_scaffold:
+            payload["test_scaffold"] = self.test_scaffold
+        else:
+            payload["test_scaffold"] = None
+
+        # BPRS: doc_scaffold inline (string, not an artifact)
+        if self.doc_scaffold:
+            payload["doc_scaffold"] = self.doc_scaffold
+        else:
+            payload["doc_scaffold"] = None
+
         return payload
 
     @classmethod
@@ -921,8 +1071,40 @@ class PipelineState:
         # Profiler signals path — preserved from checkpoint
         profiler_signals_path = raw.get("profiler_signals_path") or None
 
+        # BPRS: operational model resolution
+        op_model_raw = raw.get("operational_model")
+        operational_model: OperationalModel | None = None
+        if op_model_raw:
+            resolved_op_model = (
+                _resolve_artifacts(op_model_raw, base_dir) if base_dir else op_model_raw
+            )
+            if isinstance(resolved_op_model, dict):
+                operational_model = OperationalModel.from_dict(resolved_op_model)
+
+        # BPRS: validation record inline (small)
+        validation_record: ValidationRecord | None = None
+        val_raw = raw.get("validation_record")
+        if val_raw and isinstance(val_raw, dict):
+            validation_record = ValidationRecord.from_dict(val_raw)
+
+        # BPRS: coverage report inline (small)
+        coverage_report: CoverageReport | None = None
+        cov_raw = raw.get("coverage_report")
+        if cov_raw and isinstance(cov_raw, dict):
+            coverage_report = CoverageReport.from_dict(cov_raw)
+
+        # BPRS: test_scaffold inline (string)
+        test_scaffold_raw = raw.get("test_scaffold")
+        test_scaffold: str | None = (
+            str(test_scaffold_raw) if test_scaffold_raw else None
+        )
+
+        # BPRS: doc_scaffold inline (string)
+        doc_scaffold_raw = raw.get("doc_scaffold")
+        doc_scaffold: str | None = str(doc_scaffold_raw) if doc_scaffold_raw else None
+
         return cls(
-            version=str(raw.get("version", "0.0.9")),
+            version=str(raw.get("version", "0.1.0")),
             discovery=discovery,
             deep_profile_index=deep_profile_index,
             domain_knowledge=domain_knowledge,
@@ -932,6 +1114,11 @@ class PipelineState:
             profiler_signals_path=(
                 str(profiler_signals_path) if profiler_signals_path else None
             ),
+            operational_model=operational_model,
+            validation_record=validation_record,
+            coverage_report=coverage_report,
+            test_scaffold=test_scaffold,
+            doc_scaffold=doc_scaffold,
         )
 
     # ------------------------------------------------------------------
@@ -1823,6 +2010,491 @@ class PipelineState:
                 errors.append(f"decision[{idx}] ({decision.decision_id}) missing phase")
 
         return errors
+
+    # ------------------------------------------------------------------
+    # BPRS phase methods
+    # ------------------------------------------------------------------
+
+    def derive_operational_model(
+        self, base_dir: str | os.PathLike[str] | None = None
+    ) -> PipelineState:
+        """Phase: Derive the operational model from profiler artifacts.
+
+        Consumes ``discovery``, ``deep_profile_index``, and ``domain_knowledge``
+        to produce the primary BPRS artifact.
+
+        Args:
+            base_dir: Base directory for resolving ``out_json`` relative paths
+                in deep profile index entries.  If ``None``, entries with
+                ``out_json`` but no inline ``columns`` are passed through
+                unresolved.
+
+        Returns:
+            PipelineState: Self for chaining.
+
+        Raises:
+            RuntimeError: If ``domain_knowledge.domain`` is empty.
+        """
+        if not self.domain_knowledge.domain:
+            raise RuntimeError(
+                "derive_operational_model: domain_knowledge.domain is required"
+            )
+
+        from profiler.tools.operational_model_deriver import derive_operational_model
+
+        # Resolve out_json references to inline column data
+        entries: list[dict[str, Any]] = []
+        for entry in self.deep_profile_index.entries or []:
+            entry_dict = (
+                dict(entry) if hasattr(entry, "__dataclass_fields__") else dict(entry)
+            )
+            out_json = entry_dict.get("out_json")
+            if out_json and not entry_dict.get("columns"):
+                candidate_bases: list[Path] = []
+                if base_dir:
+                    base_path = Path(base_dir)
+                    candidate_bases.append(base_path)
+                    candidate_bases.append(base_path.parent)
+                    candidate_bases.append(base_path.parent / "data")
+
+                resolved = False
+                for candidate_base in candidate_bases:
+                    candidate_path = candidate_base / out_json
+                    if candidate_path.exists():
+                        try:
+                            with open(candidate_path, "r", encoding="utf-8") as f:
+                                deep_data = json.load(f)
+                            columns = deep_data.get("columns") or deep_data.get(
+                                "summary", {}
+                            ).get("columns", [])
+                            if not columns:
+                                columns = _parse_raw_deep_profile(deep_data)
+                            entry_dict["columns"] = columns
+                            resolved = True
+                            break
+                        except (OSError, json.JSONDecodeError):
+                            continue
+
+                if not resolved and base_dir:
+                    logger.warning(
+                        "Could not resolve out_json %s from base_dir %s",
+                        out_json,
+                        base_dir,
+                    )
+
+            # Resolve dependency_json artifact paths (formula dependency graph)
+            # so the deriver can consume them without file I/O.
+            dep_json = entry_dict.get("dependency_json")
+            if dep_json and base_dir:
+                dep_candidate_bases: list[Path] = [
+                    Path(base_dir),
+                    Path(base_dir).parent,
+                    Path(base_dir).parent / "data",
+                ]
+                dep_resolved = False
+                for dep_base in dep_candidate_bases:
+                    dep_path = dep_base / dep_json
+                    if dep_path.exists():
+                        try:
+                            with open(dep_path, "r", encoding="utf-8") as f:
+                                entry_dict["_dependency_artifact"] = json.load(f)
+                            dep_resolved = True
+                            break
+                        except (OSError, json.JSONDecodeError):
+                            continue
+                if not dep_resolved:
+                    logger.debug(
+                        "Could not resolve dependency_json %s from base_dir %s",
+                        dep_json,
+                        base_dir,
+                    )
+
+            entries.append(entry_dict)
+
+        self.operational_model = derive_operational_model(
+            discovery={
+                "workbook_index": self.discovery.workbook_index,
+                "broad_inventory": self.discovery.broad_inventory,
+            },
+            deep_profile_index={"entries": entries},
+            domain_knowledge={
+                "domain": self.domain_knowledge.domain,
+                "vocabulary": self.domain_knowledge.vocabulary,
+            },
+        )
+        return self
+
+    def derive_state_projections(
+        self, projection: str = "schema_contract"
+    ) -> PipelineState:
+        """Phase: Derive state projections from the operational model.
+
+        Currently supports ``schema_contract``, ``test_scaffold``, and
+        ``doc_scaffold`` projections.
+
+        Args:
+            projection: Which projection to derive. Defaults to
+                ``schema_contract``.
+
+        Returns:
+            PipelineState: Self for chaining.
+
+        Raises:
+            RuntimeError: If ``operational_model`` is not populated.
+            ValueError: If *projection* is not supported.
+        """
+        if self.operational_model is None:
+            raise RuntimeError(
+                "derive_state_projections: operational_model must be derived first"
+            )
+
+        if projection == "schema_contract":
+            self.schema_contract = self._derive_schema_contract_from_operational_model()
+        elif projection == "test_scaffold":
+            self.test_scaffold = self._derive_test_scaffold_from_operational_model()
+        elif projection == "doc_scaffold":
+            self.doc_scaffold = self._derive_doc_scaffold_from_operational_model()
+        else:
+            raise ValueError(f"Unsupported projection: {projection}")
+
+        return self
+
+    def _derive_schema_contract_from_operational_model(self) -> dict[str, Any]:
+        """Derive a schema contract dict from the operational model.
+
+        Maps events to contract tables, payloads to columns, and invariants
+        to constraints.
+
+        Returns:
+            dict: Schema contract compatible with existing codegen.
+        """
+        # Guard is enforced by the caller, but type checker needs this.
+        assert self.operational_model is not None
+
+        tables: list[dict[str, Any]] = []
+        for event in self.operational_model.events or []:
+            columns: list[dict[str, Any]] = []
+            for field_name in event.payload or []:
+                columns.append(
+                    {
+                        "source_column": field_name,
+                        "suggested_field_name": field_name.lower().replace(" ", "_"),
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 255, "blank": True},
+                    }
+                )
+
+            tables.append(
+                {
+                    "suggested_model_name": event.id.lower().replace(" ", "_"),
+                    "bundle_worksheet_title": event.sourced_from[0]["tab"]
+                    if event.sourced_from
+                    else "",
+                    "columns": columns,
+                }
+            )
+
+        return {"version": "1.1", "tables": tables}
+
+    def _derive_test_scaffold_from_operational_model(self) -> str:
+        """Derive a pytest test file string from the operational model.
+
+        Generates test classes for invariants, workflows, and events
+        based on the operational model data.
+
+        Returns:
+            str: Python source code for a pytest test module.
+        """
+        assert self.operational_model is not None
+
+        from datetime import datetime, timezone
+
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        source_id = self.operational_model.source_id or "unknown"
+
+        # --- Invariant tests ---
+        invariant_tests_lines: list[str] = []
+        for invariant in self.operational_model.invariants or []:
+            if invariant.enforcement == "database_check":
+                safe_name = invariant.id.lower().replace(" ", "_").replace("-", "_")
+                expression = invariant.expression or ""
+                invariant_tests_lines.append(
+                    f"""    def test_{safe_name}(self):
+        \"\"\"{expression}\"\"\"
+        # TODO: implement with real model instances
+        pass
+"""
+                )
+        if not invariant_tests_lines:
+            invariant_tests_lines.append(
+                "    # No database_check invariants defined.\n"
+            )
+        invariant_tests = "\n".join(invariant_tests_lines).rstrip()
+
+        # --- Workflow tests ---
+        workflow_tests_lines: list[str] = []
+        for workflow in self.operational_model.workflows or []:
+            safe_name = workflow.id.lower().replace(" ", "_").replace("-", "_")
+            commands_ids = workflow.commands or []
+            commands_list_repr = str(commands_ids)
+            workflow_tests_lines.append(
+                f"""    def test_{safe_name}_has_commands(self):
+        \"\"\"Workflow {workflow.id} must have at least one command.\"\"\"
+        commands_list = {commands_list_repr}
+        assert len(commands_list) >= 1
+"""
+            )
+        if not workflow_tests_lines:
+            workflow_tests_lines.append("    # No workflows defined.\n")
+        workflow_tests = "\n".join(workflow_tests_lines).rstrip()
+
+        # --- Event tests ---
+        event_tests_lines: list[str] = []
+        for event in self.operational_model.events or []:
+            safe_name = event.id.lower().replace(" ", "_").replace("-", "_")
+            payload_list = event.payload or []
+            payload_list_repr = str(payload_list)
+            event_tests_lines.append(
+                f"""    def test_{safe_name}_has_payload(self):
+        \"\"\"Event {event.id} must have payload fields.\"\"\"
+        payload_list = {payload_list_repr}
+        assert len(payload_list) >= 1
+"""
+            )
+        if not event_tests_lines:
+            event_tests_lines.append("    # No events defined.\n")
+        event_tests = "\n".join(event_tests_lines).rstrip()
+
+        return f'''"""Auto-generated operational model tests.
+
+Generated from operational model: {source_id}
+Generated at: {timestamp}
+"""
+
+import pytest
+
+
+class TestOperationalInvariants:
+    """Tests derived from operational model invariants."""
+
+{invariant_tests}
+
+
+class TestOperationalWorkflows:
+    """Tests derived from operational model workflows."""
+
+{workflow_tests}
+
+
+class TestOperationalEvents:
+    """Tests derived from operational model events."""
+
+{event_tests}
+'''
+
+    def _derive_doc_scaffold_from_operational_model(self) -> str:
+        """Derive a Markdown documentation string from the operational model.
+
+        Generates a living documentation file describing the business operating
+        system: capabilities, events, workflows, commands, and invariants.
+
+        Returns:
+            str: Markdown document as a string.
+        """
+        assert self.operational_model is not None
+
+        from datetime import datetime, timezone
+
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        source_id = self.operational_model.source_id or "unknown"
+
+        lines: list[str] = []
+        lines.append(f"# Operational Model: {source_id}")
+        lines.append("")
+        lines.append(f"_Generated at: {timestamp}_")
+        lines.append("")
+        lines.append(
+            "This document describes the operational model derived from "
+            "profiler evidence. It captures the business operating system's "
+            "capabilities, events, workflows, commands, and invariants."
+        )
+        lines.append("")
+
+        # --- Capabilities ---
+        lines.append("## Capabilities")
+        lines.append("")
+        capabilities = self.operational_model.capabilities or []
+        if capabilities:
+            for capability in capabilities:
+                owners_str = capability.owner or "unknown"
+                lines.append(f"- **{capability.id}** — Owner: {owners_str}")
+        else:
+            lines.append("*No capabilities defined.*")
+        lines.append("")
+
+        # --- Events ---
+        lines.append("## Events")
+        lines.append("")
+        events = self.operational_model.events or []
+        if events:
+            lines.append("| Event ID | Payload Fields | Source Tab/Column |")
+            lines.append("|----------|----------------|--------------------|")
+            for event in events:
+                payload_str = ", ".join(event.payload or []) or "*empty*"
+                source_parts = []
+                for src in event.sourced_from or []:
+                    tab = src.get("tab", "")
+                    column = src.get("column", "")
+                    if tab and column:
+                        source_parts.append(f"{tab}.{column}")
+                    elif tab:
+                        source_parts.append(tab)
+                    elif column:
+                        source_parts.append(column)
+                source_str = "; ".join(source_parts) if source_parts else "*unknown*"
+                lines.append(f"| `{event.id}` | {payload_str} | {source_str} |")
+        else:
+            lines.append("*No events defined.*")
+        lines.append("")
+
+        # --- Workflows ---
+        lines.append("## Workflows")
+        lines.append("")
+        workflows = self.operational_model.workflows or []
+        if workflows:
+            for workflow in workflows:
+                lines.append(f"### {workflow.id}")
+                lines.append("")
+                if workflow.frequency:
+                    lines.append(f"- **Frequency:** {workflow.frequency}")
+                if workflow.actor:
+                    lines.append(f"- **Actor:** {workflow.actor}")
+                if workflow.outcome:
+                    lines.append(f"- **Outcome:** {workflow.outcome}")
+                if workflow.commands:
+                    commands_list = ", ".join(f"`{cmd}`" for cmd in workflow.commands)
+                    lines.append(f"- **Commands:** {commands_list}")
+                if workflow.evidence:
+                    evidence_list = ", ".join(workflow.evidence)
+                    lines.append(f"- **Evidence:** {evidence_list}")
+                lines.append("")
+        else:
+            lines.append("*No workflows defined.*")
+        lines.append("")
+
+        # --- Commands ---
+        lines.append("## Commands")
+        lines.append("")
+        commands = self.operational_model.commands or []
+        if commands:
+            for command in commands:
+                lines.append(f"- `{command.id}`")
+        else:
+            # Collect unique command IDs from workflows as fallback
+            command_ids: set[str] = set()
+            for workflow in workflows:
+                for cmd_id in workflow.commands or []:
+                    command_ids.add(cmd_id)
+            if command_ids:
+                for cmd_id in sorted(command_ids):
+                    lines.append(f"- `{cmd_id}`")
+            else:
+                lines.append("*No commands defined.*")
+        lines.append("")
+
+        # --- Invariants ---
+        lines.append("## Invariants")
+        lines.append("")
+        invariants = self.operational_model.invariants or []
+        if invariants:
+            lines.append(
+                "| Invariant ID | Expression | Enforcement | Violations Handling |"
+            )
+            lines.append(
+                "|--------------|------------|-------------|---------------------|"
+            )
+            for invariant in invariants:
+                expression_str = invariant.expression or "*none*"
+                enforcement_str = invariant.enforcement or "application_logic"
+                violations_str = invariant.violations_are or "warning"
+                lines.append(
+                    f"| `{invariant.id}` | `{expression_str}` "
+                    f"| {enforcement_str} | {violations_str} |"
+                )
+        else:
+            lines.append("*No invariants defined.*")
+        lines.append("")
+
+        # --- Event-to-Workflow Mapping ---
+        lines.append("## Event-to-Workflow Mapping")
+        lines.append("")
+        # Build mapping by finding workflow/event pairs that share terms
+        mapping_found = False
+        workflow_event_terms: dict[str, set[str]] = {}
+        for workflow in workflows:
+            terms: set[str] = set()
+            terms.add(workflow.id.lower())
+            for cmd in workflow.commands or []:
+                terms.add(cmd.lower())
+            workflow_event_terms[workflow.id] = terms
+
+        for event in events:
+            event_terms: set[str] = set()
+            event_terms.add(event.id.lower())
+            for payload_field in event.payload or []:
+                event_terms.add(payload_field.lower())
+
+            matched = False
+            for workflow_id, wf_terms in workflow_event_terms.items():
+                shared = event_terms & wf_terms
+                if shared:
+                    lines.append(
+                        f"- Event `{event.id}` may trigger workflow "
+                        f"`{workflow_id}` (shared terms: "
+                        f"{', '.join(sorted(shared))})"
+                    )
+                    matched = True
+                    mapping_found = True
+
+            if not matched:
+                lines.append(f"- Event `{event.id}` — no workflow mapping identified")
+
+        if not mapping_found and not events and not workflows:
+            lines.append("*No event-to-workflow mappings available.*")
+        lines.append("")
+
+        return "\n".join(lines)
+
+    def validate_operational_model(self) -> PipelineState:
+        """Phase: Validate the operational model and compute coverage.
+
+        This is a human review gate. The method computes coverage metrics
+        and records a validation record.
+
+        Returns:
+            PipelineState: Self for chaining.
+
+        Raises:
+            RuntimeError: If ``operational_model`` is not populated.
+        """
+        if self.operational_model is None:
+            raise RuntimeError(
+                "validate_operational_model: operational_model must be derived first"
+            )
+
+        from profiler.tools.validation_framework import compute_coverage_metrics
+
+        artifact_inventory: dict[str, Any] = {}
+        for entry in self.discovery.workbook_index or []:
+            tab_title = str(entry.get("tab_title") or "")
+            if tab_title:
+                artifact_inventory[tab_title] = {"columns": []}
+
+        self.coverage_report = compute_coverage_metrics(
+            self.operational_model,
+            artifact_inventory,
+        )
+        return self
 
 
 # ---------------------------------------------------------------------------

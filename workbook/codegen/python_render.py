@@ -316,10 +316,21 @@ def _render_index(idx: dict[str, Any], inner: str) -> str:
 
 
 def _render_constraint(con: dict[str, Any], inner: str) -> str:
-    """Render a ``models.UniqueConstraint(...)`` declaration."""
+    """Render a constraint declaration.
+
+    Supported constraint types:
+    - ``type: unique`` (default) → ``models.UniqueConstraint(fields=[...], name=...)``
+    - ``type: check`` → ``models.CheckConstraint(condition=Q(...), name=...)``
+    """
+    name = con.get("name", "")
+    constraint_type = con.get("type", "unique")
+
+    if constraint_type == "check":
+        condition = con.get("condition", "")
+        return f"{inner}models.CheckConstraint(condition=models.Q({condition}), name={name!r}),"
+
     fields = con.get("fields", [])
     fields_str = ", ".join(repr(f) for f in fields)
-    name = con.get("name", "")
     return f"{inner}models.UniqueConstraint(fields=[{fields_str}], name={name!r}),"
 
 

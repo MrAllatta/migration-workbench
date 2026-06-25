@@ -24,9 +24,9 @@ class TestDataclassDefaults:
     """Verify default field values for each dataclass."""
 
     def test_pipeline_state_defaults(self):
-        """Fresh PipelineState has version="0.0.9" and all sub-objects."""
+        """Fresh PipelineState has version="0.1.0" and all sub-objects."""
         state = PipelineState()
-        assert state.version == "0.0.9"
+        assert state.version == "0.1.0"
         assert isinstance(state.discovery, DiscoveryState)
         assert isinstance(state.deep_profile_index, DeepProfileIndex)
         assert isinstance(state.domain_knowledge, DomainKnowledge)
@@ -188,7 +188,7 @@ class TestCheckpointRoundTrip:
         state.save_checkpoint(checkpoint)
 
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.0.9"
+        assert loaded.version == "0.1.0"
         assert loaded.discovery.source_tree == {}
         # Guard-clause sentinels survive round-trip
         assert loaded.discovery.shortlist is None
@@ -240,7 +240,7 @@ class TestCheckpointRoundTrip:
     def test_checkpoint_roundtrip_full(self, tmp_path):
         """Full PipelineState round-trips with all data intact."""
         state = PipelineState(
-            version="0.0.9",
+            version="0.1.0",
             discovery=DiscoveryState(
                 source_tree={"provider": "google_sheets"},
                 workbook_index=[{"workbook_code": "101", "year": 2023}],
@@ -271,7 +271,7 @@ class TestCheckpointRoundTrip:
         assert path.exists()
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.0.9"
+        assert loaded.version == "0.1.0"
         assert loaded.discovery.source_tree == {"provider": "google_sheets"}
         assert loaded.discovery.workbook_index == [
             {"workbook_code": "101", "year": 2023}
@@ -298,7 +298,7 @@ class TestCheckpointRoundTrip:
         """Loading a non-existent checkpoint returns an empty state."""
         checkpoint = tmp_path / "nonexistent.yaml"
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.0.9"
+        assert loaded.version == "0.1.0"
         assert loaded.discovery.approved_tabs is None
 
 
@@ -313,7 +313,7 @@ class TestLoadOrCreate:
         )
         state = PipelineState.load_or_create(config_path=config_path)
         assert isinstance(state, PipelineState)
-        assert state.version == "0.0.9"
+        assert state.version == "0.1.0"
         assert state.domain_knowledge.domain == "test_domain"
         assert state.discovery.source_tree is None
 
@@ -343,7 +343,7 @@ class TestLoadOrCreate:
             config_path=tmp_path / "nonexistent.json",
             checkpoint_path=checkpoint,
         )
-        assert state.version == "0.0.9"
+        assert state.version == "0.1.0"
         assert not checkpoint.exists()
 
     def test_load_or_create_loads_existing_simple(self, tmp_path: Path):
@@ -783,7 +783,7 @@ class TestSpecExample:
     def test_spec_example_roundtrip(self, tmp_path):
         """Load the full YAML example from the design spec."""
         state = PipelineState(
-            version="0.0.9",
+            version="0.1.0",
             discovery=DiscoveryState(
                 source_tree={
                     "provider": "google_sheets",
@@ -863,7 +863,7 @@ class TestSpecExample:
         state.save_checkpoint(path)
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.0.9"
+        assert loaded.version == "0.1.0"
         assert loaded.discovery.source_tree["provider"] == "google_sheets"
         assert (
             loaded.discovery.source_tree["spreadsheets"][0]["name"]
@@ -996,9 +996,9 @@ class TestVersionIndependence:
         """Assert PipelineState.version is a valid semver string."""
         import re
 
-        assert re.match(
-            r"^\d+\.\d+\.\d+$", PipelineState.version
-        ), f"PipelineState.version ({PipelineState.version}) is not valid semver"
+        assert re.match(r"^\d+\.\d+\.\d+$", PipelineState.version), (
+            f"PipelineState.version ({PipelineState.version}) is not valid semver"
+        )
 
     def test_pipeline_state_version_not_tied_to_pyproject(self) -> None:
         """Assert PipelineState.version is independent of pyproject.toml."""
@@ -1357,7 +1357,7 @@ class TestVersionMigration:
         from profiler.tools.pipeline_state import PipelineState
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.0.9"
+        assert loaded.version == "0.1.0"
         assert loaded.domain_knowledge.domain == "test"
 
 
@@ -1773,9 +1773,9 @@ class TestFormulaDependencyWiring:
         # (the enrich function requires every cell in a column to be a formula).
         assert "computed_fields" in entry
         computed_headers = {cf["header"] for cf in entry["computed_fields"]}
-        assert (
-            "Total" in computed_headers
-        ), f"Expected 'Total' in computed_fields, got {computed_headers}"
+        assert "Total" in computed_headers, (
+            f"Expected 'Total' in computed_fields, got {computed_headers}"
+        )
         assert "GrandTotal" not in computed_headers, (
             f"Expected GrandTotal NOT in computed_fields since it has mixed "
             f"empty/formula cells, got {computed_headers}"
