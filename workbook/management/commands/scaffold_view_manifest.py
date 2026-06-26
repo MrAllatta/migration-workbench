@@ -86,14 +86,14 @@ class Command(BaseCommand):
             action="store_true",
             default=False,
             help="Print human-readable archetype explanation for each tab "
-                 "(only in --signals-only mode).",
+            "(only in --signals-only mode).",
         )
         parser.add_argument(
             "--min-confidence",
             type=float,
             default=0.0,
             help="Only show explanations for tabs with confidence below this "
-                 "threshold (default: 0.0 = show all). Requires --explain.",
+            "threshold (default: 0.0 = show all). Requires --explain.",
         )
 
     def handle(self, *args, **options):
@@ -114,9 +114,7 @@ class Command(BaseCommand):
 
         out_path_arg = options.get("out")
         if not out_path_arg:
-            raise CommandError(
-                "--out is required when --signals-only is not set."
-            )
+            raise CommandError("--out is required when --signals-only is not set.")
 
         schema_contract: dict[str, Any] | None = None
         contract_arg = options.get("schema_contract")
@@ -181,9 +179,7 @@ class Command(BaseCommand):
         if bundle_config_arg:
             bundle_config_path = Path(bundle_config_arg).resolve()
             if not bundle_config_path.is_file():
-                raise CommandError(
-                    f"bundle-config not found: {bundle_config_path}"
-                )
+                raise CommandError(f"bundle-config not found: {bundle_config_path}")
             bundle_config = _load_json(bundle_config_path)
 
         signals = extract_signals(structure, bundle_config=bundle_config)
@@ -191,9 +187,7 @@ class Command(BaseCommand):
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise CommandError(
-                "PyYAML is required for YAML output."
-            ) from exc
+            raise CommandError("PyYAML is required for YAML output.") from exc
 
         out_path = Path(options["output"]).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -230,34 +224,19 @@ class Command(BaseCommand):
             null_rates = tab_signal.get("null_rates", {})
             signal_dict = {
                 "column_count": int(tab_signal.get("column_count", 0)),
-                "formula_density": float(
-                    tab_signal.get("formula_density", 0.0)
-                ),
-                "cross_sheet_ref_count": int(
-                    tab_signal.get("cross_sheet_refs", 0)
-                ),
-                "avg_null_rate": sum(null_rates.values())
-                / max(len(null_rates), 1)
+                "formula_density": float(tab_signal.get("formula_density", 0.0)),
+                "cross_sheet_ref_count": int(tab_signal.get("cross_sheet_refs", 0)),
+                "avg_null_rate": sum(null_rates.values()) / max(len(null_rates), 1)
                 if null_rates
                 else float(tab_signal.get("avg_null_rate", 0.0)),
-                "has_status_column": float(
-                    tab_signal.get("has_status_column", False)
-                ),
-                "has_time_scope": float(
-                    tab_signal.get("has_time_scope", False)
-                ),
+                "has_status_column": float(tab_signal.get("has_status_column", False)),
+                "has_time_scope": float(tab_signal.get("has_time_scope", False)),
                 "data_validation_density": float(
                     tab_signal.get("data_validation_density", 0.0)
                 ),
-                "header_formula_count": int(
-                    tab_signal.get("header_formula_count", 0)
-                ),
-                "header_entity_count": int(
-                    tab_signal.get("header_entity_count", 0)
-                ),
-                "merged_cell_ratio": float(
-                    tab_signal.get("merged_cell_ratio", 0.0)
-                ),
+                "header_formula_count": int(tab_signal.get("header_formula_count", 0)),
+                "header_entity_count": int(tab_signal.get("header_entity_count", 0)),
+                "merged_cell_ratio": float(tab_signal.get("merged_cell_ratio", 0.0)),
                 "row_count": int(tab_signal.get("row_count", 0)),
                 "expansion_formula_ratio": float(
                     tab_signal.get("expansion_formula_ratio", 0.0)

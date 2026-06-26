@@ -78,6 +78,8 @@ _TRUNCATE_LENGTH = 200
 
 @dataclass
 class ColumnProfile:
+    """Profiled metadata for a single column in a spreadsheet tab."""
+
     letter: str
     header_slug: str
     header_raw: str
@@ -92,6 +94,7 @@ class ColumnProfile:
 
 
 def _slugify_header(header: str) -> str:
+    """Lowercase a header and replace non-alphanumeric runs with underscores."""
     return _re.sub(r"[^a-z0-9]+", "_", header.lower()).strip("_") if header else ""
 
 
@@ -237,6 +240,7 @@ def build_cohort_corpus_index(
     records: list[dict] = []
 
     def walk(node: dict, path_parts: list[str]):
+        """Recursively walk folder structure, collecting workbook matches."""
         name = node.get("name") or node.get("id") or ""
         current = path_parts + ([name] if name else [])
         folder_year = None
@@ -301,6 +305,7 @@ def _token_match(token: str, text: str, mode: str) -> bool:
 
 
 def _normalize_tab_heuristics(config: dict | None) -> dict:
+    """Normalise user-provided tab-scoring heuristics, filling defaults."""
     config = config or {}
 
     operational_weight = config.get("operational_weight", 3)
@@ -371,6 +376,7 @@ def _normalize_tab_heuristics(config: dict | None) -> dict:
 
 
 def _normalize_column_heuristics(config: dict | None) -> dict:
+    """Normalise user-provided column-scoring heuristics, filling defaults."""
     config = config or {}
     return {
         "domain_keyword_tokens": [
@@ -706,7 +712,9 @@ def select_tabs_from_inventory(
                 "workbook_code": entry["workbook_code"],
                 "tab_title": entry["tab_title"],
                 "classification": entry.get("classification", "unknown"),
-                "classification_confidence": entry.get("classification_confidence", 0.0),
+                "classification_confidence": entry.get(
+                    "classification_confidence", 0.0
+                ),
                 "classification_rationale": entry.get("classification_rationale", ""),
                 "occurrences": 0,
                 "years": set(),
@@ -771,9 +779,7 @@ def select_tabs_from_inventory(
                 "classification_confidence": bucket.get(
                     "classification_confidence", 0.0
                 ),
-                "classification_rationale": bucket.get(
-                    "classification_rationale", ""
-                ),
+                "classification_rationale": bucket.get("classification_rationale", ""),
                 "years": sorted(year for year in bucket["years"] if year is not None),
                 "occurrences": bucket["occurrences"],
                 "avg_score": round(avg_score, 2),
@@ -1040,6 +1046,7 @@ def derive_column_candidates(
 
 
 def enrich_computed_fields(columns: list[dict]) -> None:
+    """Tag columns whose formula pattern indicates a computed (derived) field."""
     computed_patterns = {"row_formula", "expansion_formula"}
     for col in columns:
         evidence = col.get("evidence") or {}
@@ -1048,6 +1055,7 @@ def enrich_computed_fields(columns: list[dict]) -> None:
 
 
 def enrich_fk_candidates(columns: list[dict], entity_names: set[str]) -> None:
+    """Suggest FK targets for ``_id``-suffixed columns or cross-sheet references."""
     for col in columns:
         name = col.get("proposed_canonical_field", "")
         evidence = col.get("evidence") or {}
@@ -1066,6 +1074,7 @@ def enrich_fk_candidates(columns: list[dict], entity_names: set[str]) -> None:
 
 
 def enrich_import_key_candidates(columns: list[dict]) -> None:
+    """Tag columns that look like natural-key candidates for import lookup."""
     for col in columns:
         name = col.get("proposed_canonical_field", "")
         is_identifier = False
@@ -1082,6 +1091,7 @@ def enrich_import_key_candidates(columns: list[dict]) -> None:
 def enrich_entity_groupings(
     columns: list[dict],
 ) -> dict[str, str]:
+    """Map each workbook-tab pair to a suggested entity name via header overlap."""
     tab_headers: dict[tuple[str, str], set[str]] = {}
     for col in columns:
         key = (col.get("workbook_code", ""), col.get("tab_title", ""))

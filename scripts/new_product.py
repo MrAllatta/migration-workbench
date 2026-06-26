@@ -16,7 +16,7 @@ from typing import Any
 _script_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(_script_dir.parent))
 
-from workbook.makefile_targets import (
+from workbook.makefile_targets import (  # noqa: E402
     MakeContext,
     phonies,
     full_targets_block,

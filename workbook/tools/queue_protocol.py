@@ -72,6 +72,7 @@ _MAX_OMO_DEPTH: int = 10
 @dataclass
 class Lifecycle:
     """Lifecycle state of a queue entry."""
+
     status: str = "created"
     created_at: str = ""
     activated_at: str | None = None
@@ -79,6 +80,7 @@ class Lifecycle:
     actor: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize lifecycle to a dict (omitting ``None`` optional fields)."""
         result: dict[str, Any] = {
             "status": self.status,
             "created_at": self.created_at or _now_iso(),
@@ -93,6 +95,7 @@ class Lifecycle:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> Lifecycle:
+        """Deserialize a lifecycle dict, falling back to active default."""
         if not data:
             return cls(status="active", created_at=_now_iso())
         return cls(
@@ -107,6 +110,7 @@ class Lifecycle:
 @dataclass
 class QueueEntry:
     """A single queue entry with its lifecycle and content."""
+
     path: Path
     queue_name: str
     filename: str
@@ -115,6 +119,7 @@ class QueueEntry:
 
     @property
     def age_hours(self) -> float:
+        """Return hours since this entry was created (0 for missing timestamps)."""
         if not self.lifecycle.created_at:
             return 0.0
         try:
@@ -128,6 +133,7 @@ class QueueEntry:
 
 
 def _now_iso() -> str:
+    """Return current UTC timestamp as ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -244,10 +250,10 @@ def validate_queue_entry(
         return [f"Entry must be a dict, got {type(data).__name__}"]
 
     required = QUEUE_REQUIRED_FIELDS.get(queue_name, [])
-    for field in required:
-        value = _get_nested_value(data, field)
+    for entry_field in required:
+        value = _get_nested_value(data, entry_field)
         if value is None or (isinstance(value, str) and not value.strip()):
-            errors.append(f"Missing required field: '{field}'")
+            errors.append(f"Missing required field: '{entry_field}'")
 
     lifecycle = data.get("lifecycle")
     if lifecycle is not None:
@@ -292,6 +298,7 @@ def _update_lifecycle_in_file(path: Path, new_status: str, actor: str) -> None:
 
     if not isinstance(data, dict):
         import logging
+
         logging.getLogger(__name__).warning(
             f"Cannot update lifecycle in {path}: content is not a dict"
         )
@@ -312,14 +319,19 @@ def _update_lifecycle_in_file(path: Path, new_status: str, actor: str) -> None:
         _write_markdown_front_matter(path, raw, data)
     else:
         path.write_text(
-            yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True),
+            yaml.dump(
+                data, default_flow_style=False, sort_keys=False, allow_unicode=True
+            ),
             encoding="utf-8",
         )
 
 
-def _write_markdown_front_matter(path: Path, original_raw: str, front_matter: dict[str, Any]) -> None:
+def _write_markdown_front_matter(
+    path: Path, original_raw: str, front_matter: dict[str, Any]
+) -> None:
     """Replace YAML front matter in a Markdown file while preserving body content."""
     import logging
+
     logger = logging.getLogger(__name__)
 
     lines = original_raw.splitlines()
@@ -334,7 +346,7 @@ def _write_markdown_front_matter(path: Path, original_raw: str, front_matter: di
     if end_idx is None:
         logger.warning(f"Cannot write front matter to {path}: no closing --- found")
         return
-    body = "\n".join(lines[end_idx + 1:])
+    body = "\n".join(lines[end_idx + 1 :])
     new_front = yaml.dump(
         front_matter, default_flow_style=False, sort_keys=False, allow_unicode=True
     ).strip()
@@ -344,6 +356,7 @@ def _write_markdown_front_matter(path: Path, original_raw: str, front_matter: di
 @dataclass
 class QueueHealthReport:
     """Health report for a single queue."""
+
     queue_name: str
     total_entries: int = 0
     by_status: dict[str, int] = field(default_factory=dict)
@@ -354,6 +367,7 @@ class QueueHealthReport:
     validation_errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the health report to a dict for JSON output."""
         return {
             "queue_name": self.queue_name,
             "total_entries": self.total_entries,
@@ -366,8 +380,7 @@ class QueueHealthReport:
             "oldest_unconsumed_name": self.oldest_unconsumed_name,
             "stale_count": len(self.stale_entries),
             "stale_entries": [
-                {k: v for k, v in e.items() if k != "entry"}
-                for e in self.stale_entries
+                {k: v for k, v in e.items() if k != "entry"} for e in self.stale_entries
             ],
             "malformed_count": len(self.malformed_entries),
             "malformed_entries": self.malformed_entries,
@@ -412,12 +425,14 @@ def check_queue_health(
                 timeouts = DEFAULT_TIMEOUTS.get(qname, {})
                 timeout_hours = timeouts.get(status, 168)
                 if age > timeout_hours:
-                    stale.append({
-                        "filename": entry.filename,
-                        "status": status,
-                        "age_hours": round(age, 1),
-                        "timeout_hours": timeout_hours,
-                    })
+                    stale.append(
+                        {
+                            "filename": entry.filename,
+                            "status": status,
+                            "age_hours": round(age, 1),
+                            "timeout_hours": timeout_hours,
+                        }
+                    )
 
         report.total_entries = len(entries)
         report.by_status = status_counts

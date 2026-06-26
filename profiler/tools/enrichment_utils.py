@@ -17,8 +17,11 @@ _Q_PATTERN = re.compile(r"^q[1-4]$", re.IGNORECASE)
 
 # Type alias for return values
 HeaderCategory = Literal[
-    "formula_keyword", "entity_keyword", "time_scope_keyword",
-    "status_keyword", "generic",
+    "formula_keyword",
+    "entity_keyword",
+    "time_scope_keyword",
+    "status_keyword",
+    "generic",
 ]
 
 
@@ -167,9 +170,7 @@ def enrich_from_dependency_graph(
         if not cells:
             continue
 
-        formula_count = sum(
-            1 for c in cells if c.get("kind") == "formula"
-        )
+        formula_count = sum(1 for c in cells if c.get("kind") == "formula")
         total = len(cells)
 
         if formula_count == total and total > 0:

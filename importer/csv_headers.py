@@ -67,6 +67,7 @@ def register_preamble_prefix(prefix: str) -> None:
     if normalized not in existing_normalized:
         _INSTRUCTIVE_PREFIXES.append(normalized)
 
+
 # Keywords that suggest a row is a header rather than data or metadata.
 # At least one must appear (normalized) in a candidate header row.
 HEADER_KEYWORDS = (
@@ -276,6 +277,7 @@ def build_reader(
     # into an in-memory buffer so the file handle can be closed before we
     # return the reader.
     import io
+
     text_buffer = io.StringIO()
     csv_writer = csv.writer(text_buffer)
     csv_writer.writerows(remaining_rows)
@@ -378,7 +380,7 @@ class HeaderRegistry:
     def build_reader_for(
         self,
         csv_path: str,
-    ) -> 'csv.DictReader':
+    ) -> "csv.DictReader":
         """Build a reader for *csv_path* using the best-matching registered config.
 
         Args:

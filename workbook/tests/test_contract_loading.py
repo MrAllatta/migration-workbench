@@ -241,7 +241,7 @@ def test_resolve_field_mapping_partial_source_columns():
     table = {
         "columns": [
             {"source_column": "Crop", "suggested_field_name": "name"},
-            {"suggested_field_name": "computed"},     # no source_column
+            {"suggested_field_name": "computed"},  # no source_column
             {"source_column": "Notes", "suggested_field_name": "notes"},
         ],
     }

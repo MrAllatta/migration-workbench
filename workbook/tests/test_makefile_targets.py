@@ -58,9 +58,15 @@ def test_generate_admin_block():
     assert "wb generate admin" in block
     assert "$(MANAGE) generate_admin" not in block
     # Uses shell conditionals instead of make if/else
-    assert "$(shell if [ -f \"$(VIEW_MANIFEST)\" ]; then echo \"--manifest $(VIEW_MANIFEST)\"; fi)" in block
-    assert "$(shell if [ -f \"build/codegen-manifest.yaml\" ]; then echo \"--codegen-manifest build/codegen-manifest.yaml\"; fi)" in block
-    assert "--out \"$(CORE)/admin.py\"" in block
+    assert (
+        '$(shell if [ -f "$(VIEW_MANIFEST)" ]; then echo "--manifest $(VIEW_MANIFEST)"; fi)'
+        in block
+    )
+    assert (
+        '$(shell if [ -f "build/codegen-manifest.yaml" ]; then echo "--codegen-manifest build/codegen-manifest.yaml"; fi)'
+        in block
+    )
+    assert '--out "$(CORE)/admin.py"' in block
 
 
 def test_generate_import_block():

@@ -94,9 +94,8 @@ class Command(BaseCommand):
                 raise CommandError(f"codegen-manifest not found: {cg_path}")
             try:
                 import yaml  # type: ignore[import-untyped]
-                codegen_manifest = yaml.safe_load(
-                    cg_path.read_text(encoding="utf-8")
-                )
+
+                codegen_manifest = yaml.safe_load(cg_path.read_text(encoding="utf-8"))
                 if not isinstance(codegen_manifest, dict):
                     raise CommandError(
                         f"codegen-manifest is not a YAML mapping: {cg_path}"
@@ -161,7 +160,11 @@ class Command(BaseCommand):
         existing_source = None
         if out_path and out_path.exists():
             existing_source = out_path.read_text(encoding="utf-8")
-            self.stdout.write(self.style.SUCCESS(f"read existing {out_path} to preserve custom sections"))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"read existing {out_path} to preserve custom sections"
+                )
+            )
 
         source = render_admin_py(
             clean_contract,

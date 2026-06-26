@@ -9,7 +9,6 @@ from importer.csv_headers import (
     HeaderRegistry,
     build_reader,
     find_header_row,
-    header_registry,
     iter_year_suffixed_csvs,
     normalize_field_name,
     register_preamble_prefix,
@@ -58,9 +57,7 @@ class TestFindHeaderRow:
 
     def test_finds_header_inside_data_row(self) -> None:
         path = FIXTURES / "header_in_data_row.csv"
-        assert (
-            find_header_row(path, ["Sales QTY Goal", "QTY Left To Pack"]) == 0
-        )
+        assert find_header_row(path, ["Sales QTY Goal", "QTY Left To Pack"]) == 0
 
     def test_raises_when_not_found(self) -> None:
         path = FIXTURES / "header_not_found.csv"
@@ -142,22 +139,26 @@ class TestRegisterPreamblePrefix:
         finally:
             # Clean up so we don't affect other tests
             from importer.csv_headers import _INSTRUCTIVE_PREFIXES
+
             _INSTRUCTIVE_PREFIXES.remove("welcome to")
 
     def test_registered_prefix_case_insensitive(self) -> None:
         from importer.csv_headers import _INSTRUCTIVE_PREFIXES
+
         register_preamble_prefix("NOTE:")
         assert "note:" in _INSTRUCTIVE_PREFIXES
         _INSTRUCTIVE_PREFIXES.remove("note:")
 
     def test_empty_prefix_ignored(self) -> None:
         from importer.csv_headers import _INSTRUCTIVE_PREFIXES
+
         count_before = len(_INSTRUCTIVE_PREFIXES)
         register_preamble_prefix("")
         assert len(_INSTRUCTIVE_PREFIXES) == count_before
 
     def test_duplicate_not_added(self) -> None:
         from importer.csv_headers import _INSTRUCTIVE_PREFIXES
+
         count_before = len(_INSTRUCTIVE_PREFIXES)
         register_preamble_prefix("choose ")
         assert len(_INSTRUCTIVE_PREFIXES) == count_before
@@ -211,10 +212,7 @@ class TestHeaderRegistry:
     def test_longest_pattern_wins(self, tmp_path) -> None:
         csv_path = tmp_path / "pack_list_2024.csv"
         csv_path.write_text(
-            "Crop,Var,Notes\n"
-            "2024,1,first\n"
-            "INVENTORY,ITEM,QTY\n"
-            "Carrots,bunch,50\n"
+            "Crop,Var,Notes\n2024,1,first\nINVENTORY,ITEM,QTY\nCarrots,bunch,50\n"
         )
 
         registry = HeaderRegistry()
@@ -240,4 +238,5 @@ class TestHeaderRegistry:
     def test_default_registry_is_global_singleton(self) -> None:
         # The module-level ``header_registry`` is a global singleton.
         from importer.csv_headers import header_registry as default_registry
+
         assert isinstance(default_registry, HeaderRegistry)

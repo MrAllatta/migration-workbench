@@ -555,11 +555,11 @@ def _vertical_list(args: argparse.Namespace) -> int:
                 },
                 args.json,
             )
-        
+
         if not verticals:
             print("No vertical templates found.")
             return 0
-            
+
         # Print table header
         print(f"{'Name':<15} {'Version':<10} {'Confidence':<12} {'Description'}")
         print("-" * 80)
@@ -591,6 +591,7 @@ def _vertical_show(args: argparse.Namespace) -> int:
         if args.json:
             # Convert VerticalTemplate to dict for JSON output
             from dataclasses import asdict
+
             return _render_output(
                 {
                     "ok": True,
@@ -600,13 +601,13 @@ def _vertical_show(args: argparse.Namespace) -> int:
                 },
                 args.json,
             )
-        
+
         # Pretty print vertical details
         print(f"Name: {vertical.name}")
         print(f"Version: {vertical.version}")
         print(f"Description: {vertical.description}")
         print(f"Confidence: {vertical.confidence}")
-        
+
         if vertical.domain_context:
             print("\nDomain Context:")
             if vertical.domain_context.get("vocabulary"):
@@ -620,8 +621,10 @@ def _vertical_show(args: argparse.Namespace) -> int:
             if vertical.domain_context.get("entities"):
                 print("  Entities:")
                 for entity in vertical.domain_context["entities"]:
-                    print(f"    - {entity.get('name', 'Unknown')}: {entity.get('description', '')}")
-        
+                    print(
+                        f"    - {entity.get('name', 'Unknown')}: {entity.get('description', '')}"
+                    )
+
         if vertical.entity_templates:
             print("\nEntity Templates:")
             for entity_name, template in vertical.entity_templates.items():
@@ -655,7 +658,7 @@ def _vertical_show(args: argparse.Namespace) -> int:
                         print(f"    unique_on: {import_config['unique_on']}")
                     if import_config.get("fk_lookup"):
                         print(f"    fk_lookup: {import_config['fk_lookup']}")
-        
+
         if vertical.interaction_defaults:
             print("\nInteraction Defaults:")
             if vertical.interaction_defaults.get("roles"):
@@ -664,12 +667,12 @@ def _vertical_show(args: argparse.Namespace) -> int:
                     print(f"    {role}:")
                     print(f"      archetype: {config.get('archetype', 'unknown')}")
                     print(f"      tabs: {config.get('tabs', [])}")
-        
+
         if vertical.signal_thresholds:
             print("\nSignal Thresholds:")
             for key, value in vertical.signal_thresholds.items():
                 print(f"  {key}: {value}")
-                
+
         return 0
     except FileNotFoundError:
         return _render_output(
@@ -841,6 +844,8 @@ def _ecosystem_ack(args: argparse.Namespace) -> int:
         },
         args.json,
     )
+
+
 def _deploy_live(args: argparse.Namespace) -> int:
     """Perform a live deploy: validate manifest, deploy, health-check, record."""
     from deployment.health import wait_for_healthy
@@ -1300,17 +1305,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Ecosystem subcommands
     ecosystem_cmd = sub.add_parser("ecosystem", help="Ecosystem protocol operations")
-    ecosystem_sub = ecosystem_cmd.add_subparsers(dest="ecosystem_command", required=True)
-
-    health_cmd = ecosystem_sub.add_parser(
-        "health", help="Check queue protocol health"
+    ecosystem_sub = ecosystem_cmd.add_subparsers(
+        dest="ecosystem_command", required=True
     )
+
+    health_cmd = ecosystem_sub.add_parser("health", help="Check queue protocol health")
     health_cmd.set_defaults(func=_ecosystem_health)
 
     ack_cmd = ecosystem_sub.add_parser(
         "ack", help="Acknowledge a queue entry (mark as consumed or active)"
     )
-    ack_cmd.add_argument("queue", help="Queue name (next, ready, exercise, results, etc.)")
+    ack_cmd.add_argument(
+        "queue", help="Queue name (next, ready, exercise, results, etc.)"
+    )
     ack_cmd.add_argument("filename", help="Queue entry filename")
     ack_cmd.add_argument(
         "--status",

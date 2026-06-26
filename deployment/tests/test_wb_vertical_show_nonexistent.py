@@ -14,7 +14,7 @@ def _run_wb(extra_args: list[str] | None = None) -> subprocess.CompletedProcess:
         "vertical",
         "show",
         "nonexistent",
-        * (extra_args or []),
+        *(extra_args or []),
     ]
     return subprocess.run(cmd, capture_output=True, text=True)
 
@@ -28,13 +28,17 @@ def test_wb_vertical_show_nonexistent_clear_error():
     )
     output = result.stdout
     # Should contain clear error message, not traceback
-    assert "WB-VERTICAL-4001" in output, f"Expected error code WB-VERTICAL-4001, got: {output}"
+    assert "WB-VERTICAL-4001" in output, (
+        f"Expected error code WB-VERTICAL-4001, got: {output}"
+    )
     assert "Vertical template 'nonexistent' not found." in output, (
         f"Expected clear error message, got: {output}"
     )
     # Should not contain traceback-like content
     assert "Traceback" not in output, f"Should not contain traceback, got: {output}"
-    assert "FileNotFoundError" not in output, f"Should not contain FileNotFoundError, got: {output}"
+    assert "FileNotFoundError" not in output, (
+        f"Should not contain FileNotFoundError, got: {output}"
+    )
 
 
 def test_wb_vertical_show_nonexistent_json_returns_error():

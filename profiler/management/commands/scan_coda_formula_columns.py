@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Scan Coda docs for column-level formula text matching regex patterns."""
+
+from __future__ import annotations
 
 import argparse
 import json

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Enumerate a Drive folder tree and list spreadsheet tabs."""
+
+from __future__ import annotations
 
 import json
 from pathlib import Path

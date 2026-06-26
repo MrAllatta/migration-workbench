@@ -1,3 +1,10 @@
+"""Collector for rejected-table artifacts during scaffold validation.
+
+Tracks tables that fail validation checks and serialises the rejection
+report to YAML.  Used by the schema-contract scaffolding pipeline to
+produce partial output when ``--continue-on-error`` is active.
+"""
+
 from __future__ import annotations
 
 import yaml
@@ -43,6 +50,7 @@ class PartialOutputCollector:
         )
 
     def is_empty(self) -> bool:
+        """Return ``True`` when no tables have been rejected."""
         return len(self.rejected) == 0
 
     def write_rejection_file(self, path: Path) -> None:

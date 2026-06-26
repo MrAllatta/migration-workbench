@@ -19,6 +19,7 @@ from workbook.tools.vertical_registry import load_vertical
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _get_column_names(entity_template: dict) -> list[str]:
     """Return list of column names from an entity template dict."""
     return [c["name"] for c in entity_template.get("columns", [])]
@@ -32,6 +33,7 @@ def _get_column_types(entity_template: dict) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Test 1: Farm vertical loads with 4+ entity templates
 # ---------------------------------------------------------------------------
+
 
 class TestLoadFarmVertical:
     """Verify the farm vertical can be loaded and has expected structure."""
@@ -57,6 +59,7 @@ class TestLoadFarmVertical:
 # ---------------------------------------------------------------------------
 # Test 2: Crop template has expected fields
 # ---------------------------------------------------------------------------
+
 
 class TestCropEntity:
     """Verify the Crop entity template."""
@@ -89,6 +92,7 @@ class TestCropEntity:
 # Test 3: FieldBlock template has expected fields
 # ---------------------------------------------------------------------------
 
+
 class TestFieldBlockEntity:
     """Verify the FieldBlock entity template."""
 
@@ -103,8 +107,13 @@ class TestFieldBlockEntity:
         )
 
         core_fields = {
-            "name", "code", "acreage", "soil_type", "irrigation_type",
-            "is_active", "notes",
+            "name",
+            "code",
+            "acreage",
+            "soil_type",
+            "irrigation_type",
+            "is_active",
+            "notes",
         }
         assert core_fields.issubset(column_names), (
             f"Missing core FieldBlock fields. Expected {core_fields}, got {column_names}"
@@ -118,6 +127,7 @@ class TestFieldBlockEntity:
 # ---------------------------------------------------------------------------
 # Test 4: PlantingPlan has 20+ fields with proper FKs
 # ---------------------------------------------------------------------------
+
 
 class TestPlantingPlanEntity:
     """Verify the PlantingPlan entity template."""
@@ -133,10 +143,9 @@ class TestPlantingPlanEntity:
         )
 
         # Verify FK fields reference other entities
-        column_types = _get_column_types(planting_plan)
+        _column_types = _get_column_types(planting_plan)  # noqa: F841
         fk_columns = [
-            c for c in planting_plan["columns"]
-            if c.get("data_type") == "ForeignKey"
+            c for c in planting_plan["columns"] if c.get("data_type") == "ForeignKey"
         ]
         assert len(fk_columns) >= 3, (
             f"PlantingPlan has {len(fk_columns)} FK fields, expected 3+"
@@ -160,9 +169,7 @@ class TestPlantingPlanEntity:
         assert plant_date_def["null"] is False
 
         # Verify status field defaults
-        status_def = next(
-            c for c in planting_plan["columns"] if c["name"] == "status"
-        )
+        status_def = next(c for c in planting_plan["columns"] if c["name"] == "status")
         assert status_def.get("default") == "planned"
 
         # Verify import_config has FK lookups
@@ -184,6 +191,7 @@ class TestPlantingPlanEntity:
 # Test 5: Field types match heuristics
 # ---------------------------------------------------------------------------
 
+
 class TestFieldTypes:
     """Verify field types follow the vertical template heuristics."""
 
@@ -200,8 +208,7 @@ class TestFieldTypes:
 
         # Names should be CharField
         name_fields = [
-            c for c in all_columns
-            if c["name"] in ("crop_name", "name", "variety")
+            c for c in all_columns if c["name"] in ("crop_name", "name", "variety")
         ]
         for field in name_fields:
             assert field["data_type"] == "CharField", (
@@ -210,7 +217,8 @@ class TestFieldTypes:
 
         # Date fields should be DateField
         date_fields = [
-            c for c in all_columns
+            c
+            for c in all_columns
             if "date" in c["name"] or c["name"] in ("plant_date",)
         ]
         for field in date_fields:
@@ -219,28 +227,21 @@ class TestFieldTypes:
             )
 
         # Boolean fields should be BooleanField
-        bool_fields = [
-            c for c in all_columns
-            if c.get("data_type") == "BooleanField"
-        ]
+        bool_fields = [c for c in all_columns if c.get("data_type") == "BooleanField"]
         bool_names = {c["name"] for c in bool_fields}
         assert "is_perennial" in bool_names
         assert "is_active" in bool_names
         assert "is_organic" in bool_names
 
         # Integer fields for counts
-        count_fields = [
-            c for c in all_columns
-            if c.get("data_type") == "IntegerField"
-        ]
+        count_fields = [c for c in all_columns if c.get("data_type") == "IntegerField"]
         count_names = {c["name"] for c in count_fields}
         assert "days_to_maturity" in count_names
         assert "beds_used" in count_names or "beds_count" in count_names
 
         # Decimal fields for quantities
         decimal_fields = [
-            c for c in all_columns
-            if c.get("data_type") == "DecimalField"
+            c for c in all_columns if c.get("data_type") == "DecimalField"
         ]
         decimal_names = {c["name"] for c in decimal_fields}
         assert "acreage" in decimal_names
@@ -250,6 +251,7 @@ class TestFieldTypes:
 # ---------------------------------------------------------------------------
 # Test 6: Generated admin blocks are valid
 # ---------------------------------------------------------------------------
+
 
 class TestAdminBlocks:
     """Verify admin blocks from entity templates are valid."""
@@ -281,6 +283,7 @@ class TestAdminBlocks:
 # ---------------------------------------------------------------------------
 # Test 7: Domain context has farm vocabulary
 # ---------------------------------------------------------------------------
+
 
 class TestDomainContext:
     """Verify farm domain vocabulary and glossary."""
@@ -323,6 +326,7 @@ class TestDomainContext:
 # ---------------------------------------------------------------------------
 # Test 8: Signal thresholds are populated
 # ---------------------------------------------------------------------------
+
 
 class TestSignalThresholds:
     """Verify farm-specific signal thresholds are populated."""

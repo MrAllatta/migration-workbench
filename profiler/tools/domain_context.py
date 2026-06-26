@@ -23,17 +23,23 @@ class DomainContext:
 
     @dataclass
     class YearScope:
+        """Active, archived, and forward year lists for scoping."""
+
         active: list[int] = field(default_factory=list)
         archived: list[int] = field(default_factory=list)
         forward: list[int] = field(default_factory=list)
 
     @dataclass
     class DeduplicationContext:
+        """Deduplication strategy and tab-title exception list."""
+
         strategy: str = "latest_year"
         exceptions: list[dict] = field(default_factory=list)
 
     @dataclass
     class VocabularyContext:
+        """Categorised token lists used by tab-scoring heuristics."""
+
         operational: list[str] = field(default_factory=list)
         reference: list[str] = field(default_factory=list)
         support: list[str] = field(default_factory=list)
@@ -49,15 +55,18 @@ class DomainContext:
     scope_notes: str = ""
 
     def active_years(self) -> set[int]:
+        """Return all years (active, archived, forward) as a single set."""
         years: set[int] = set(self.year_scope.active)
         years.update(self.year_scope.archived)
         years.update(self.year_scope.forward)
         return years
 
     def is_archived_year(self, year: int) -> bool:
+        """Return ``True`` when *year* is in the archived list."""
         return year in self.year_scope.archived
 
     def is_deduplication_exception(self, tab_title: str) -> bool:
+        """Return ``True`` when *tab_title* is an exception to dedup rules."""
         for exc in self.deduplication.exceptions:
             if exc.get("tab_title") == tab_title:
                 return True
@@ -65,6 +74,7 @@ class DomainContext:
 
 
 def load_domain_context(path: str | Path) -> DomainContext | None:
+    """Load a ``DomainContext`` from a YAML file, or ``None`` when absent."""
     file_path = Path(path)
     if not file_path.exists():
         return None
@@ -113,6 +123,10 @@ def merge_vocabulary(
     heuristics: dict,
     domain_context: DomainContext | None,
 ) -> dict:
+    """Merge domain-context vocabulary tokens into heuristic config.
+
+    When *domain_context* is ``None``, returns *heuristics* unchanged.
+    """
     if domain_context is None:
         return heuristics
     token_keys = {
@@ -154,6 +168,7 @@ def deduplicate_index_records(
 
 
 def has_meaningful_vocabulary(domain_context: DomainContext | None) -> bool:
+    """Return ``True`` when the context has operational or reference tokens."""
     if domain_context is None:
         return False
     return bool(

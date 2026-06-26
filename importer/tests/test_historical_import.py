@@ -28,15 +28,27 @@ def year_bundle_dir(tmp_path):
     """Create a temp bundle directory with 3 years of CSV data."""
     years_data = {
         "2022": [
-            ("CropPlanner.csv", ["Crop", "Variety", "Beds"], ["Carrot", "Danvers", "10"]),
+            (
+                "CropPlanner.csv",
+                ["Crop", "Variety", "Beds"],
+                ["Carrot", "Danvers", "10"],
+            ),
             ("FieldLog.csv", ["Field", "Acreage"], ["North", "12.5"]),
         ],
         "2023": [
-            ("CropPlanner.csv", ["Crop", "Variety", "Beds"], ["Lettuce", "Buttercrunch", "8"]),
+            (
+                "CropPlanner.csv",
+                ["Crop", "Variety", "Beds"],
+                ["Lettuce", "Buttercrunch", "8"],
+            ),
             ("FieldLog.csv", ["Field", "Acreage"], ["South", "15.0"]),
         ],
         "2024": [
-            ("CropPlanner.csv", ["Crop", "Variety", "Beds"], ["Tomato", "Brandywine", "6"]),
+            (
+                "CropPlanner.csv",
+                ["Crop", "Variety", "Beds"],
+                ["Tomato", "Brandywine", "6"],
+            ),
             ("FieldLog.csv", ["Field", "Acreage"], ["Hillside", "20.0"]),
         ],
     }
@@ -64,8 +76,16 @@ def tab_bundle_dir(tmp_path):
     """Create a temp bundle directory with tab-named subdirectories and year-suffixed CSVs."""
     tab_files = {
         "crop_plan": [
-            ("crop_plan_2025.csv", ["Crop", "Variety", "Beds"], ["Carrot", "Danvers", "10"]),
-            ("crop_plan_2026.csv", ["Crop", "Variety", "Beds"], ["Lettuce", "Buttercrunch", "8"]),
+            (
+                "crop_plan_2025.csv",
+                ["Crop", "Variety", "Beds"],
+                ["Carrot", "Danvers", "10"],
+            ),
+            (
+                "crop_plan_2026.csv",
+                ["Crop", "Variety", "Beds"],
+                ["Lettuce", "Buttercrunch", "8"],
+            ),
         ],
         "harvest_log": [
             ("harvest_log_2025.csv", ["Field", "Yield"], ["North", "120"]),

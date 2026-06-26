@@ -307,7 +307,7 @@ class TestFarmBPRSIntegration:
         """Crop Planner 2025 and 2026 cluster into the same entity
         (Jaccard similarity > 0.50).
         """
-        ps = _build_pipeline_state(tmp_path)
+        _ps = _build_pipeline_state(tmp_path)
 
         # Build the tabs list the same way the deriver does.
         tabs = [

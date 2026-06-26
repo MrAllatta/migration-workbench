@@ -86,9 +86,7 @@ class TabClassification:
                 f"Must be one of {sorted(TAB_CLASSIFICATION_CATEGORIES)}"
             )
         if not 0.0 <= self.confidence <= 1.0:
-            raise ValueError(
-                f"Confidence must be in [0.0, 1.0], got {self.confidence}"
-            )
+            raise ValueError(f"Confidence must be in [0.0, 1.0], got {self.confidence}")
 
 
 # ---------------------------------------------------------------------------
@@ -226,10 +224,7 @@ def classify_tab(
             category="reference",
             confidence=0.85,
             signals=signals,
-            rationale=(
-                f"Tab title matches reference pattern with "
-                f"{row_count} rows"
-            ),
+            rationale=(f"Tab title matches reference pattern with {row_count} rows"),
         )
 
     # -- Rule 6: Derived name pattern --
@@ -239,9 +234,7 @@ def classify_tab(
             category="derived",
             confidence=0.80,
             signals=signals,
-            rationale=(
-                f"Tab title matches derived/summary pattern"
-            ),
+            rationale=("Tab title matches derived/summary pattern"),
         )
 
     # -- Rule 7: Large + operational domain hits → data --

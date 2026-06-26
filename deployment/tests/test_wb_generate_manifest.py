@@ -33,7 +33,7 @@ def test_generate_manifest_imports_scaffold_not_generate():
         with patch("deployment.wb_cli._setup_django"):
             with patch(
                 "workbook.management.commands.scaffold_view_manifest.Command"
-            ) as mock_cmd:
+            ) as _mock_cmd:
                 args = argparse.Namespace(
                     structure="build/structure.json",
                     contract="build/schema-contract.yaml",

@@ -28,6 +28,7 @@ import argparse
 import json
 import re
 from collections import Counter
+from pathlib import Path
 from urllib.parse import quote
 from connectors.google_sheets import (
     DRIVE_READONLY_SCOPE,

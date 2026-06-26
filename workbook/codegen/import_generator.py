@@ -467,7 +467,7 @@ def _render_import_method(
     unique_on = import_cfg.get("unique_on") or []
     required = import_cfg.get("required_source_columns") or []
     fk_lookup = import_cfg.get("fk_lookup") or {}
-    field_parsers = import_cfg.get("field_parsers") or {}
+    _field_parsers = import_cfg.get("field_parsers") or {}  # noqa: F841
 
     # Build source_header mapping: column_map values, else field name.
     cmap = import_cfg.get("column_map") or {}

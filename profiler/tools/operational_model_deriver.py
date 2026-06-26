@@ -87,17 +87,61 @@ def _infer_candidate_events(
     """
     temporal_keywords = {"date", "time", "when", "log", "timestamp", "at"}
     action_keywords = {
-        "status", "stage", "decision", "action", "task", "result",
-        "outcome", "state", "phase", "step", "type", "category",
-        "choice", "option", "method", "reason", "flag", "code",
-        "group", "class", "rank", "priority", "level", "grade",
-        "mode", "source", "format", "tag", "label", "event",
+        "status",
+        "stage",
+        "decision",
+        "action",
+        "task",
+        "result",
+        "outcome",
+        "state",
+        "phase",
+        "step",
+        "type",
+        "category",
+        "choice",
+        "option",
+        "method",
+        "reason",
+        "flag",
+        "code",
+        "group",
+        "class",
+        "rank",
+        "priority",
+        "level",
+        "grade",
+        "mode",
+        "source",
+        "format",
+        "tag",
+        "label",
+        "event",
     }
     quantity_keywords = {
-        "qty", "quantity", "amount", "total", "count", "weight",
-        "volume", "price", "cost", "rate", "size", "length",
-        "width", "height", "depth", "area", "percent", "pct",
-        "sum", "avg", "average", "min", "max",
+        "qty",
+        "quantity",
+        "amount",
+        "total",
+        "count",
+        "weight",
+        "volume",
+        "price",
+        "cost",
+        "rate",
+        "size",
+        "length",
+        "width",
+        "height",
+        "depth",
+        "area",
+        "percent",
+        "pct",
+        "sum",
+        "avg",
+        "average",
+        "min",
+        "max",
     }
     candidates: list[dict[str, Any]] = []
     _numeric_patterns: set[str] = set()
@@ -107,9 +151,7 @@ def _infer_candidate_events(
         if not distinct_vals:
             return False
         sample = [str(v).strip() for v in distinct_vals[:20]]
-        numeric_count = sum(
-            1 for v in sample if v and _is_numeric_string(v)
-        )
+        numeric_count = sum(1 for v in sample if v and _is_numeric_string(v))
         return numeric_count >= len(sample) * 0.7 if sample else False
 
     def _is_numeric_string(s: str) -> bool:
@@ -141,67 +183,81 @@ def _infer_candidate_events(
 
         if has_temporal_keyword and (is_categorical or is_timestamp_like):
             event_id = header.replace(" ", "_") + "_logged"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "temporal",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "temporal",
+                }
+            )
         elif has_action_keyword and is_categorical:
             event_id = header.replace(" ", "_") + "_recorded"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "action",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "action",
+                }
+            )
         elif is_boolean:
             event_id = header.replace(" ", "_") + "_flagged"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "boolean",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "boolean",
+                }
+            )
         elif is_timestamp_like and is_categorical:
             event_id = header.replace(" ", "_") + "_logged"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "temporal",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "temporal",
+                }
+            )
         elif is_numeric_with_quantity_header:
             event_id = header.replace(" ", "_") + "_measured"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "measurement",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "measurement",
+                }
+            )
         elif is_categorical and null_rate <= 0.40:
             event_id = header.replace(" ", "_") + "_set"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "categorical",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "categorical",
+                }
+            )
         elif null_rate <= 0.50:
             event_id = header.replace(" ", "_") + "_recorded"
-            candidates.append({
-                "suggested_event_id": event_id,
-                "source_column": header,
-                "null_rate": null_rate,
-                "distinct_count": len(distinct_values),
-                "event_type": "generic",
-            })
+            candidates.append(
+                {
+                    "suggested_event_id": event_id,
+                    "source_column": header,
+                    "null_rate": null_rate,
+                    "distinct_count": len(distinct_values),
+                    "event_type": "generic",
+                }
+            )
 
     return candidates
 
@@ -302,10 +358,27 @@ def _infer_commands_from_tabs(
         and ``source_tab`` keys.
     """
     action_verbs = {
-        "plan", "plant", "harvest", "pack", "ship", "order",
-        "record", "schedule", "allocate", "transfer", "adjust",
-        "review", "approve", "setup", "configure", "update",
-        "create", "manage", "track", "monitor", "report",
+        "plan",
+        "plant",
+        "harvest",
+        "pack",
+        "ship",
+        "order",
+        "record",
+        "schedule",
+        "allocate",
+        "transfer",
+        "adjust",
+        "review",
+        "approve",
+        "setup",
+        "configure",
+        "update",
+        "create",
+        "manage",
+        "track",
+        "monitor",
+        "report",
     }
     commands: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
@@ -513,12 +586,14 @@ def derive_operational_model(
         tab_slug = tab_title.lower().replace(" ", "_")[:30]
         wf_id = f"{tab_slug}_workflow"
         if wf_id not in all_workflow_ids:
-            workflow_candidates.append({
-                "id": wf_id,
-                "commands": [f"manage_{tab_slug}"],
-                "evidence": [tab_title],
-                "ref_type": "singleton_event_tab",
-            })
+            workflow_candidates.append(
+                {
+                    "id": wf_id,
+                    "commands": [f"manage_{tab_slug}"],
+                    "evidence": [tab_title],
+                    "ref_type": "singleton_event_tab",
+                }
+            )
             all_workflow_ids.add(wf_id)
 
     workflows = [

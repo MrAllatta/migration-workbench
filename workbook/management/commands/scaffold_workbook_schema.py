@@ -12,28 +12,28 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError  # noqa: E402
 
-from connectors.spreadsheet import guess_header_row, raw_sheet_to_row_lists
-from workbook.partial_output import PartialOutputCollector
-from workbook.codegen.designed_model_detection import (
+from connectors.spreadsheet import guess_header_row, raw_sheet_to_row_lists  # noqa: E402
+from workbook.partial_output import PartialOutputCollector  # noqa: E402
+from workbook.codegen.designed_model_detection import (  # noqa: E402
     find_column_overlap_groups,
     suggest_designed_model,
 )
-from workbook.field_mapping import (
+from workbook.field_mapping import (  # noqa: E402
     is_valid_python_identifier,
     map_profiler_column_to_django_field,
     suggested_field_name,
 )
-from workbook.schema_contract import (
+from workbook.schema_contract import (  # noqa: E402
     build_contract,
     _compute_fk_resolutions,
     _suggest_import_keys,
     _compute_bundle_paths,
     load_json,
 )
-from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case
-from workbook.tools.vertical_registry import (
+from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case  # noqa: E402
+from workbook.tools.vertical_registry import (  # noqa: E402
     MIN_CONFIDENCE_THRESHOLD,
     apply_vertical_to_schema,
     discover_verticals,
@@ -676,7 +676,11 @@ def _merge_domain_knowledge(
     warning.
     """
     if warn is None:
-        warn = lambda _: None
+
+        def _noop_warn(_):  # noqa: E731
+            pass
+
+        warn = _noop_warn
 
     entities = domain_knowledge.get("entities", {})
     tab_to_entity: dict[str, tuple[str, dict]] = {}
@@ -875,7 +879,7 @@ class Command(BaseCommand):
                     f"Vertical template {vertical_name!r} not found. "
                     f"Available: {', '.join(v['name'] for v in discover_verticals())}"
                 )
-            
+
             # Compute template match suggestions for each tab
             bundle_config = options.get("bundle_config")
             tab_headers = {}
@@ -888,35 +892,49 @@ class Command(BaseCommand):
                         cols = tab.get("required_headers", [])
                         if title:
                             tab_headers[title] = {"columns": cols}
-             
+
             all_suggestions = {}
             for tab_title, tab_info in tab_headers.items():
-                suggestions = score_tab_against_templates(tab_title, tab_info["columns"], vertical)
+                suggestions = score_tab_against_templates(
+                    tab_title, tab_info["columns"], vertical
+                )
                 # Filter suggestions above confidence threshold
-                filtered_suggestions = [s for s in suggestions if s["confidence"] >= MIN_CONFIDENCE_THRESHOLD]
+                filtered_suggestions = [
+                    s
+                    for s in suggestions
+                    if s["confidence"] >= MIN_CONFIDENCE_THRESHOLD
+                ]
                 if filtered_suggestions:
                     all_suggestions[tab_title] = filtered_suggestions
-             
+
             # Apply suggestions if flag is set, otherwise store for YAML comments
             if apply_suggestions:
                 # Apply all suggestions above threshold
-                 for tab_title, suggestions in all_suggestions.items():
-                     # For each suggestion, apply the top match (highest confidence)
-                     if suggestions:
-                         top_suggestion = suggestions[0]  # Already sorted by confidence descending
-                         entity_name = top_suggestion["entity_name"]
-                         # Find the table with matching bundle_worksheet_title and apply the template
-                         for table in contract.get("tables", []):
-                             if table.get("bundle_worksheet_title") == tab_title:
-                                 if vertical.entity_templates:
-                                     entity_template = vertical.entity_templates.get(entity_name)
-                                     if entity_template:
-                                         table.update(merge_entity_template(table, entity_template))
-                                 break
-             
+                for tab_title, suggestions in all_suggestions.items():
+                    # For each suggestion, apply the top match (highest confidence)
+                    if suggestions:
+                        top_suggestion = suggestions[
+                            0
+                        ]  # Already sorted by confidence descending
+                        entity_name = top_suggestion["entity_name"]
+                        # Find the table with matching bundle_worksheet_title and apply the template
+                        for table in contract.get("tables", []):
+                            if table.get("bundle_worksheet_title") == tab_title:
+                                if vertical.entity_templates:
+                                    entity_template = vertical.entity_templates.get(
+                                        entity_name
+                                    )
+                                    if entity_template:
+                                        table.update(
+                                            merge_entity_template(
+                                                table, entity_template
+                                            )
+                                        )
+                                break
+
             # Store suggestions in contract for YAML comment generation
             contract["_template_suggestions"] = all_suggestions
-             
+
             contract = apply_vertical_to_schema(contract, vertical)
         elif no_vertical:
             self.stdout.write("Vertical templates disabled via --no-vertical")
@@ -1032,7 +1050,9 @@ class Command(BaseCommand):
             raise CommandError(
                 f"Expected a deep/ subdirectory inside {cohort_dir}; none found"
             )
-        config_threshold = float(coverage_payload.get("pivot_detection_threshold", 0.5))
+        _config_threshold = float(
+            coverage_payload.get("pivot_detection_threshold", 0.5)
+        )  # noqa: F841
         contract, collector = _build_cohort_contract(
             deep_dir,
             coverage_payload,

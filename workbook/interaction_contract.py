@@ -49,9 +49,7 @@ _VALID_ARCHETYPES = {"form", "list", "dashboard", "reference"}
 _INTERVIEW_REQUIRED = {"role"}
 
 
-def _validate_interview_entry(
-    entry: dict[str, Any], index: int
-) -> list[str]:
+def _validate_interview_entry(entry: dict[str, Any], index: int) -> list[str]:
     """Validate a single interview entry, returning a list of error messages.
 
     Args:
@@ -71,7 +69,9 @@ def _validate_interview_entry(
 
     role = entry.get("role")
     if role and not isinstance(role, str):
-        errors.append(f"interviews[{index}]: 'role' must be a string, got {type(role).__name__}")
+        errors.append(
+            f"interviews[{index}]: 'role' must be a string, got {type(role).__name__}"
+        )
 
     # Validate archetype_overrides if present.
     overrides = entry.get("archetype_overrides")
@@ -162,9 +162,7 @@ def validate_interaction_contract(raw: dict[str, Any]) -> list[str]:
 
     missing = _REQUIRED_KEYS - set(raw.keys())
     if missing:
-        errors.append(
-            f"missing required top-level keys: {', '.join(sorted(missing))}"
-        )
+        errors.append(f"missing required top-level keys: {', '.join(sorted(missing))}")
 
     version = raw.get("version")
     if version != INTERACTION_CONTRACT_VERSION:
@@ -176,9 +174,7 @@ def validate_interaction_contract(raw: dict[str, Any]) -> list[str]:
     if interviews is None:
         errors.append("missing required key: 'interviews'")
     elif not isinstance(interviews, list):
-        errors.append(
-            f"'interviews' must be a list, got {type(interviews).__name__}"
-        )
+        errors.append(f"'interviews' must be a list, got {type(interviews).__name__}")
     else:
         for entry_index, entry in enumerate(interviews):
             errors.extend(_validate_interview_entry(entry, entry_index))

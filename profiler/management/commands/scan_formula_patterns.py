@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Scan configured workbooks for formula regex patterns."""
+
+from __future__ import annotations
 
 import argparse
 import json

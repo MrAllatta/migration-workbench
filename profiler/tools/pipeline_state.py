@@ -441,10 +441,9 @@ class PipelineState:
     _date_stamp: str | None = field(default=None, repr=False, compare=False)
     _signals_output_path: Path | None = field(default=None, repr=False, compare=False)
     _signals_cache: dict[tuple[str, str], dict[str, Any]] | None = field(
-        default=None, repr=False, compare=False)
-    _checkpoint_dir: Path | None = field(
         default=None, repr=False, compare=False
     )
+    _checkpoint_dir: Path | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Validate field types on construction."""
@@ -2511,7 +2510,9 @@ class TestOperationalEvents:
 
         artifact_inventory: dict[str, Any] = {}
         for entry in self.deep_profile_index.entries or []:
-            tab_title = str(getattr(entry, "tab_title", "") or entry.get("tab_title", ""))
+            tab_title = str(
+                getattr(entry, "tab_title", "") or entry.get("tab_title", "")
+            )
             if not tab_title:
                 continue
 
@@ -2521,12 +2522,20 @@ class TestOperationalEvents:
                 out_json = getattr(entry, "out_json", None) or entry.get("out_json", "")
                 base_dir = self._checkpoint_dir
                 if out_json and base_dir:
-                    for candidate_base in [base_dir, base_dir.parent, base_dir.parent / "data"]:
+                    for candidate_base in [
+                        base_dir,
+                        base_dir.parent,
+                        base_dir.parent / "data",
+                    ]:
                         candidate_path = candidate_base / out_json
                         if candidate_path.exists():
                             try:
-                                deep_data = json.loads(candidate_path.read_text(encoding="utf-8"))
-                                columns = deep_data.get("columns") or deep_data.get("summary", {}).get("columns", [])
+                                deep_data = json.loads(
+                                    candidate_path.read_text(encoding="utf-8")
+                                )
+                                columns = deep_data.get("columns") or deep_data.get(
+                                    "summary", {}
+                                ).get("columns", [])
                                 if not columns:
                                     columns = _parse_raw_deep_profile(deep_data)
                             except (OSError, json.JSONDecodeError):
@@ -2534,10 +2543,7 @@ class TestOperationalEvents:
                             break
 
             artifact_inventory[tab_title] = {
-                "columns": [
-                    col.get("header_label", "")
-                    for col in (columns or [])
-                ]
+                "columns": [col.get("header_label", "") for col in (columns or [])]
             }
 
         self.coverage_report = compute_coverage_metrics(

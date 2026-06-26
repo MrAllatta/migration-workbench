@@ -521,7 +521,9 @@ def _render_admin_class(
         # Generate YearWeekFilter if week_field is also present.
         if time_scope.get("week_field"):
             week_field = time_scope["week_field"]
-            year_week_filter_text = _render_year_week_filter(year_field, week_field, model_name, contract_fields)
+            year_week_filter_text = _render_year_week_filter(
+                year_field, week_field, model_name, contract_fields
+            )
             ywf_ref = _ClassRef(f"{model_name}YearWeekFilter")
             if ywf_ref not in filter_fields:
                 filter_fields = list(filter_fields) + [ywf_ref]
@@ -574,7 +576,9 @@ def _render_admin_class(
             expression = edf.get("expression", "")
             boolean_flag = edf.get("boolean", False)
             if boolean_flag:
-                lines.append(f"    @admin.display(description='{description}', boolean=True)")
+                lines.append(
+                    f"    @admin.display(description='{description}', boolean=True)"
+                )
             else:
                 lines.append(f"    @admin.display(description='{description}')")
             lines.append(f"    def {name}(self, obj):")
@@ -595,8 +599,8 @@ def _render_admin_class(
         lines.append(f"    readonly_fields = [{items}]")
 
     # Expand '__all__' autocomplete to all FK fields in the contract
-    if '__all__' in autocomplete_fields_list and contract_fields:
-        fk_fields = [f['name'] for f in contract_fields if _is_fk_field(f)]
+    if "__all__" in autocomplete_fields_list and contract_fields:
+        fk_fields = [f["name"] for f in contract_fields if _is_fk_field(f)]
         autocomplete_fields_list = [f for f in fk_fields if f not in readonly_fields]
 
     if autocomplete_fields_list:
@@ -690,7 +694,9 @@ def _render_admin_class(
         target_to_prior: dict[str, str] = {}
         if status_transitions:
             for prior_value, target_value in status_transitions.items():
-                targets = target_value if isinstance(target_value, list) else [target_value]
+                targets = (
+                    target_value if isinstance(target_value, list) else [target_value]
+                )
                 for tv in targets:
                     target_to_prior[str(tv)] = str(prior_value)
 
@@ -760,9 +766,7 @@ def _render_admin_class(
     if access_hints:
         _access_permissions = access_hints.get("permissions")
     if _access_permissions:
-        _owner_role_pascal = _to_pascal_case(
-            _access_permissions.get("owner_role", "")
-        )
+        _owner_role_pascal = _to_pascal_case(_access_permissions.get("owner_role", ""))
         _reviewer_roles_pascal = [
             _to_pascal_case(r)
             for r in (_access_permissions.get("reviewer_roles") or [])
@@ -808,13 +812,17 @@ def _render_admin_class(
         summary_cards = dashboard_config.get("summary_cards") or []
         if summary_cards:
             lines.append("")
-            lines.append("    change_list_template = \"admin/workbench_dashboard/change_list.html\"")
+            lines.append(
+                '    change_list_template = "admin/workbench_dashboard/change_list.html"'
+            )
             lines.append("")
             lines.append("    def changelist_view(self, request, extra_context=None):")
             lines.append("        from django.db import models as db_models")
-            lines.append("        response = super().changelist_view(request, extra_context)")
+            lines.append(
+                "        response = super().changelist_view(request, extra_context)"
+            )
             lines.append("        try:")
-            lines.append("            qs = response.context_data[\"cl\"].queryset")
+            lines.append('            qs = response.context_data["cl"].queryset')
             lines.append("        except (AttributeError, KeyError):")
             lines.append("            return response")
             lines.append("        cards = []")
@@ -822,11 +830,11 @@ def _render_admin_class(
                 label = card.get("label", "")
                 color = card.get("color", "#e0e0e0")
                 expression = card.get("expression", "qs.count()")
-                lines.append(f"        cards.append({{")
+                lines.append("        cards.append({")
                 lines.append(f'            "label": "{label}",')
                 lines.append(f'            "color": "{color}",')
                 lines.append(f'            "value": {expression},')
-                lines.append(f"        }})")
+                lines.append("        })")
             lines.append('        response.context_data["dashboard_cards"] = cards')
             lines.append("        return response")
 
@@ -905,9 +913,7 @@ def _render_ensure_groups(
         lines.append(
             f'    group, _ = Group.objects.get_or_create(name="{reviewer_pascal}")'
         )
-        lines.append(
-            f'    view_perm = Permission.objects.get('
-        )
+        lines.append("    view_perm = Permission.objects.get(")
         lines.append(
             f'        codename="view_{model_snake}", content_type=content_type,'
         )
@@ -1094,8 +1100,12 @@ def render_admin_py(
 
     # Collect all inline classes (must be defined before admin classes).
     inline_class_defs: list[str] = []
-    inline_class_names: set[str] = set()  # Track which inline classes we've already emitted.
-    ensure_groups_defs: list[str] = []  # _ensure_*_groups() functions for permission-based access.
+    inline_class_names: set[str] = (
+        set()
+    )  # Track which inline classes we've already emitted.
+    ensure_groups_defs: list[
+        str
+    ] = []  # _ensure_*_groups() functions for permission-based access.
     admin_class_parts: list[str] = []
 
     for table in tables:
@@ -1126,12 +1136,8 @@ def render_admin_py(
                 ensure_groups_defs.append(
                     _render_ensure_groups(
                         model_name=model_name,
-                        owner_role=str(
-                            cg_permissions.get("owner_role", "")
-                        ),
-                        reviewer_roles=list(
-                            cg_permissions.get("reviewer_roles") or []
-                        ),
+                        owner_role=str(cg_permissions.get("owner_role", "")),
+                        reviewer_roles=list(cg_permissions.get("reviewer_roles") or []),
                     )
                 )
 
@@ -1187,21 +1193,22 @@ def render_admin_py(
                 (f for f in get_fields(ref_table) if f["name"] == ref["field_name"]),
                 None,
             )
-            rel_name = (
-                child_fk["kwargs"].get("related_name") if child_fk else None
-            )
+            rel_name = child_fk["kwargs"].get("related_name") if child_fk else None
             if not rel_name:
                 rel_name = f"{_to_snake_case(ref['source_name'])}_set"
             count_name = f"{_to_snake_case(ref['source_name'])}_count"
             if count_name not in existing_computed:
-                auto_count_fields.append({
-                    "name": count_name,
-                    "description": " ".join(
-                        w.capitalize() for w in _to_snake_case(ref["source_name"]).split("_")
-                    ),
-                    "expression": f"obj.{rel_name}.count()",
-                    "boolean": False,
-                })
+                auto_count_fields.append(
+                    {
+                        "name": count_name,
+                        "description": " ".join(
+                            w.capitalize()
+                            for w in _to_snake_case(ref["source_name"]).split("_")
+                        ),
+                        "expression": f"obj.{rel_name}.count()",
+                        "boolean": False,
+                    }
+                )
 
         # Admin class for this model.
         is_user = _is_abstract_user_model(table)
@@ -1266,7 +1273,8 @@ def render_admin_py(
                 valid_names = {f["name"] for f in contract_fields}
                 fk_field_names = {f["name"] for f in contract_fields if _is_fk_field(f)}
                 list_editable = [
-                    f for f in editable_fields
+                    f
+                    for f in editable_fields
                     if f in valid_names and f not in fk_field_names
                 ]
             elif archetype in ("dashboard", "reference"):
@@ -1283,10 +1291,18 @@ def render_admin_py(
                 for field in contract_fields:
                     fname = field["name"]
                     fclass = field.get("class", "")
-                    if fclass == "models.BooleanField" and fname in valid_names and fname not in fk_field_names:
+                    if (
+                        fclass == "models.BooleanField"
+                        and fname in valid_names
+                        and fname not in fk_field_names
+                    ):
                         if fname not in list_editable:
                             list_editable = list(list_editable) + [fname]
-                if status_field and status_field in valid_names and status_field not in list_editable:
+                if (
+                    status_field
+                    and status_field in valid_names
+                    and status_field not in list_editable
+                ):
                     list_editable = list(list_editable) + [status_field]
 
         # Codegen manifest: status transitions → admin actions.
@@ -1315,14 +1331,26 @@ def render_admin_py(
         # Use a list-valued dict so multiple terminal values (e.g. "done" and
         # "skipped") can share the same prior ("open") without overwriting.
         if cg_status_transitions is None and status_values and status_field:
-            _terminal_prefixes = ("done", "skipped", "cancelled", "completed", "finished", "closed", "archived")
+            _terminal_prefixes = (
+                "done",
+                "skipped",
+                "cancelled",
+                "completed",
+                "finished",
+                "closed",
+                "archived",
+            )
             _default_transitions: dict[str, list[str]] = {}
             for sv in status_values:
                 sv_lower = sv.lower()
-                if any(sv_lower == p or sv_lower.endswith(p) for p in _terminal_prefixes):
+                if any(
+                    sv_lower == p or sv_lower.endswith(p) for p in _terminal_prefixes
+                ):
                     for candidate in ("open", "todo", str(status_values[0])):
                         if candidate != sv and candidate in status_values:
-                            _default_transitions.setdefault(str(candidate), []).append(str(sv))
+                            _default_transitions.setdefault(str(candidate), []).append(
+                                str(sv)
+                            )
                             break
             if _default_transitions:
                 cg_status_transitions = _default_transitions
@@ -1345,7 +1373,7 @@ def render_admin_py(
         if autocomplete:
             valid = {f["name"] for f in contract_fields if _is_fk_field(f)}
             # Preserve '__all__' sentinel; it will be expanded later.
-            autocomplete = [f for f in autocomplete if f in valid or f == '__all__']
+            autocomplete = [f for f in autocomplete if f in valid or f == "__all__"]
 
         # Exclude readonly fields from autocomplete to avoid dead config
         # (readonly_fields takes precedence over autocomplete_fields).

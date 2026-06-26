@@ -1,4 +1,5 @@
 """Tests for profiler.tools.tab_classifier."""
+
 import pytest
 from profiler.tools.tab_classifier import (
     TAB_CLASSIFICATION_CATEGORIES,
@@ -701,7 +702,9 @@ class TestTestCount:
             if name.startswith("test_") and callable(obj):
                 test_count += 1
             elif inspect.isclass(obj) and name.startswith("Test"):
-                for method_name, method in inspect.getmembers(obj, predicate=inspect.isfunction):
+                for method_name, method in inspect.getmembers(
+                    obj, predicate=inspect.isfunction
+                ):
                     if method_name.startswith("test_"):
                         test_count += 1
         assert test_count >= 25, f"Only {test_count} tests, need >= 25"

@@ -587,4 +587,4 @@ def test_command_warns_on_existing_output(tmp_path, capsys):
 
 
 # Need pytest marker for the SystemExit test
-import pytest
+import pytest  # noqa: E402

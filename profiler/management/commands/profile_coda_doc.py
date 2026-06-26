@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Enumerate tables and views in a Coda doc (and optionally column metadata)."""
+
+from __future__ import annotations
 
 import json
 from pathlib import Path

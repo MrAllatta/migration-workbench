@@ -6,8 +6,6 @@ boundaries, margin confidence, explain output, and vertical overrides.
 
 from __future__ import annotations
 
-import pytest
-
 from workbook.tools.archetype_matrix import (
     SCORING_MATRIX,
     ArchetypeProfile,
@@ -59,9 +57,7 @@ class TestScoringMatrix:
         """Each weight entry is a callable or numeric value."""
         for archetype_name, weights in SCORING_MATRIX.items():
             for signal_name, weight_fn in weights.items():
-                assert callable(weight_fn) or isinstance(
-                    weight_fn, (int, float)
-                ), (
+                assert callable(weight_fn) or isinstance(weight_fn, (int, float)), (
                     f"{archetype_name}.{signal_name} is neither callable "
                     f"nor numeric: {type(weight_fn)}"
                 )
@@ -77,9 +73,7 @@ class TestArchetypeProfile:
 
     def test_profile_creation(self):
         """ArchetypeProfile can be created with label and description."""
-        profile = ArchetypeProfile(
-            label="form", description="Data entry form"
-        )
+        profile = ArchetypeProfile(label="form", description="Data entry form")
         assert profile.label == "form"
         assert profile.description == "Data entry form"
         assert profile.typical_signals == {}
@@ -718,9 +712,7 @@ class TestExplainArchetype:
 
     def test_explain_empty_signals(self):
         """Empty signals dict still produces valid output."""
-        explanation = explain_archetype(
-            "Unknown", signals={}
-        )
+        explanation = explain_archetype("Unknown", signals={})
         assert "Unknown" in explanation
 
 

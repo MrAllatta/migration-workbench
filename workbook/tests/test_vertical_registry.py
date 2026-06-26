@@ -248,9 +248,7 @@ def test_merge_priority_user_wins():
     }
     merged = merge_entity_template(contract_table, entity_template)
     qty_col = next(
-        c
-        for c in merged["columns"]
-        if c["suggested_field_name"] == "quantity"
+        c for c in merged["columns"] if c["suggested_field_name"] == "quantity"
     )
     # User's DecimalField should win over template's IntegerField
     assert qty_col["django_field_class"] == "models.DecimalField"
@@ -379,7 +377,7 @@ def test_user_vertical_overrides_package(tmp_path: Path):
         "entity_templates:\n"
         "  Widget:\n"
         "    columns:\n"
-        '      - name: name\n'
+        "      - name: name\n"
         "        data_type: CharField\n"
         "        max_length: 500\n"
         "        null: false\n"
@@ -418,10 +416,13 @@ def test_vertical_flag_on_scaffold(tmp_path: Path):
     )
     assert out.exists()
     import yaml
+
     with out.open() as f:
         contract_data = yaml.safe_load(f) or {}
     for table in contract_data.get("tables", []):
-        assert "admin" not in table, f"Table {table.get('model_name')} got unexpected vertical admin block"
+        assert "admin" not in table, (
+            f"Table {table.get('model_name')} got unexpected vertical admin block"
+        )
 
 
 def test_no_vertical_flag_disabled(tmp_path: Path):
@@ -446,12 +447,12 @@ def test_score_tab_exact_title_match():
     """Tab titled 'Widget' scores high for Widget entity."""
     # Load the example vertical
     vertical = load_vertical("example")
-    
+
     # Score a tab with exact title match; "name" is in GENERIC_HEADERS
     # so it is excluded from column-overlap scoring. Only "quantity"
     # (non-generic) counts toward the field score.
     results = score_tab_against_templates("Widget", ["quantity"], vertical)
-    
+
     # Should find Widget with high confidence
     assert len(results) > 0
     widget_result = next((r for r in results if r["entity_name"] == "Widget"), None)
@@ -465,14 +466,14 @@ def test_score_tab_partial_field_match():
     """Tab with one non-generic field match gets moderate score."""
     # Load the example vertical
     vertical = load_vertical("example")
-    
+
     # Score a tab with partial field match.
     # The Widget template has non-generic column "quantity" only
     # (since "name" is in GENERIC_HEADERS). A tab that includes
     # "quantity" gets a field score of 1/1 = 1.0, but a mismatched
     # title ("Other Tab" vs "Widget") gives a low title score.
     results = score_tab_against_templates("Other Tab", ["quantity"], vertical)
-    
+
     # Should find Widget with moderate confidence
     assert len(results) > 0
     widget_result = next((r for r in results if r["entity_name"] == "Widget"), None)
@@ -506,8 +507,11 @@ def test_vertical_cli_invalid_name(tmp_path: Path):
 
 def test_apply_vertical_domain_context_merge():
     """apply_vertical_domain_context() merges domain vocab correctly."""
-    from workbook.tools.vertical_registry import apply_vertical_domain_context, VerticalTemplate
-    
+    from workbook.tools.vertical_registry import (
+        apply_vertical_domain_context,
+        VerticalTemplate,
+    )
+
     # Create a vertical with domain context
     vertical = VerticalTemplate(
         name="test",
@@ -516,54 +520,59 @@ def test_apply_vertical_domain_context_merge():
         domain_context={
             "vocabulary": {
                 "operational": ["crop", "field"],
-                "reference": ["type", "unit"]
+                "reference": ["type", "unit"],
             },
-            "glossary": {
-                "crop": "product_variety",
-                "field": "land_area"
-            },
+            "glossary": {"crop": "product_variety", "field": "land_area"},
             "entities": [
                 {"name": "Crop", "description": "A crop variety"},
-                {"name": "Field", "description": "A field"}
-            ]
+                {"name": "Field", "description": "A field"},
+            ],
         },
-        entity_templates={}  # Initialize to empty dict to avoid None
+        entity_templates={},  # Initialize to empty dict to avoid None
     )
-    
+
     # Existing domain context with some overlapping and some new keys
     existing = {
         "vocabulary": {
             "operational": ["planting", "harvest"],  # "planting" and "harvest" are new
-            "lookup": ["category"]  # entirely new category
+            "lookup": ["category"],  # entirely new category
         },
         "glossary": {
             "planting": "seeding_event",  # new glossary entry
-            "crop": "cultivar"  # conflicts with vertical's "crop": "product_variety"
+            "crop": "cultivar",  # conflicts with vertical's "crop": "product_variety"
         },
         "entities": [
             {"name": "Planting", "description": "A planting event"},  # new entity
-            {"name": "Crop", "description": "A cultivated plant"}  # conflicts with vertical's Crop
-        ]
+            {
+                "name": "Crop",
+                "description": "A cultivated plant",
+            },  # conflicts with vertical's Crop
+        ],
     }
-    
+
     result = apply_vertical_domain_context(vertical, existing)
-    
+
     # Verify vocabulary merge: existing wins on conflict within subkeys
-    assert result["vocabulary"]["operational"] == ["planting", "harvest"]  # existing wins
+    assert result["vocabulary"]["operational"] == [
+        "planting",
+        "harvest",
+    ]  # existing wins
     assert result["vocabulary"]["reference"] == ["type", "unit"]  # from vertical
-    assert result["vocabulary"]["lookup"] == ["category"]  # from existing (new category)
-    
+    assert result["vocabulary"]["lookup"] == [
+        "category"
+    ]  # from existing (new category)
+
     # Verify glossary merge: existing wins on conflict within subkeys
     assert result["glossary"]["crop"] == "cultivar"  # existing wins
     assert result["glossary"]["field"] == "land_area"  # from vertical
     assert result["glossary"]["planting"] == "seeding_event"  # from existing
-    
+
     # Verify entities merge: existing wins on conflict within subkeys
     entity_names = [e["name"] for e in result["entities"]]
     assert "Planting" in entity_names  # from existing
     assert "Crop" in entity_names  # from existing (conflict resolved)
     assert "Field" in entity_names  # from vertical
-    
+
     # Verify that existing Crop description wins over vertical's
     crop_entity = next(e for e in result["entities"] if e["name"] == "Crop")
     assert crop_entity["description"] == "A cultivated plant"  # from existing
@@ -571,27 +580,24 @@ def test_apply_vertical_domain_context_merge():
 
 def test_apply_vertical_domain_context_user_wins():
     """apply_vertical_domain_context() ensures existing context overrides vertical."""
-    from workbook.tools.vertical_registry import apply_vertical_domain_context, VerticalTemplate
-    
+    from workbook.tools.vertical_registry import (
+        apply_vertical_domain_context,
+        VerticalTemplate,
+    )
+
     # Create a vertical with domain context
     vertical = VerticalTemplate(
         name="test",
         version="0.1.0",
         description="Test vertical",
         domain_context={
-            "vocabulary": {
-                "operational": ["crop", "field"]
-            },
-            "glossary": {
-                "crop": "product_variety"
-            },
-            "entities": [
-                {"name": "Crop", "description": "A crop variety"}
-            ]
+            "vocabulary": {"operational": ["crop", "field"]},
+            "glossary": {"crop": "product_variety"},
+            "entities": [{"name": "Crop", "description": "A crop variety"}],
         },
-        entity_templates={}  # Initialize to empty dict to avoid None
+        entity_templates={},  # Initialize to empty dict to avoid None
     )
-    
+
     # Existing domain context that should override vertical
     existing = {
         "vocabulary": {
@@ -601,24 +607,27 @@ def test_apply_vertical_domain_context_user_wins():
             "crop": "cultivar"  # different value
         },
         "entities": [
-            {"name": "Crop", "description": "A cultivated plant"}  # different description
-        ]
+            {
+                "name": "Crop",
+                "description": "A cultivated plant",
+            }  # different description
+        ],
     }
-    
+
     result = apply_vertical_domain_context(vertical, existing)
-    
+
     # Existing should win completely for conflicting keys
     assert result["vocabulary"]["operational"] == ["plant"]  # existing value
     assert result["glossary"]["crop"] == "cultivar"  # existing value
-    
+
     # Entity from existing should win
     crop_entity = next(e for e in result["entities"] if e["name"] == "Crop")
     assert crop_entity["description"] == "A cultivated plant"  # existing value
-    
+
     # Test with None existing context
     result_none = apply_vertical_domain_context(vertical, None)
     assert result_none == vertical.domain_context
-    
+
     # Test with empty existing context
     result_empty = apply_vertical_domain_context(vertical, {})
     assert result_empty == vertical.domain_context

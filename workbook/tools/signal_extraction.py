@@ -131,9 +131,7 @@ def _extract_formula_edges_from_text(
     seen_targets: set[str] = set()
 
     # IMPORTRANGE("key", "'Sheet'!range") or IMPORTRANGE("url", "'Sheet'!range")
-    for match in re.finditer(
-        r"IMPORTRANGE\s*\([^)]+\)", formula_text, re.IGNORECASE
-    ):
+    for match in re.finditer(r"IMPORTRANGE\s*\([^)]+\)", formula_text, re.IGNORECASE):
         inner = match.group()
         # Find the second argument which contains the range
         parts = re.findall(r'"([^"]+)"', inner)
@@ -142,12 +140,14 @@ def _extract_formula_edges_from_text(
             target = _extract_sheet_name_from_range(range_arg)
             if target and target != source_tab and target not in seen_targets:
                 seen_targets.add(target)
-                found.append({
-                    "from": source_tab,
-                    "to": target,
-                    "ref_type": "IMPORTRANGE",
-                    "confidence": 0.90,
-                })
+                found.append(
+                    {
+                        "from": source_tab,
+                        "to": target,
+                        "ref_type": "IMPORTRANGE",
+                        "confidence": 0.90,
+                    }
+                )
 
     # VLOOKUP(lookup, 'Sheet'!range, ...)
     for match in re.finditer(
@@ -158,13 +158,17 @@ def _extract_formula_edges_from_text(
         target = match.group(1)
         if target != source_tab and target not in seen_targets:
             seen_targets.add(target)
-            ref_type = "VLOOKUP" if formula_text[match.start()].upper() == "V" else "HLOOKUP"
-            found.append({
-                "from": source_tab,
-                "to": target,
-                "ref_type": ref_type,
-                "confidence": 0.85,
-            })
+            ref_type = (
+                "VLOOKUP" if formula_text[match.start()].upper() == "V" else "HLOOKUP"
+            )
+            found.append(
+                {
+                    "from": source_tab,
+                    "to": target,
+                    "ref_type": ref_type,
+                    "confidence": 0.85,
+                }
+            )
 
     # SUM/SUMIF/SUMIFS('Sheet'!range)
     for match in re.finditer(
@@ -175,12 +179,14 @@ def _extract_formula_edges_from_text(
         target = match.group(1)
         if target != source_tab and target not in seen_targets:
             seen_targets.add(target)
-            found.append({
-                "from": source_tab,
-                "to": target,
-                "ref_type": "SUM_range",
-                "confidence": 0.80,
-            })
+            found.append(
+                {
+                    "from": source_tab,
+                    "to": target,
+                    "ref_type": "SUM_range",
+                    "confidence": 0.80,
+                }
+            )
 
     # Direct cell references: 'Sheet'!A1 (but not already caught above)
     for match in re.finditer(
@@ -190,12 +196,14 @@ def _extract_formula_edges_from_text(
         target = match.group(1)
         if target != source_tab and target not in seen_targets:
             seen_targets.add(target)
-            found.append({
-                "from": source_tab,
-                "to": target,
-                "ref_type": "cell_ref",
-                "confidence": 0.60,
-            })
+            found.append(
+                {
+                    "from": source_tab,
+                    "to": target,
+                    "ref_type": "cell_ref",
+                    "confidence": 0.60,
+                }
+            )
 
     return found
 
@@ -234,24 +242,28 @@ def _extract_dependency_edges(
         range_str = str(named_range.get("range", ""))
         target = _extract_sheet_name_from_range(range_str)
         if target and target != tab_title:
-            edges.append({
-                "from": tab_title,
-                "to": target,
-                "ref_type": "named_range",
-                "confidence": 0.95,
-            })
+            edges.append(
+                {
+                    "from": tab_title,
+                    "to": target,
+                    "ref_type": "named_range",
+                    "confidence": 0.95,
+                }
+            )
 
     # Filter views referencing other sheets.
     for fv in tab.get("filter_views") or []:
         fv_range = str(fv.get("range", ""))
         target = _extract_sheet_name_from_range(fv_range)
         if target and target != tab_title:
-            edges.append({
-                "from": tab_title,
-                "to": target,
-                "ref_type": "filter_view",
-                "confidence": 0.80,
-            })
+            edges.append(
+                {
+                    "from": tab_title,
+                    "to": target,
+                    "ref_type": "filter_view",
+                    "confidence": 0.80,
+                }
+            )
 
     # Formula patterns from deep_profiles (column-level formula_text).
     if deep_profiles and tab_title in deep_profiles:
@@ -262,9 +274,7 @@ def _extract_dependency_edges(
                     formula_text = str(col_profile.get("formula_text") or "")
                     if formula_text:
                         edges.extend(
-                            _extract_formula_edges_from_text(
-                                formula_text, tab_title
-                            )
+                            _extract_formula_edges_from_text(formula_text, tab_title)
                         )
 
     # Formula patterns from optional formula_data parameter.
@@ -272,9 +282,7 @@ def _extract_dependency_edges(
         for formula_entry in formula_data[tab_title]:
             formula_text = str(formula_entry.get("formula_text") or "")
             if formula_text:
-                edges.extend(
-                    _extract_formula_edges_from_text(formula_text, tab_title)
-                )
+                edges.extend(_extract_formula_edges_from_text(formula_text, tab_title))
 
     return edges
 
@@ -387,9 +395,13 @@ def _build_workflow_graph(
     # Build tabs dict for graph output.
     graph_tabs: dict[str, dict[str, Any]] = {}
     for tab_name in all_tabs_sorted:
-        tab_info = tab_lookup.get(tab_name, {
-            "title": tab_name, "position": -1,
-        })
+        tab_info = tab_lookup.get(
+            tab_name,
+            {
+                "title": tab_name,
+                "position": -1,
+            },
+        )
         graph_tabs[tab_name] = dict(tab_info)
 
     workflow_graph: dict[str, Any] = {
@@ -426,9 +438,7 @@ def _compute_data_validation_density(columns: list[dict[str, Any]]) -> float:
     """Compute the fraction of columns with a data validation type."""
     if not columns:
         return 0.0
-    validated = sum(
-        1 for col in columns if col.get("data_validation_type") is not None
-    )
+    validated = sum(1 for col in columns if col.get("data_validation_type") is not None)
     return validated / len(columns)
 
 
@@ -477,9 +487,7 @@ def _compute_expansion_formula_ratio(columns: list[dict[str, Any]]) -> float:
     """
     if not columns:
         return 0.0
-    expansion_count = sum(
-        1 for col in columns if col.get("is_expansion_formula")
-    )
+    expansion_count = sum(1 for col in columns if col.get("is_expansion_formula"))
     if expansion_count > 0:
         return expansion_count / len(columns)
     return _EXPANSION_FORMULA_RATIO_DEFAULT
@@ -566,23 +574,17 @@ def extract_signals(
 
         workbook_code = source_id
         if bundle_config:
-            workbook_code = str(
-                bundle_config.get("source_id", "") or workbook_code
-            )
+            workbook_code = str(bundle_config.get("source_id", "") or workbook_code)
         bundle_match = bundle_tabs.get(title)
         if bundle_match:
-            per_tab = bundle_match.get("source_id") or bundle_match.get(
-                "workbook_code"
-            )
+            per_tab = bundle_match.get("source_id") or bundle_match.get("workbook_code")
             if per_tab:
                 workbook_code = str(per_tab)
 
         formula_count = sum(1 for col in columns if col.get("is_formula"))
         formula_density = formula_count / len(columns) if columns else 0.0
 
-        tab_edges = _extract_dependency_edges(
-            tab, title, deep_profiles=deep_profiles
-        )
+        tab_edges = _extract_dependency_edges(tab, title, deep_profiles=deep_profiles)
         all_edges.extend(tab_edges)
         cross_sheet_refs = len(tab_edges)
 
@@ -613,21 +615,19 @@ def extract_signals(
         expansion_formula_ratio = _compute_expansion_formula_ratio(columns)
         merged_cell_ratio = _compute_merged_cell_ratio(columns, tab_profile)
 
-        ui_archetype, confidence_score, archetype_scores = (
-            _classify_ui_archetype_v2(
-                column_count=total_cols,
-                formula_density=formula_density,
-                cross_sheet_ref_count=cross_sheet_refs,
-                avg_null_rate=avg_null_rate,
-                has_status_column=has_status_column,
-                has_time_scope=has_time_scope,
-                data_validation_density=data_validation_density,
-                header_formula_count=header_formula_count,
-                header_entity_count=header_entity_count,
-                merged_cell_ratio=merged_cell_ratio,
-                row_count=row_count,
-                expansion_formula_ratio=expansion_formula_ratio,
-            )
+        ui_archetype, confidence_score, archetype_scores = _classify_ui_archetype_v2(
+            column_count=total_cols,
+            formula_density=formula_density,
+            cross_sheet_ref_count=cross_sheet_refs,
+            avg_null_rate=avg_null_rate,
+            has_status_column=has_status_column,
+            has_time_scope=has_time_scope,
+            data_validation_density=data_validation_density,
+            header_formula_count=header_formula_count,
+            header_entity_count=header_entity_count,
+            merged_cell_ratio=merged_cell_ratio,
+            row_count=row_count,
+            expansion_formula_ratio=expansion_formula_ratio,
         )
 
         # Attach tab classification if available
@@ -697,26 +697,18 @@ def explain_archetype(
                     "column_count": float(
                         max(len(columns), tab.get("total_cols") or 0)
                     ),
-                    "formula_density": sum(
-                        1 for c in columns if c.get("is_formula")
-                    )
+                    "formula_density": sum(1 for c in columns if c.get("is_formula"))
                     / max(len(columns), 1),
                     "cross_sheet_ref_count": float(
-                        len(
-                            _extract_dependency_edges(tab, tab_title_candidate)
-                        )
+                        len(_extract_dependency_edges(tab, tab_title_candidate))
                     ),
                     "avg_null_rate": _compute_avg_null_rate(
-                        dict.fromkeys(
-                            [c.get("header_label", "") for c in columns], 0.0
-                        )
+                        dict.fromkeys([c.get("header_label", "") for c in columns], 0.0)
                     ),
                     "has_status_column": (
                         1.0 if _detect_has_status_column(columns) else 0.0
                     ),
-                    "has_time_scope": (
-                        1.0 if _detect_has_time_scope(columns) else 0.0
-                    ),
+                    "has_time_scope": (1.0 if _detect_has_time_scope(columns) else 0.0),
                     "data_validation_density": (
                         _compute_data_validation_density(columns)
                     ),

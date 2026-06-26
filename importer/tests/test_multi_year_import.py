@@ -150,9 +150,7 @@ class HistoricalFarmCommand(import_historical.Command):
         """
         name = (row.get("Farm Name") or "").strip()
         if not name:
-            self.record_missing_required(
-                "ExampleFarm", row_index, "name", "Farm Name"
-            )
+            self.record_missing_required("ExampleFarm", row_index, "name", "Farm Name")
             self.stats["ExampleFarm"]["errors"] += 1
             return
 
@@ -184,9 +182,7 @@ class HistoricalFarmCommand(import_historical.Command):
             self.stats["ExampleFarm"]["processed"] += 1
             return
 
-        _, created = ExampleFarm.objects.update_or_create(
-            name=name, defaults=defaults
-        )
+        _, created = ExampleFarm.objects.update_or_create(name=name, defaults=defaults)
         stats_key = "created" if created else "updated"
         self.stats["ExampleFarm"][stats_key] += 1
 
@@ -199,9 +195,7 @@ class HistoricalFarmCommand(import_historical.Command):
 class TestHistoricalFarmImporter:
     """Integration tests for the multi-year historical import pipeline."""
 
-    def test_imports_all_years_with_correct_counts(
-        self, db, multi_year_bundle
-    ):
+    def test_imports_all_years_with_correct_counts(self, db, multi_year_bundle):
         bundle_dir, years_data = multi_year_bundle
         csv_counts = _count_csv_rows(years_data)
 
@@ -220,16 +214,13 @@ class TestHistoricalFarmImporter:
         )
 
         total_imported = (
-            cmd.stats["ExampleFarm"]["created"]
-            + cmd.stats["ExampleFarm"]["updated"]
+            cmd.stats["ExampleFarm"]["created"] + cmd.stats["ExampleFarm"]["updated"]
         )
         assert total_imported == total_farm_rows, (
             f"Imported {total_imported} farm rows, expected {total_farm_rows}"
         )
 
-    def test_all_years_have_no_errors(
-        self, db, multi_year_bundle
-    ):
+    def test_all_years_have_no_errors(self, db, multi_year_bundle):
         bundle_dir, _years_data = multi_year_bundle
 
         cmd = HistoricalFarmCommand()
@@ -242,11 +233,9 @@ class TestHistoricalFarmImporter:
             f"Expected 0 errors, got {cmd.stats['ExampleFarm']['errors']}"
         )
 
-    def test_source_bundle_year_is_injected_per_row(
-        self, db, multi_year_bundle
-    ):
+    def test_source_bundle_year_is_injected_per_row(self, db, multi_year_bundle):
         bundle_dir, years_data = multi_year_bundle
-        expected_totals = _count_csv_rows(years_data)
+        _expected_totals = _count_csv_rows(years_data)
 
         cmd = HistoricalFarmCommand()
         call_command(
@@ -254,21 +243,15 @@ class TestHistoricalFarmImporter:
             bundle_dir=bundle_dir,
         )
 
-        farm_rows = [
-            (year, row_data)
-            for year, row_data in cmd.processed_rows
-        ]
+        farm_rows = [(year, row_data) for year, row_data in cmd.processed_rows]
 
         for year_name, files in years_data.items():
             for filename, _headers, rows in files:
                 if filename != "farms.csv":
                     continue
-                year_rows = [
-                    rd for y, rd in farm_rows if y == year_name
-                ]
+                year_rows = [rd for y, rd in farm_rows if y == year_name]
                 assert len(year_rows) == len(rows), (
-                    f"Expected {len(rows)} rows for {year_name}, "
-                    f"got {len(year_rows)}"
+                    f"Expected {len(rows)} rows for {year_name}, got {len(year_rows)}"
                 )
                 for row_data in year_rows:
                     assert row_data.get("source_bundle_year") == year_name, (
@@ -277,9 +260,7 @@ class TestHistoricalFarmImporter:
                         f"expected {year_name!r}"
                     )
 
-    def test_dry_run_processes_all_rows_no_db_writes(
-        self, db, multi_year_bundle
-    ):
+    def test_dry_run_processes_all_rows_no_db_writes(self, db, multi_year_bundle):
         bundle_dir, years_data = multi_year_bundle
 
         cmd = HistoricalFarmCommand()
@@ -295,17 +276,14 @@ class TestHistoricalFarmImporter:
         )
 
         total_farm_rows = sum(
-            _count_csv_rows(years_data)[year].get("farms.csv", 0)
-            for year in years_data
+            _count_csv_rows(years_data)[year].get("farms.csv", 0) for year in years_data
         )
         processed = cmd.stats["ExampleFarm"]["processed"]
         assert processed == total_farm_rows, (
             f"Dry run processed {processed}, expected {total_farm_rows}"
         )
 
-    def test_validate_only_rolls_back(
-        self, db, multi_year_bundle
-    ):
+    def test_validate_only_rolls_back(self, db, multi_year_bundle):
         bundle_dir, _years_data = multi_year_bundle
 
         cmd = HistoricalFarmCommand()
@@ -334,9 +312,7 @@ class TestHistoricalFarmImporter:
         assert "Importing year: 2023" in output
         assert "Importing year: 2024" in output
 
-    def test_farm_records_created_with_correct_data(
-        self, db, multi_year_bundle
-    ):
+    def test_farm_records_created_with_correct_data(self, db, multi_year_bundle):
         bundle_dir, _years_data = multi_year_bundle
 
         cmd = HistoricalFarmCommand()

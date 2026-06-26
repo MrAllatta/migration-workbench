@@ -30,7 +30,7 @@ Typical usage::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Callable
 
 # ---------------------------------------------------------------------------
 # Weight functions — each maps a signal value to a numeric contribution
@@ -201,9 +201,7 @@ class ArchetypeProfile:
     label: str
     description: str
     typical_signals: dict[str, str] = field(default_factory=dict)
-    weight_overrides: dict[str, _WEIGHT_FN | int | float] = field(
-        default_factory=dict
-    )
+    weight_overrides: dict[str, _WEIGHT_FN | int | float] = field(default_factory=dict)
 
 
 _ARCHETYPE_DESCRIPTIONS: dict[str, ArchetypeProfile] = {
@@ -304,9 +302,7 @@ def classify_archetype(
     """
     raw_scores: dict[str, float] = {}
     for archetype_name, archetype_weights in SCORING_MATRIX.items():
-        raw_scores[archetype_name] = _compute_weighted_score(
-            archetype_weights, signals
-        )
+        raw_scores[archetype_name] = _compute_weighted_score(archetype_weights, signals)
 
     # Find winner and runner-up
     sorted_scores = sorted(raw_scores.items(), key=lambda x: x[1], reverse=True)
@@ -378,9 +374,7 @@ def explain_archetype(
     top_signals = contributing[:5]
 
     # Find second-place archetype
-    sorted_scores = sorted(
-        archetype_scores.items(), key=lambda x: x[1], reverse=True
-    )
+    sorted_scores = sorted(archetype_scores.items(), key=lambda x: x[1], reverse=True)
     runner_up_label = sorted_scores[1][0] if len(sorted_scores) > 1 else "none"
     runner_up_score = sorted_scores[1][1] if len(sorted_scores) > 1 else 0.0
 
@@ -394,9 +388,7 @@ def explain_archetype(
         lines.append("  Top contributing signals:")
         for signal_name, contribution in top_signals:
             raw_value = signals.get(signal_name, 0.0)
-            lines.append(
-                f"    - {signal_name}: {raw_value} → +{contribution}"
-            )
+            lines.append(f"    - {signal_name}: {raw_value} → +{contribution}")
 
     # Check for signals that hurt the winner (negative contributions)
     negative_signals: list[tuple[str, float]] = []
@@ -413,9 +405,7 @@ def explain_archetype(
         lines.append("  Signals against:")
         for signal_name, contribution in negative_signals:
             raw_value = signals.get(signal_name, 0.0)
-            lines.append(
-                f"    - {signal_name}: {raw_value} → {contribution}"
-            )
+            lines.append(f"    - {signal_name}: {raw_value} → {contribution}")
 
     if confidence < 0.3:
         lines.append(

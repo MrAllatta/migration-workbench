@@ -33,7 +33,7 @@ import glob
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any

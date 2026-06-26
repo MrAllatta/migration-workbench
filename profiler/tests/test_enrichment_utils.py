@@ -18,10 +18,20 @@ def test_enrich_from_dependency_graph_all_formula_column():
     """Column where all cells are formula types gets is_computed=True."""
     artifact = {
         "nodes": [
-            {"id": "Sheet1!B2", "sheet": "Sheet1", "cell": "B2",
-             "formula": "=A2*2", "node_type": "formula"},
-            {"id": "Sheet1!B3", "sheet": "Sheet1", "cell": "B3",
-             "formula": "=A3*2", "node_type": "formula"},
+            {
+                "id": "Sheet1!B2",
+                "sheet": "Sheet1",
+                "cell": "B2",
+                "formula": "=A2*2",
+                "node_type": "formula",
+            },
+            {
+                "id": "Sheet1!B3",
+                "sheet": "Sheet1",
+                "cell": "B3",
+                "formula": "=A3*2",
+                "node_type": "formula",
+            },
         ],
         "edges": [],
         "summary": {},
@@ -44,13 +54,21 @@ def test_enrich_from_dependency_graph_fk_candidate():
     """INDEX/MATCH cross-sheet reference suggests FK target."""
     artifact = {
         "nodes": [
-            {"id": "Sheet1!D2", "sheet": "Sheet1", "cell": "D2",
-             "formula": "=INDEX(Products!A:A, MATCH(C2, Products!B:B, 0))",
-             "node_type": "formula"},
+            {
+                "id": "Sheet1!D2",
+                "sheet": "Sheet1",
+                "cell": "D2",
+                "formula": "=INDEX(Products!A:A, MATCH(C2, Products!B:B, 0))",
+                "node_type": "formula",
+            },
         ],
         "edges": [
-            {"source": "Products!A:A", "target": "Sheet1!D2",
-             "ref_type": "range", "is_cross_sheet": True},
+            {
+                "source": "Products!A:A",
+                "target": "Sheet1!D2",
+                "ref_type": "range",
+                "is_cross_sheet": True,
+            },
         ],
         "summary": {},
         "high_value_nodes": [],
@@ -59,8 +77,10 @@ def test_enrich_from_dependency_graph_fk_candidate():
         "D": {
             "header": "ProductName",
             "column_cells": [
-                {"kind": "formula",
-                 "text": "=INDEX(Products!A:A, MATCH(C2, Products!B:B, 0))"},
+                {
+                    "kind": "formula",
+                    "text": "=INDEX(Products!A:A, MATCH(C2, Products!B:B, 0))",
+                },
             ],
         },
     }
@@ -72,8 +92,13 @@ def test_enrich_from_dependency_graph_mixed_column_no_computed():
     """Column with mixed raw and formula cells does not get is_computed."""
     artifact = {
         "nodes": [
-            {"id": "Sheet1!B2", "sheet": "Sheet1", "cell": "B2",
-             "formula": "=A2*2", "node_type": "formula"},
+            {
+                "id": "Sheet1!B2",
+                "sheet": "Sheet1",
+                "cell": "B2",
+                "formula": "=A2*2",
+                "node_type": "formula",
+            },
         ],
         "edges": [],
         "summary": {},

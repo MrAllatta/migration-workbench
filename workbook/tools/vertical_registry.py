@@ -79,9 +79,7 @@ def _load_manifest_from_path(manifest_path: Path) -> dict[str, Any]:
             (``name``, ``version``, ``description``).
     """
     if not manifest_path.exists():
-        raise FileNotFoundError(
-            f"Vertical manifest not found: {manifest_path}"
-        )
+        raise FileNotFoundError(f"Vertical manifest not found: {manifest_path}")
 
     with manifest_path.open(encoding="utf-8") as file_handle:
         manifest = yaml.safe_load(file_handle) or {}
@@ -293,6 +291,7 @@ def load_vertical(
         if package_manifest is False:
             try:
                 import importlib.resources as importlib_resources
+
                 pkg = importlib_resources.files("workbook.verticals")
             except Exception:
                 pkg = Path(__file__).resolve().parent.parent / "verticals"
@@ -300,9 +299,7 @@ def load_vertical(
         if vertical_dir:
             searched_parts.append(f"user:{vertical_dir!s}")
         searched = ", ".join(searched_parts) or "(default paths)"
-        raise FileNotFoundError(
-            f"Vertical template {name!r} not found in: {searched}"
-        )
+        raise FileNotFoundError(f"Vertical template {name!r} not found in: {searched}")
 
     # 4. Merge: user wins over package.
     if user_manifest is not None and package_manifest is not None:
@@ -499,21 +496,19 @@ def score_tab_against_templates(
             entity_name = entry.get("name", "")
             raw_keywords = entry.get("keywords", [])
             if entity_name:
-                entity_keywords[entity_name] = {
-                    kw.lower() for kw in raw_keywords
-                }
+                entity_keywords[entity_name] = {kw.lower() for kw in raw_keywords}
 
     title_lower = tab_title.lower()
     headers_lower: set[str] = {
-        h.lower() for h in column_headers
-        if h.lower() not in GENERIC_HEADERS
+        h.lower() for h in column_headers if h.lower() not in GENERIC_HEADERS
     }
 
     for entity_name, entity_data in entity_templates.items():
         # --- Title score ---
         entity_name_lower = entity_name.lower()
         title_score = _compute_title_score(
-            title_lower, entity_name_lower,
+            title_lower,
+            entity_name_lower,
             entity_keywords.get(entity_name, set()),
         )
 
@@ -529,12 +524,14 @@ def score_tab_against_templates(
         # Combined confidence (weighted average).
         confidence = round(0.4 * title_score + 0.6 * field_score, 2)
 
-        results.append({
-            "entity_name": entity_name,
-            "confidence": confidence,
-            "matched_headers": sorted(matched),
-            "unmatched_headers": sorted(unmatched),
-        })
+        results.append(
+            {
+                "entity_name": entity_name,
+                "confidence": confidence,
+                "matched_headers": sorted(matched),
+                "unmatched_headers": sorted(unmatched),
+            }
+        )
 
     results.sort(key=lambda r: r["confidence"], reverse=True)
     return results
@@ -573,7 +570,7 @@ def _extract_template_fields(entity_data: dict) -> set[str]:
     names.
     """
     fields: set[str] = set()
-    for col in (entity_data.get("columns") or []):
+    for col in entity_data.get("columns") or []:
         name = (col.get("name") or "").lower()
         if name and name not in GENERIC_HEADERS:
             fields.add(name)

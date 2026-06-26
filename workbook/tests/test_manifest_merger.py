@@ -405,17 +405,11 @@ def test_merge_command_with_all_inputs(tmp_path):
     from django.core.management import call_command
 
     signals_path = tmp_path / "signals.yaml"
-    signals_path.write_text(
-        yaml.safe_dump(_profiler_signals()), encoding="utf-8"
-    )
+    signals_path.write_text(yaml.safe_dump(_profiler_signals()), encoding="utf-8")
     contract_path = tmp_path / "contract.yaml"
-    contract_path.write_text(
-        yaml.safe_dump(_interaction_contract()), encoding="utf-8"
-    )
+    contract_path.write_text(yaml.safe_dump(_interaction_contract()), encoding="utf-8")
     manifest_path = tmp_path / "manifest.yaml"
-    manifest_path.write_text(
-        yaml.safe_dump(_view_manifest()), encoding="utf-8"
-    )
+    manifest_path.write_text(yaml.safe_dump(_view_manifest()), encoding="utf-8")
     out_path = tmp_path / "codegen-manifest.yaml"
 
     call_command(

@@ -13,7 +13,7 @@ def _run_wb(extra_args: list[str] | None = None) -> subprocess.CompletedProcess:
         "deployment.wb_cli",
         "vertical",
         "list",
-        * (extra_args or []),
+        *(extra_args or []),
     ]
     return subprocess.run(cmd, capture_output=True, text=True)
 
@@ -27,8 +27,12 @@ def test_wb_vertical_list_json_returns_valid_json():
     )
     payload = json.loads(result.stdout)
     assert payload["ok"] is True, f"Expected ok=True, got: {payload}"
-    assert "verticals" in payload, f"Expected 'verticals' key in payload, got: {payload}"
-    assert isinstance(payload["verticals"], list), f"Expected verticals to be list, got: {payload['verticals']}"
+    assert "verticals" in payload, (
+        f"Expected 'verticals' key in payload, got: {payload}"
+    )
+    assert isinstance(payload["verticals"], list), (
+        f"Expected verticals to be list, got: {payload['verticals']}"
+    )
     # Should have at least example and farm
     names = [v.get("name") for v in payload["verticals"]]
     assert "example" in names, f"Expected 'example' in vertical names, got: {names}"

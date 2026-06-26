@@ -748,7 +748,7 @@ def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(
         ) as mock_walk,
         patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
     ):
-        outputs = run_cohort_corpus(
+        _outputs = run_cohort_corpus(
             drive_service=mock_drive,
             sheets_service=mock_sheets,
             config=corpus_config,
@@ -850,8 +850,8 @@ def test_run_cohort_corpus_429_aborts_after_max_cooldowns(tmp_path: Path):
     with (
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
-        ) as mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        ) as _mock_walk,
+        patch("profiler.tools.cohort_corpus.list_tabs") as _mock_list_tabs,
         patch(
             "profiler.tools.cohort_corpus.fetch_tab_grid",
             mock_fetch,
@@ -860,7 +860,7 @@ def test_run_cohort_corpus_429_aborts_after_max_cooldowns(tmp_path: Path):
             "profiler.tools.cohort_corpus.summarize_tab",
         ),
     ):
-        outputs = run_cohort_corpus(
+        _outputs = run_cohort_corpus(
             drive_service=mock_drive,
             sheets_service=mock_sheets,
             config=corpus_config,
@@ -1552,7 +1552,7 @@ class TestEnrichEntityGroupings:
         assert all(isinstance(v, str) for v in entity_map.values())
 
 
-from profiler.tools.domain_context import DomainContext
+from profiler.tools.domain_context import DomainContext  # noqa: E402
 
 
 def test_score_tab_glossary_expansion():
@@ -1920,7 +1920,7 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
             return_value={"formula_cell_count": 0},
         ),
     ):
-        outputs = run_cohort_corpus(
+        _outputs = run_cohort_corpus(
             drive_service=mock_drive,
             sheets_service=mock_sheets,
             config=corpus_config,

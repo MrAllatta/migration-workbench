@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Profile one workbook tab or list workbook tabs (Google Sheets)."""
+
+from __future__ import annotations
 
 import json
 import random

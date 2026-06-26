@@ -293,9 +293,7 @@ class TestReviewContractFkDependencyArtifact:
             },
         }
         issues = review_contract(contract, dependency_artifact=artifact)
-        assert any(
-            i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
-        )
+        assert any(i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues)
 
     def test_review_contract_fk_with_empty_sheet_graph(self):
         """Empty sheet_graph yields no crash and no issue."""

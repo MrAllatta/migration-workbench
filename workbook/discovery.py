@@ -38,7 +38,9 @@ _LIST_ITEM_RE = re.compile(r"^\s*\d+\.\s+(.*)$")
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
-def _format_inferred_fields(fields: list[str], glossary_hints: list[str] | None = None) -> str:
+def _format_inferred_fields(
+    fields: list[str], glossary_hints: list[str] | None = None
+) -> str:
     """Render an inline reminder of inferred editable fields, comma-separated."""
     if not fields and not glossary_hints:
         return "(none inferred)"
@@ -52,15 +54,15 @@ def _format_inferred_fields(fields: list[str], glossary_hints: list[str] | None 
 
 def _extract_role_name(full_answer: str) -> str:
     """Extract a concise role name from a full interview answer.
-    
+
     Answers are expected to be in the format:
     "Role description — explanation" or "Role description. explanation"
-    
+
     Returns the role description part, stripped of whitespace.
     """
     if not full_answer:
         return ""
-    
+
     # Split on common delimiters: " — " (em dash) or ". " (period + space)
     # Take the first part as the role name
     if " — " in full_answer:
@@ -118,14 +120,18 @@ def _render_view_block(
     lines.append(f"- Is **{title}** used by everyone, or a specific role?")
     role_presets = (tab_role_presets or {}).get(title)
     if role_presets:
-        lines.append(f"  > {_PLACEHOLDER} (vertical presets: {', '.join(role_presets)})")
+        lines.append(
+            f"  > {_PLACEHOLDER} (vertical presets: {', '.join(role_presets)})"
+        )
     else:
         lines.append(f"  > {_PLACEHOLDER}")
     lines.append("")
     fields = list(view.get("editable_fields") or [])
     glossary_hints = view.get("_vertical_glossary_hints")
     lines.append("- Which fields does your team edit most frequently?")
-    lines.append(f"  > _Editable fields inferred: {_format_inferred_fields(fields, glossary_hints)}_")
+    lines.append(
+        f"  > _Editable fields inferred: {_format_inferred_fields(fields, glossary_hints)}_"
+    )
     lines.append("")
     status_field = view.get("status_field")
     if status_field:
@@ -199,9 +205,7 @@ def _build_tab_glossary_hints(
     hints: dict[str, list[str]] = {}
     if not vertical_template:
         return hints
-    vocabulary = (
-        (vertical_template.get("domain_context") or {}).get("vocabulary") or {}
-    )
+    vocabulary = (vertical_template.get("domain_context") or {}).get("vocabulary") or {}
     for category, terms in vocabulary.items():
         hints[category] = list(terms) if isinstance(terms, list) else [str(terms)]
     return hints
@@ -624,7 +628,9 @@ def build_interaction_contract_from_patch(
                 if "->" in desc:
                     status_parts = [s.strip() for s in desc.split("->")]
                     for status_idx in range(len(status_parts) - 1):
-                        status_semantics[status_parts[status_idx]] = status_parts[status_idx + 1]
+                        status_semantics[status_parts[status_idx]] = status_parts[
+                            status_idx + 1
+                        ]
                 else:
                     status_semantics[field_name] = desc
 

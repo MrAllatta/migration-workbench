@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Profile one Coda table or view, or list tables in a doc."""
+
+from __future__ import annotations
 
 import json
 from collections import Counter

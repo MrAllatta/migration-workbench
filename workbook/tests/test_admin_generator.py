@@ -169,25 +169,30 @@ def test_find_view_for_entity_merges_multiple_views():
     """Multiple views for same entity are merged, richer view wins for time_scope."""
     manifest = _manifest()
     # Add a second "crop" view with time_scope and extra editable_fields.
-    manifest["views"].append({
-        "name": "crop_audit",
-        "entity": "crop",
-        "source_tab": "Crop Audit",
-        "type": "list",
-        "editable_fields": ["organic", "notes"],
-        "computed_fields": ["age"],
-        "filterable_by": ["status"],
-        "status_field": "status",
-        "time_scope": {"year_field": "harvest_year", "week_field": "harvest_week"},
-        "notes": "Second crop view",
-    })
+    manifest["views"].append(
+        {
+            "name": "crop_audit",
+            "entity": "crop",
+            "source_tab": "Crop Audit",
+            "type": "list",
+            "editable_fields": ["organic", "notes"],
+            "computed_fields": ["age"],
+            "filterable_by": ["status"],
+            "status_field": "status",
+            "time_scope": {"year_field": "harvest_year", "week_field": "harvest_week"},
+            "notes": "Second crop view",
+        }
+    )
     merged = find_view_for_entity(manifest, "crop")
     assert merged is not None
     # First view's scalar field preserved.
     assert merged["name"] == "crop_info"
     assert merged["source_tab"] == "Crop Info"
     # time_scope from richer view (second view has one, first doesn't).
-    assert merged["time_scope"] == {"year_field": "harvest_year", "week_field": "harvest_week"}
+    assert merged["time_scope"] == {
+        "year_field": "harvest_year",
+        "week_field": "harvest_week",
+    }
     # editable_fields unioned.
     editable = merged.get("editable_fields") or []
     assert "name" in editable
@@ -251,7 +256,10 @@ def test_inline_fields_from_codegen_manifest():
                     {
                         "suggested_field_name": "nursery",
                         "django_field_class": "models.ForeignKey",
-                        "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"},
+                        "django_field_kwargs": {
+                            "to": "Nursery",
+                            "on_delete": "models.CASCADE",
+                        },
                     },
                     {
                         "suggested_field_name": "variety",
@@ -296,8 +304,26 @@ def test_inline_fields_from_codegen_manifest():
         "version": "view-manifest-draft-1",
         "source": {"source_id": "test", "provider": "google_sheets"},
         "views": [
-            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
-            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {
+                "name": "nursery",
+                "entity": "nursery",
+                "type": "reference",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+            {
+                "name": "seeding_schedule",
+                "entity": "seeding_schedule",
+                "type": "list",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
         ],
         "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
     }
@@ -314,8 +340,13 @@ def test_inline_fields_from_codegen_manifest():
                 "ui_archetype": "list",
                 "workflow_hints": {
                     "inline_fields": [
-                        "variety", "seeding_week", "trays_to_seed",
-                        "seeded", "germinated", "thinned", "notes",
+                        "variety",
+                        "seeding_week",
+                        "trays_to_seed",
+                        "seeded",
+                        "germinated",
+                        "thinned",
+                        "notes",
                     ],
                 },
             },
@@ -359,7 +390,10 @@ def test_inline_show_change_link():
                     {
                         "suggested_field_name": "nursery",
                         "django_field_class": "models.ForeignKey",
-                        "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"},
+                        "django_field_kwargs": {
+                            "to": "Nursery",
+                            "on_delete": "models.CASCADE",
+                        },
                     },
                 ],
                 "fk_resolutions": {"nursery": "Nursery"},
@@ -370,8 +404,26 @@ def test_inline_show_change_link():
         "version": "view-manifest-draft-1",
         "source": {"source_id": "test", "provider": "google_sheets"},
         "views": [
-            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
-            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {
+                "name": "nursery",
+                "entity": "nursery",
+                "type": "reference",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+            {
+                "name": "seeding_schedule",
+                "entity": "seeding_schedule",
+                "type": "list",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
         ],
         "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
     }
@@ -388,15 +440,34 @@ def test_inline_config_editable_grid_archetype():
             {
                 "model_name": "Nursery",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
             {
                 "model_name": "SeedingSchedule",
                 "columns": [
-                    {"suggested_field_name": "nursery", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"}},
-                    {"suggested_field_name": "variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "seeding_week", "django_field_class": "models.PositiveSmallIntegerField", "django_field_kwargs": {"blank": True, "null": True}},
+                    {
+                        "suggested_field_name": "nursery",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "Nursery",
+                            "on_delete": "models.CASCADE",
+                        },
+                    },
+                    {
+                        "suggested_field_name": "variety",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "seeding_week",
+                        "django_field_class": "models.PositiveSmallIntegerField",
+                        "django_field_kwargs": {"blank": True, "null": True},
+                    },
                 ],
             },
         ],
@@ -405,15 +476,37 @@ def test_inline_config_editable_grid_archetype():
         "version": "view-manifest-draft-1",
         "source": {"source_id": "test", "provider": "google_sheets"},
         "views": [
-            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
-            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {
+                "name": "nursery",
+                "entity": "nursery",
+                "type": "reference",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+            {
+                "name": "seeding_schedule",
+                "entity": "seeding_schedule",
+                "type": "list",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
         ],
         "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
     }
     codegen = {
         "version": 1,
         "tables": [
-            {"model_name": "Nursery", "ui_archetype": "reference", "workflow_hints": {}},
+            {
+                "model_name": "Nursery",
+                "ui_archetype": "reference",
+                "workflow_hints": {},
+            },
             {
                 "model_name": "SeedingSchedule",
                 "ui_archetype": "list",
@@ -428,7 +521,9 @@ def test_inline_config_editable_grid_archetype():
             },
         ],
     }
-    source = render_admin_py(contract, manifest, app_label="core", codegen_manifest=codegen)
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
     assert "class SeedingScheduleInline(admin.TabularInline):" in source
     assert "extra = 2" in source
     assert "show_change_link = False" in source
@@ -444,16 +539,39 @@ def test_inline_config_reference_archetype():
             {
                 "model_name": "Nursery",
                 "columns": [
-                    {"suggested_field_name": "name", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
+                    {
+                        "suggested_field_name": "name",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
                 ],
             },
             {
                 "model_name": "SeedingSchedule",
                 "columns": [
-                    {"suggested_field_name": "nursery", "django_field_class": "models.ForeignKey", "django_field_kwargs": {"to": "Nursery", "on_delete": "models.CASCADE"}},
-                    {"suggested_field_name": "variety", "django_field_class": "models.CharField", "django_field_kwargs": {"max_length": 200}},
-                    {"suggested_field_name": "seeded", "django_field_class": "models.BooleanField", "django_field_kwargs": {"default": False}},
-                    {"suggested_field_name": "notes", "django_field_class": "models.TextField", "django_field_kwargs": {"blank": True}},
+                    {
+                        "suggested_field_name": "nursery",
+                        "django_field_class": "models.ForeignKey",
+                        "django_field_kwargs": {
+                            "to": "Nursery",
+                            "on_delete": "models.CASCADE",
+                        },
+                    },
+                    {
+                        "suggested_field_name": "variety",
+                        "django_field_class": "models.CharField",
+                        "django_field_kwargs": {"max_length": 200},
+                    },
+                    {
+                        "suggested_field_name": "seeded",
+                        "django_field_class": "models.BooleanField",
+                        "django_field_kwargs": {"default": False},
+                    },
+                    {
+                        "suggested_field_name": "notes",
+                        "django_field_class": "models.TextField",
+                        "django_field_kwargs": {"blank": True},
+                    },
                 ],
             },
         ],
@@ -462,15 +580,37 @@ def test_inline_config_reference_archetype():
         "version": "view-manifest-draft-1",
         "source": {"source_id": "test", "provider": "google_sheets"},
         "views": [
-            {"name": "nursery", "entity": "nursery", "type": "reference", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
-            {"name": "seeding_schedule", "entity": "seeding_schedule", "type": "list", "editable_fields": [], "computed_fields": [], "filterable_by": [], "status_field": None, "notes": None},
+            {
+                "name": "nursery",
+                "entity": "nursery",
+                "type": "reference",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
+            {
+                "name": "seeding_schedule",
+                "entity": "seeding_schedule",
+                "type": "list",
+                "editable_fields": [],
+                "computed_fields": [],
+                "filterable_by": [],
+                "status_field": None,
+                "notes": None,
+            },
         ],
         "workflow_hints": {"tab_sequence": [], "role_hints": [], "weekly_actions": []},
     }
     codegen = {
         "version": 1,
         "tables": [
-            {"model_name": "Nursery", "ui_archetype": "reference", "workflow_hints": {}},
+            {
+                "model_name": "Nursery",
+                "ui_archetype": "reference",
+                "workflow_hints": {},
+            },
             {
                 "model_name": "SeedingSchedule",
                 "ui_archetype": "list",
@@ -485,7 +625,9 @@ def test_inline_config_reference_archetype():
             },
         ],
     }
-    source = render_admin_py(contract, manifest, app_label="core", codegen_manifest=codegen)
+    source = render_admin_py(
+        contract, manifest, app_label="core", codegen_manifest=codegen
+    )
     assert "class SeedingScheduleInline(admin.TabularInline):" in source
     assert "readonly_fields" in source
     assert "show_change_link = True" in source
@@ -1217,7 +1359,9 @@ def test_fk_link_appears_in_list_display_instead_of_raw_fk():
     )
     # Confirm list_display uses block_link, not bare block
     list_display_line = [
-        l.strip() for l in source.splitlines() if l.strip().startswith("list_display")
+        col_line.strip()
+        for col_line in source.splitlines()
+        if col_line.strip().startswith("list_display")
     ][0]
     assert "'block'" not in list_display_line.replace("'block_link'", "")
     _check_compiles(source)
@@ -2734,9 +2878,9 @@ def test_ensure_groups_function_generated():
     )
     assert "def _ensure_crop_groups():" in source
     assert "ContentType.objects.get_for_model(Crop)" in source
-    assert "Group.objects.get_or_create(name=\"FieldManager\")" in source
-    assert "Group.objects.get_or_create(name=\"Operations\")" in source
-    assert "Group.objects.get_or_create(name=\"Auditor\")" in source
+    assert 'Group.objects.get_or_create(name="FieldManager")' in source
+    assert 'Group.objects.get_or_create(name="Operations")' in source
+    assert 'Group.objects.get_or_create(name="Auditor")' in source
     assert "change_crop" in source
     assert "view_crop" in source
     assert "add_crop" in source

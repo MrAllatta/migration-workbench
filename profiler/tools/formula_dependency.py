@@ -55,7 +55,7 @@ class ParsedFormula:
 # Sheet-qualified reference: 'Sheet Name'!A1:B10 or Sheet1!$A$1
 _SHEET_REF_RE = re.compile(
     r"(?:"
-    r"'([^']+)'"           # group 1 — quoted sheet name
+    r"'([^']+)'"  # group 1 — quoted sheet name
     r"|"
     r"([A-Za-z0-9_.\-]+)"  # group 2 — unquoted sheet name
     r")"
@@ -66,29 +66,29 @@ _SHEET_REF_RE = re.compile(
 
 # Bare local reference: A1  $B$2  C3:D10  $A$1:$Z$100
 _LOCAL_REF_RE = re.compile(
-    r"(?<![!A-Za-z\d$])"          # not preceded by !, letter, digit, $
-    r"\$?([A-Z]{1,3})"            # group 1 — column letters
-    r"\$?(\d+)"                   # group 2 — row number
+    r"(?<![!A-Za-z\d$])"  # not preceded by !, letter, digit, $
+    r"\$?([A-Z]{1,3})"  # group 1 — column letters
+    r"\$?(\d+)"  # group 2 — row number
     r"(?::\$?([A-Z]{1,3})\$?(\d+))?",  # groups 3-4 — optional range end
 )
 
 _CELL_RE = re.compile(r"([A-Z]{1,3})(\d+)", re.IGNORECASE)
 
 # External references
-_IMPORTRANGE_RE = re.compile(r'\bIMPORTRANGE\s*\(', re.IGNORECASE)
+_IMPORTRANGE_RE = re.compile(r"\bIMPORTRANGE\s*\(", re.IGNORECASE)
 _IMPORTRANGE_FULL_RE = re.compile(
-    r'IMPORTRANGE\s*\([^)]*\)',
+    r"IMPORTRANGE\s*\([^)]*\)",
     re.IGNORECASE,
 )
 _IMPORTRANGE_ARGS_RE = re.compile(
     r'IMPORTRANGE\s*\(\s*"([^"]+)"',
     re.IGNORECASE,
 )
-_EXTERNAL_REF_RE = re.compile(r'\[.+?\]')
-_EXTERNAL_WB_RE = re.compile(r'\[([^\]]+)\]')
+_EXTERNAL_REF_RE = re.compile(r"\[.+?\]")
+_EXTERNAL_WB_RE = re.compile(r"\[([^\]]+)\]")
 
 # Function call extraction
-_FUNCTION_RE = re.compile(r'\b([A-Z][A-Z0-9_]*)\s*\(', re.IGNORECASE)
+_FUNCTION_RE = re.compile(r"\b([A-Z][A-Z0-9_]*)\s*\(", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
@@ -176,15 +176,17 @@ def _add_importrange_ref(
     """Parse an IMPORTRANGE match into a Ref and track its consumed span."""
     key_m = _IMPORTRANGE_ARGS_RE.search(match.group(0))
     spreadsheet_key = key_m.group(1) if key_m else ""
-    refs.append(Ref(
-        type="importrange",
-        qualified_address=f"IMPORTRANGE({spreadsheet_key})",
-        sheet="external",
-        cell_start=None,
-        is_cross_sheet=True,
-        is_external=True,
-        external_spreadsheet_id=spreadsheet_key,
-    ))
+    refs.append(
+        Ref(
+            type="importrange",
+            qualified_address=f"IMPORTRANGE({spreadsheet_key})",
+            sheet="external",
+            cell_start=None,
+            is_cross_sheet=True,
+            is_external=True,
+            external_spreadsheet_id=spreadsheet_key,
+        )
+    )
     consumed_spans.append(match.span())
 
 
@@ -192,15 +194,17 @@ def _add_external_wb_ref(
     refs: list[Ref], consumed_spans: list[tuple[int, int]], match: re.Match
 ) -> None:
     """Parse an external workbook bracket match into a Ref and track span."""
-    refs.append(Ref(
-        type="external_workbook",
-        qualified_address=match.group(0),
-        sheet="external",
-        cell_start=None,
-        is_cross_sheet=True,
-        is_external=True,
-        external_spreadsheet_id=match.group(1),
-    ))
+    refs.append(
+        Ref(
+            type="external_workbook",
+            qualified_address=match.group(0),
+            sheet="external",
+            cell_start=None,
+            is_cross_sheet=True,
+            is_external=True,
+            external_spreadsheet_id=match.group(1),
+        )
+    )
     consumed_spans.append(match.span())
 
 
@@ -218,7 +222,7 @@ def parse_references(
     expanded = formula
     if named_ranges:
         for name, ref in named_ranges.items():
-            expanded = re.sub(r'\b' + re.escape(name) + r'\b', ref, expanded)
+            expanded = re.sub(r"\b" + re.escape(name) + r"\b", ref, expanded)
 
     refs: list[Ref] = []
     consumed_spans: list[tuple[int, int]] = []
@@ -273,26 +277,26 @@ def extract_functions(formula: str) -> list[str]:
 
 def generate_pattern_id(formula: str, source_cell: str) -> tuple[str, str]:
     """Generate a pattern ID and hash by abstracting row numbers."""
-    row_match = re.search(r'(\d+)$', source_cell)
+    row_match = re.search(r"(\d+)$", source_cell)
     source_row = int(row_match.group(1)) if row_match else 0
 
     def replace_row(m: re.Match) -> str:
         row = int(m.group(2))
         if abs(row - source_row) <= 1:
-            return m.group(0)[:-len(m.group(2))] + "{row}"
+            return m.group(0)[: -len(m.group(2))] + "{row}"
         return m.group(0)
 
     # Replace bare row numbers in cell references
     pattern = re.sub(
-        r'([A-Z]+)(\d+)(?![A-Z])',
+        r"([A-Z]+)(\d+)(?![A-Z])",
         replace_row,
         formula,
         flags=re.IGNORECASE,
     )
     # Replace absolute row references
     pattern = re.sub(
-        r'\$(\d+)',
-        lambda m: f"${{row}}" if abs(int(m.group(1)) - source_row) <= 1 else m.group(0),
+        r"\$(\d+)",
+        lambda m: "${row}" if abs(int(m.group(1)) - source_row) <= 1 else m.group(0),
         pattern,
     )
 
@@ -330,16 +334,18 @@ def parse_cells(cells: list[dict[str, str]]) -> list[ParsedFormula]:
         is_array = raw_formula.startswith("={") or raw_formula.startswith("={=")
         pattern_id, pattern_hash = generate_pattern_id(raw_formula, cell_addr)
 
-        parsed.append(ParsedFormula(
-            source_sheet=sheet,
-            source_cell=cell_addr,
-            raw_formula=raw_formula,
-            references=refs,
-            functions_called=functions,
-            is_array_formula=is_array,
-            pattern_id=pattern_id,
-            pattern_hash=pattern_hash,
-        ))
+        parsed.append(
+            ParsedFormula(
+                source_sheet=sheet,
+                source_cell=cell_addr,
+                raw_formula=raw_formula,
+                references=refs,
+                functions_called=functions,
+                is_array_formula=is_array,
+                pattern_id=pattern_id,
+                pattern_hash=pattern_hash,
+            )
+        )
 
     return parsed
 
@@ -441,10 +447,12 @@ def _compute_cross_sheet_edges_list(
             source_sheet = edge["source"].split("!")[0]
             target_sheet = edge["target"].split("!")[0]
             if source_sheet != target_sheet:
-                cross_sheet_edge_list.append({
-                    "from_sheet": source_sheet,
-                    "to_sheet": target_sheet,
-                })
+                cross_sheet_edge_list.append(
+                    {
+                        "from_sheet": source_sheet,
+                        "to_sheet": target_sheet,
+                    }
+                )
     return cross_sheet_edge_list
 
 
@@ -507,14 +515,16 @@ def _extract_cross_workbook_deps(
     for pf in parsed_formulas:
         for ref in pf.references:
             if ref.type in ("external_workbook", "importrange"):
-                deps.append({
-                    "sheet": pf.source_sheet,
-                    "cell": pf.source_cell,
-                    "formula": pf.raw_formula,
-                    "ref_type": ref.type,
-                    "external_id": ref.external_spreadsheet_id or "",
-                    "qualified_address": ref.qualified_address,
-                })
+                deps.append(
+                    {
+                        "sheet": pf.source_sheet,
+                        "cell": pf.source_cell,
+                        "formula": pf.raw_formula,
+                        "ref_type": ref.type,
+                        "external_id": ref.external_spreadsheet_id or "",
+                        "qualified_address": ref.qualified_address,
+                    }
+                )
     return deps
 
 
@@ -571,7 +581,7 @@ def build_dependency_artifact(
         sheet_edges.append(entry)
 
     # Signals
-    signals = compute_dependency_signals(
+    _signals = compute_dependency_signals(
         {"nodes": nodes_list, "edges": edges_list}, cell_graph=G_cell
     )
     sheet_signals = compute_sheet_signals(G_cell, G_sheet)
@@ -582,9 +592,7 @@ def build_dependency_artifact(
             "total_formula_cells": len(parsed_formulas),
             "total_nodes": G_cell.number_of_nodes(),
             "total_edges": G_cell.number_of_edges(),
-            "cross_sheet_edges": sum(
-                1 for e in edges_list if e.get("is_cross_sheet")
-            ),
+            "cross_sheet_edges": sum(1 for e in edges_list if e.get("is_cross_sheet")),
             "cross_workbook_deps": {
                 "workbook_key": workbook_key,
                 "external_ref_count": external_ref_count,
@@ -619,9 +627,12 @@ def _rebuild_graph_from_artifact(artifact: dict[str, Any]) -> nx.DiGraph:
         attrs = {k: v for k, v in node.items() if k != "id"}
         G.add_node(node_id, **attrs)
     for edge in artifact.get("edges", []):
-        G.add_edge(edge["source"], edge["target"],
-                   ref_type=edge.get("ref_type", ""),
-                   is_cross_sheet=edge.get("is_cross_sheet", False))
+        G.add_edge(
+            edge["source"],
+            edge["target"],
+            ref_type=edge.get("ref_type", ""),
+            is_cross_sheet=edge.get("is_cross_sheet", False),
+        )
     return G
 
 
@@ -670,7 +681,9 @@ def compute_dependency_signals(
             "referenced_by": count,
             "sheet": node_id.split("!")[0],
         }
-        for node_id, count in sorted(ref_count.items(), key=lambda x: x[1], reverse=True)
+        for node_id, count in sorted(
+            ref_count.items(), key=lambda x: x[1], reverse=True
+        )
         if count >= high_value_threshold
     ]
 
@@ -696,8 +709,10 @@ def compute_dependency_signals(
         "cross_sheet_edges": cross_sheet_edges,
         "high_value_nodes": high_value_nodes,
         "pattern_clusters": [
-            v for v in sorted(pattern_clusters.values(),
-                            key=lambda x: x["count"], reverse=True)
+            v
+            for v in sorted(
+                pattern_clusters.values(), key=lambda x: x["count"], reverse=True
+            )
         ],
     }
 
@@ -738,10 +753,12 @@ def compute_sheet_signals(
     orphaned: list[dict[str, Any]] = []
     for sheet, formula_count in sheet_formula_count.items():
         if sheet not in sheets_with_cross_sheet_edges:
-            orphaned.append({
-                "sheet": sheet,
-                "formula_count": formula_count,
-            })
+            orphaned.append(
+                {
+                    "sheet": sheet,
+                    "formula_count": formula_count,
+                }
+            )
 
     return {
         "orphaned_sheets": orphaned,
@@ -761,12 +778,14 @@ def _get_cell_graph_referenced_nodes(G: nx.DiGraph) -> list[dict[str, Any]]:
         out_deg = G.out_degree(node_id)
         if in_deg > 0 or out_deg > 0:
             sheet = node_id.split("!")[0]
-            result.append({
-                "cell_id": node_id,
-                "sheet": sheet,
-                "in_degree": in_deg,
-                "out_degree": out_deg,
-            })
+            result.append(
+                {
+                    "cell_id": node_id,
+                    "sheet": sheet,
+                    "in_degree": in_deg,
+                    "out_degree": out_deg,
+                }
+            )
     return result
 
 
@@ -798,23 +817,27 @@ def build_dependency_report(artifact: dict[str, Any]) -> dict[str, Any]:
         "total_edges": summary.get("total_edges", 0),
         "cross_sheet_edges": summary.get("cross_sheet_edges", 0),
         "worksheets_with_formulas": sum(
-            1 for node, data in G.nodes(data=True)
-            if data.get("node_type") == "formula"
+            1 for node, data in G.nodes(data=True) if data.get("node_type") == "formula"
         ),
     }
 
     # External references
     external_references: list[dict[str, Any]] = []
-    workbook_key = artifact.get("workbook_key", "")
+    _workbook_key = artifact.get("workbook_key", "")
     cross_wb = summary.get("cross_workbook_deps", {})
-    if cross_wb.get("importrange_count", 0) > 0 or cross_wb.get("external_ref_count", 0) > 0:
+    if (
+        cross_wb.get("importrange_count", 0) > 0
+        or cross_wb.get("external_ref_count", 0) > 0
+    ):
         for node_id, data in G.nodes(data=True):
             if data.get("node_type") == "external":
-                external_references.append({
-                    "cell_id": node_id,
-                    "sheet": data.get("sheet", ""),
-                    "formula": data.get("formula", ""),
-                })
+                external_references.append(
+                    {
+                        "cell_id": node_id,
+                        "sheet": data.get("sheet", ""),
+                        "formula": data.get("formula", ""),
+                    }
+                )
 
     # Sheet dependency table from sheet_graph
     sheet_graph = artifact.get("sheet_graph", {})

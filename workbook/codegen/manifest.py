@@ -80,7 +80,8 @@ def find_view_for_entity(
         A merged view dict, or ``None`` if no view is bound to that entity.
     """
     matching = [
-        v for v in (manifest.get("views") or [])
+        v
+        for v in (manifest.get("views") or [])
         if str(v.get("entity") or "") == entity_name
     ]
     if not matching:

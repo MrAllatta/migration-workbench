@@ -59,9 +59,7 @@ class Command(BaseCommand):
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise CommandError(
-                "PyYAML is required to read/write YAML files."
-            ) from exc
+            raise CommandError("PyYAML is required to read/write YAML files.") from exc
 
         from workbook.tools.manifest_merger import merge_manifests
 
@@ -70,12 +68,8 @@ class Command(BaseCommand):
         if options.get("profiler_signals"):
             signals_path = Path(options["profiler_signals"]).resolve()
             if not signals_path.is_file():
-                raise CommandError(
-                    f"profiler-signals not found: {signals_path}"
-                )
-            profiler_signals = yaml.safe_load(
-                signals_path.read_text(encoding="utf-8")
-            )
+                raise CommandError(f"profiler-signals not found: {signals_path}")
+            profiler_signals = yaml.safe_load(signals_path.read_text(encoding="utf-8"))
             if not isinstance(profiler_signals, dict):
                 raise CommandError(
                     f"profiler-signals is not a YAML mapping: {signals_path}"
@@ -85,9 +79,7 @@ class Command(BaseCommand):
         if options.get("interaction_contract"):
             contract_path = Path(options["interaction_contract"]).resolve()
             if not contract_path.is_file():
-                raise CommandError(
-                    f"interaction-contract not found: {contract_path}"
-                )
+                raise CommandError(f"interaction-contract not found: {contract_path}")
             interaction_contract = yaml.safe_load(
                 contract_path.read_text(encoding="utf-8")
             )
@@ -100,12 +92,8 @@ class Command(BaseCommand):
         if options.get("view_manifest"):
             manifest_path = Path(options["view_manifest"]).resolve()
             if not manifest_path.is_file():
-                raise CommandError(
-                    f"view-manifest not found: {manifest_path}"
-                )
-            view_manifest = yaml.safe_load(
-                manifest_path.read_text(encoding="utf-8")
-            )
+                raise CommandError(f"view-manifest not found: {manifest_path}")
+            view_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             if not isinstance(view_manifest, dict):
                 raise CommandError(
                     f"view-manifest is not a YAML mapping: {manifest_path}"
@@ -122,16 +110,16 @@ class Command(BaseCommand):
                         profiler_signals = {"signals": []}
                     elif "signals" not in profiler_signals:
                         profiler_signals["signals"] = []
-                    
+
                     # Create a signal entry for the vertical thresholds
                     vertical_signal = {
                         "tab_title": "__vertical_thresholds__",
                         "ui_archetype": "list",
                         "confidence_score": 1.0,
-                        "_vertical_signal_thresholds": signal_thresholds
+                        "_vertical_signal_thresholds": signal_thresholds,
                     }
                     profiler_signals["signals"].append(vertical_signal)
-                    
+
                     # Also merge vertical's interaction_defaults.roles into role mapping
                     interaction_defaults = vertical.interaction_defaults or {}
                     roles = interaction_defaults.get("roles", {})
@@ -140,7 +128,7 @@ class Command(BaseCommand):
                             interaction_contract = {"interviews": []}
                         elif "interviews" not in interaction_contract:
                             interaction_contract["interviews"] = []
-                        
+
                         # Add role presets from vertical (existing user hints win on conflict)
                         for role_name, role_data in roles.items():
                             tabs = role_data.get("tabs", [])
@@ -150,13 +138,10 @@ class Command(BaseCommand):
                                 if interview.get("role") == role_name:
                                     existing_role = interview
                                     break
-                            
+
                             if existing_role is None:
                                 # Create new interview entry for this role
-                                new_interview = {
-                                    "role": role_name,
-                                    "tabs": tabs
-                                }
+                                new_interview = {"role": role_name, "tabs": tabs}
                                 interaction_contract["interviews"].append(new_interview)
                             else:
                                 # Merge tabs: existing tabs win, add missing ones from vertical

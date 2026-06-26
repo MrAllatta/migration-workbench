@@ -295,9 +295,7 @@ def import_historical_block(ctx: MakeContext) -> str:
     """
     return (
         "import-historical:\n"
-        + _indent(
-            "$(MANAGE) import_historical --bundle-dir data/bundles"
-        )
+        + _indent("$(MANAGE) import_historical --bundle-dir data/bundles")
         + "\n\n"
     )
 
@@ -405,13 +403,13 @@ def import_blocks(ctx: MakeContext) -> str:
         + "merge-interaction-contract:\n"
         + _indent(
             '@if [ -f "build/view-manifest.yaml" ]; then \\\n'
-            '$(MANAGE) merge_interaction_contract '
+            "$(MANAGE) merge_interaction_contract "
             '--contract "$(CONTRACT)" '
             '--manifest "build/view-manifest.yaml" '
             '--out "build/codegen-manifest.yaml"; \\\n'
-            'else \\\n'
+            "else \\\n"
             '@echo "Skipping merge-interaction-contract: build/view-manifest.yaml not found"; \\\n'
-            'fi'
+            "fi"
         )
         + "\n"
     )
@@ -445,9 +443,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         + "\n\n"
         + "# [DEPRECATED] Use profile-phase-all instead.\n"
         + "profile-cohort-corpus:\n"
-        + _indent(
-            '@echo "DEPRECATED: Use make profile-phase-all instead"'
-        )
+        + _indent('@echo "DEPRECATED: Use make profile-phase-all instead"')
         + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
@@ -461,9 +457,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "Inspect tab_selection_<date>.json, then configure heuristics.\n"
         + "# [DEPRECATED] Use profile-phase-discover instead.\n"
         + "profile-cohort-corpus-phase1:\n"
-        + _indent(
-            '@echo "DEPRECATED: Use make profile-phase-discover instead"'
-        )
+        + _indent('@echo "DEPRECATED: Use make profile-phase-discover instead"')
         + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
@@ -477,9 +471,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "Iterate on cohort_corpus.json, then re-run.\n"
         + "# [DEPRECATED] Use profile-phase-score instead.\n"
         + "profile-cohort-corpus-phase2:\n"
-        + _indent(
-            '@echo "DEPRECATED: Use make profile-phase-score instead"'
-        )
+        + _indent('@echo "DEPRECATED: Use make profile-phase-score instead"')
         + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "
@@ -494,9 +486,7 @@ def profile_blocks(ctx: MakeContext) -> str:
         "expansion_formula_penalty, expansion_formula_threshold, plus token lists.\n"
         + "# [DEPRECATED] Use profile-phase-deep instead.\n"
         + "profile-cohort-corpus-phase3:\n"
-        + _indent(
-            '@echo "DEPRECATED: Use make profile-phase-deep instead"'
-        )
+        + _indent('@echo "DEPRECATED: Use make profile-phase-deep instead"')
         + "\n"
         + _indent(
             "DB_ENGINE=sqlite $(MANAGE) profile_cohort_corpus "

@@ -14,7 +14,6 @@ from decimal import Decimal
 from io import StringIO
 
 import pytest
-from django.test import TestCase
 
 from examples.models import ExampleCrop
 from importer.base_audit import (
@@ -175,9 +174,7 @@ class TestCompareFieldValue:
 
     def test_decimal_field_precision(self):
         """Decimal values compare within tolerance."""
-        assert (
-            compare_field_value("10.50", Decimal("10.50"), "DecimalField") is True
-        )
+        assert compare_field_value("10.50", Decimal("10.50"), "DecimalField") is True
 
 
 # ── Test 9: CsvMapping.match_csv_files ─────────────────────────────────────────

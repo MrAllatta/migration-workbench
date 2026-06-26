@@ -103,9 +103,7 @@ class Command(BaseCommand):
             interaction_contract = build_interaction_contract_from_patch(
                 patch,
                 updated,
-                source_id=(
-                    (updated.get("source") or {}).get("source_id") or ""
-                ),
+                source_id=((updated.get("source") or {}).get("source_id") or ""),
             )
             contract_path = Path(contract_out).resolve()
             contract_path.parent.mkdir(parents=True, exist_ok=True)

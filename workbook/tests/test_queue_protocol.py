@@ -7,7 +7,6 @@ module-level constants.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -30,7 +29,6 @@ from workbook.tools.queue_protocol import (
     acknowledge_activation,
     acknowledge_consumption,
     check_queue_health,
-    _now_iso,
 )
 
 
@@ -95,13 +93,15 @@ class TestLifecycle:
 
     def test_from_dict_preserves_values(self):
         """from_dict preserves all provided values."""
-        lc = Lifecycle.from_dict({
-            "status": "consumed",
-            "created_at": "2026-01-01T00:00:00",
-            "activated_at": "2026-01-02T00:00:00",
-            "consumed_at": "2026-01-03T00:00:00",
-            "actor": "test-agent",
-        })
+        lc = Lifecycle.from_dict(
+            {
+                "status": "consumed",
+                "created_at": "2026-01-01T00:00:00",
+                "activated_at": "2026-01-02T00:00:00",
+                "consumed_at": "2026-01-03T00:00:00",
+                "actor": "test-agent",
+            }
+        )
         assert lc.status == "consumed"
         assert lc.created_at == "2026-01-01T00:00:00"
         assert lc.activated_at == "2026-01-02T00:00:00"

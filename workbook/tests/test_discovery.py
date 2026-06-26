@@ -480,7 +480,9 @@ def test_build_interaction_contract_preserves_weekly_actions():
 def test_build_interaction_contract_with_source_id():
     manifest = _orders_manifest()
     patch = parse_interview(_filled_interview_text(), manifest)
-    contract = build_interaction_contract_from_patch(patch, manifest, source_id="custom")
+    contract = build_interaction_contract_from_patch(
+        patch, manifest, source_id="custom"
+    )
     assert contract["source_id"] == "custom"
 
 

@@ -1,7 +1,5 @@
 """Tests for cell-level formula dependency analysis."""
 
-import networkx as nx
-
 from profiler.tools.formula_dependency import (
     Ref,
     ParsedFormula,
@@ -14,7 +12,6 @@ from profiler.tools.formula_dependency import (
     build_cell_graph,
     build_sheet_dependency_graph,
     compute_sheet_signals,
-    build_dependency_report,
 )
 
 
@@ -370,7 +367,7 @@ def test_parse_importrange_reference():
 
 def test_parse_external_workbook_reference():
     """External workbook bracket ref [Workbook.xlsx] is detected."""
-    refs = parse_references('=[Workbook.xlsx]Sheet1!A1', "Home")
+    refs = parse_references("=[Workbook.xlsx]Sheet1!A1", "Home")
     ext_refs = [r for r in refs if r.type == "external_workbook"]
     assert len(ext_refs) >= 1
     assert ext_refs[0].type == "external_workbook"

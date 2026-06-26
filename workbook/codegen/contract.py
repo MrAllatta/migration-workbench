@@ -36,6 +36,7 @@ def _make_contract_loader(base_path: str | Path) -> type:
         _contract_path: Path = contract_path
 
     def _resolve_include_target(loader: ContractLoader, path_str: str) -> Path:
+        """Resolve an ``!include`` path relative to the including file."""
         including_file = (
             loader._include_stack[-1]
             if loader._include_stack
@@ -44,6 +45,7 @@ def _make_contract_loader(base_path: str | Path) -> type:
         return (including_file.parent / path_str).resolve()
 
     def _load_included_yaml(loader: ContractLoader, target: Path) -> Any:
+        """Load a YAML file referenced by ``!include`` with cycle detection."""
         if target == loader._contract_path or target in loader._include_stack:
             cycle = " -> ".join(str(p) for p in loader._include_stack + [target])
             from workbench.exceptions import UserFacingError
@@ -69,11 +71,13 @@ def _make_contract_loader(base_path: str | Path) -> type:
             loader._include_stack.pop()
 
     def _include_constructor(loader: ContractLoader, node: yaml.ScalarNode) -> Any:
+        """PyYAML constructor for ``!include`` scalar tags."""
         path_str: str = str(loader.construct_scalar(node))
         target = _resolve_include_target(loader, path_str)
         return _load_included_yaml(loader, target)
 
     def _include_list_constructor(loader: ContractLoader, node: yaml.ScalarNode) -> Any:
+        """PyYAML constructor for ``!include`` tags expected to resolve to a list."""
         path_str: str = str(loader.construct_scalar(node))
         target = _resolve_include_target(loader, path_str)
         included = _load_included_yaml(loader, target)
@@ -136,6 +140,7 @@ def load_contract_unvalidated(path: str | Path) -> dict[str, Any]:
         )
 
     def _walk_table_entries(table_entries: list[Any]) -> list[dict[str, Any]]:
+        """Flatten nested table-entry lists from ``!include`` expansion."""
         flattened: list[dict[str, Any]] = []
         for entry in table_entries:
             if isinstance(entry, list):
@@ -602,6 +607,7 @@ def review_contract(
         suppressed_rule_ids = set(table.get("suppress_review_warnings") or [])
 
         def add_issue(rule_id: str, field: str, message: str) -> None:
+            """Append a review issue unless suppressed by table-level config."""
             if rule_id in suppressed_rule_ids:
                 return
             issues.append(
@@ -680,8 +686,7 @@ def review_contract(
                 this_tab = table.get("bundle_worksheet_title", "")
                 if this_tab:
                     tab_has_edges = any(
-                        e.get("from_sheet") == this_tab
-                        or e.get("to_sheet") == this_tab
+                        e.get("from_sheet") == this_tab or e.get("to_sheet") == this_tab
                         for e in sheet_edges
                     )
                     if not tab_has_edges:
@@ -760,9 +765,7 @@ def assign_import_tiers(
 
     tier_map: dict[str, int] = {}
     try:
-        for tier, generation in enumerate(
-            nx.topological_generations(G), start=1
-        ):
+        for tier, generation in enumerate(nx.topological_generations(G), start=1):
             for name in generation:
                 tier_map[name] = tier
     except nx.NetworkXUnfeasible:

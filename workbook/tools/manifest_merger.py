@@ -217,9 +217,7 @@ def _index_interaction_contract(
             if semantics:
                 tab_entry["status_semantics"] = dict(semantics)
                 tab_entry["workflow_notes"] = str(entry.get("workflow_notes") or "")
-                tab_entry["weekly_actions"] = list(
-                    entry.get("weekly_actions") or []
-                )
+                tab_entry["weekly_actions"] = list(entry.get("weekly_actions") or [])
             # Access hints: flowed from interview entry.
             access = entry.get("access_hints") or {}
             if access:
@@ -323,9 +321,7 @@ def merge_manifests(
     # Enrich contract_index with per-role supplement data for tabs that
     # have role_hints in the view manifest but no archetype_overrides.
     if view_manifest and role_supplement:
-        role_hints = (
-            view_manifest.get("workflow_hints") or {}
-        ).get("role_hints") or []
+        role_hints = (view_manifest.get("workflow_hints") or {}).get("role_hints") or []
         for hint in role_hints:
             if ":" not in hint:
                 continue
@@ -337,11 +333,20 @@ def merge_manifests(
             if role_name in role_supplement:
                 role_data = role_supplement[role_name]
                 enriched_entry = contract_index.setdefault(tab_name, {})
-                if "status_semantics" not in enriched_entry and "status_semantics" in role_data:
+                if (
+                    "status_semantics" not in enriched_entry
+                    and "status_semantics" in role_data
+                ):
                     enriched_entry["status_semantics"] = role_data["status_semantics"]
-                if "workflow_notes" not in enriched_entry and "workflow_notes" in role_data:
+                if (
+                    "workflow_notes" not in enriched_entry
+                    and "workflow_notes" in role_data
+                ):
                     enriched_entry["workflow_notes"] = role_data["workflow_notes"]
-                if "weekly_actions" not in enriched_entry and "weekly_actions" in role_data:
+                if (
+                    "weekly_actions" not in enriched_entry
+                    and "weekly_actions" in role_data
+                ):
                     enriched_entry["weekly_actions"] = role_data["weekly_actions"]
                 if "access_hints" not in enriched_entry and "access_hints" in role_data:
                     enriched_entry["access_hints"] = role_data["access_hints"]
@@ -356,9 +361,7 @@ def merge_manifests(
         )
 
         # Resolve status transitions.
-        status_info = _resolve_status_transitions(
-            tab_title, contract_index, view
-        )
+        status_info = _resolve_status_transitions(tab_title, contract_index, view)
 
         # Resolve role hints.
         roles = _resolve_role_hints(tab_title, contract_index, view_manifest)
@@ -404,9 +407,7 @@ def merge_manifests(
         permissions: dict[str, Any] = {}
         if ic_entry and ic_entry.get("role_owner"):
             permissions["owner_role"] = ic_entry["role_owner"]
-            permissions["reviewer_roles"] = list(
-                ic_entry.get("role_reviewers") or []
-            )
+            permissions["reviewer_roles"] = list(ic_entry.get("role_reviewers") or [])
             permissions["mechanism"] = "django_groups"
         if permissions:
             table_entry.setdefault("access_hints", {})["permissions"] = permissions
@@ -415,9 +416,7 @@ def merge_manifests(
 
     source_id = ""
     if view_manifest:
-        source_id = str(
-            (view_manifest.get("source") or {}).get("source_id") or ""
-        )
+        source_id = str((view_manifest.get("source") or {}).get("source_id") or "")
 
     # Propagate workflow_graph from profiler signals (read-only, not
     # human-editable per interaction contract design).  Tab removal
@@ -432,14 +431,12 @@ def merge_manifests(
             active_tabs = set(all_tab_titles)
             existing_edges = workflow_graph.get("edges") or []
             filtered_edges = [
-                e for e in existing_edges
+                e
+                for e in existing_edges
                 if e.get("from") in active_tabs or e.get("to") in active_tabs
             ]
             existing_tabs = workflow_graph.get("tabs") or {}
-            filtered_tabs = {
-                k: v for k, v in existing_tabs.items()
-                if k in active_tabs
-            }
+            filtered_tabs = {k: v for k, v in existing_tabs.items() if k in active_tabs}
             existing_seq = workflow_graph.get("tab_sequence") or []
             filtered_seq = [t for t in existing_seq if t in active_tabs]
             workflow_graph = {

@@ -107,7 +107,9 @@ class Command(BaseImportCommand):
             **options: Parsed argument dict from :meth:`add_arguments`.
         """
         self.bundle_dir = options["bundle_dir"]
-        self.validate_only = bool(options.get("validate_only") or options.get("preflight"))
+        self.validate_only = bool(
+            options.get("validate_only") or options.get("preflight")
+        )
         self.dry_run = bool(options.get("dry_run"))
         self.verbose = options.get("verbose", False)
 
@@ -126,9 +128,7 @@ class Command(BaseImportCommand):
         self.run_id = self.run_started_at.strftime("%Y%m%dT%H%M%S%f")
         self.data_dir = self.bundle_dir
         requested_summary_path = options.get("summary_json")
-        self.summary_json_path = self.resolve_summary_json_path(
-            requested_summary_path
-        )
+        self.summary_json_path = self.resolve_summary_json_path(requested_summary_path)
         self.setup_runtime()
 
         if not os.path.isdir(self.bundle_dir):
@@ -211,9 +211,7 @@ class Command(BaseImportCommand):
         """
         self.stdout.write(
             self.style.SUCCESS(
-                f"\n{'=' * 70}\n"
-                f"Importing year: {year_label}\n"
-                f"{'=' * 70}"
+                f"\n{'=' * 70}\nImporting year: {year_label}\n{'=' * 70}"
             )
         )
 
@@ -314,9 +312,7 @@ class Command(BaseImportCommand):
         self.source_bundle_year = year
         year_label = f"{tab_dir.name}/{csv_path.name}"
         self._print_year_header(year_label)
-        self._run_with_transaction(
-            lambda: self._import_csv_file(csv_path), year_label
-        )
+        self._run_with_transaction(lambda: self._import_csv_file(csv_path), year_label)
 
     # ------------------------------------------------------------------
     # CSV reading helpers
@@ -382,9 +378,7 @@ class Command(BaseImportCommand):
         for row_index, row in rows:
             self._process_row(csv_name, row_index, row)
 
-    def _process_row(
-        self, csv_name: str, row_index: int, row: dict[str, str]
-    ) -> None:
+    def _process_row(self, csv_name: str, row_index: int, row: dict[str, str]) -> None:
         """Process a single row from a CSV file.
 
         Subclasses override this for model-specific creation logic.  The

@@ -170,9 +170,7 @@ def _dashboard_like_structure() -> dict:
                     {"header_label": "Q4", "is_formula": True},
                     {"header_label": "Annual", "is_formula": True},
                 ],
-                "named_ranges": [
-                    {"name": "Q1Data", "range": "'Source Data'!A1:B10"}
-                ],
+                "named_ranges": [{"name": "Q1Data", "range": "'Source Data'!A1:B10"}],
                 "filter_views": [],
             }
         ],
@@ -412,9 +410,7 @@ class TestDependencyEdges:
         """Named range referencing another sheet produces an edge."""
         edges = _extract_dependency_edges(
             {
-                "named_ranges": [
-                    {"name": "External", "range": "'Sheet2'!A1:B10"}
-                ],
+                "named_ranges": [{"name": "External", "range": "'Sheet2'!A1:B10"}],
                 "filter_views": [],
             },
             "SourceTab",
@@ -428,9 +424,7 @@ class TestDependencyEdges:
         """Named range only on the same sheet produces no edge."""
         edges = _extract_dependency_edges(
             {
-                "named_ranges": [
-                    {"name": "LocalData", "range": "A1:B10"}
-                ],
+                "named_ranges": [{"name": "LocalData", "range": "A1:B10"}],
                 "filter_views": [],
             },
             "SourceTab",
@@ -442,9 +436,7 @@ class TestDependencyEdges:
         edges = _extract_dependency_edges(
             {
                 "named_ranges": [],
-                "filter_views": [
-                    {"range": "'Summary'!A1:C50"}
-                ],
+                "filter_views": [{"range": "'Summary'!A1:C50"}],
             },
             "SourceTab",
         )
@@ -471,7 +463,6 @@ class TestDependencyEdges:
 
 
 class TestExtractSheetNameFromRange:
-
     def test_quoted_sheet_name(self):
         result = _extract_sheet_name_from_range("'Sheet2'!A1:B10")
         assert result == "Sheet2"
@@ -495,7 +486,6 @@ class TestExtractSheetNameFromRange:
 
 
 class TestExtractFormulaEdgesFromText:
-
     def test_importrange(self):
         edges = _extract_formula_edges_from_text(
             '=IMPORTRANGE("abc123", "Sheet2!A1:B10")', "CurrentTab"
@@ -542,9 +532,7 @@ class TestExtractFormulaEdgesFromText:
         assert edges[0]["confidence"] == 0.60
 
     def test_same_sheet_formula_ignored(self):
-        edges = _extract_formula_edges_from_text(
-            "=SUM(A1:A10)", "CurrentTab"
-        )
+        edges = _extract_formula_edges_from_text("=SUM(A1:A10)", "CurrentTab")
         assert len(edges) == 0
 
     def test_multiple_formulas_in_one_cell(self):
@@ -563,11 +551,14 @@ class TestExtractFormulaEdgesFromText:
 
 
 class TestBuildWorkflowGraph:
-
     def test_simple_graph(self):
         edges = [
-            {"from": "CropPlanner", "to": "HarvestRecord",
-             "ref_type": "VLOOKUP", "confidence": 0.85},
+            {
+                "from": "CropPlanner",
+                "to": "HarvestRecord",
+                "ref_type": "VLOOKUP",
+                "confidence": 0.85,
+            },
         ]
         tabs = [
             {"worksheet_title": "CropPlanner", "tab_position": 0},
@@ -587,12 +578,9 @@ class TestBuildWorkflowGraph:
 
     def test_cycle_detection(self):
         edges = [
-            {"from": "A", "to": "B", "ref_type": "named_range",
-             "confidence": 0.95},
-            {"from": "B", "to": "C", "ref_type": "named_range",
-             "confidence": 0.95},
-            {"from": "C", "to": "A", "ref_type": "named_range",
-             "confidence": 0.95},
+            {"from": "A", "to": "B", "ref_type": "named_range", "confidence": 0.95},
+            {"from": "B", "to": "C", "ref_type": "named_range", "confidence": 0.95},
+            {"from": "C", "to": "A", "ref_type": "named_range", "confidence": 0.95},
         ]
         tabs = [
             {"worksheet_title": "A", "tab_position": 0},
@@ -608,8 +596,12 @@ class TestBuildWorkflowGraph:
 
     def test_graph_tabs_include_edge_targets(self):
         edges = [
-            {"from": "Orders", "to": "Products", "ref_type": "VLOOKUP",
-             "confidence": 0.85},
+            {
+                "from": "Orders",
+                "to": "Products",
+                "ref_type": "VLOOKUP",
+                "confidence": 0.85,
+            },
         ]
         tabs = [
             {"worksheet_title": "Orders", "tab_position": 0},
@@ -621,12 +613,24 @@ class TestBuildWorkflowGraph:
 
     def test_topological_sort(self):
         edges = [
-            {"from": "Budget", "to": "Actuals", "ref_type": "VLOOKUP",
-             "confidence": 0.85},
-            {"from": "Actuals", "to": "Report", "ref_type": "named_range",
-             "confidence": 0.95},
-            {"from": "Input", "to": "Budget", "ref_type": "SUM_range",
-             "confidence": 0.80},
+            {
+                "from": "Budget",
+                "to": "Actuals",
+                "ref_type": "VLOOKUP",
+                "confidence": 0.85,
+            },
+            {
+                "from": "Actuals",
+                "to": "Report",
+                "ref_type": "named_range",
+                "confidence": 0.95,
+            },
+            {
+                "from": "Input",
+                "to": "Budget",
+                "ref_type": "SUM_range",
+                "confidence": 0.80,
+            },
         ]
         tabs = [
             {"worksheet_title": "Input", "tab_position": 0},
@@ -794,7 +798,10 @@ class TestExtractSignals:
         assert 0.0 <= entry["confidence_score"] <= 1.0
         assert "archetype_scores" in entry
         assert set(entry["archetype_scores"].keys()) == {
-            "form", "list", "dashboard", "reference"
+            "form",
+            "list",
+            "dashboard",
+            "reference",
         }
         # New v2 signal fields
         assert entry["has_status_column"] is False
@@ -982,14 +989,14 @@ class TestCliExplain:
             "scaffold_view_manifest",
             "--signals-only",
             "--explain",
-            "--structure", str(structure_path),
+            "--structure",
+            str(structure_path),
             stdout=out,
         )
         output = out.getvalue()
         # Should contain archetype labels in the explanation output
         assert any(
-            label in output
-            for label in ("form", "list", "dashboard", "reference")
+            label in output for label in ("form", "list", "dashboard", "reference")
         )
 
     def test_explain_requires_signals_only(self):
@@ -998,7 +1005,8 @@ class TestCliExplain:
             call_command(
                 "scaffold_view_manifest",
                 "--explain",
-                "--structure", "/nonexistent/structure.json",
+                "--structure",
+                "/nonexistent/structure.json",
             )
 
     def test_min_confidence_requires_explain(self):
@@ -1007,8 +1015,10 @@ class TestCliExplain:
             call_command(
                 "scaffold_view_manifest",
                 "--signals-only",
-                "--min-confidence", "0.7",
-                "--structure", "/nonexistent/structure.json",
+                "--min-confidence",
+                "0.7",
+                "--structure",
+                "/nonexistent/structure.json",
             )
 
     def test_min_confidence_filters_low_confidence(self, tmp_path):
@@ -1022,8 +1032,10 @@ class TestCliExplain:
             "scaffold_view_manifest",
             "--signals-only",
             "--explain",
-            "--min-confidence", "1.0",
-            "--structure", str(structure_path),
+            "--min-confidence",
+            "1.0",
+            "--structure",
+            str(structure_path),
             stdout=out,
         )
         output = out.getvalue()
