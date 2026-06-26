@@ -438,6 +438,7 @@ def render_makefile(product_kebab: str, provider: str = PROVIDER_GOOGLE_SHEETS) 
         + export_block
         + r"""
 export VIEW_MANIFEST
+export SOURCE_CONFIG
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python

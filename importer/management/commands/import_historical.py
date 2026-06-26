@@ -310,7 +310,7 @@ class Command(BaseImportCommand):
             csv_path: Path to the CSV file to import.
             year: Four-digit year string extracted from the filename.
         """
-        self.data_dir = str(tab_dir)
+        self.data_dir = str(self.bundle_dir)
         self.source_bundle_year = year
         year_label = f"{tab_dir.name}/{csv_path.name}"
         self._print_year_header(year_label)
