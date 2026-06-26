@@ -441,6 +441,8 @@ class PipelineState:
     _date_stamp: str | None = field(default=None, repr=False, compare=False)
     _signals_output_path: Path | None = field(default=None, repr=False, compare=False)
     _signals_cache: dict[tuple[str, str], dict[str, Any]] | None = field(
+        default=None, repr=False, compare=False)
+    _checkpoint_dir: Path | None = field(
         default=None, repr=False, compare=False
     )
 
@@ -740,7 +742,9 @@ class PipelineState:
         if not isinstance(resolved, dict):
             raise CommandError(f"Checkpoint at {file_path} resolved to non-dict.")
 
-        return cls._from_resolved_dict(resolved, base_dir=base_dir)
+        instance = cls._from_resolved_dict(resolved, base_dir=base_dir)
+        instance._checkpoint_dir = base_dir
+        return instance
 
     @classmethod
     def load_or_create(
@@ -1019,10 +1023,18 @@ class PipelineState:
         else:
             index_data = []
 
+        broad_inventory_raw = discovery_raw.get("broad_inventory") or []
+        if isinstance(broad_inventory_raw, dict):
+            broad_inventory = broad_inventory_raw.get("results", [])
+        elif isinstance(broad_inventory_raw, list):
+            broad_inventory = broad_inventory_raw
+        else:
+            broad_inventory = []
+
         discovery = DiscoveryState(
             source_tree=discovery_raw.get("source_tree") or {},
             workbook_index=list(index_data),
-            broad_inventory=list(discovery_raw.get("broad_inventory") or []),
+            broad_inventory=broad_inventory,
             shortlist=shortlist,
             approved_tabs=approved_tabs,
         )
@@ -1182,9 +1194,15 @@ class PipelineState:
             self.discovery.workbook_index = raw_index
         else:
             self.discovery.workbook_index = []
-        self.discovery.broad_inventory = self._load_json_artifact(
-            artifact_paths.get("broad_coverage"), []
+        broad_coverage = self._load_json_artifact(
+            artifact_paths.get("broad_coverage"), {}
         )
+        if isinstance(broad_coverage, dict):
+            self.discovery.broad_inventory = broad_coverage.get("results", [])
+        elif isinstance(broad_coverage, list):
+            self.discovery.broad_inventory = broad_coverage
+        else:
+            self.discovery.broad_inventory = []
         self.discovery.shortlist = self._load_json_artifact(
             artifact_paths.get("tab_shortlist"), []
         )
@@ -1279,11 +1297,18 @@ class PipelineState:
             scope_notes=self.domain_knowledge.scope_notes,
         )
 
+        # Use tab-level shortlist (not workbook-level broad_inventory)
+        shortlist_entries = self.discovery.shortlist
+        if isinstance(shortlist_entries, dict):
+            shortlist_entries = shortlist_entries.get("selected") or []
+        if not isinstance(shortlist_entries, list):
+            shortlist_entries = []
+
         scored_tabs: list[dict] = []
-        for tab in self.discovery.broad_inventory or []:
+        for tab in shortlist_entries:
             title = tab.get("tab_title", "")
-            rows = tab.get("row_count", 0) or 0
-            cols = tab.get("column_count", 0) or 0
+            rows = tab.get("rows_max", 0) or tab.get("row_count", 0) or 0
+            cols = tab.get("cols_max", 0) or tab.get("column_count", 0) or 0
 
             raw_score, reasons, breakdown = score_tab(
                 title=title,
@@ -2485,10 +2510,35 @@ class TestOperationalEvents:
         from profiler.tools.validation_framework import compute_coverage_metrics
 
         artifact_inventory: dict[str, Any] = {}
-        for entry in self.discovery.workbook_index or []:
-            tab_title = str(entry.get("tab_title") or "")
-            if tab_title:
-                artifact_inventory[tab_title] = {"columns": []}
+        for entry in self.deep_profile_index.entries or []:
+            tab_title = str(getattr(entry, "tab_title", "") or entry.get("tab_title", ""))
+            if not tab_title:
+                continue
+
+            # Resolve inline columns or load from out_json
+            columns = getattr(entry, "columns", None) or entry.get("columns", [])
+            if not columns:
+                out_json = getattr(entry, "out_json", None) or entry.get("out_json", "")
+                base_dir = self._checkpoint_dir
+                if out_json and base_dir:
+                    for candidate_base in [base_dir, base_dir.parent, base_dir.parent / "data"]:
+                        candidate_path = candidate_base / out_json
+                        if candidate_path.exists():
+                            try:
+                                deep_data = json.loads(candidate_path.read_text(encoding="utf-8"))
+                                columns = deep_data.get("columns") or deep_data.get("summary", {}).get("columns", [])
+                                if not columns:
+                                    columns = _parse_raw_deep_profile(deep_data)
+                            except (OSError, json.JSONDecodeError):
+                                columns = []
+                            break
+
+            artifact_inventory[tab_title] = {
+                "columns": [
+                    col.get("header_label", "")
+                    for col in (columns or [])
+                ]
+            }
 
         self.coverage_report = compute_coverage_metrics(
             self.operational_model,

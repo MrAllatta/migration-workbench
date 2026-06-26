@@ -1048,15 +1048,15 @@ class TestPhaseMethods:
         state = PipelineState(
             discovery=DiscoveryState(
                 source_tree={},
-                workbook_index=[],
-                broad_inventory=[
+                workbook_index=[],  # Not None, so guard passes
+                broad_inventory=[],
+                shortlist=[
                     {
                         "tab_title": "Crop Planner",
                         "row_count": 100,
                         "column_count": 20,
                     }
                 ],
-                shortlist=[],  # not None, so guard passes
             ),
             domain_knowledge=DomainKnowledge(
                 domain="farm",
