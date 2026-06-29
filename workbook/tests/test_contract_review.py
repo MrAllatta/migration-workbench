@@ -331,3 +331,53 @@ class TestReviewContractFkDependencyArtifact:
         assert not any(
             i.get("rule_id") == "fk_lookup_no_cross_sheet_edge" for i in issues
         )
+
+
+def test_validate_contract_tables_with_exceptions():
+    """Exception blocks on tables are validated by validate_contract_tables()."""
+    contract = {
+        "version": "1.3",
+        "tables": [
+            {
+                "model_name": "HarvestOrder",
+                "source_tab": "HarvestOrders",
+                "columns": [],
+                "exceptions": [
+                    {
+                        "id": "EX-harvest-001",
+                        "title": "Insufficient Inventory",
+                        "condition": "Planned harvest < committed order quantity",
+                        "severity": "warning",
+                        "responses": [{"action": "flag_shortfall", "actor": "system"}],
+                    },
+                    {
+                        "id": "",
+                        "condition": "Missing id",
+                        "severity": "warning",
+                    },
+                    {
+                        "id": "EX-harvest-002",
+                        "condition": "",
+                        "severity": "warning",
+                    },
+                    {
+                        "id": "EX-harvest-003",
+                        "condition": "Bad severity",
+                        "severity": "critical",
+                    },
+                ],
+            }
+        ],
+    }
+    from workbook.codegen.contract import validate_contract_tables
+
+    warnings = validate_contract_tables(contract)
+    assert any("missing id" in w for w in warnings), (
+        f"Expected warning about missing id, got: {warnings}"
+    )
+    assert any("missing condition" in w for w in warnings), (
+        f"Expected warning about missing condition, got: {warnings}"
+    )
+    assert any("invalid severity" in w for w in warnings), (
+        f"Expected warning about invalid severity, got: {warnings}"
+    )

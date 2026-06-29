@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
+from profiler.tools.pipeline_state import PipelineState
 from workbook.discovery import render_interview
 from workbook.tools.vertical_registry import load_vertical
 
@@ -36,6 +37,12 @@ class Command(BaseCommand):
             "--vertical",
             help="Load vertical template to seed interview presets",
         )
+        parser.add_argument(
+            "--checkpoint",
+            default=None,
+            help="Path to a PipelineState checkpoint YAML. When provided, "
+            "artifact provenance is recorded on the state and saved.",
+        )
 
     def handle(self, *args, **options):
         """Read the view-manifest YAML and render the interview Markdown to disk."""
@@ -62,8 +69,32 @@ class Command(BaseCommand):
 
         out_path = Path(options["out"]).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(render_interview(manifest), encoding="utf-8")
+        interview_text = render_interview(manifest)
+        out_path.write_text(interview_text, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote {out_path}"))
+
+        # Record artifact provenance on PipelineState if checkpoint path provided
+        checkpoint_arg = options.get("checkpoint")
+        if checkpoint_arg:
+            checkpoint_path = Path(checkpoint_arg).resolve()
+            if checkpoint_path.exists():
+                state = PipelineState.load(checkpoint_path)
+            else:
+                state = PipelineState()
+            source_id = manifest.get("source", {}).get("source_id", "unknown")
+            question_count = len(manifest.get("views", []))
+            if hasattr(state, "record_artifact_provenance"):
+                state.record_artifact_provenance(
+                    artifact_key=f"discovery_interview:{source_id}",
+                    source="elicited",
+                    signals=[{"questions_count": question_count}],
+                )
+                state.save_checkpoint(checkpoint_path)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"recorded provenance on checkpoint {checkpoint_path}"
+                    )
+                )
 
     def _enrich_manifest_with_vertical(self, manifest: dict, vertical) -> dict:
         """Enrich manifest with vertical data for interview presets."""

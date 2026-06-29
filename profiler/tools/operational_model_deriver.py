@@ -542,7 +542,7 @@ def derive_operational_model(
                         }
                     )
 
-        dep_artifact = entry.get("_dependency_artifact")
+        dep_artifact = entry.get("dependency_artifact")
         if dep_artifact:
             sheet_graph = dep_artifact.get("sheet_graph", {})
             for sheet_edge in sheet_graph.get("edges", []):

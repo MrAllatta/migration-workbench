@@ -280,3 +280,38 @@ def build_view_manifest(
         "views": views,
         "workflow_hints": workflow_hints,
     }
+
+
+# Valid acceptance criterion types
+VALID_ACCEPTANCE_TYPES = {"completion", "coverage", "accuracy", "sequence", "speed", "recovery", "independence"}
+
+# Valid test types
+VALID_TEST_TYPES = {"automated", "performance", "manual"}
+
+
+def validate_view_manifest(manifest: dict) -> list[str]:
+    """Validate a view manifest dict, including acceptance criteria.
+
+    Args:
+        manifest: View manifest dict.
+
+    Returns:
+        List of human-readable error/warning strings.
+    """
+    errors: list[str] = []
+    views = manifest.get("views") or []
+
+    for view in views:
+        view_name = view.get("name") or view.get("tab", "?")
+        for criterion in view.get("acceptance_criteria") or []:
+            cid = criterion.get("id", "?")
+            if not criterion.get("description"):
+                errors.append(f"view {view_name}: criterion {cid} missing description")
+            ctype = criterion.get("type", "")
+            if ctype and ctype not in VALID_ACCEPTANCE_TYPES:
+                errors.append(f"view {view_name}: criterion {cid} has invalid type '{ctype}'")
+            ttype = criterion.get("test_type", "")
+            if ttype and ttype not in VALID_TEST_TYPES:
+                errors.append(f"view {view_name}: criterion {cid} has invalid test_type '{ttype}'")
+
+    return errors

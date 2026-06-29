@@ -1,4 +1,4 @@
-"""Management command: validate the operational model and compute coverage."""
+"""Management command: validate the behavioral specification and compute coverage."""
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -6,7 +6,7 @@ from profiler.tools.pipeline_state import PipelineState
 
 
 class Command(BaseCommand):
-    help = "Validate the operational model and compute coverage metrics"
+    help = "Validate the behavioral specification and compute coverage metrics"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -26,12 +26,12 @@ class Command(BaseCommand):
         threshold = options["threshold"]
 
         state = PipelineState.load(checkpoint_path)
-        if state.operational_model is None:
+        if state.behavioral_spec is None:
             raise CommandError(
-                "Operational model not found. Run derive_operational_model first."
+                "Behavioral spec not found. Run derive_behavioral_spec first."
             )
 
-        state.validate_operational_model()
+        state.validate_behavioral_spec()
 
         if state.coverage_report is None:
             raise CommandError("Failed to compute coverage report")

@@ -22,7 +22,9 @@ from django.core.management.base import CommandError
 
 from profiler.tools.domain_context import DomainContext
 from profiler.tools.operational_model import Capability, OperationalModel
-from profiler.tools.validation_framework import CoverageReport, ValidationRecord
+from profiler.tools.behavioral_spec import BehavioralSpec
+from profiler.tools.behavioral_spec_validation import CoverageReport
+from profiler.tools.validation_framework import ValidationRecord
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +105,7 @@ def _col_index_to_letter(col_index: int) -> str:
     return letters
 
 
-_CHECKPOINT_CURRENT_VERSION = "0.1.0"
+_CHECKPOINT_CURRENT_VERSION = "0.2.0"
 
 
 # Registry: version_string -> list of migration functions.
@@ -167,6 +169,10 @@ _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
     # and the key is <= current, apply the migrations to upgrade payloads.
     "0.0.9": [_migrate_v0_0_8_to_v0_0_9],
     "0.1.0": [_migrate_v0_0_9_to_v0_1_0],
+    # 0.2.0: BehavioralSpec field added — deserializer handles None gracefully.
+    "0.2.0": [
+        lambda raw: raw,
+    ],
 }
 
 
@@ -417,7 +423,7 @@ class PipelineState:
 
     # Schema version for checkpoint migration. Independent of the package version in pyproject.toml
     # -- see Agents.md "Schema versions".
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     discovery: DiscoveryState = field(default_factory=DiscoveryState)
     deep_profile_index: DeepProfileIndex = field(default_factory=DeepProfileIndex)
     domain_knowledge: DomainKnowledge = field(default_factory=DomainKnowledge)
@@ -430,10 +436,19 @@ class PipelineState:
 
     # BPRS unified pipeline fields.
     operational_model: OperationalModel | None = None
+    behavioral_spec: BehavioralSpec | None = None
     validation_record: ValidationRecord | None = None
     coverage_report: CoverageReport | None = None
     test_scaffold: str | None = field(default=None, repr=False)
     doc_scaffold: str | None = field(default=None, repr=False)
+
+    # Operator-defined priority stack rank for workflows
+    operator_priority: dict[str, int] = field(default_factory=dict)
+    # Maps workflow_id -> priority rank (1 = highest)
+
+    # Provenance tracking for all artifacts
+    artifact_provenance: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Maps artifact_key -> {"source": str, "signals": list, "recorded_at": str}
 
     # Runtime-only fields (not serialized to checkpoint).
     _config: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
@@ -653,6 +668,42 @@ class PipelineState:
         )
         self.decisions.append(record)
         return record
+
+    # ------------------------------------------------------------------
+    # Artifact provenance
+    # ------------------------------------------------------------------
+
+    def record_artifact_provenance(
+        self,
+        artifact_key: str,
+        source: str,
+        signals: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Record how an artifact was derived.
+
+        Args:
+            artifact_key: Identifier for the artifact (e.g. 'workflow:weekly_harvest_planning').
+            source: 'inferred', 'elicited', or 'hybrid'.
+            signals: Optional list of inference signals.
+        """
+        import datetime
+
+        self.artifact_provenance[artifact_key] = {
+            "source": source,
+            "signals": signals or [],
+            "recorded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+
+    def get_artifact_provenance(self, artifact_key: str) -> dict[str, Any] | None:
+        """Retrieve provenance for an artifact.
+
+        Args:
+            artifact_key: Identifier for the artifact.
+
+        Returns:
+            The provenance dict or ``None`` if not found.
+        """
+        return self.artifact_provenance.get(artifact_key)
 
     # ------------------------------------------------------------------
     # Checkpoint I/O
@@ -928,6 +979,19 @@ class PipelineState:
         else:
             payload["operational_model"] = None
 
+        # MWBS: behavioral spec as artifact reference
+        if self.behavioral_spec:
+            bs_path = base_dir / "behavioral-spec.json"
+            bs_path.write_text(
+                json.dumps(self.behavioral_spec.to_dict(), indent=2),
+                encoding="utf-8",
+            )
+            payload["behavioral_spec"] = {
+                "_artifact": str(bs_path.relative_to(base_dir))
+            }
+        else:
+            payload["behavioral_spec"] = None
+
         # BPRS: validation record inline (small)
         if self.validation_record:
             payload["validation_record"] = self.validation_record.to_dict()
@@ -951,6 +1015,10 @@ class PipelineState:
             payload["doc_scaffold"] = self.doc_scaffold
         else:
             payload["doc_scaffold"] = None
+
+        # Operator priority and artifact provenance (small, inline)
+        payload["operator_priority"] = dict(self.operator_priority)
+        payload["artifact_provenance"] = dict(self.artifact_provenance)
 
         return payload
 
@@ -1092,6 +1160,16 @@ class PipelineState:
             if isinstance(resolved_op_model, dict):
                 operational_model = OperationalModel.from_dict(resolved_op_model)
 
+        # MWBS: behavioral spec resolution
+        bs_raw = raw.get("behavioral_spec")
+        behavioral_spec: BehavioralSpec | None = None
+        if bs_raw:
+            resolved_bs = (
+                _resolve_artifacts(bs_raw, base_dir) if base_dir else bs_raw
+            )
+            if isinstance(resolved_bs, dict):
+                behavioral_spec = BehavioralSpec.from_dict(resolved_bs)
+
         # BPRS: validation record inline (small)
         validation_record: ValidationRecord | None = None
         val_raw = raw.get("validation_record")
@@ -1114,8 +1192,12 @@ class PipelineState:
         doc_scaffold_raw = raw.get("doc_scaffold")
         doc_scaffold: str | None = str(doc_scaffold_raw) if doc_scaffold_raw else None
 
+        # Operator priority and artifact provenance (small, inline)
+        operator_priority = dict(raw.get("operator_priority") or {})
+        artifact_provenance = dict(raw.get("artifact_provenance") or {})
+
         return cls(
-            version=str(raw.get("version", "0.1.0")),
+            version=str(raw.get("version", "0.2.0")),
             discovery=discovery,
             deep_profile_index=deep_profile_index,
             domain_knowledge=domain_knowledge,
@@ -1126,10 +1208,13 @@ class PipelineState:
                 str(profiler_signals_path) if profiler_signals_path else None
             ),
             operational_model=operational_model,
+            behavioral_spec=behavioral_spec,
             validation_record=validation_record,
             coverage_report=coverage_report,
             test_scaffold=test_scaffold,
             doc_scaffold=doc_scaffold,
+            operator_priority=operator_priority,
+            artifact_provenance=artifact_provenance,
         )
 
     # ------------------------------------------------------------------
@@ -1707,6 +1792,22 @@ class PipelineState:
             )
 
         self.schema_contract = {"tables": tables}
+
+        # Record provenance for the derived schema contract
+        if self.schema_contract:
+            self.record_artifact_provenance(
+                artifact_key="schema_contract",
+                source="inferred",
+                signals=[
+                    {
+                        "phase": "derive_contracts",
+                        "tables_count": len(
+                            self.schema_contract.get("tables", [])
+                        ),
+                    }
+                ],
+            )
+
         self.interaction_contract = {"views": []}
 
         # --- Tab Classification ---
@@ -2121,7 +2222,7 @@ class PipelineState:
                     if dep_path.exists():
                         try:
                             with open(dep_path, "r", encoding="utf-8") as f:
-                                entry_dict["_dependency_artifact"] = json.load(f)
+                                entry_dict["dependency_artifact"] = json.load(f)
                             dep_resolved = True
                             break
                         except (OSError, json.JSONDecodeError):
@@ -2146,6 +2247,121 @@ class PipelineState:
                 "vocabulary": self.domain_knowledge.vocabulary,
             },
         )
+        return self
+
+    def derive_behavioral_spec(
+        self, base_dir: str | os.PathLike[str] | None = None
+    ) -> PipelineState:
+        """Phase: Derive the behavioral specification from profiler artifacts.
+
+        Consumes ``discovery``, ``deep_profile_index``, and ``domain_knowledge``
+        to produce the MWBS BehavioralSpec artifact.
+
+        Args:
+            base_dir: Base directory for resolving ``out_json`` relative paths
+                in deep profile index entries.
+
+        Returns:
+            PipelineState: Self for chaining.
+
+        Raises:
+            RuntimeError: If ``domain_knowledge.domain`` is empty.
+        """
+        if not self.domain_knowledge.domain:
+            raise RuntimeError(
+                "derive_behavioral_spec: domain_knowledge.domain is required"
+            )
+
+        from profiler.tools.behavioral_spec_elicitor import derive_behavioral_spec
+
+        # Resolve out_json references to inline column data
+        entries: list[dict[str, Any]] = []
+        for entry in self.deep_profile_index.entries or []:
+            entry_dict = (
+                dict(entry) if hasattr(entry, "__dataclass_fields__") else dict(entry)
+            )
+            out_json = entry_dict.get("out_json")
+            if out_json and not entry_dict.get("columns"):
+                candidate_bases: list[Path] = []
+                if base_dir:
+                    base_path = Path(base_dir)
+                    candidate_bases.append(base_path)
+                    candidate_bases.append(base_path.parent)
+                    candidate_bases.append(base_path.parent / "data")
+
+                resolved = False
+                for candidate_base in candidate_bases:
+                    candidate_path = candidate_base / out_json
+                    if candidate_path.exists():
+                        try:
+                            with open(candidate_path, "r", encoding="utf-8") as f:
+                                deep_data = json.load(f)
+                            columns = deep_data.get("columns") or deep_data.get(
+                                "summary", {}
+                            ).get("columns", [])
+                            if not columns:
+                                columns = _parse_raw_deep_profile(deep_data)
+                            entry_dict["columns"] = columns
+                            resolved = True
+                            break
+                        except (OSError, json.JSONDecodeError):
+                            continue
+
+                if not resolved and base_dir:
+                    logger.warning(
+                        "Could not resolve out_json %s from base_dir %s",
+                        out_json,
+                        base_dir,
+                    )
+
+            # Resolve dependency_json artifact paths
+            dep_json = entry_dict.get("dependency_json")
+            if dep_json and base_dir:
+                dep_candidate_bases: list[Path] = [
+                    Path(base_dir),
+                    Path(base_dir).parent,
+                    Path(base_dir).parent / "data",
+                ]
+                dep_resolved = False
+                for dep_base in dep_candidate_bases:
+                    dep_path = dep_base / dep_json
+                    if dep_path.exists():
+                        try:
+                            with open(dep_path, "r", encoding="utf-8") as f:
+                                entry_dict["dependency_artifact"] = json.load(f)
+                            dep_resolved = True
+                            break
+                        except (OSError, json.JSONDecodeError):
+                            continue
+                if not dep_resolved:
+                    logger.debug(
+                        "Could not resolve dependency_json %s from base_dir %s",
+                        dep_json,
+                        base_dir,
+                    )
+
+            entries.append(entry_dict)
+
+        self.behavioral_spec = derive_behavioral_spec(
+            discovery={
+                "workbook_index": self.discovery.workbook_index,
+                "broad_inventory": self.discovery.broad_inventory,
+            },
+            deep_profile_index={"entries": entries},
+            domain_knowledge={
+                "domain": self.domain_knowledge.domain,
+                "vocabulary": self.domain_knowledge.vocabulary,
+            },
+        )
+
+        # Populate operator_priority from behavioral spec project metadata
+        if self.behavioral_spec and self.behavioral_spec.project:
+            project = self.behavioral_spec.project
+            if project.operator:
+                self.operator_priority[project.operator] = 1
+            if project.developer:
+                self.operator_priority[project.developer] = 2
+
         return self
 
     def derive_state_projections(
@@ -2506,50 +2722,44 @@ class TestOperationalEvents:
                 "validate_operational_model: operational_model must be derived first"
             )
 
-        from profiler.tools.validation_framework import compute_coverage_metrics
-
-        artifact_inventory: dict[str, Any] = {}
-        for entry in self.deep_profile_index.entries or []:
-            tab_title = str(
-                getattr(entry, "tab_title", "") or entry.get("tab_title", "")
-            )
-            if not tab_title:
-                continue
-
-            # Resolve inline columns or load from out_json
-            columns = getattr(entry, "columns", None) or entry.get("columns", [])
-            if not columns:
-                out_json = getattr(entry, "out_json", None) or entry.get("out_json", "")
-                base_dir = self._checkpoint_dir
-                if out_json and base_dir:
-                    for candidate_base in [
-                        base_dir,
-                        base_dir.parent,
-                        base_dir.parent / "data",
-                    ]:
-                        candidate_path = candidate_base / out_json
-                        if candidate_path.exists():
-                            try:
-                                deep_data = json.loads(
-                                    candidate_path.read_text(encoding="utf-8")
-                                )
-                                columns = deep_data.get("columns") or deep_data.get(
-                                    "summary", {}
-                                ).get("columns", [])
-                                if not columns:
-                                    columns = _parse_raw_deep_profile(deep_data)
-                            except (OSError, json.JSONDecodeError):
-                                columns = []
-                            break
-
-            artifact_inventory[tab_title] = {
-                "columns": [col.get("header_label", "") for col in (columns or [])]
-            }
-
-        self.coverage_report = compute_coverage_metrics(
-            self.operational_model,
-            artifact_inventory,
+        from profiler.tools.validation_framework import (
+            CoverageReport,
+            compute_coverage_metrics,
         )
+
+        # Backward compat: derive behavioral_spec if not already set, so we
+        # can use the new MWBS compute_coverage_metrics (single-arg).
+        if self.behavioral_spec is None and self.domain_knowledge.domain:
+            self.derive_behavioral_spec()
+
+        if self.behavioral_spec is not None:
+            self.coverage_report = compute_coverage_metrics(self.behavioral_spec)
+        else:
+            self.coverage_report = CoverageReport()
+        return self
+
+    def validate_behavioral_spec(
+        self, base_dir: str | os.PathLike[str] | None = None
+    ) -> PipelineState:
+        """Phase: Validate the behavioral spec, computing coverage.
+
+        Uses the new MWBS :func:`compute_coverage_metrics` which takes a
+        single ``BehavioralSpec`` argument (not ``OperationalModel`` + dict).
+
+        Returns:
+            PipelineState: Self for chaining.
+
+        Raises:
+            RuntimeError: If ``behavioral_spec`` is not populated.
+        """
+        if self.behavioral_spec is None:
+            raise RuntimeError(
+                "validate_behavioral_spec: behavioral_spec must be derived first"
+            )
+
+        from profiler.tools.behavioral_spec_validation import compute_coverage_metrics
+
+        self.coverage_report = compute_coverage_metrics(self.behavioral_spec)
         return self
 
 

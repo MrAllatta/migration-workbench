@@ -24,9 +24,9 @@ class TestDataclassDefaults:
     """Verify default field values for each dataclass."""
 
     def test_pipeline_state_defaults(self):
-        """Fresh PipelineState has version="0.1.0" and all sub-objects."""
+        """Fresh PipelineState has version="0.2.0" and all sub-objects."""
         state = PipelineState()
-        assert state.version == "0.1.0"
+        assert state.version == "0.2.0"
         assert isinstance(state.discovery, DiscoveryState)
         assert isinstance(state.deep_profile_index, DeepProfileIndex)
         assert isinstance(state.domain_knowledge, DomainKnowledge)
@@ -188,7 +188,7 @@ class TestCheckpointRoundTrip:
         state.save_checkpoint(checkpoint)
 
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.1.0"
+        assert loaded.version == "0.2.0"
         assert loaded.discovery.source_tree == {}
         # Guard-clause sentinels survive round-trip
         assert loaded.discovery.shortlist is None
@@ -240,7 +240,7 @@ class TestCheckpointRoundTrip:
     def test_checkpoint_roundtrip_full(self, tmp_path):
         """Full PipelineState round-trips with all data intact."""
         state = PipelineState(
-            version="0.1.0",
+            version="0.2.0",
             discovery=DiscoveryState(
                 source_tree={"provider": "google_sheets"},
                 workbook_index=[{"workbook_code": "101", "year": 2023}],
@@ -271,7 +271,7 @@ class TestCheckpointRoundTrip:
         assert path.exists()
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.1.0"
+        assert loaded.version == "0.2.0"
         assert loaded.discovery.source_tree == {"provider": "google_sheets"}
         assert loaded.discovery.workbook_index == [
             {"workbook_code": "101", "year": 2023}
@@ -298,7 +298,7 @@ class TestCheckpointRoundTrip:
         """Loading a non-existent checkpoint returns an empty state."""
         checkpoint = tmp_path / "nonexistent.yaml"
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.1.0"
+        assert loaded.version == "0.2.0"
         assert loaded.discovery.approved_tabs is None
 
 
@@ -313,7 +313,7 @@ class TestLoadOrCreate:
         )
         state = PipelineState.load_or_create(config_path=config_path)
         assert isinstance(state, PipelineState)
-        assert state.version == "0.1.0"
+        assert state.version == "0.2.0"
         assert state.domain_knowledge.domain == "test_domain"
         assert state.discovery.source_tree is None
 
@@ -343,7 +343,7 @@ class TestLoadOrCreate:
             config_path=tmp_path / "nonexistent.json",
             checkpoint_path=checkpoint,
         )
-        assert state.version == "0.1.0"
+        assert state.version == "0.2.0"
         assert not checkpoint.exists()
 
     def test_load_or_create_loads_existing_simple(self, tmp_path: Path):
@@ -783,7 +783,7 @@ class TestSpecExample:
     def test_spec_example_roundtrip(self, tmp_path):
         """Load the full YAML example from the design spec."""
         state = PipelineState(
-            version="0.1.0",
+            version="0.2.0",
             discovery=DiscoveryState(
                 source_tree={
                     "provider": "google_sheets",
@@ -863,7 +863,7 @@ class TestSpecExample:
         state.save_checkpoint(path)
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.1.0"
+        assert loaded.version == "0.2.0"
         assert loaded.discovery.source_tree["provider"] == "google_sheets"
         assert (
             loaded.discovery.source_tree["spreadsheets"][0]["name"]
@@ -1357,7 +1357,7 @@ class TestVersionMigration:
         from profiler.tools.pipeline_state import PipelineState
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.1.0"
+        assert loaded.version == "0.2.0"
         assert loaded.domain_knowledge.domain == "test"
 
 
@@ -1810,3 +1810,248 @@ class TestFormulaDependencyWiring:
             entry, out_dir=tmp_path, date_stamp="2026-06-23"
         )
         assert "dependency_json" not in entry
+
+
+# ---------------------------------------------------------------------------
+# 13. BehavioralSpec integration
+# ---------------------------------------------------------------------------
+
+
+class TestBehavioralSpecIntegration:
+    """BehavioralSpec field, serialization, derive, and validate on PipelineState."""
+
+    def test_behavioral_spec_field_defaults_to_none(self):
+        """Fresh PipelineState has behavioral_spec=None."""
+        state = PipelineState()
+        assert state.behavioral_spec is None
+
+    @patch("profiler.tools.behavioral_spec_elicitor.derive_behavioral_spec")
+    def test_derive_behavioral_spec_pipeline_method(
+        self, mock_derive, tmp_path
+    ):
+        """derive_behavioral_spec() calls elicitor and sets behavioral_spec."""
+        from profiler.tools.behavioral_spec import BehavioralSpec
+
+        mock_derive.return_value = BehavioralSpec()
+
+        state = PipelineState()
+        state.deep_profile_index.entries = [
+            {"tab_title": "Crop Planner", "columns": [{"header_label": "crop"}]}
+        ]
+        state.domain_knowledge.domain = "farm"
+        state.domain_knowledge.vocabulary = {
+            "operational": ["crop"],
+            "reference": [],
+            "support": [],
+            "derived": [],
+        }
+
+        result = state.derive_behavioral_spec()
+
+        assert mock_derive.called
+        assert result.behavioral_spec is not None
+        assert isinstance(result.behavioral_spec, BehavioralSpec)
+        assert result is state  # chaining
+
+    def test_derive_behavioral_spec_requires_domain(self):
+        """RuntimeError when domain_knowledge.domain is empty."""
+        state = PipelineState()
+        with pytest.raises(RuntimeError, match="domain_knowledge.domain is required"):
+            state.derive_behavioral_spec()
+
+    def test_behavioral_spec_roundtrip_serialization(self, tmp_path):
+        """behavioral_spec survives save-checkpoint -> load cycle."""
+        from profiler.tools.behavioral_spec import BehavioralSpec, MwbsProject
+
+        state = PipelineState()
+        state.behavioral_spec = BehavioralSpec(
+            project=MwbsProject(
+                name="test_project",
+                version=1,
+                status="draft",
+            ),
+        )
+
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.behavioral_spec is not None
+        assert loaded.behavioral_spec.project is not None
+        assert loaded.behavioral_spec.project.name == "test_project"
+        assert loaded.behavioral_spec.project.status == "draft"
+
+    def test_behavioral_spec_none_serialization(self, tmp_path):
+        """behavioral_spec=None serializes and deserializes as None."""
+        state = PipelineState()
+        assert state.behavioral_spec is None
+
+        checkpoint = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(checkpoint)
+
+        loaded = PipelineState.load(checkpoint)
+        assert loaded.behavioral_spec is None
+
+    def test_validate_behavioral_spec_requires_behavioral_spec(self):
+        """RuntimeError when behavioral_spec is None."""
+        state = PipelineState()
+        with pytest.raises(RuntimeError, match="behavioral_spec must be derived first"):
+            state.validate_behavioral_spec()
+
+    @patch("profiler.tools.behavioral_spec_validation.compute_coverage_metrics")
+    def test_validate_behavioral_spec_computes_coverage(
+        self, mock_compute
+    ):
+        """validate_behavioral_spec() calls compute_coverage_metrics and sets coverage_report."""
+        from profiler.tools.behavioral_spec import BehavioralSpec
+        from profiler.tools.behavioral_spec_validation import CoverageReport
+
+        mock_compute.return_value = CoverageReport(
+            data_coverage=1.0,
+            formula_coverage=1.0,
+            structural_coverage=1.0,
+            workflow_coverage=1.0,
+            exception_coverage=1.0,
+            report_coverage=1.0,
+        )
+
+        state = PipelineState()
+        state.behavioral_spec = BehavioralSpec()
+
+        result = state.validate_behavioral_spec()
+
+        assert mock_compute.called
+        assert result.coverage_report is not None
+        assert result.coverage_report.data_coverage == 1.0
+        assert result is state  # chaining
+
+
+# ---------------------------------------------------------------------------
+# 14. Operator priority and artifact provenance
+# ---------------------------------------------------------------------------
+
+
+class TestOperatorPriority:
+    """PipelineState operator_priority field."""
+
+    def test_operator_priority_defaults_empty(self):
+        """Fresh PipelineState has empty operator_priority."""
+        state = PipelineState()
+        assert state.operator_priority == {}
+
+    def test_operator_priority_stores_values(self):
+        """PipelineState can store operator-defined workflow priorities."""
+        state = PipelineState()
+        state.operator_priority = {
+            "weekly_harvest_planning": 1,
+            "weekly_sales_plan_creation": 2,
+            "post_sales_inventory_reconciliation": 3,
+        }
+        assert state.operator_priority["weekly_harvest_planning"] == 1
+
+    def test_operator_priority_serialization(self, tmp_path):
+        """operator_priority survives to_dict/from_dict round-trip."""
+        state = PipelineState()
+        state.operator_priority = {
+            "weekly_harvest_planning": 1,
+            "weekly_sales_plan_creation": 2,
+        }
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+        loaded = PipelineState.load(path)
+        assert loaded.operator_priority["weekly_harvest_planning"] == 1
+        assert loaded.operator_priority["weekly_sales_plan_creation"] == 2
+
+
+class TestArtifactProvenance:
+    """PipelineState artifact_provenance field and methods."""
+
+    def test_artifact_provenance_defaults_empty(self):
+        """Fresh PipelineState has empty artifact_provenance."""
+        state = PipelineState()
+        assert state.artifact_provenance == {}
+
+    def test_artifact_provenance_records(self):
+        """PipelineState can track artifact provenance."""
+        state = PipelineState()
+        state.record_artifact_provenance(
+            artifact_key="workflow:weekly_harvest_planning",
+            source="hybrid",
+            signals=[
+                {"rule": "INF-04", "signal": "Print range on HarvestOrders tab"},
+                {"rule": "INF-02", "signal": "Formula chain to WeeklySales"},
+            ],
+        )
+        provenance = state.get_artifact_provenance("workflow:weekly_harvest_planning")
+        assert provenance["source"] == "hybrid"
+        assert len(provenance["signals"]) == 2
+
+    def test_artifact_provenance_get_unknown(self):
+        """get_artifact_provenance returns None for unknown key."""
+        state = PipelineState()
+        assert state.get_artifact_provenance("nonexistent") is None
+
+    def test_artifact_provenance_serialization(self, tmp_path):
+        """Provenance survives save_checkpoint -> load cycle (to_dict/from_dict)."""
+        state = PipelineState()
+        state.record_artifact_provenance(
+            artifact_key="workflow:weekly_harvest_planning",
+            source="inferred",
+        )
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+        loaded = PipelineState.load(path)
+        assert loaded.get_artifact_provenance("workflow:weekly_harvest_planning")["source"] == "inferred"
+
+    def test_artifact_provenance_round_trip(self, tmp_path):
+        """Provenance survives save-checkpoint -> load cycle."""
+        state = PipelineState()
+        state.record_artifact_provenance(
+            artifact_key="schema_contract",
+            source="inferred",
+            signals=[{"phase": "derive_contracts", "tables_count": 3}],
+        )
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+        loaded = PipelineState.load(path)
+        provenance = loaded.get_artifact_provenance("schema_contract")
+        assert provenance is not None
+        assert provenance["source"] == "inferred"
+        assert len(provenance["signals"]) == 1
+        assert provenance["signals"][0]["tables_count"] == 3
+
+    def test_artifact_provenance_recorded_at_has_tz(self):
+        """record_artifact_provenance sets recorded_at with timezone."""
+        state = PipelineState()
+        state.record_artifact_provenance(
+            artifact_key="test",
+            source="inferred",
+        )
+        provenance = state.get_artifact_provenance("test")
+        assert provenance is not None
+        assert provenance["recorded_at"].endswith("+00:00") or provenance["recorded_at"].endswith("Z")
+
+
+class TestDeriveContractsProvenance:
+    """derive_contracts() records provenance for schema_contract."""
+
+    def test_derive_contracts_records_provenance(self):
+        """derive_contracts() records provenance for the schema contract."""
+        state = PipelineState(
+            deep_profile_index=DeepProfileIndex(
+                entries=[
+                    {
+                        "tab_title": "Crop Planner",
+                        "columns": [
+                            {"header": "crop_name", "data_type": "string"},
+                        ],
+                    },
+                ]
+            ),
+        )
+        result = state.derive_contracts()
+        provenance = result.get_artifact_provenance("schema_contract")
+        assert provenance is not None
+        assert provenance["source"] == "inferred"
+        assert len(provenance["signals"]) == 1
+        assert provenance["signals"][0]["tables_count"] == 1

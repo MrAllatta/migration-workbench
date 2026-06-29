@@ -42,7 +42,7 @@ class TestCheckpointMigration:
         checkpoint_path.write_text(yaml.safe_dump(old_checkpoint), encoding="utf-8")
 
         state = PipelineState.load(checkpoint_path)
-        assert state.version == "0.1.0"
+        assert state.version == "0.2.0"
         assert state.operational_model is not None
 
     def test_migrate_populates_operational_model(self, tmp_path):

@@ -451,3 +451,58 @@ def test_scaffold_view_manifest_command_writes_yaml(tmp_path):
         "status_fields_inferred": 1,
         "tabs_hidden_skipped": 1,
     }
+
+
+def test_view_entry_with_acceptance_criteria():
+    """View manifest entry can define acceptance criteria."""
+    view_entry = {
+        "tab": "HarvestOrders",
+        "model_name": "HarvestOrder",
+        "view_type": "list",
+        "acceptance_criteria": [
+            {
+                "id": "AC-harvest-001",
+                "type": "completion",
+                "description": "All confirmed orders appear in harvest plan",
+                "assertion": "count(harvest_order.line_items) == count(confirmed_orders)",
+                "test_type": "automated",
+            }
+        ],
+    }
+    assert view_entry["acceptance_criteria"][0]["type"] == "completion"
+
+
+def test_validate_view_manifest_with_acceptance_criteria():
+    """View manifest validation catches bad acceptance criteria."""
+    from workbook.view_manifest import validate_view_manifest
+    manifest = {
+        "version": "view-manifest-draft-1",
+        "views": [
+            {
+                "name": "harvest_orders",
+                "acceptance_criteria": [
+                    {
+                        "id": "AC-001",
+                        "type": "completion",
+                        "description": "All orders included",
+                        "test_type": "automated",
+                    },
+                    {
+                        "id": "AC-002",
+                        "type": "invalid_type",
+                        "description": "Bad type",
+                        "test_type": "automated",
+                    },
+                    {
+                        "id": "AC-003",
+                        "type": "completion",
+                        "description": "",
+                        "test_type": "manual",
+                    },
+                ],
+            }
+        ],
+    }
+    errors = validate_view_manifest(manifest)
+    assert any("invalid type" in e for e in errors)
+    assert any("missing description" in e for e in errors)

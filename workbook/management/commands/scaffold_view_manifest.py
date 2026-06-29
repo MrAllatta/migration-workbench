@@ -10,9 +10,10 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
+from profiler.tools.pipeline_state import PipelineState
 from workbook.schema_contract import load_json
 from workbook.tools.signal_extraction import extract_signals
-from workbook.view_manifest import VIEW_MANIFEST_VERSION, build_view_manifest
+from workbook.view_manifest import VIEW_MANIFEST_VERSION, build_view_manifest, validate_view_manifest
 
 
 def _load_yaml(path: Path) -> Any:
@@ -95,6 +96,12 @@ class Command(BaseCommand):
             help="Only show explanations for tabs with confidence below this "
             "threshold (default: 0.0 = show all). Requires --explain.",
         )
+        parser.add_argument(
+            "--checkpoint",
+            default=None,
+            help="Path to a PipelineState checkpoint YAML. When provided, "
+            "artifact provenance is recorded on the state and saved.",
+        )
 
     def handle(self, *args, **options):
         # Validate argument combinations
@@ -129,6 +136,12 @@ class Command(BaseCommand):
             schema_contract=schema_contract,
         )
 
+        validation_errors = validate_view_manifest(manifest)
+        if validation_errors:
+            self.stdout.write(self.style.WARNING("View manifest validation issues:"))
+            for error in validation_errors:
+                self.stdout.write(self.style.WARNING(f"  {error}"))
+
         try:
             import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
@@ -146,6 +159,27 @@ class Command(BaseCommand):
         )
         out_path.write_text(text, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"wrote {out_path}"))
+
+        # Record artifact provenance on PipelineState if checkpoint path provided
+        checkpoint_arg = options.get("checkpoint")
+        if checkpoint_arg:
+            checkpoint_path = Path(checkpoint_arg).resolve()
+            if checkpoint_path.exists():
+                state = PipelineState.load(checkpoint_path)
+            else:
+                state = PipelineState()
+            if hasattr(state, "record_artifact_provenance"):
+                state.record_artifact_provenance(
+                    artifact_key=f"view_manifest:{manifest.get('source', {}).get('source_id', 'unknown')}",
+                    source="inferred",
+                    signals=[{"views_count": len(manifest.get("views", []))}],
+                )
+                state.save_checkpoint(checkpoint_path)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"recorded provenance on checkpoint {checkpoint_path}"
+                    )
+                )
 
         summary_arg = options.get("summary_json")
         if summary_arg:

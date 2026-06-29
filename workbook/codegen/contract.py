@@ -509,6 +509,40 @@ def resolve_field_mapping(table: dict[str, Any]) -> dict[str, str]:
     return mapping
 
 
+def _validate_table_exceptions(table: dict[str, Any]) -> list[str]:
+    """Validate exception blocks on a single contract table.
+
+    Checks that each exception has an ``id``, a ``condition``, a valid
+    ``severity`` (one of ``warning``, ``error``, ``blocking``), and that
+    every response entry has an ``action``.
+
+    Returns:
+        List of human-readable warning strings (empty when no issues).
+    """
+    warnings: list[str] = []
+    name = table.get("model_name") or table.get("source_tab", "?")
+    valid_severities = {"warning", "error", "blocking"}
+
+    for exception in table.get("exceptions") or []:
+        exc_id = exception.get("id", "")
+        if not exc_id:
+            warnings.append(f"{name}: exception missing id")
+            continue
+        if not exception.get("condition"):
+            warnings.append(f"{name}: exception {exc_id} missing condition")
+        severity = exception.get("severity", "")
+        if severity and severity not in valid_severities:
+            warnings.append(
+                f"{name}: exception {exc_id} has invalid severity '{severity}'"
+            )
+        for response in exception.get("responses") or []:
+            if not response.get("action"):
+                warnings.append(
+                    f"{name}: exception {exc_id} response missing action"
+                )
+    return warnings
+
+
 def validate_contract_tables(
     contract: dict[str, Any],
 ) -> list[str]:
@@ -577,6 +611,10 @@ def validate_contract_tables(
                         f'{name}.import_config.unique_on: "{f}" appears more than once'
                     )
                 seen.add(f)
+
+        # Validate exception blocks
+        exception_warnings = _validate_table_exceptions(table)
+        warnings.extend(exception_warnings)
 
     return warnings
 
