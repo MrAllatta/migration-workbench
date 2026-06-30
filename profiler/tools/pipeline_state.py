@@ -1553,7 +1553,12 @@ class PipelineState:
         for tab in scored_tabs:
             if tab["confidence"] >= 0.90:
                 approved.setdefault("auto_selected", []).append(tab["tab_title"])
-        self.discovery.approved_tabs = approved
+        # Only overwrite approved_tabs if the re-scoring produced results.
+        # Otherwise preserve the tab_selection from discover().
+        if approved:
+            self.discovery.approved_tabs = approved
+        elif self.discovery.approved_tabs is None:
+            self.discovery.approved_tabs = {}
 
         self.completed_phases.append("score_and_select")
         return self
