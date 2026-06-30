@@ -9,7 +9,6 @@ from profiler.tools.tab_classifier import (
     classification_summary,
 )
 
-
 # ── TabClassification dataclass validation ──────────────────────────────────
 
 

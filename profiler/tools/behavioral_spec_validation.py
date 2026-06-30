@@ -23,7 +23,6 @@ from profiler.tools.behavioral_spec import (
     SignOffBlock,
 )
 
-
 # ---------------------------------------------------------------------------
 # ValidationRecord (unchanged from original validation_framework.py)
 # ---------------------------------------------------------------------------
@@ -173,6 +172,21 @@ class CoverageReport:
             ]
         )
 
+    @property
+    def auto_derivable_dimensions(self) -> list[str]:
+        """Return names of the three auto-derivable dimensions.
+
+        These dimensions are derived automatically from the behavioral spec
+        without requiring manual review or intervention:
+        - data_coverage
+        - structural_coverage
+        - workflow_coverage
+
+        Returns:
+            List of dimension names that are auto-derivable.
+        """
+        return ["data_coverage", "structural_coverage", "workflow_coverage"]
+
     def to_dict(self) -> dict[str, float]:
         """Convert to a plain dict for serialization.
 
@@ -318,9 +332,7 @@ def validate_sign_off(spec: BehavioralSpec) -> list[str]:
     # ---- Rule 7: workflow exceptions ----
     for workflow in spec.workflows:
         if not workflow.exceptions:
-            errors.append(
-                f"Rule 7: workflow '{workflow.id}' references no exceptions"
-            )
+            errors.append(f"Rule 7: workflow '{workflow.id}' references no exceptions")
 
     # ---- Rule 8: workflow acceptance criteria ----
     for workflow in spec.workflows:
@@ -339,8 +351,7 @@ def validate_sign_off(spec: BehavioralSpec) -> list[str]:
     for workflow in spec.workflows:
         if not workflow.priority:
             errors.append(
-                f"Rule 9: workflow '{workflow.id}' must have "
-                f"a non-zero priority"
+                f"Rule 9: workflow '{workflow.id}' must have " f"a non-zero priority"
             )
 
     # ---- Rule 10: decision information_system_must_provide ----
@@ -365,8 +376,7 @@ def validate_sign_off(spec: BehavioralSpec) -> list[str]:
         excluded_ids: set[str] = set()
         if spec.sign_off is not None:
             excluded_ids = {
-                exclusion.workflow
-                for exclusion in spec.sign_off.scope_exclusions
+                exclusion.workflow for exclusion in spec.sign_off.scope_exclusions
             }
         for cm_workflow in spec.coverage_map.workflows:
             if (
@@ -421,8 +431,7 @@ def compute_coverage_metrics(spec: BehavioralSpec) -> CoverageReport:
 
     # Formula coverage: fraction of workflows with data_entry populated
     workflows_with_data_entry = sum(
-        1 for w in spec.workflows
-        if w.data_entry is not None and w.data_entry.frequency
+        1 for w in spec.workflows if w.data_entry is not None and w.data_entry.frequency
     )
     formula_coverage = workflows_with_data_entry / n_workflows
 
@@ -441,10 +450,7 @@ def compute_coverage_metrics(spec: BehavioralSpec) -> CoverageReport:
     workflow_coverage = workflows_with_job_stories / n_workflows
 
     # Exception coverage: fraction of workflows with exceptions documented
-    workflows_with_exceptions = sum(
-        1 for w in spec.workflows
-        if w.exceptions
-    )
+    workflows_with_exceptions = sum(1 for w in spec.workflows if w.exceptions)
     exception_coverage = min(1.0, workflows_with_exceptions / n_workflows)
 
     # Report coverage: ratio of reports to workflows

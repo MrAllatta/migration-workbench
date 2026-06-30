@@ -129,9 +129,11 @@ def test_import_preflight_uses_import_preflight_script():
     assert "import_preflight" in block
     preflight_section = block[block.index("import-preflight:") :]
     preflight_section = preflight_section[
-        : preflight_section.index("\n\n")
-        if "\n\n" in preflight_section
-        else len(preflight_section)
+        : (
+            preflight_section.index("\n\n")
+            if "\n\n" in preflight_section
+            else len(preflight_section)
+        )
     ]
     assert "import_preflight" in preflight_section
 

@@ -43,7 +43,6 @@ from django.db.models import Model
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now as tz_now
 
-
 # ── CSV cell helpers ──────────────────────────────────────────────────────────────
 
 
@@ -516,11 +515,11 @@ class BaseAuditCommand(BaseCommand):
                 symbol = (
                     "\u2713"
                     if status == "pass"
-                    else "\u26a0"
-                    if status == "warn"
-                    else "\u2717"
-                    if status == "fail"
-                    else "\u2139"
+                    else (
+                        "\u26a0"
+                        if status == "warn"
+                        else "\u2717" if status == "fail" else "\u2139"
+                    )
                 )
                 self.stdout.write(
                     f"  {symbol} {mapping.model.__name__}: "
@@ -645,11 +644,11 @@ class BaseAuditCommand(BaseCommand):
                 symbol = (
                     "\u2713"
                     if status == "pass"
-                    else "\u26a0"
-                    if status == "warn"
-                    else "\u2717"
-                    if status == "fail"
-                    else "\u2139"
+                    else (
+                        "\u26a0"
+                        if status == "warn"
+                        else "\u2717" if status == "fail" else "\u2139"
+                    )
                 )
                 self.stdout.write(
                     f"  {symbol} {mapping.model.__name__}: {total_sampled} rows sampled, "
@@ -673,9 +672,7 @@ class BaseAuditCommand(BaseCommand):
         overall_status = (
             "fail"
             if has_mismatch and any(c["status"] == "fail" for c in checks)
-            else "warn"
-            if has_mismatch
-            else "pass"
+            else "warn" if has_mismatch else "pass"
         )
         return {"status": overall_status, "checks": checks}
 

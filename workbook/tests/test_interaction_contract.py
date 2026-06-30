@@ -10,7 +10,6 @@ from workbook.interaction_contract import (
     validate_interaction_contract,
 )
 
-
 # ---------------------------------------------------------------------------
 # Validation: top-level structure
 # ---------------------------------------------------------------------------

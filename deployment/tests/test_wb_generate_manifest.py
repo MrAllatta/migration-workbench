@@ -20,9 +20,9 @@ def test_generate_manifest_forwards_contract_as_schema_contract():
             _generate_manifest(args)
 
     call_kwargs = mock_call.call_args[1]
-    assert call_kwargs.get("schema_contract") == "build/schema-contract.yaml", (
-        f"Expected schema_contract kwarg to be forwarded, got: {call_kwargs}"
-    )
+    assert (
+        call_kwargs.get("schema_contract") == "build/schema-contract.yaml"
+    ), f"Expected schema_contract kwarg to be forwarded, got: {call_kwargs}"
 
 
 def test_generate_manifest_imports_scaffold_not_generate():

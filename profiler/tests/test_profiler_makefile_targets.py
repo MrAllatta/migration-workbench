@@ -6,6 +6,8 @@ from workbook.makefile_targets import (
     profile_phase_blocks,
     profile_clean_block,
     full_targets_block,
+    derive_behavioral_spec_block,
+    validate_behavioral_spec_block,
 )
 
 
@@ -87,6 +89,39 @@ class TestProfileCleanBlock:
         """Confirmation prompt is present."""
         output = profile_clean_block(MakeContext())
         assert "Are you sure" in output
+
+    def test_force_clean_bypass(self):
+        """FORCE=1 bypasses prompt but cleanup always runs."""
+        output = profile_clean_block(MakeContext())
+        assert 'if [ -z "$$FORCE" ]; then' in output
+        assert "rm -f" in output
+        # "FORCE not set - skipping cleanup" should NOT exist;
+        # cleanup runs regardless of FORCE after the prompt gate
+        assert "FORCE not set" not in output
+
+
+class TestBehavioralSpecBlocks:
+    """Verify behavioral spec target blocks."""
+
+    def test_derive_behavioral_spec_present(self):
+        """derive-behavioral-spec target is in the block."""
+
+        output = derive_behavioral_spec_block(MakeContext())
+        assert "derive-behavioral-spec" in output
+
+    def test_validate_behavioral_spec_present(self):
+        """validate-behavioral-spec target is in the block."""
+
+        output = validate_behavioral_spec_block(MakeContext())
+        assert "validate-behavioral-spec" in output
+
+    def test_behavioral_spec_targets(self):
+        """Both derive-behavioral-spec and validate-behavioral-spec appear in generated blocks."""
+
+        derive_output = derive_behavioral_spec_block(MakeContext())
+        validate_output = validate_behavioral_spec_block(MakeContext())
+        assert "derive-behavioral-spec" in derive_output
+        assert "validate-behavioral-spec" in validate_output
 
 
 class TestFullTargetsBlock:

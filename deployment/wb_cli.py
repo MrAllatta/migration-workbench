@@ -949,12 +949,12 @@ def _deploy_live(args: argparse.Namespace) -> int:
             outcome="deploy_failed",
             is_healthy=False,
             metadata={
-                "deploy_stderr": deploy_result.stderr[-2000:]
-                if deploy_result.stderr
-                else "",
-                "deploy_stdout": deploy_result.stdout[-2000:]
-                if deploy_result.stdout
-                else "",
+                "deploy_stderr": (
+                    deploy_result.stderr[-2000:] if deploy_result.stderr else ""
+                ),
+                "deploy_stdout": (
+                    deploy_result.stdout[-2000:] if deploy_result.stdout else ""
+                ),
                 "build_strategy": build_strategy,
             },
             durable_log_path=Path("build/deploy/release-events.jsonl"),

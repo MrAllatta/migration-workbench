@@ -37,13 +37,18 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
-from profiler.tools.pipeline_state import PipelineState
+from profiler.tools.pipeline_state import (
+    PipelineState,
+    _PHASE_ORDER,
+    _is_scored_shortlist,
+)
 
 PHASES = (
     "discover",
     "score_and_select",
     "deep_profile",
     "derive_contracts",
+    "scan_formulas",
     "validate",
 )
 
@@ -150,6 +155,38 @@ class Command(BaseCommand):
             signals_output_path=options.get("signals_output"),
         )
 
+        # --force: remove target phase and all downstream phases from
+        # completed_phases before execution.  This allows re-running a
+        # specific phase and all phases that depend on its output.
+        force = options.get("force", False)
+        if force and phase != "all":
+            if phase in _PHASE_ORDER:
+                phase_index = _PHASE_ORDER.index(phase)
+                downstream = set(_PHASE_ORDER[phase_index:])
+                original = list(state.completed_phases)
+                state.completed_phases = [
+                    p for p in state.completed_phases if p not in downstream
+                ]
+                removed = set(original) - set(state.completed_phases)
+                if removed:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"--force: removing completed phases "
+                            f"{sorted(removed)} to re-run {phase}"
+                        )
+                    )
+        elif force and phase == "all":
+            # --force --phase all: clear all completed phases, re-run everything
+            original_count = len(state.completed_phases)
+            state.completed_phases.clear()
+            if original_count:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"--force: clearing {original_count} completed "
+                        f"phases to re-run all"
+                    )
+                )
+
         if phase == "all":
             self._run_all(
                 state,
@@ -179,7 +216,17 @@ class Command(BaseCommand):
         stop_before_deep: bool = False,
     ) -> None:
         """Run all phases sequentially, skipping completed ones."""
-        if state.discovery.source_tree is None:
+        # --- discover ---
+        # Check completed_phases registry first, fall back to sentinel for
+        # backward compat with pre-v0.3.0 checkpoints.
+        discover_done = "discover" in state.completed_phases
+        if not discover_done:
+            # Sentinel fallback: old behavior — source_tree is not None means
+            # discover completed (even if source_tree is {} from an empty run).
+            if state.discovery.source_tree is not None:
+                discover_done = True
+
+        if not discover_done:
             self._run_discover(
                 state,
                 config,
@@ -191,7 +238,20 @@ class Command(BaseCommand):
         else:
             self.stdout.write("[skip] discover already complete")
 
-        if state.discovery.shortlist is None:
+        # --- score_and_select ---
+        # Check completed_phases first (authoritative after v0.3.0 migration).
+        # Sentinel fallback (backward compat with manually constructed states):
+        # only if shortlist entries are in re-scored format (score + scoring_rationale).
+        # NOTE: discover() always writes to shortlist, so a plain "shortlist is not None"
+        # check would conflate discover with score_and_select — that's the bug this fixes.
+        sas_done = "score_and_select" in state.completed_phases
+        if not sas_done:
+            if state.discovery.shortlist is not None and _is_scored_shortlist(
+                state.discovery.shortlist
+            ):
+                sas_done = True
+
+        if not sas_done:
             self._run_score_and_select(
                 state,
                 config,
@@ -203,7 +263,13 @@ class Command(BaseCommand):
         else:
             self.stdout.write("[skip] score_and_select already complete")
 
-        if not state.deep_profile_index.entries:
+        # --- deep_profile ---
+        dp_done = "deep_profile" in state.completed_phases
+        if not dp_done:
+            if state.deep_profile_index.entries:
+                dp_done = True
+
+        if not dp_done:
             self._run_deep_profile(
                 state,
                 config,
@@ -214,7 +280,13 @@ class Command(BaseCommand):
         else:
             self.stdout.write("[skip] deep_profile already complete")
 
-        if state.schema_contract is None:
+        # --- derive_contracts ---
+        dc_done = "derive_contracts" in state.completed_phases
+        if not dc_done:
+            if state.schema_contract is not None:
+                dc_done = True
+
+        if not dc_done:
             self._run_derive_contracts(
                 state,
                 config,
@@ -224,6 +296,24 @@ class Command(BaseCommand):
             )
         else:
             self.stdout.write("[skip] derive_contracts already complete")
+
+        # --- scan_formulas ---
+        sf_done = "scan_formulas" in state.completed_phases
+        if not sf_done:
+            if state.deep_profile_index.entries:
+                self._run_scan_formulas(
+                    state,
+                    config,
+                    out_dir,
+                    date_stamp,
+                    checkpoint_path,
+                )
+            else:
+                self.stdout.write(
+                    "[skip] scan_formulas — no deep profile data available"
+                )
+        else:
+            self.stdout.write("[skip] scan_formulas already complete")
 
     def _run_discover(
         self,
@@ -235,6 +325,11 @@ class Command(BaseCommand):
         stop_before_deep: bool = False,
     ) -> None:
         """Phase 0/1: Discovery through tab selection."""
+        if "discover" in state.completed_phases:
+            self.stdout.write(
+                "Checkpoint has completed_phases discover — skipping discover phase"
+            )
+            return
         if state.discovery.source_tree and state.discovery.approved_tabs:
             self.stdout.write("Checkpoint has approved_tabs — skipping discover phase")
             return
@@ -255,6 +350,12 @@ class Command(BaseCommand):
         stop_before_deep: bool = False,
     ) -> None:
         """Phase 2: Re-score tabs using domain knowledge (no API calls)."""
+        if "score_and_select" in state.completed_phases:
+            self.stdout.write(
+                "Checkpoint has completed_phases score_and_select — "
+                "skipping score_and_select phase"
+            )
+            return
         if not state.discovery.broad_inventory:
             self.stdout.write("No broad_inventory in checkpoint — cannot re-score")
             return
@@ -276,6 +377,12 @@ class Command(BaseCommand):
         stop_before_deep: bool = False,
     ) -> None:
         """Phase 3: Deep profiling of approved tabs."""
+        if "deep_profile" in state.completed_phases:
+            self.stdout.write(
+                "Checkpoint has completed_phases deep_profile — "
+                "skipping deep_profile phase"
+            )
+            return
         if not state.discovery.approved_tabs:
             self.stdout.write("No approved_tabs in checkpoint — run discover first")
             return
@@ -298,6 +405,12 @@ class Command(BaseCommand):
         stop_before_deep: bool = False,
     ) -> None:
         """Phase 4: Derive schema and interaction contracts."""
+        if "derive_contracts" in state.completed_phases:
+            self.stdout.write(
+                "Checkpoint has completed_phases derive_contracts — "
+                "skipping derive_contracts phase"
+            )
+            return
         if not state.deep_profile_index.entries:
             self.stdout.write("No deep profile data — run deep_profile first")
             return
@@ -307,6 +420,34 @@ class Command(BaseCommand):
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
             self.style.SUCCESS(f"derive_contracts complete — {checkpoint_path}")
+        )
+
+    def _run_scan_formulas(
+        self,
+        state: PipelineState,
+        config: dict[str, Any],
+        out_dir: Path,
+        date_stamp: str,
+        checkpoint_path: Path,
+        stop_before_deep: bool = False,
+    ) -> None:
+        """Phase: Scan approved workbooks for formula patterns."""
+        if "scan_formulas" in state.completed_phases:
+            self.stdout.write(
+                "Checkpoint has completed_phases scan_formulas — "
+                "skipping scan_formulas phase"
+            )
+            return
+        if not state.deep_profile_index.entries:
+            self.stdout.write("No deep profile data — run deep_profile first")
+            return
+
+        self.stdout.write("Running scan_formulas...")
+        _drive, sheets_service = self._build_services()
+        state.scan_formulas(sheets_service=sheets_service)
+        state.save_checkpoint(checkpoint_path)
+        self.stdout.write(
+            self.style.SUCCESS(f"scan_formulas complete — {checkpoint_path}")
         )
 
     def _run_validate(

@@ -1,6 +1,5 @@
 """Tests for the MWBS BehavioralSpec dataclass layer."""
 
-import pathlib
 
 from profiler.tools.behavioral_spec import (
     MWBS_SPEC_VERSION,
@@ -377,9 +376,7 @@ class TestFullConstruction:
                     workflow="weekly_harvest_planning",
                     condition="Qty < committed",
                     severity="warning",
-                    detection=Detection(
-                        method="system_computed", trigger="step_02"
-                    ),
+                    detection=Detection(method="system_computed", trigger="step_02"),
                     responses=[
                         ExceptionResponse(
                             id="r1",
@@ -605,9 +602,7 @@ class TestRoundTrip:
             "schema": "mwbs/v1",
             "project": {"name": "FromDict", "version": 2},
             "business": {"name": "Biz", "domain": "farm"},
-            "actors": [
-                {"id": "a1", "name": "Actor One", "access_level": "full"}
-            ],
+            "actors": [{"id": "a1", "name": "Actor One", "access_level": "full"}],
             "events": [
                 {
                     "id": "e1",
@@ -622,10 +617,16 @@ class TestRoundTrip:
                 {
                     "id": "w1",
                     "title": "Workflow One",
-                    "job_story": {"when": "test", "i_need_to": "do", "so_i_can": "done"},
+                    "job_story": {
+                        "when": "test",
+                        "i_need_to": "do",
+                        "so_i_can": "done",
+                    },
                     "actor": "a1",
                     "frequency": "weekly",
-                    "steps": [{"id": "s1", "title": "Step 1", "actor_action": "review"}],
+                    "steps": [
+                        {"id": "s1", "title": "Step 1", "actor_action": "review"}
+                    ],
                     "operational": {"max_steps": 3, "spreadsheet_access": "forbidden"},
                     "data_entry": {"frequency": "weekly", "batch_capable": True},
                     "provenance": {"source": "hybrid"},
@@ -818,9 +819,11 @@ class TestRoundTrip:
     def test_from_yaml_not_mapping(self, tmp_path):
         """from_yaml raises ValueError for non-mapping YAML."""
         import yaml
+
         path = tmp_path / "bad.yaml"
         path.write_text(yaml.safe_dump(["not", "a", "dict"]), encoding="utf-8")
         import pytest
+
         with pytest.raises(ValueError, match="not a mapping"):
             BehavioralSpec.from_yaml(path)
 
@@ -893,8 +896,6 @@ class TestPlaceholders:
         assert "Why is this needed?" in descriptions
         assert "What happens here?" in descriptions
         assert "Offline needed?" in descriptions
-
-
 
 
 class TestProvenanceDefaults:

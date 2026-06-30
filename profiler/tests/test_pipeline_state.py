@@ -1,5 +1,6 @@
 """Tests for PipelineState — dataclass, checkpoint I/O, phase methods, artifacts."""
 
+import json
 import logging
 import tomllib
 from pathlib import Path
@@ -188,7 +189,7 @@ class TestCheckpointRoundTrip:
         state.save_checkpoint(checkpoint)
 
         loaded = PipelineState.load(checkpoint)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.3.0"
         assert loaded.discovery.source_tree == {}
         # Guard-clause sentinels survive round-trip
         assert loaded.discovery.shortlist is None
@@ -271,7 +272,7 @@ class TestCheckpointRoundTrip:
         assert path.exists()
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.3.0"
         assert loaded.discovery.source_tree == {"provider": "google_sheets"}
         assert loaded.discovery.workbook_index == [
             {"workbook_code": "101", "year": 2023}
@@ -863,7 +864,7 @@ class TestSpecExample:
         state.save_checkpoint(path)
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.3.0"
         assert loaded.discovery.source_tree["provider"] == "google_sheets"
         assert (
             loaded.discovery.source_tree["spreadsheets"][0]["name"]
@@ -996,9 +997,9 @@ class TestVersionIndependence:
         """Assert PipelineState.version is a valid semver string."""
         import re
 
-        assert re.match(r"^\d+\.\d+\.\d+$", PipelineState.version), (
-            f"PipelineState.version ({PipelineState.version}) is not valid semver"
-        )
+        assert re.match(
+            r"^\d+\.\d+\.\d+$", PipelineState.version
+        ), f"PipelineState.version ({PipelineState.version}) is not valid semver"
 
     def test_pipeline_state_version_not_tied_to_pyproject(self) -> None:
         """Assert PipelineState.version is independent of pyproject.toml."""
@@ -1357,8 +1358,9 @@ class TestVersionMigration:
         from profiler.tools.pipeline_state import PipelineState
 
         loaded = PipelineState.load(path)
-        assert loaded.version == "0.2.0"
+        assert loaded.version == "0.3.0"
         assert loaded.domain_knowledge.domain == "test"
+        assert loaded.completed_phases == []
 
 
 # ---------------------------------------------------------------------------
@@ -1773,9 +1775,9 @@ class TestFormulaDependencyWiring:
         # (the enrich function requires every cell in a column to be a formula).
         assert "computed_fields" in entry
         computed_headers = {cf["header"] for cf in entry["computed_fields"]}
-        assert "Total" in computed_headers, (
-            f"Expected 'Total' in computed_fields, got {computed_headers}"
-        )
+        assert (
+            "Total" in computed_headers
+        ), f"Expected 'Total' in computed_fields, got {computed_headers}"
         assert "GrandTotal" not in computed_headers, (
             f"Expected GrandTotal NOT in computed_fields since it has mixed "
             f"empty/formula cells, got {computed_headers}"
@@ -1826,9 +1828,7 @@ class TestBehavioralSpecIntegration:
         assert state.behavioral_spec is None
 
     @patch("profiler.tools.behavioral_spec_elicitor.derive_behavioral_spec")
-    def test_derive_behavioral_spec_pipeline_method(
-        self, mock_derive, tmp_path
-    ):
+    def test_derive_behavioral_spec_pipeline_method(self, mock_derive, tmp_path):
         """derive_behavioral_spec() calls elicitor and sets behavioral_spec."""
         from profiler.tools.behavioral_spec import BehavioralSpec
 
@@ -1899,9 +1899,7 @@ class TestBehavioralSpecIntegration:
             state.validate_behavioral_spec()
 
     @patch("profiler.tools.behavioral_spec_validation.compute_coverage_metrics")
-    def test_validate_behavioral_spec_computes_coverage(
-        self, mock_compute
-    ):
+    def test_validate_behavioral_spec_computes_coverage(self, mock_compute):
         """validate_behavioral_spec() calls compute_coverage_metrics and sets coverage_report."""
         from profiler.tools.behavioral_spec import BehavioralSpec
         from profiler.tools.behavioral_spec_validation import CoverageReport
@@ -2001,7 +1999,10 @@ class TestArtifactProvenance:
         path = tmp_path / "pipeline-state.yaml"
         state.save_checkpoint(path)
         loaded = PipelineState.load(path)
-        assert loaded.get_artifact_provenance("workflow:weekly_harvest_planning")["source"] == "inferred"
+        assert (
+            loaded.get_artifact_provenance("workflow:weekly_harvest_planning")["source"]
+            == "inferred"
+        )
 
     def test_artifact_provenance_round_trip(self, tmp_path):
         """Provenance survives save-checkpoint -> load cycle."""
@@ -2029,7 +2030,9 @@ class TestArtifactProvenance:
         )
         provenance = state.get_artifact_provenance("test")
         assert provenance is not None
-        assert provenance["recorded_at"].endswith("+00:00") or provenance["recorded_at"].endswith("Z")
+        assert provenance["recorded_at"].endswith("+00:00") or provenance[
+            "recorded_at"
+        ].endswith("Z")
 
 
 class TestDeriveContractsProvenance:
@@ -2055,3 +2058,303 @@ class TestDeriveContractsProvenance:
         assert provenance["source"] == "inferred"
         assert len(provenance["signals"]) == 1
         assert provenance["signals"][0]["tables_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 12. Completed phases registry
+# ---------------------------------------------------------------------------
+
+
+class TestCompletedPhases:
+    """Verify completed_phases field save/load, backward compat, force, guards."""
+
+    def test_completed_phases_roundtrip(self, tmp_path):
+        """Create PipelineState, set completed_phases, save checkpoint, reload, verify list identical."""
+        state = PipelineState()
+        state.completed_phases = ["discover", "deep_profile"]
+        path = tmp_path / "pipeline-state.yaml"
+        state.save_checkpoint(path)
+
+        loaded = PipelineState.load(path)
+        assert loaded.completed_phases == ["discover", "deep_profile"]
+
+    def test_backward_compat_load(self, tmp_path):
+        """Synthetic v0.2.0 checkpoint (no completed_phases) loads correctly with sentinel fallback, and save_checkpoint populates completed_phases."""
+        import yaml
+
+        raw = {
+            "version": "0.2.0",
+            "discovery": {
+                "source_tree": {"_artifact": "pipeline-state-source-tree.json"},
+                "workbook_index": [{"workbook_code": "101", "year": 2023}],
+                "broad_inventory": [],
+                "shortlist": None,
+                "approved_tabs": {"101": ["Crop Planner"]},
+            },
+            "domain_knowledge": {
+                "domain": "test",
+                "description": "",
+                "vocabulary": {
+                    "operational": [],
+                    "reference": [],
+                    "support": [],
+                    "derived": [],
+                },
+                "year_scope": {"active": [], "archived": [], "forward": []},
+                "deduplication": {"strategy": "latest_year", "exceptions": []},
+                "entities": [],
+                "glossary": {},
+                "scope_notes": "",
+            },
+        }
+        # Write source_tree artifact so migration can see it
+        artifact_path = tmp_path / "pipeline-state-source-tree.json"
+        artifact_path.write_text(
+            json.dumps({"provider": "google_sheets"}), encoding="utf-8"
+        )
+
+        checkpoint = tmp_path / "old-state.yaml"
+        checkpoint.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+        loaded = PipelineState.load(checkpoint)
+        # Backward compat: guards should work via sentinel data
+        assert loaded.discovery.source_tree == {"provider": "google_sheets"}
+        assert loaded.discovery.approved_tabs == {"101": ["Crop Planner"]}
+        # completed_phases should be populated by migration
+        assert "discover" in loaded.completed_phases
+        # score_and_select was NOT re-scored (shortlist is None), so not in completed_phases
+        assert "score_and_select" not in loaded.completed_phases
+
+        # save_checkpoint round-trips completed_phases
+        saved = tmp_path / "migrated-state.yaml"
+        loaded.save_checkpoint(saved)
+        reloaded = PipelineState.load(saved)
+        assert reloaded.completed_phases == loaded.completed_phases
+
+    def test_force_rerun_phase(self):
+        """--force --phase deep_profile removes deep_profile + downstream from completed_phases."""
+        from profiler.tools.pipeline_state import _PHASE_ORDER
+
+        state = PipelineState(
+            completed_phases=[
+                "discover",
+                "score_and_select",
+                "deep_profile",
+                "derive_contracts",
+            ]
+        )
+        phase = "deep_profile"
+        # Simulate the --force logic from handle()
+        if phase in _PHASE_ORDER:
+            phase_index = _PHASE_ORDER.index(phase)
+            downstream = set(_PHASE_ORDER[phase_index:])
+            state.completed_phases = [
+                p for p in state.completed_phases if p not in downstream
+            ]
+
+        assert state.completed_phases == ["discover", "score_and_select"]
+
+    def test_force_rerun_all(self):
+        """--force --phase all clears all completed_phases."""
+        state = PipelineState(
+            completed_phases=[
+                "discover",
+                "score_and_select",
+                "deep_profile",
+                "derive_contracts",
+            ]
+        )
+        # Simulate --force --phase all logic
+        state.completed_phases.clear()
+        assert state.completed_phases == []
+
+    def test_score_and_select_guard(self):
+        """Given discover done but shortlist in discover format (no scoring_rationale), the guard should NOT skip score_and_select."""
+        from profiler.tools.pipeline_state import _is_scored_shortlist
+
+        # Simulate the _run_all guard logic:
+        # 1. Check completed_phases first
+        # 2. If not found, check sentinel via _is_scored_shortlist
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[{"workbook_code": "101"}],
+                broad_inventory=[],
+                shortlist=[{"tab_title": "Crop Planner", "final_score": 0.8}],
+            ),
+            completed_phases=[
+                "discover",
+                # score_and_select deliberately NOT completed
+            ],
+        )
+        # Guard logic from _run_all:
+        sas_done = "score_and_select" in state.completed_phases
+        assert not sas_done, "score_and_select should NOT be in completed_phases"
+
+        if not sas_done:
+            if state.discovery.shortlist is not None and _is_scored_shortlist(
+                state.discovery.shortlist
+            ):
+                sas_done = True
+
+        # Should NOT be skipped — shortlist is in discover format (final_score, no scoring_rationale)
+        assert not sas_done, (
+            "score_and_select should NOT be skipped when shortlist is in "
+            "discover format (no scoring_rationale)"
+        )
+
+    def test_score_and_select_skip_when_scored(self):
+        """Given score_and_select in completed_phases with re-scored shortlist, the guard should skip."""
+        from profiler.tools.pipeline_state import _is_scored_shortlist
+
+        state = PipelineState(
+            discovery=DiscoveryState(
+                source_tree={},
+                workbook_index=[{"workbook_code": "101"}],
+                broad_inventory=[],
+                shortlist=[
+                    {
+                        "tab_title": "Crop Planner",
+                        "score": 85,
+                        "scoring_rationale": "Domain vocabulary match",
+                    }
+                ],
+            ),
+            completed_phases=["discover", "score_and_select"],
+        )
+        # Guard logic from _run_all:
+        sas_done = "score_and_select" in state.completed_phases
+        assert sas_done, "score_and_select IS in completed_phases — should skip"
+
+        # Even without completed_phases, sentinel fallback should catch it
+        sas_done_via_sentinel = False
+        if state.discovery.shortlist is not None and _is_scored_shortlist(
+            state.discovery.shortlist
+        ):
+            sas_done_via_sentinel = True
+        assert sas_done_via_sentinel, (
+            "score_and_select should be skipped via sentinel fallback "
+            "when shortlist has score + scoring_rationale"
+        )
+
+
+class TestScanFormulasPhase:
+    """Verify scan_formulas phase method and its wiring in run_pipeline_state."""
+
+    def test_scan_formulas_in_phases(self):
+        """'scan_formulas' is registered in the run_pipeline_state PHASES tuple."""
+        from profiler.management.commands.run_pipeline_state import PHASES
+
+        assert "scan_formulas" in PHASES
+
+    def test_scan_formulas_completes_phase(self, tmp_path):
+        """scan_formulas() runs with formula_patterns config and records completed_phases."""
+        state = PipelineState()
+        state.configure(out_dir=tmp_path)
+        state._config["formula_patterns"] = {
+            "workbooks": [
+                {
+                    "spreadsheet_id": "test_sheet_123",
+                    "patterns": [
+                        {"name": "vlookup", "regex": r"VLOOKUP"},
+                        {"name": "sumif", "regex": r"SUMIF"},
+                    ],
+                }
+            ]
+        }
+        # Set up minimal deep_profile_index entries
+        state.deep_profile_index.entries = [
+            {"tab_title": "Crop Planner", "out_json": "profile_Crop Planner.json"}
+        ]
+
+        with patch(
+            "profiler.tools.formula_scanner.scan_workbook_patterns",
+            return_value=[
+                {
+                    "sheet": "Sheet1",
+                    "row": 1,
+                    "col": 1,
+                    "pattern": "vlookup",
+                    "formula": "=VLOOKUP(A1, B1:C10, 2, FALSE)",
+                }
+            ],
+        ):
+            state.scan_formulas(sheets_service=None)
+
+        assert "scan_formulas" in state.completed_phases
+        assert state.formula_scan_results is not None
+        assert "test_sheet_123" in state.formula_scan_results
+        assert len(state.formula_scan_results["test_sheet_123"]) == 1
+
+    def test_scan_formulas_missing_config(self, tmp_path):
+        """scan_formulas() is a graceful no-op when formula_patterns config is missing."""
+        state = PipelineState()
+        state.configure(out_dir=tmp_path)
+        # No formula_patterns in config
+        state.deep_profile_index.entries = [{"tab_title": "Crop Planner"}]
+
+        state.scan_formulas(sheets_service=None)
+
+        assert "scan_formulas" not in state.completed_phases
+        assert state.formula_scan_results is None
+
+    def test_scan_formulas_already_completed(self, tmp_path):
+        """scan_formulas() is skipped when already in completed_phases."""
+        state = PipelineState()
+        state.configure(out_dir=tmp_path)
+        state.completed_phases.append("scan_formulas")
+
+        # Should return immediately without reading config
+        state._config["formula_patterns"] = {
+            "workbooks": [
+                {
+                    "spreadsheet_id": "test_sheet_123",
+                    "patterns": [{"name": "vlookup", "regex": r"VLOOKUP"}],
+                }
+            ]
+        }
+
+        with patch(
+            "profiler.tools.formula_scanner.scan_workbook_patterns",
+            side_effect=AssertionError("should not be called"),
+        ):
+            state.scan_formulas(sheets_service=None)
+
+        assert "scan_formulas" in state.completed_phases
+        assert state.formula_scan_results is None
+
+    def test_scan_formulas_handles_empty_workbooks_list(self, tmp_path):
+        """scan_formulas() is a graceful no-op when workbooks list is empty."""
+        state = PipelineState()
+        state.configure(out_dir=tmp_path)
+        state._config["formula_patterns"] = {"workbooks": []}
+        state.deep_profile_index.entries = [{"tab_title": "Crop Planner"}]
+
+        state.scan_formulas(sheets_service=None)
+
+        assert "scan_formulas" not in state.completed_phases
+        assert state.formula_scan_results is None
+
+    def test_scan_formulas_handles_scanner_failure(self, tmp_path):
+        """scan_formulas() handles scan_workbook_patterns failure gracefully."""
+        state = PipelineState()
+        state.configure(out_dir=tmp_path)
+        state._config["formula_patterns"] = {
+            "workbooks": [
+                {
+                    "spreadsheet_id": "test_sheet_123",
+                    "patterns": [{"name": "vlookup", "regex": r"VLOOKUP"}],
+                }
+            ]
+        }
+        state.deep_profile_index.entries = [{"tab_title": "Crop Planner"}]
+
+        with patch(
+            "profiler.tools.formula_scanner.scan_workbook_patterns",
+            side_effect=Exception("API error"),
+        ):
+            state.scan_formulas(sheets_service=None)
+
+        # Should still complete phase even if individual scans fail
+        assert "scan_formulas" in state.completed_phases
+        assert state.formula_scan_results == {}

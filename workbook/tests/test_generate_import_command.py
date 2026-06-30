@@ -5,7 +5,6 @@ from django.core.management.base import CommandError
 import pytest
 import yaml
 
-
 CONTRACT_WITH_APP_LABEL = """\
 tables:
   - suggested_model_name: "Widget"
@@ -39,12 +38,12 @@ def test_generate_import_reads_app_label_from_contract(tmp_path):
     )
 
     source = out_path.read_text()
-    assert "from myapp.models import Widget" in source, (
-        f"Expected generated import to use app_label 'myapp', got:\n{source}"
-    )
-    assert 'help = "Import myapp data' in source, (
-        "Expected help text to use app_label 'myapp'"
-    )
+    assert (
+        "from myapp.models import Widget" in source
+    ), f"Expected generated import to use app_label 'myapp', got:\n{source}"
+    assert (
+        'help = "Import myapp data' in source
+    ), "Expected help text to use app_label 'myapp'"
 
 
 def test_generate_import_cli_app_label_overrides_contract(tmp_path):

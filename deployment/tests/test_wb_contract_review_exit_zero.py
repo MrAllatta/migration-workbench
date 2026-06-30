@@ -13,7 +13,6 @@ from pathlib import Path
 
 import yaml
 
-
 _CONTRACT_WITH_ISSUES = {
     "source": {"provider": "test"},
     "tables": [
@@ -107,6 +106,6 @@ def test_contract_review_exit_zero_json_marks_ok_true():
         f"Full payload: {payload}"
     )
     assert payload.get("details"), f"Expected details to contain issues, got: {payload}"
-    assert "(exit-zero)" in payload["message"], (
-        f"Expected '(exit-zero)' in message, got: {payload['message']}"
-    )
+    assert (
+        "(exit-zero)" in payload["message"]
+    ), f"Expected '(exit-zero)' in message, got: {payload['message']}"

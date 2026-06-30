@@ -664,6 +664,34 @@ def profile_phase_blocks(ctx: MakeContext) -> str:
     )
 
 
+def derive_behavioral_spec_block(ctx: MakeContext) -> str:
+    """Return the derive-behavioral-spec Makefile target.
+
+    Derives the behavioral specification from a PipelineState checkpoint.
+    """
+    return (
+        "derive-behavioral-spec:\n"
+        + _indent(
+            "$(MANAGE) derive_behavioral_spec --checkpoint $(PIPELINE_CHECKPOINT) --out build/behavioral-spec.yaml"
+        )
+        + "\n"
+    )
+
+
+def validate_behavioral_spec_block(ctx: MakeContext) -> str:
+    """Return the validate-behavioral-spec Makefile target.
+
+    Validates the behavioral specification and computes coverage metrics.
+    """
+    return (
+        "validate-behavioral-spec:\n"
+        + _indent(
+            "$(MANAGE) validate_behavioral_spec --checkpoint $(PIPELINE_CHECKPOINT)"
+        )
+        + "\n"
+    )
+
+
 def profile_clean_block(ctx: MakeContext) -> str:
     """Return the profile-clean Makefile target.
 
@@ -675,11 +703,12 @@ def profile_clean_block(ctx: MakeContext) -> str:
         "# artifacts (tab_selection_*.json, approved_tabs edits, checkpoint)\n"
         "# may contain hand-edited consultant decisions.\n"
         "profile-clean:\n"
-        + _indent(
-            r"""@echo "WARNING: This will remove ALL profiling artifacts."; \
-	read -p "Are you sure? [y/N] " confirm; \
-	if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
-		echo "Aborted."; exit 0; \
+        + _indent(r"""@echo "WARNING: This will remove ALL profiling artifacts."; \
+	if [ -z "$$FORCE" ]; then \
+		read -p "Are you sure? [y/N] " confirm; \
+		if [ "$$confirm" != "y" ] && [ "$$confirm" != "Y" ]; then \
+			echo "Aborted."; exit 0; \
+		fi; \
 	fi; \
 	echo "Removing PipelineState checkpoint..."; \
 	rm -f $(PIPELINE_CHECKPOINT) build/pipeline-state-*.json; \
@@ -687,8 +716,7 @@ def profile_clean_block(ctx: MakeContext) -> str:
 	rm -rf data/profile_snapshots/; \
 	echo "Removing Coda corpus..."; \
 	rm -rf $${CODA_CORPUS_OUT_DIR:-build/coda_corpus}; \
-	echo 'Done. Run make profile-phase-discover to start fresh.'"""
-        )
+	echo 'Done. Run make profile-phase-discover to start fresh.'""")
         + "\n"
     )
 
@@ -723,6 +751,9 @@ def full_targets_block(ctx: MakeContext) -> str:
         profile_blocks(ctx),
         "\n",
         profile_phase_blocks(ctx),
+        "\n",
+        derive_behavioral_spec_block(ctx),
+        validate_behavioral_spec_block(ctx),
         "\n",
         profile_clean_block(ctx),
         "\n",

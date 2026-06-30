@@ -97,9 +97,9 @@ def _compute_fk_resolutions(tables: list[dict]) -> list[dict]:
                                 "field": field_name,
                                 "target_model": other_model,
                                 "target_field": target_field,
-                                "confidence": "high"
-                                if unique_count == total
-                                else "medium",
+                                "confidence": (
+                                    "high" if unique_count == total else "medium"
+                                ),
                                 "source": "column_overlap",
                             }
                         )

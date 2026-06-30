@@ -17,7 +17,6 @@ from importer.management.commands.import_historical import (
     YEAR_SUFFIX_PATTERN,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

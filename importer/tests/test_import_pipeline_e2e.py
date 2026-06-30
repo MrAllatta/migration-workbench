@@ -9,7 +9,6 @@ from examples.models import ExampleBlock, ExampleCrop, ExampleFarm
 from workbook.codegen.contract import load_contract
 from workbook.codegen.import_generator import render_import_py
 
-
 CONTRACT_PATH = "example_data/import_pipeline_contract.example.yaml"
 
 

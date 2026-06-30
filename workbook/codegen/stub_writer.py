@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 MARKER = "# --- custom models below this line ---"
 IMPORT_LINE = "from .{module} import *  # noqa: F401, F403"
 AUTO_STUB_CONTENT = (

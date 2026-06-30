@@ -31,18 +31,18 @@ def test_wb_vertical_show_json_returns_valid_json():
     assert "vertical" in payload, f"Expected 'vertical' key in payload, got: {payload}"
     vertical = payload["vertical"]
     # Check that we got the expected structure
-    assert isinstance(vertical, dict), (
-        f"Expected vertical to be dict, got: {type(vertical)}"
-    )
-    assert vertical.get("name") == "example", (
-        f"Expected name 'example', got: {vertical.get('name')}"
-    )
-    assert vertical.get("version") == "0.1.0", (
-        f"Expected version '0.1.0', got: {vertical.get('version')}"
-    )
-    assert "example" in vertical.get("description", "").lower(), (
-        f"Expected description to contain 'example', got: {vertical.get('description')}"
-    )
-    assert vertical.get("confidence") == "exploratory", (
-        f"Expected confidence 'exploratory', got: {vertical.get('confidence')}"
-    )
+    assert isinstance(
+        vertical, dict
+    ), f"Expected vertical to be dict, got: {type(vertical)}"
+    assert (
+        vertical.get("name") == "example"
+    ), f"Expected name 'example', got: {vertical.get('name')}"
+    assert (
+        vertical.get("version") == "0.1.0"
+    ), f"Expected version '0.1.0', got: {vertical.get('version')}"
+    assert (
+        "example" in vertical.get("description", "").lower()
+    ), f"Expected description to contain 'example', got: {vertical.get('description')}"
+    assert (
+        vertical.get("confidence") == "exploratory"
+    ), f"Expected confidence 'exploratory', got: {vertical.get('confidence')}"

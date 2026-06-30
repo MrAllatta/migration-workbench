@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 import yaml
 
-
 # All recognised queue directory names under .omo/
 QUEUE_NAMES: list[str] = [
     "next",

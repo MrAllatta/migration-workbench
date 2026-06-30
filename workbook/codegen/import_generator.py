@@ -21,7 +21,6 @@ from workbook.codegen.contract import (
     get_model_name,
 )
 
-
 # -- helpers ----------------------------------------------------------------
 
 

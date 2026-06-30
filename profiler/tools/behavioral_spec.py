@@ -98,6 +98,7 @@ class Actor:
     responsibilities: list[str] = field(default_factory=list)
     time_pressures: list[str] = field(default_factory=list)
     access_level: str = "not_yet_elicited"
+    provenance: Provenance | None = None
 
 
 @dataclass
@@ -471,6 +472,7 @@ class BehavioralSpec:
         Returns:
             A new BehavioralSpec instance populated from the dict.
         """
+
         # -- helpers -------------------------------------------------------
         def _build_payload(payload_data: Any) -> list[PayloadField]:
             if not isinstance(payload_data, list):
@@ -499,12 +501,16 @@ class BehavioralSpec:
 
         def _build_operational(op_data: Any) -> WorkflowOperational | None:
             if isinstance(op_data, dict):
-                return WorkflowOperational(**_filter_dc_kwargs(WorkflowOperational, op_data))
+                return WorkflowOperational(
+                    **_filter_dc_kwargs(WorkflowOperational, op_data)
+                )
             return None
 
         def _build_data_entry(de_data: Any) -> WorkflowDataEntry | None:
             if isinstance(de_data, dict):
-                return WorkflowDataEntry(**_filter_dc_kwargs(WorkflowDataEntry, de_data))
+                return WorkflowDataEntry(
+                    **_filter_dc_kwargs(WorkflowDataEntry, de_data)
+                )
             return None
 
         def _build_detection(det_data: Any) -> Detection | None:
@@ -554,9 +560,15 @@ class BehavioralSpec:
 
         business = None
         if isinstance(data.get("business"), dict):
-            business = BusinessSection(**_filter_dc_kwargs(BusinessSection, data["business"]))
+            business = BusinessSection(
+                **_filter_dc_kwargs(BusinessSection, data["business"])
+            )
 
-        actors = [Actor(**_filter_dc_kwargs(Actor, a)) for a in data.get("actors", []) if isinstance(a, dict)]
+        actors = [
+            Actor(**_filter_dc_kwargs(Actor, a))
+            for a in data.get("actors", [])
+            if isinstance(a, dict)
+        ]
 
         events = []
         for evt_data in data.get("events", []):
@@ -692,7 +704,9 @@ class BehavioralSpec:
             cm_data = data["coverage_map"]
             summary = None
             if isinstance(cm_data.get("summary"), dict):
-                summary = CoverageMapSummary(**_filter_dc_kwargs(CoverageMapSummary, cm_data["summary"]))
+                summary = CoverageMapSummary(
+                    **_filter_dc_kwargs(CoverageMapSummary, cm_data["summary"])
+                )
             coverage_map = CoverageMap(
                 workflows=_build_coverage_workflows(cm_data.get("workflows")),
                 summary=summary,
@@ -788,8 +802,10 @@ class BehavioralSpec:
 def _as_plain_dict(obj: Any) -> Any:
     """Convert a dataclass tree to plain dicts/lists for uniform scanning."""
     if hasattr(obj, "__dataclass_fields__"):
-        return {field_name: _as_plain_dict(getattr(obj, field_name))
-                for field_name in obj.__dataclass_fields__}
+        return {
+            field_name: _as_plain_dict(getattr(obj, field_name))
+            for field_name in obj.__dataclass_fields__
+        }
     if isinstance(obj, list):
         return [_as_plain_dict(item) for item in obj]
     if isinstance(obj, dict):

@@ -11,7 +11,6 @@ from connectors.router import build_provider_adapter
 from connectors.spreadsheet import normalize_rows
 from profiler.contracts import LIVE_SOURCE_NORMALIZER_CONTRACT
 
-
 STRUCTURE_SCHEMA_VERSION = "structure-draft-1"
 
 

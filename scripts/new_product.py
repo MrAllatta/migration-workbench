@@ -603,14 +603,10 @@ DRIVE_FOLDER_ID=replace-me
 DRIVE_FOLDER_OUT=data/profile_snapshots/drive_tree.json
 """
 
-    return (
-        shared_env
-        + provider_env
-        + """
+    return shared_env + provider_env + """
 
 # Optional chassis development only: WORKBENCH=/absolute/path/to/migration-workbench
 """
-    )
 
 
 def _render_agents_profile_section(provider: str) -> str:

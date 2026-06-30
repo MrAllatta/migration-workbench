@@ -11,26 +11,21 @@ Covers:
 
 from profiler.tools.behavioral_spec import (
     Actor,
-    BehavioralEvent,
     BehavioralSpec,
     BehavioralWorkflow,
-    BusinessRule,
     Decision,
     JobStory,
     MwbsProject,
-    PayloadField,
-    Placeholder,
-    Provenance,
     WorkflowDataEntry,
     WorkflowException,
     WorkflowOperational,
-    WorkflowStep,
 )
 from profiler.tools.behavioral_spec_elicitor import (
     INFERENCE_RULES,
     InferenceConfidenceLog,
     InferenceRule,
     _cluster_tabs_into_entities,
+    _derive_actors,
     _derive_invariants_from_events,
     _infer_candidate_events,
     _infer_commands_from_tabs,
@@ -44,7 +39,6 @@ from profiler.tools.behavioral_spec_elicitor import (
     generate_placeholders,
 )
 from profiler.tools.operational_model import OperationalModel
-
 
 # ===================================================================
 # InferenceRule dataclass
@@ -93,7 +87,7 @@ class TestInferenceRulesCatalog:
         """All rules have non-empty IDs."""
         ids = [rule.id for rule in INFERENCE_RULES]
         for rule_id in ids:
-            assert rule_id, f"Rule with empty id found"
+            assert rule_id, "Rule with empty id found"
         assert ids == [f"INF-{i:02d}" for i in range(1, 13)]
 
     def test_all_rules_have_non_empty_names(self):
@@ -283,8 +277,7 @@ class TestGeneratePlaceholders:
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
         max_duration_ph = [
-            p for p in placeholders
-            if "max_duration_minutes" in p.field_path
+            p for p in placeholders if "max_duration_minutes" in p.field_path
         ]
         assert len(max_duration_ph) >= 1
         assert any("wf_harvest" in p.workflow_id for p in max_duration_ph)
@@ -293,10 +286,7 @@ class TestGeneratePlaceholders:
         """Workflow with empty job_story.when gets a placeholder."""
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
-        when_ph = [
-            p for p in placeholders
-            if "job_story.when" in p.field_path
-        ]
+        when_ph = [p for p in placeholders if "job_story.when" in p.field_path]
         assert len(when_ph) >= 1
         assert any("wf_harvest" in p.workflow_id for p in when_ph)
 
@@ -304,10 +294,7 @@ class TestGeneratePlaceholders:
         """Workflow with empty preferred_input gets a placeholder."""
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
-        input_ph = [
-            p for p in placeholders
-            if "preferred_input" in p.field_path
-        ]
+        input_ph = [p for p in placeholders if "preferred_input" in p.field_path]
         assert len(input_ph) >= 1
         assert any("wf_harvest" in p.workflow_id for p in input_ph)
 
@@ -315,10 +302,7 @@ class TestGeneratePlaceholders:
         """Workflow with zero priority gets a placeholder."""
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
-        priority_ph = [
-            p for p in placeholders
-            if "priority" in p.field_path
-        ]
+        priority_ph = [p for p in placeholders if "priority" in p.field_path]
         assert len(priority_ph) >= 1
         assert any("wf_harvest" in p.workflow_id for p in priority_ph)
 
@@ -327,8 +311,7 @@ class TestGeneratePlaceholders:
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
         criteria_ph = [
-            p for p in placeholders
-            if "criteria_actor_applies" in p.field_path
+            p for p in placeholders if "criteria_actor_applies" in p.field_path
         ]
         assert len(criteria_ph) >= 1
 
@@ -336,20 +319,14 @@ class TestGeneratePlaceholders:
         """Exception with empty current_handling gets a placeholder."""
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
-        handling_ph = [
-            p for p in placeholders
-            if "current_handling" in p.field_path
-        ]
+        handling_ph = [p for p in placeholders if "current_handling" in p.field_path]
         assert len(handling_ph) >= 1
 
     def test_actor_time_pressures_placeholder(self):
         """Actor with empty time_pressures gets a placeholder."""
         spec = _make_spec_with_gaps()
         placeholders = generate_placeholders(spec)
-        time_ph = [
-            p for p in placeholders
-            if "time_pressures" in p.field_path
-        ]
+        time_ph = [p for p in placeholders if "time_pressures" in p.field_path]
         assert len(time_ph) >= 1
 
     def test_workflow_with_complete_data_has_fewer_placeholders(self):
@@ -357,12 +334,8 @@ class TestGeneratePlaceholders:
         spec = _make_spec_with_gaps()
         # wf_planting has most fields filled
         placeholders = generate_placeholders(spec)
-        planting_ph = [
-            p for p in placeholders if p.workflow_id == "wf_planting"
-        ]
-        harvest_ph = [
-            p for p in placeholders if p.workflow_id == "wf_harvest"
-        ]
+        planting_ph = [p for p in placeholders if p.workflow_id == "wf_planting"]
+        harvest_ph = [p for p in placeholders if p.workflow_id == "wf_harvest"]
         # wf_planting should have fewer placeholders than wf_harvest
         # (both still have some gaps like decisions/exceptions criteria)
         assert len(planting_ph) <= len(harvest_ph)
@@ -507,14 +480,15 @@ class TestOldHelpers:
         }
         workflows = _infer_workflows_from_graph(formula_graph)
         assert len(workflows) >= 1
-        assert any(
-            wf["id"] == "crop_planner_to_harvest_record" for wf in workflows
-        )
+        assert any(wf["id"] == "crop_planner_to_harvest_record" for wf in workflows)
 
     def test_infer_workflows_from_clusters(self):
         """Workflow inference from entity clusters."""
         clusters = [
-            {"entity_name": "Crop", "tabs": ["Crop Planner", "Crop by Season", "Crop Info"]},
+            {
+                "entity_name": "Crop",
+                "tabs": ["Crop Planner", "Crop by Season", "Crop Info"],
+            },
         ]
         workflows = _infer_workflows_from_clusters(clusters)
         assert len(workflows) >= 1
@@ -795,17 +769,37 @@ class TestDeriveBehavioralSpec:
                 {
                     "tab_title": "Crop Planner",
                     "columns": [
-                        {"header_label": "Crop Name", "null_rate": 0.0, "distinct_values": ["Tomato", "Pepper"]},
-                        {"header_label": "Plant Date", "null_rate": 0.05, "distinct_values": ["2025-03-01"]},
-                        {"header_label": "Status", "null_rate": 0.02, "distinct_values": ["Planned", "Planted"]},
+                        {
+                            "header_label": "Crop Name",
+                            "null_rate": 0.0,
+                            "distinct_values": ["Tomato", "Pepper"],
+                        },
+                        {
+                            "header_label": "Plant Date",
+                            "null_rate": 0.05,
+                            "distinct_values": ["2025-03-01"],
+                        },
+                        {
+                            "header_label": "Status",
+                            "null_rate": 0.02,
+                            "distinct_values": ["Planned", "Planted"],
+                        },
                     ],
                     "fk_candidates": [],
                 },
                 {
                     "tab_title": "Harvest Log",
                     "columns": [
-                        {"header_label": "Crop", "null_rate": 0.0, "distinct_values": ["Tomato"]},
-                        {"header_label": "Qty Harvested", "null_rate": 0.0, "distinct_values": ["100", "200"]},
+                        {
+                            "header_label": "Crop",
+                            "null_rate": 0.0,
+                            "distinct_values": ["Tomato"],
+                        },
+                        {
+                            "header_label": "Qty Harvested",
+                            "null_rate": 0.0,
+                            "distinct_values": ["100", "200"],
+                        },
                     ],
                     "fk_candidates": [{"target": "Crop Planner"}],
                 },
@@ -822,6 +816,153 @@ class TestDeriveBehavioralSpec:
         assert len(spec.actors) >= 1
         assert len(spec.decisions) >= 1
         assert len(spec.exceptions) >= 1
+
+
+# ===================================================================
+# Actor derivation from interaction contract
+# ===================================================================
+
+
+class TestActorDerivationFromInteractionContract:
+    """Actor derivation prefers interaction contract roles over vocabulary."""
+
+    def test_actor_from_interaction_contract(self):
+        """Interaction contract role_hints produce Actor names matching roles."""
+        interaction_contract = {
+            "views": [
+                {
+                    "workflow_hints": {
+                        "role_hints": [
+                            {
+                                "role": "Field Manager",
+                                "description": "Oversees field operations and planting schedules",
+                                "access_hints": "field_access",
+                            },
+                            {
+                                "role": "Harvest Coordinator",
+                                "description": "Manages harvest logistics",
+                                "access_hints": "harvest_access",
+                            },
+                        ]
+                    }
+                }
+            ]
+        }
+        domain_knowledge = {
+            "domain": "farm",
+            "vocabulary": {"operational": ["crop", "harvest", "inventory"]},
+        }
+        actors = _derive_actors(interaction_contract, domain_knowledge)
+        actor_names = [actor.name for actor in actors]
+        assert "Field Manager" in actor_names
+        assert "Harvest Coordinator" in actor_names
+        # Should NOT contain vocabulary-derived actors like "Crop"
+        assert "Crop" not in actor_names
+
+    def test_actor_from_interaction_contract_fields(self):
+        """Interaction-contract actors have correct id, responsibilities, access_level."""
+        interaction_contract = {
+            "views": [
+                {
+                    "workflow_hints": {
+                        "role_hints": [
+                            {
+                                "role": "Field Manager",
+                                "description": "Oversees field operations",
+                                "access_hints": "field_access",
+                            },
+                        ]
+                    }
+                }
+            ]
+        }
+        actors = _derive_actors(interaction_contract, None)
+        assert len(actors) == 1
+        manager = actors[0]
+        assert manager.id == "field_manager"
+        assert manager.name == "Field Manager"
+        assert "Oversees field operations" in manager.responsibilities
+        assert manager.access_level == "field_access"
+
+    def test_actor_fallback_vocabulary(self):
+        """Without interaction contract, actors come from vocabulary terms."""
+        domain_knowledge = {
+            "domain": "farm",
+            "vocabulary": {"operational": ["crop", "harvest"]},
+        }
+        actors = _derive_actors(None, domain_knowledge)
+        actor_names = [actor.name for actor in actors]
+        assert "Crop" in actor_names
+        assert "Harvest" in actor_names
+
+    def test_actor_vocabulary_provenance(self):
+        """Vocabulary-derived actors have provenance.source == 'vocabulary_stub'."""
+        domain_knowledge = {
+            "domain": "farm",
+            "vocabulary": {"operational": ["crop"]},
+        }
+        actors = _derive_actors(None, domain_knowledge)
+        assert len(actors) == 1
+        actor = actors[0]
+        assert actor.provenance is not None
+        assert actor.provenance.source == "vocabulary_stub"
+
+    def test_actor_vocabulary_provenance_default_actor(self):
+        """Default fallback actor also carries vocabulary_stub provenance."""
+        domain_knowledge = {"domain": "farm", "vocabulary": {"operational": []}}
+        actors = _derive_actors(None, domain_knowledge)
+        assert len(actors) == 1
+        assert actors[0].id == "primary_operator"
+        assert actors[0].provenance is not None
+        assert actors[0].provenance.source == "vocabulary_stub"
+
+    def test_actor_derive_behavioral_spec_with_interaction_contract(self):
+        """derive_behavioral_spec uses interaction_contract for actors."""
+        interaction_contract = {
+            "views": [
+                {
+                    "workflow_hints": {
+                        "role_hints": [
+                            {"role": "Field Manager", "description": "Manages fields"},
+                        ]
+                    }
+                }
+            ]
+        }
+        # Even though vocabulary has more terms, the interaction contract
+        # should take precedence.
+        spec = derive_behavioral_spec(
+            discovery={"workbook_index": [], "broad_inventory": []},
+            deep_profile_index={"entries": []},
+            domain_knowledge={
+                "domain": "farm",
+                "vocabulary": {"operational": ["crop", "harvest", "inventory"]},
+            },
+            interaction_contract=interaction_contract,
+        )
+        assert len(spec.actors) == 1
+        assert spec.actors[0].name == "Field Manager"
+
+    def test_actor_derive_behavioral_spec_fallback(self):
+        """Without interaction_contract, behavioral spec falls back to vocabulary."""
+        spec = derive_behavioral_spec(
+            discovery={"workbook_index": [], "broad_inventory": []},
+            deep_profile_index={"entries": []},
+            domain_knowledge={
+                "domain": "farm",
+                "vocabulary": {"operational": ["crop", "harvest"]},
+            },
+            interaction_contract=None,
+        )
+        assert len(spec.actors) == 2
+        actor_names = [actor.name for actor in spec.actors]
+        assert "Crop" in actor_names
+        assert "Harvest" in actor_names
+        # All vocabulary-derived actors have provenance tag
+        for actor in spec.actors:
+            if actor.id != "primary_operator":
+                assert actor.provenance is not None
+                assert actor.provenance.source == "vocabulary_stub"
 
 
 # ===================================================================
@@ -873,7 +1014,10 @@ class TestDeriveOperationalModelBackwardCompat:
         model = derive_operational_model(
             discovery={"workbook_index": [], "broad_inventory": []},
             deep_profile_index={"entries": []},
-            domain_knowledge={"domain": "test", "vocabulary": {"operational": ["crop", "harvest"]}},
+            domain_knowledge={
+                "domain": "test",
+                "vocabulary": {"operational": ["crop", "harvest"]},
+            },
         )
         capability_ids = [cap.id for cap in model.capabilities]
         assert "crop" in capability_ids

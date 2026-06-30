@@ -55,9 +55,7 @@ class TestCoverageReport:
             report_coverage=0.75,
         )
         assert report.is_acceptable(threshold=0.80) is False
-        assert report.failing_dimensions(threshold=0.80) == [
-            "report_coverage"
-        ]
+        assert report.failing_dimensions(threshold=0.80) == ["report_coverage"]
 
     def test_all_passing(self):
         """All dimensions at or above threshold is acceptable."""

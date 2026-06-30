@@ -13,7 +13,11 @@ from django.core.management.base import BaseCommand, CommandError
 from profiler.tools.pipeline_state import PipelineState
 from workbook.schema_contract import load_json
 from workbook.tools.signal_extraction import extract_signals
-from workbook.view_manifest import VIEW_MANIFEST_VERSION, build_view_manifest, validate_view_manifest
+from workbook.view_manifest import (
+    VIEW_MANIFEST_VERSION,
+    build_view_manifest,
+    validate_view_manifest,
+)
 
 
 def _load_yaml(path: Path) -> Any:
@@ -260,9 +264,11 @@ class Command(BaseCommand):
                 "column_count": int(tab_signal.get("column_count", 0)),
                 "formula_density": float(tab_signal.get("formula_density", 0.0)),
                 "cross_sheet_ref_count": int(tab_signal.get("cross_sheet_refs", 0)),
-                "avg_null_rate": sum(null_rates.values()) / max(len(null_rates), 1)
-                if null_rates
-                else float(tab_signal.get("avg_null_rate", 0.0)),
+                "avg_null_rate": (
+                    sum(null_rates.values()) / max(len(null_rates), 1)
+                    if null_rates
+                    else float(tab_signal.get("avg_null_rate", 0.0))
+                ),
                 "has_status_column": float(tab_signal.get("has_status_column", False)),
                 "has_time_scope": float(tab_signal.get("has_time_scope", False)),
                 "data_validation_density": float(

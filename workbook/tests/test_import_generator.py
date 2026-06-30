@@ -14,7 +14,6 @@ from importer.base import BaseImportCommand
 from workbook.codegen.contract import get_import_config
 from workbook.codegen.import_generator import render_import_py
 
-
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
@@ -891,9 +890,9 @@ def test_import_generator_diff_shows_changes(tmp_path):
         diff=True,
     )
     output = cmd.stdout.getvalue()
-    assert "---" in output or "+++" in output, (
-        "Expected diff output with change markers"
-    )
+    assert (
+        "---" in output or "+++" in output
+    ), "Expected diff output with change markers"
 
 
 def test_import_generator_diff_no_changes(tmp_path):
@@ -1013,12 +1012,12 @@ def test_render_import_py_no_year_loop_when_bundle_path_is_static():
         ],
     }
     source = render_import_py(contract, app_label="core")
-    assert "_resolve_years" not in source, (
-        "Should not include _resolve_years for static bundle_path"
-    )
-    assert "_run_year" not in source, (
-        "Should not include _run_year for static bundle_path"
-    )
+    assert (
+        "_resolve_years" not in source
+    ), "Should not include _resolve_years for static bundle_path"
+    assert (
+        "_run_year" not in source
+    ), "Should not include _run_year for static bundle_path"
 
 
 def test_render_import_py_resolve_path_substitutes_year():
@@ -1044,9 +1043,9 @@ def test_render_import_py_resolve_path_substitutes_year():
         ],
     }
     source = render_import_py(contract, app_label="core")
-    assert "self._resolve_path(" in source, (
-        "Expected _resolve_path call in _import_crop"
-    )
-    assert "{year}" not in source.split("_run_import_pipeline")[0], (
-        "Year template should be resolved at runtime, not hardcoded"
-    )
+    assert (
+        "self._resolve_path(" in source
+    ), "Expected _resolve_path call in _import_crop"
+    assert (
+        "{year}" not in source.split("_run_import_pipeline")[0]
+    ), "Year template should be resolved at runtime, not hardcoded"

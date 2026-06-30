@@ -475,6 +475,7 @@ def test_view_entry_with_acceptance_criteria():
 def test_validate_view_manifest_with_acceptance_criteria():
     """View manifest validation catches bad acceptance criteria."""
     from workbook.view_manifest import validate_view_manifest
+
     manifest = {
         "version": "view-manifest-draft-1",
         "views": [

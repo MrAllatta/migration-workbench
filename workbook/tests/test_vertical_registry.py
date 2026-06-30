@@ -17,7 +17,6 @@ from workbook.tools.vertical_registry import (
     score_tab_against_templates,
 )
 
-
 # ---------------------------------------------------------------------------
 # discover_verticals
 # ---------------------------------------------------------------------------
@@ -420,9 +419,9 @@ def test_vertical_flag_on_scaffold(tmp_path: Path):
     with out.open() as f:
         contract_data = yaml.safe_load(f) or {}
     for table in contract_data.get("tables", []):
-        assert "admin" not in table, (
-            f"Table {table.get('model_name')} got unexpected vertical admin block"
-        )
+        assert (
+            "admin" not in table
+        ), f"Table {table.get('model_name')} got unexpected vertical admin block"
 
 
 def test_no_vertical_flag_disabled(tmp_path: Path):
@@ -600,12 +599,8 @@ def test_apply_vertical_domain_context_user_wins():
 
     # Existing domain context that should override vertical
     existing = {
-        "vocabulary": {
-            "operational": ["plant"]  # completely different value
-        },
-        "glossary": {
-            "crop": "cultivar"  # different value
-        },
+        "vocabulary": {"operational": ["plant"]},  # completely different value
+        "glossary": {"crop": "cultivar"},  # different value
         "entities": [
             {
                 "name": "Crop",

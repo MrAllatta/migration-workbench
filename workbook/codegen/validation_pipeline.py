@@ -9,7 +9,6 @@ from typing import Any, Literal
 from workbench.exceptions import UserFacingError
 from workbook.partial_output import PartialOutputCollector
 
-
 _VALID_SEVERITIES = frozenset({"error", "warning"})
 
 

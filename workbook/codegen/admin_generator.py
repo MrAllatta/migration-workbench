@@ -1103,9 +1103,9 @@ def render_admin_py(
     inline_class_names: set[str] = (
         set()
     )  # Track which inline classes we've already emitted.
-    ensure_groups_defs: list[
-        str
-    ] = []  # _ensure_*_groups() functions for permission-based access.
+    ensure_groups_defs: list[str] = (
+        []
+    )  # _ensure_*_groups() functions for permission-based access.
     admin_class_parts: list[str] = []
 
     for table in tables:
@@ -1445,9 +1445,9 @@ def render_admin_py(
                 status_values=codegen_status_values or status_values,
                 editable_fields=fields_to_pass,
                 status_transitions=cg_status_transitions,
-                access_hints=codegen_entry.get("access_hints")
-                if codegen_entry
-                else None,
+                access_hints=(
+                    codegen_entry.get("access_hints") if codegen_entry else None
+                ),
                 contract_fields=contract_fields,
                 extra_display_fields=extra_display_fields,
                 css_rules=cg_css_rules,

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from workbook.tools.vertical_registry import load_vertical
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
@@ -51,9 +50,9 @@ class TestLoadFarmVertical:
 
         expected_entities = {"Crop", "FieldBlock", "Season", "PlantingPlan"}
         loaded_entities = set(farm.entity_templates.keys())
-        assert expected_entities.issubset(loaded_entities), (
-            f"Expected entities {expected_entities}, got {loaded_entities}"
-        )
+        assert expected_entities.issubset(
+            loaded_entities
+        ), f"Expected entities {expected_entities}, got {loaded_entities}"
 
 
 # ---------------------------------------------------------------------------
@@ -102,9 +101,9 @@ class TestFieldBlockEntity:
         field_block = farm.entity_templates["FieldBlock"]
 
         column_names = _get_column_names(field_block)
-        assert len(column_names) >= 10, (
-            f"FieldBlock has {len(column_names)} fields, expected 10+"
-        )
+        assert (
+            len(column_names) >= 10
+        ), f"FieldBlock has {len(column_names)} fields, expected 10+"
 
         core_fields = {
             "name",
@@ -115,9 +114,9 @@ class TestFieldBlockEntity:
             "is_active",
             "notes",
         }
-        assert core_fields.issubset(column_names), (
-            f"Missing core FieldBlock fields. Expected {core_fields}, got {column_names}"
-        )
+        assert core_fields.issubset(
+            column_names
+        ), f"Missing core FieldBlock fields. Expected {core_fields}, got {column_names}"
 
         # Name should be unique
         name_def = next(c for c in field_block["columns"] if c["name"] == "name")
@@ -138,18 +137,18 @@ class TestPlantingPlanEntity:
         planting_plan = farm.entity_templates["PlantingPlan"]
 
         column_names = _get_column_names(planting_plan)
-        assert len(column_names) >= 20, (
-            f"PlantingPlan has {len(column_names)} fields, expected 20+"
-        )
+        assert (
+            len(column_names) >= 20
+        ), f"PlantingPlan has {len(column_names)} fields, expected 20+"
 
         # Verify FK fields reference other entities
         _column_types = _get_column_types(planting_plan)  # noqa: F841
         fk_columns = [
             c for c in planting_plan["columns"] if c.get("data_type") == "ForeignKey"
         ]
-        assert len(fk_columns) >= 3, (
-            f"PlantingPlan has {len(fk_columns)} FK fields, expected 3+"
-        )
+        assert (
+            len(fk_columns) >= 3
+        ), f"PlantingPlan has {len(fk_columns)} FK fields, expected 3+"
 
         # Verify specific FK targets
         fk_targets = {c["to"] for c in fk_columns if c.get("to")}
@@ -211,9 +210,9 @@ class TestFieldTypes:
             c for c in all_columns if c["name"] in ("crop_name", "name", "variety")
         ]
         for field in name_fields:
-            assert field["data_type"] == "CharField", (
-                f"Expected CharField for '{field['name']}', got {field['data_type']}"
-            )
+            assert (
+                field["data_type"] == "CharField"
+            ), f"Expected CharField for '{field['name']}', got {field['data_type']}"
 
         # Date fields should be DateField
         date_fields = [
@@ -222,9 +221,9 @@ class TestFieldTypes:
             if "date" in c["name"] or c["name"] in ("plant_date",)
         ]
         for field in date_fields:
-            assert field["data_type"] == "DateField", (
-                f"Expected DateField for '{field['name']}', got {field['data_type']}"
-            )
+            assert (
+                field["data_type"] == "DateField"
+            ), f"Expected DateField for '{field['name']}', got {field['data_type']}"
 
         # Boolean fields should be BooleanField
         bool_fields = [c for c in all_columns if c.get("data_type") == "BooleanField"]
@@ -262,15 +261,15 @@ class TestAdminBlocks:
 
         for entity_name, template in farm.entity_templates.items():
             admin_block = template.get("admin")
-            assert admin_block is not None, (
-                f"Entity '{entity_name}' is missing admin block"
-            )
-            assert "list_display" in admin_block, (
-                f"Entity '{entity_name}' admin block missing list_display"
-            )
-            assert len(admin_block["list_display"]) >= 2, (
-                f"Entity '{entity_name}' list_display has fewer than 2 fields"
-            )
+            assert (
+                admin_block is not None
+            ), f"Entity '{entity_name}' is missing admin block"
+            assert (
+                "list_display" in admin_block
+            ), f"Entity '{entity_name}' admin block missing list_display"
+            assert (
+                len(admin_block["list_display"]) >= 2
+            ), f"Entity '{entity_name}' list_display has fewer than 2 fields"
             # Verify all list_display fields exist in columns
             column_names = set(_get_column_names(template))
             for display_field in admin_block["list_display"]:

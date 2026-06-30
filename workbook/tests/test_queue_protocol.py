@@ -31,7 +31,6 @@ from workbook.tools.queue_protocol import (
     check_queue_health,
 )
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -50,9 +49,9 @@ class TestConstants:
         for name in QUEUE_NAMES:
             assert name in DEFAULT_TIMEOUTS, f"Missing timeouts for queue '{name}'"
             for status in ("created", "active"):
-                assert status in DEFAULT_TIMEOUTS[name], (
-                    f"Queue '{name}' missing timeout for status '{status}'"
-                )
+                assert (
+                    status in DEFAULT_TIMEOUTS[name]
+                ), f"Queue '{name}' missing timeout for status '{status}'"
 
     def test_lifecycle_statuses_are_valid(self):
         """LIFECYCLE_STATUSES contains exactly the three expected values."""
@@ -61,9 +60,9 @@ class TestConstants:
     def test_required_fields_exist_for_all_queues(self):
         """Every queue name has a list of required fields."""
         for name in QUEUE_NAMES:
-            assert name in QUEUE_REQUIRED_FIELDS, (
-                f"Missing required fields for queue '{name}'"
-            )
+            assert (
+                name in QUEUE_REQUIRED_FIELDS
+            ), f"Missing required fields for queue '{name}'"
             assert isinstance(QUEUE_REQUIRED_FIELDS[name], list)
 
 

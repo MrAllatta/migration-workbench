@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Callable
 from datetime import date
 from dataclasses import asdict, dataclass, field
@@ -105,7 +106,18 @@ def _col_index_to_letter(col_index: int) -> str:
     return letters
 
 
-_CHECKPOINT_CURRENT_VERSION = "0.2.0"
+_CHECKPOINT_CURRENT_VERSION = "0.3.0"
+
+# Canonical phase ordering for downstream dependency tracking.
+# Used by --force to determine which phases to invalidate.
+_PHASE_ORDER: list[str] = [
+    "discover",
+    "score_and_select",
+    "deep_profile",
+    "derive_contracts",
+    "scan_formulas",
+    "validate",
+]
 
 
 # Registry: version_string -> list of migration functions.
@@ -164,6 +176,91 @@ def _migrate_v0_0_9_to_v0_1_0(raw: dict[str, Any]) -> dict[str, Any]:
     return raw
 
 
+def _migrate_v0_2_0_to_v0_3_0(raw: dict[str, Any]) -> dict[str, Any]:
+    """Populate ``completed_phases`` from sentinel data.
+
+    Before 0.3.0, phase completion was tracked implicitly via sentinel
+    fields. This migration reads those sentinels and builds the explicit
+    ``completed_phases`` list, handling the discover/score_and_select
+    shortlist conflation.
+
+    Args:
+        raw: Deserialized checkpoint dictionary (pre-migration).
+
+    Returns:
+        Checkpoint dictionary with ``completed_phases`` populated.
+    """
+    if "completed_phases" in raw:
+        # Already migrated — skip.
+        return raw
+
+    completed: list[str] = []
+    discovery_raw = raw.get("discovery") or {}
+
+    # discover: source_tree populated → completed
+    # At migration time, source_tree is either {} (empty, no discover) or
+    # {"_artifact": "..."} (artifact ref, discover ran).  {} is falsy.
+    source_tree = discovery_raw.get("source_tree")
+    if source_tree:
+        completed.append("discover")
+
+    # score_and_select: shortlist entries have score + scoring_rationale
+    # (re-scored format from score_and_select, not raw discover output).
+    # The conflation issue: discover() always writes to shortlist in raw
+    # format (final_score-based), while score_and_select() overwrites with
+    # a re-scored format containing score + scoring_rationale keys.
+    shortlist_raw = discovery_raw.get("shortlist")
+    if _is_scored_shortlist(shortlist_raw):
+        completed.append("score_and_select")
+
+    # deep_profile: deep_profile_index has entries → completed
+    deep_raw = raw.get("deep_profile_index") or {}
+    deep_entries = (
+        deep_raw if isinstance(deep_raw, list) else deep_raw.get("entries") or []
+    )
+    if deep_entries:
+        completed.append("deep_profile")
+
+    # derive_contracts: schema_contract populated → completed
+    # At migration time, schema_contract is either None (empty) or
+    # {"_artifact": "..."} (artifact ref).  None is falsy.
+    schema_contract = raw.get("schema_contract")
+    if schema_contract:
+        completed.append("derive_contracts")
+
+    raw["completed_phases"] = completed
+    return raw
+
+
+def _is_scored_shortlist(shortlist_raw: Any) -> bool:
+    """Check if a shortlist contains re-scored entries (``score_and_select`` format).
+
+    ``discover()`` writes shortlist entries with ``final_score`` / ``breakdown_summary``
+    keys from raw cohort corpus output.  ``score_and_select()`` overwrites entries
+    with ``score`` / ``scoring_rationale`` keys from domain-aware re-scoring.
+
+    Returns:
+        True if the shortlist has at least one entry with both ``score`` and
+        ``scoring_rationale`` keys.
+    """
+    if isinstance(shortlist_raw, list):
+        return any(
+            isinstance(entry, dict)
+            and "score" in entry
+            and "scoring_rationale" in entry
+            for entry in shortlist_raw
+        )
+    if isinstance(shortlist_raw, dict):
+        entries = shortlist_raw.get("selected") or []
+        return any(
+            isinstance(entry, dict)
+            and "score" in entry
+            and "scoring_rationale" in entry
+            for entry in entries
+        )
+    return False
+
+
 _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
     # Migrations keyed by the target version; when upgrading from a(version) < key
     # and the key is <= current, apply the migrations to upgrade payloads.
@@ -173,6 +270,13 @@ _CHECKPOINT_MIGRATIONS: dict[str, list[Callable[[dict], dict]]] = {
     "0.2.0": [
         lambda raw: raw,
     ],
+    # 0.3.0: completed_phases registry added. Populate from sentinel data.
+    #   - discover: source_tree populated → mark "discover" complete
+    #   - score_and_select: shortlist entries have score + scoring_rationale
+    #     (re-scored format) → mark "score_and_select" complete
+    #   - deep_profile: deep_profile_index has entries → mark "deep_profile" complete
+    #   - derive_contracts: schema_contract populated → mark "derive_contracts" complete
+    "0.3.0": [_migrate_v0_2_0_to_v0_3_0],
 }
 
 
@@ -439,12 +543,18 @@ class PipelineState:
     behavioral_spec: BehavioralSpec | None = None
     validation_record: ValidationRecord | None = None
     coverage_report: CoverageReport | None = None
+    formula_scan_results: dict[str, Any] | None = None
     test_scaffold: str | None = field(default=None, repr=False)
     doc_scaffold: str | None = field(default=None, repr=False)
 
     # Operator-defined priority stack rank for workflows
     operator_priority: dict[str, int] = field(default_factory=dict)
     # Maps workflow_id -> priority rank (1 = highest)
+
+    # Registry of completed pipeline phases.
+    # Used by _run_all and single-phase guards in run_pipeline_state.py
+    # to determine whether a phase has already been executed.
+    completed_phases: list[str] = field(default_factory=list)
 
     # Provenance tracking for all artifacts
     artifact_provenance: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -783,12 +893,13 @@ class PipelineState:
         if not isinstance(raw, dict):
             raise CommandError(f"Checkpoint at {file_path} is not a YAML mapping.")
 
-        # Apply format migrations before resolving artifacts
-        raw = cls._apply_migrations(raw)
-
         # Resolve _artifact references back into inline data
         base_dir = file_path.parent
         resolved = _resolve_artifacts(raw, base_dir)
+
+        # Apply format migrations after resolving artifacts so migration
+        # functions see the actual data, not artifact-reference dicts.
+        resolved = cls._apply_migrations(resolved)
         if not isinstance(resolved, dict):
             raise CommandError(f"Checkpoint at {file_path} resolved to non-dict.")
 
@@ -1020,6 +1131,9 @@ class PipelineState:
         payload["operator_priority"] = dict(self.operator_priority)
         payload["artifact_provenance"] = dict(self.artifact_provenance)
 
+        # Completed phases registry (small, inline)
+        payload["completed_phases"] = list(self.completed_phases)
+
         return payload
 
     @classmethod
@@ -1164,9 +1278,7 @@ class PipelineState:
         bs_raw = raw.get("behavioral_spec")
         behavioral_spec: BehavioralSpec | None = None
         if bs_raw:
-            resolved_bs = (
-                _resolve_artifacts(bs_raw, base_dir) if base_dir else bs_raw
-            )
+            resolved_bs = _resolve_artifacts(bs_raw, base_dir) if base_dir else bs_raw
             if isinstance(resolved_bs, dict):
                 behavioral_spec = BehavioralSpec.from_dict(resolved_bs)
 
@@ -1196,8 +1308,14 @@ class PipelineState:
         operator_priority = dict(raw.get("operator_priority") or {})
         artifact_provenance = dict(raw.get("artifact_provenance") or {})
 
+        # Completed phases registry (small, inline)
+        completed_phases_raw = raw.get("completed_phases")
+        completed_phases = (
+            list(completed_phases_raw) if isinstance(completed_phases_raw, list) else []
+        )
+
         return cls(
-            version=str(raw.get("version", "0.2.0")),
+            version=str(raw.get("version", "0.3.0")),
             discovery=discovery,
             deep_profile_index=deep_profile_index,
             domain_knowledge=domain_knowledge,
@@ -1215,6 +1333,7 @@ class PipelineState:
             doc_scaffold=doc_scaffold,
             operator_priority=operator_priority,
             artifact_provenance=artifact_provenance,
+            completed_phases=completed_phases,
         )
 
     # ------------------------------------------------------------------
@@ -1320,6 +1439,7 @@ class PipelineState:
                 },
             )
 
+        self.completed_phases.append("discover")
         return self
 
     def score_and_select(self) -> PipelineState:
@@ -1435,6 +1555,7 @@ class PipelineState:
                 approved.setdefault("auto_selected", []).append(tab["tab_title"])
         self.discovery.approved_tabs = approved
 
+        self.completed_phases.append("score_and_select")
         return self
 
     def deep_profile(self, sheets_service=None) -> PipelineState:
@@ -1517,6 +1638,7 @@ class PipelineState:
                 )
                 break
 
+        self.completed_phases.append("deep_profile")
         return self
 
     def _enrich_entry_with_formula_dependencies(
@@ -1801,9 +1923,7 @@ class PipelineState:
                 signals=[
                     {
                         "phase": "derive_contracts",
-                        "tables_count": len(
-                            self.schema_contract.get("tables", [])
-                        ),
+                        "tables_count": len(self.schema_contract.get("tables", [])),
                     }
                 ],
             )
@@ -1819,6 +1939,103 @@ class PipelineState:
         # Emit profiler signals alongside contracts
         self._emit_profiler_signals()
 
+        self.completed_phases.append("derive_contracts")
+        return self
+
+    def scan_formulas(self, sheets_service=None) -> PipelineState:
+        """Scan approved workbooks for formula patterns.
+
+        Reads ``formula_patterns`` from the pipeline config (populated from
+        ``cohort_corpus.json``) and delegates to ``scan_workbook_patterns()``
+        from the formula scanner module. Stores results in
+        ``formula_scan_results`` as a dict mapping spreadsheet ID to list of
+        cell-level match records.
+
+        Parameters
+        ----------
+        sheets_service : optional
+            Google Sheets service handle.
+
+        Returns
+        -------
+        PipelineState
+            Self for chaining.
+        """
+        if "scan_formulas" in self.completed_phases:
+            logger.warning("scan_formulas already completed, skipping")
+            return self
+
+        formula_config = self._config.get("formula_patterns", {})
+        if not formula_config or not formula_config.get("workbooks"):
+            logger.warning("No formula_patterns config found — skipping formula scan")
+            return self
+
+        from profiler.tools.formula_scanner import scan_workbook_patterns
+
+        workbook_list = formula_config["workbooks"]
+        scan_results: dict[str, list[dict]] = {}
+        for workbook_entry in workbook_list:
+            spreadsheet_id = workbook_entry.get("spreadsheet_id")
+            patterns_raw = workbook_entry.get("patterns", [])
+            if not spreadsheet_id or not patterns_raw:
+                logger.info(
+                    "Skipping workbook entry with missing spreadsheet_id or patterns"
+                )
+                continue
+
+            # Convert pattern definitions to (name, compiled_regex) tuples
+            compiled_patterns = []
+            for pattern_entry in patterns_raw:
+                if isinstance(pattern_entry, dict):
+                    name = pattern_entry.get("name", "unnamed")
+                    regex = pattern_entry.get("regex", "")
+                else:
+                    name = f"pattern_{len(compiled_patterns)}"
+                    regex = str(pattern_entry)
+                if regex:
+                    compiled_patterns.append((name, re.compile(regex)))
+
+            if not compiled_patterns:
+                continue
+
+            try:
+                matches = scan_workbook_patterns(
+                    sheets_service, spreadsheet_id, compiled_patterns
+                )
+                if matches:
+                    scan_results[spreadsheet_id] = matches
+                    logger.info(
+                        "Formula scan for %s: %d matches across %d patterns",
+                        spreadsheet_id,
+                        len(matches),
+                        len(compiled_patterns),
+                    )
+                else:
+                    logger.info(
+                        "Formula scan for %s: no matches found",
+                        spreadsheet_id,
+                    )
+            except Exception:
+                logger.exception(
+                    "Formula scan failed for spreadsheet %s",
+                    spreadsheet_id,
+                )
+
+        self.formula_scan_results = scan_results
+
+        self.record_artifact_provenance(
+            artifact_key="formula_scan_results",
+            source="inferred",
+            signals=[
+                {
+                    "phase": "scan_formulas",
+                    "workbooks_scanned": len(workbook_list),
+                    "workbooks_with_matches": len(scan_results),
+                }
+            ],
+        )
+
+        self.completed_phases.append("scan_formulas")
         return self
 
     def _classify_deep_profiled_tabs(self) -> None:
@@ -2352,6 +2569,7 @@ class PipelineState:
                 "domain": self.domain_knowledge.domain,
                 "vocabulary": self.domain_knowledge.vocabulary,
             },
+            interaction_contract=self.interaction_contract,
         )
 
         # Populate operator_priority from behavioral spec project metadata
@@ -2427,9 +2645,9 @@ class PipelineState:
             tables.append(
                 {
                     "suggested_model_name": event.id.lower().replace(" ", "_"),
-                    "bundle_worksheet_title": event.sourced_from[0]["tab"]
-                    if event.sourced_from
-                    else "",
+                    "bundle_worksheet_title": (
+                        event.sourced_from[0]["tab"] if event.sourced_from else ""
+                    ),
                     "columns": columns,
                 }
             )
@@ -2458,13 +2676,11 @@ class PipelineState:
             if invariant.enforcement == "database_check":
                 safe_name = invariant.id.lower().replace(" ", "_").replace("-", "_")
                 expression = invariant.expression or ""
-                invariant_tests_lines.append(
-                    f"""    def test_{safe_name}(self):
+                invariant_tests_lines.append(f"""    def test_{safe_name}(self):
         \"\"\"{expression}\"\"\"
         # TODO: implement with real model instances
         pass
-"""
-                )
+""")
         if not invariant_tests_lines:
             invariant_tests_lines.append(
                 "    # No database_check invariants defined.\n"
@@ -2477,13 +2693,11 @@ class PipelineState:
             safe_name = workflow.id.lower().replace(" ", "_").replace("-", "_")
             commands_ids = workflow.commands or []
             commands_list_repr = str(commands_ids)
-            workflow_tests_lines.append(
-                f"""    def test_{safe_name}_has_commands(self):
+            workflow_tests_lines.append(f"""    def test_{safe_name}_has_commands(self):
         \"\"\"Workflow {workflow.id} must have at least one command.\"\"\"
         commands_list = {commands_list_repr}
         assert len(commands_list) >= 1
-"""
-            )
+""")
         if not workflow_tests_lines:
             workflow_tests_lines.append("    # No workflows defined.\n")
         workflow_tests = "\n".join(workflow_tests_lines).rstrip()
@@ -2494,13 +2708,11 @@ class PipelineState:
             safe_name = event.id.lower().replace(" ", "_").replace("-", "_")
             payload_list = event.payload or []
             payload_list_repr = str(payload_list)
-            event_tests_lines.append(
-                f"""    def test_{safe_name}_has_payload(self):
+            event_tests_lines.append(f"""    def test_{safe_name}_has_payload(self):
         \"\"\"Event {event.id} must have payload fields.\"\"\"
         payload_list = {payload_list_repr}
         assert len(payload_list) >= 1
-"""
-            )
+""")
         if not event_tests_lines:
             event_tests_lines.append("    # No events defined.\n")
         event_tests = "\n".join(event_tests_lines).rstrip()

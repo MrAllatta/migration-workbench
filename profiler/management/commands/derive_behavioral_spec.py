@@ -8,7 +8,9 @@ from profiler.tools.pipeline_state import PipelineState
 
 
 class Command(BaseCommand):
-    help = "Derive the behavioral specification from an existing PipelineState checkpoint"
+    help = (
+        "Derive the behavioral specification from an existing PipelineState checkpoint"
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -41,6 +43,4 @@ class Command(BaseCommand):
         state.behavioral_spec.to_yaml(out_path)
         state.save_checkpoint(checkpoint_path)
 
-        self.stdout.write(
-            self.style.SUCCESS(f"Behavioral spec written to {out_path}")
-        )
+        self.stdout.write(self.style.SUCCESS(f"Behavioral spec written to {out_path}"))

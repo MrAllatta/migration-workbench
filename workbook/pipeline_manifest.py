@@ -13,7 +13,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 PIPELINE_MANIFEST_VERSION = "1.0"
 
 

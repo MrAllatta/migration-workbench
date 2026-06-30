@@ -5,31 +5,12 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import time
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
-from googleapiclient.errors import HttpError
 
 from connectors.google_sheets import SHEETS_READONLY_SCOPE, build_google_service
-
-
-def execute_with_retry(request, max_retries: int = 8):
-    """Execute a Google API request with exponential backoff retry on transient failures."""
-    delay = 5.0
-    for attempt in range(max_retries):
-        try:
-            return request.execute()
-        except TimeoutError:
-            if attempt + 1 >= max_retries:
-                raise
-            time.sleep(delay)
-            delay = min(delay * 1.6, 120.0)
-        except HttpError as err:
-            if err.resp.status != 429 or attempt + 1 >= max_retries:
-                raise
-            time.sleep(delay)
-            delay = min(delay * 1.6, 120.0)
+from profiler.tools.formula_scanner import scan_workbook_patterns
 
 
 def load_patterns(config: dict) -> list[tuple[str, re.Pattern[str]]]:
@@ -52,42 +33,6 @@ def load_workbooks(config: dict) -> list[tuple[str, str]]:
     if not workbooks:
         raise CommandError("Config must include a non-empty 'workbooks' list")
     return [(item["name"], item["spreadsheet_id"]) for item in workbooks]
-
-
-def scan_workbook(
-    svc, spreadsheet_id: str, patterns: list[tuple[str, re.Pattern[str]]]
-):
-    """Scan a single workbook for cells matching the given regex patterns. Returns a list of match dicts."""
-    sheets_resp = execute_with_retry(
-        svc.spreadsheets().get(
-            spreadsheetId=spreadsheet_id, fields="sheets(properties(title))"
-        )
-    )
-    sheet_titles = [s["properties"]["title"] for s in sheets_resp.get("sheets", [])]
-    matches = []
-    for title in sheet_titles:
-        escaped_title = title.replace("'", "''")
-        values_resp = execute_with_retry(
-            svc.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range=f"'{escaped_title}'")
-        )
-        for row_idx, row in enumerate(values_resp.get("values", []), start=1):
-            for col_idx, value in enumerate(row, start=1):
-                if not isinstance(value, str) or not value.startswith("="):
-                    continue
-                for name, pattern in patterns:
-                    if pattern.search(value):
-                        matches.append(
-                            {
-                                "sheet": title,
-                                "row": row_idx,
-                                "col": col_idx,
-                                "pattern": name,
-                                "formula": value,
-                            }
-                        )
-    return matches
 
 
 class Command(BaseCommand):
@@ -141,7 +86,9 @@ class Command(BaseCommand):
                 {
                     "workbook": name,
                     "spreadsheet_id": spreadsheet_id,
-                    "matches": scan_workbook(service, spreadsheet_id, patterns),
+                    "matches": scan_workbook_patterns(
+                        service, spreadsheet_id, patterns
+                    ),
                 }
             )
 

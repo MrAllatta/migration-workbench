@@ -283,7 +283,15 @@ def build_view_manifest(
 
 
 # Valid acceptance criterion types
-VALID_ACCEPTANCE_TYPES = {"completion", "coverage", "accuracy", "sequence", "speed", "recovery", "independence"}
+VALID_ACCEPTANCE_TYPES = {
+    "completion",
+    "coverage",
+    "accuracy",
+    "sequence",
+    "speed",
+    "recovery",
+    "independence",
+}
 
 # Valid test types
 VALID_TEST_TYPES = {"automated", "performance", "manual"}
@@ -309,9 +317,13 @@ def validate_view_manifest(manifest: dict) -> list[str]:
                 errors.append(f"view {view_name}: criterion {cid} missing description")
             ctype = criterion.get("type", "")
             if ctype and ctype not in VALID_ACCEPTANCE_TYPES:
-                errors.append(f"view {view_name}: criterion {cid} has invalid type '{ctype}'")
+                errors.append(
+                    f"view {view_name}: criterion {cid} has invalid type '{ctype}'"
+                )
             ttype = criterion.get("test_type", "")
             if ttype and ttype not in VALID_TEST_TYPES:
-                errors.append(f"view {view_name}: criterion {cid} has invalid test_type '{ttype}'")
+                errors.append(
+                    f"view {view_name}: criterion {cid} has invalid test_type '{ttype}'"
+                )
 
     return errors

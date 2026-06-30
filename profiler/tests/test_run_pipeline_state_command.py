@@ -137,7 +137,13 @@ def test_run_pipeline_state_all_phase(
                     "column_count": 20,
                 },
             ],
-            shortlist=[{"tab_title": "Crop Planner", "score": 85}],
+            shortlist=[
+                {
+                    "tab_title": "Crop Planner",
+                    "score": 85,
+                    "scoring_rationale": "Domain vocabulary match for operational entity",
+                }
+            ],
             approved_tabs={"101": ["Crop Planner"]},
         ),
     )

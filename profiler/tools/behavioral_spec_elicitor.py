@@ -242,7 +242,11 @@ def _provenance_from_rule(
         rule = _lookup_rule(rule_id)
         signal_desc = rule.signal if rule else ""
         inference_signals.append(
-            {"rule_id": rule_id, "signal": rule.name if rule else "", "description": signal_desc}
+            {
+                "rule_id": rule_id,
+                "signal": rule.name if rule else "",
+                "description": signal_desc,
+            }
         )
     if signals:
         inference_signals.extend(signals)
@@ -251,9 +255,6 @@ def _provenance_from_rule(
         inference_signals=inference_signals,
         verification_required=True,
     )
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +287,10 @@ def generate_placeholders(spec: Union[BehavioralSpec, dict]) -> list[Placeholder
         wf_id = workflow.id
 
         # operational.max_duration_minutes
-        if workflow.operational is None or workflow.operational.max_duration_minutes == 0:
+        if (
+            workflow.operational is None
+            or workflow.operational.max_duration_minutes == 0
+        ):
             placeholders.append(
                 Placeholder(
                     field_path=f"workflows[{wf_id}].operational.max_duration_minutes",
@@ -664,6 +668,132 @@ def _supplement_workflows_with_clusters_and_events(
 
 
 # ---------------------------------------------------------------------------
+# Helper: derive actors from interaction contract roles or vocabulary
+# ---------------------------------------------------------------------------
+
+
+def _derive_actors(
+    interaction_contract: dict[str, Any] | None,
+    domain_knowledge: dict[str, Any] | None,
+) -> list[Actor]:
+    """Derive Actor objects preferring interaction contract roles over vocabulary.
+
+    When ``interaction_contract`` contains ``views[].workflow_hints.role_hints``,
+    one Actor is created per role entry with name, description, and access hints
+    from the role data.  The fallback path uses domain vocabulary operational
+    terms (existing behavior) and tags those actors with provenance
+    ``source="vocabulary_stub"``.
+
+    Args:
+        interaction_contract: Optional interaction contract dict with
+            ``views`` containing ``workflow_hints.role_hints``.
+        domain_knowledge: Domain knowledge dict with ``vocabulary``.
+
+    Returns:
+        List of Actor dataclass instances.
+    """
+    # -- Try interaction contract roles first --
+    roles = _extract_role_hints(interaction_contract)
+    if roles:
+        seen_role_ids: set[str] = set()
+        actors_from_roles: list[Actor] = []
+        for role in roles:
+            role_name: str = role.get("name") or role.get("role", "")
+            if not role_name:
+                continue
+            role_slug: str = role_name.lower().replace(" ", "_")
+            if role_slug in seen_role_ids:
+                continue
+            seen_role_ids.add(role_slug)
+            responsibilities: list[str] = []
+            hints: str = role.get("hints") or role.get("description", "")
+            if hints:
+                responsibilities.append(hints)
+            access_hints = role.get("access_hints")
+            access_level: str = "not_yet_elicited"
+            if access_hints and isinstance(access_hints, str):
+                access_level = access_hints
+            elif access_hints and isinstance(access_hints, list):
+                access_level = ", ".join(str(a) for a in access_hints)
+            actors_from_roles.append(
+                Actor(
+                    id=role_slug,
+                    name=role_name,
+                    responsibilities=responsibilities,
+                    time_pressures=[],
+                    access_level=access_level,
+                )
+            )
+        if actors_from_roles:
+            return actors_from_roles
+
+    # -- Fall back to vocabulary-based derivation with provenance tag --
+    vocabulary = (domain_knowledge.get("vocabulary") or {}) if domain_knowledge else {}
+    operational_terms = vocabulary.get("operational") or []
+    actors_from_vocab: list[Actor] = []
+    for term in operational_terms:
+        actors_from_vocab.append(
+            Actor(
+                id=term.replace(" ", "_"),
+                name=term.title(),
+                responsibilities=[f"Manage {term}"],
+                time_pressures=[],
+                access_level="not_yet_elicited",
+                provenance=Provenance(
+                    source="vocabulary_stub",
+                    inference_signals=[],
+                    verification_required=True,
+                ),
+            )
+        )
+    if not actors_from_vocab:
+        actors_from_vocab = [
+            Actor(
+                id="primary_operator",
+                name="Primary Operator",
+                responsibilities=["Operate discovered workflows"],
+                time_pressures=[],
+                provenance=Provenance(
+                    source="vocabulary_stub",
+                    inference_signals=[],
+                    verification_required=True,
+                ),
+            )
+        ]
+    return actors_from_vocab
+
+
+def _extract_role_hints(
+    interaction_contract: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Extract role hint entries from an interaction contract dict.
+
+    Walks ``views[].workflow_hints.role_hints`` and collects all unique
+    role entries across all views.
+
+    Args:
+        interaction_contract: Interaction contract dict or ``None``.
+
+    Returns:
+        List of role hint dicts (may be empty).
+    """
+    if not interaction_contract:
+        return []
+    views: list[dict[str, Any]] = interaction_contract.get("views") or []
+    seen: set[str] = set()
+    roles: list[dict[str, Any]] = []
+    for view in views:
+        workflow_hints: dict[str, Any] = view.get("workflow_hints") or {}
+        role_hints: list[dict[str, Any]] = workflow_hints.get("role_hints") or []
+        for role in role_hints:
+            role_name: str = role.get("name") or role.get("role", "")
+            if role_name and role_name not in seen:
+                seen.add(role_name)
+                roles.append(role)
+    return roles
+
+
+# ---------------------------------------------------------------------------
 # derive_behavioral_spec() — the new primary entry point
 # ---------------------------------------------------------------------------
 
@@ -672,11 +802,16 @@ def derive_behavioral_spec(
     discovery: dict[str, Any],
     deep_profile_index: dict[str, Any],
     domain_knowledge: dict[str, Any],
+    interaction_contract: dict[str, Any] | None = None,
 ) -> BehavioralSpec:
     """Derive a BehavioralSpec from profiler artifacts.
 
     Uses the same internal helpers as ``derive_operational_model`` but
     produces a ``BehavioralSpec`` with provenance records and placeholders.
+
+    Prefers role data from ``interaction_contract`` (if available) for actor
+    derivation, falling back to vocabulary-based stubs when no role hints
+    are present.
 
     Args:
         discovery: Discovery state dict with ``workbook_index`` and
@@ -684,6 +819,10 @@ def derive_behavioral_spec(
         deep_profile_index: Deep profile index dict with ``entries`` list.
         domain_knowledge: Domain knowledge dict with ``domain`` and
             ``vocabulary``.
+        interaction_contract: Optional interaction contract dict with
+            ``views`` containing ``workflow_hints.role_hints``. When
+            provided, actors are derived from role data instead of
+            vocabulary terms.
 
     Returns:
         A populated BehavioralSpec instance with ``spec_version`` set to
@@ -699,27 +838,8 @@ def derive_behavioral_spec(
     # -- Entity clustering --
     entity_clusters = _cluster_tabs_into_entities(tabs)
 
-    # -- Actors from domain vocabulary --
-    vocabulary = (domain_knowledge.get("vocabulary") or {}) if domain_knowledge else {}
-    operational_terms = vocabulary.get("operational") or []
-    actors: list[Actor] = []
-    for term_index, term in enumerate(operational_terms):
-        actors.append(
-            Actor(
-                id=term.replace(" ", "_"),
-                name=term.title(),
-                responsibilities=[f"Manage {term}"],
-                time_pressures=[],
-                access_level="not_yet_elicited",
-            )
-        )
-    if not actors:
-        actors = [Actor(
-            id="primary_operator",
-            name="Primary Operator",
-            responsibilities=["Operate discovered workflows"],
-            time_pressures=[],
-        )]
+    # -- Actors: prefer interaction contract roles over vocabulary stubs --
+    actors: list[Actor] = _derive_actors(interaction_contract, domain_knowledge)
 
     # -- Events from column profiles --
     events: list[BehavioralEvent] = []
@@ -747,12 +867,16 @@ def derive_behavioral_spec(
             events.append(
                 BehavioralEvent(
                     id=candidate_event["suggested_event_id"],
-                    name=candidate_event["suggested_event_id"].replace("_", " ").title(),
+                    name=candidate_event["suggested_event_id"]
+                    .replace("_", " ")
+                    .title(),
                     description=f"Inferred from column '{candidate_event['source_column']}' "
-                                f"on tab '{tab_title}'",
+                    f"on tab '{tab_title}'",
                     producer=tab_title,
                     payload=[
-                        PayloadField(field=candidate_event["source_column"], type="string"),
+                        PayloadField(
+                            field=candidate_event["source_column"], type="string"
+                        ),
                     ],
                     consumed_by=[],
                     provenance=_provenance_from_rule(
@@ -775,7 +899,9 @@ def derive_behavioral_spec(
         event_tabs.add(event.producer)
 
     graph_workflows = _supplement_workflows_with_clusters_and_events(
-        graph_workflows, entity_clusters, event_tabs,
+        graph_workflows,
+        entity_clusters,
+        event_tabs,
     )
 
     # Build BehavioralWorkflow objects
@@ -910,7 +1036,11 @@ def derive_behavioral_spec(
             id=inv["id"],
             title=inv["id"].replace("_", " ").title(),
             expression=inv["expression"],
-            severity=inv["violations_are"] if inv["violations_are"] == "warning" else "warning",
+            severity=(
+                inv["violations_are"]
+                if inv["violations_are"] == "warning"
+                else "warning"
+            ),
             applies_to="",
             violation_response=inv.get("enforcement", "application_logic"),
             provenance=_provenance_from_rule("INF-10"),
@@ -932,7 +1062,9 @@ def derive_behavioral_spec(
     business = BusinessSection(
         name=source_id.title() if source_id else "",
         domain=source_id,
-        description=f"MWBS behavioral specification for {source_id}" if source_id else "",
+        description=(
+            f"MWBS behavioral specification for {source_id}" if source_id else ""
+        ),
     )
 
     # -- Assemble BehavioralSpec --
@@ -1020,7 +1152,9 @@ def derive_operational_model(
                 OpEvent(
                     id=candidate_event["suggested_event_id"],
                     payload=[candidate_event["source_column"]],
-                    sourced_from=[{"tab": tab_title, "column": candidate_event["source_column"]}],
+                    sourced_from=[
+                        {"tab": tab_title, "column": candidate_event["source_column"]}
+                    ],
                 )
             )
 
@@ -1038,7 +1172,9 @@ def derive_operational_model(
                 event_tabs.add(tab)
 
     workflow_candidates = _supplement_workflows_with_clusters_and_events(
-        workflow_candidates, entity_clusters, event_tabs,
+        workflow_candidates,
+        entity_clusters,
+        event_tabs,
     )
 
     workflows = [

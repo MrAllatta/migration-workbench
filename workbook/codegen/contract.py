@@ -537,9 +537,7 @@ def _validate_table_exceptions(table: dict[str, Any]) -> list[str]:
             )
         for response in exception.get("responses") or []:
             if not response.get("action"):
-                warnings.append(
-                    f"{name}: exception {exc_id} response missing action"
-                )
+                warnings.append(f"{name}: exception {exc_id} response missing action")
     return warnings
 
 

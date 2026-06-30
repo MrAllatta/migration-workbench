@@ -116,9 +116,9 @@ def test_new_product_does_not_commit_into_existing_repo(tmp_path):
         text=True,
         check=True,
     )
-    assert "baseline" in result.stdout, (
-        f"Expected 'baseline' commit to remain latest, got: {result.stdout}"
-    )
+    assert (
+        "baseline" in result.stdout
+    ), f"Expected 'baseline' commit to remain latest, got: {result.stdout}"
 
 
 def test_scaffold_copies_run_import_sh(tmp_path):
@@ -152,9 +152,9 @@ def test_check_env_works_with_posix_sh(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"check-env failed with all vars set:\n{result.stderr}{result.stdout}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"check-env failed with all vars set:\n{result.stderr}{result.stdout}"
 
     env_file.write_text(
         "WORKBENCH=/tmp\n"
@@ -181,9 +181,9 @@ def test_check_env_coda_works_with_posix_sh(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"check-env failed with all Coda vars set:\n{result.stderr}{result.stdout}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"check-env failed with all Coda vars set:\n{result.stderr}{result.stdout}"
 
     env_file.write_text("WORKBENCH=/tmp\nCODA_API_TOKEN=\n")
     result = subprocess.run(
@@ -198,18 +198,18 @@ def test_check_env_coda_works_with_posix_sh(tmp_path):
 def test_generated_makefile_has_generate_pipeline_manifest_target(tmp_path):
     output_dir = _run_new_product(tmp_path, "pipeline-test")
     makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
-    assert "generate-pipeline-manifest:" in makefile, (
-        "Missing generate-pipeline-manifest target in scaffolded Makefile"
-    )
+    assert (
+        "generate-pipeline-manifest:" in makefile
+    ), "Missing generate-pipeline-manifest target in scaffolded Makefile"
 
 
 def test_generate_all_includes_pipeline_manifest(tmp_path):
     output_dir = _run_new_product(tmp_path, "genall-test")
     makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
     genall_line = makefile.split("generate-all:")[1].split("\n")[0]
-    assert "generate-pipeline-manifest" in genall_line, (
-        "generate-all target does not include generate-pipeline-manifest"
-    )
+    assert (
+        "generate-pipeline-manifest" in genall_line
+    ), "generate-all target does not include generate-pipeline-manifest"
 
 
 def test_cohort_corpus_config_has_documentation_for_tab_overrides(tmp_path):
@@ -222,9 +222,9 @@ def test_cohort_corpus_config_has_documentation_for_tab_overrides(tmp_path):
         doc = json.load(fh)
 
     docs = doc.get("_documentation", {})
-    assert "tab_selection_overrides" in docs, (
-        f"Missing tab_selection_overrides in _documentation. Keys present: {list(docs.keys())}"
-    )
+    assert (
+        "tab_selection_overrides" in docs
+    ), f"Missing tab_selection_overrides in _documentation. Keys present: {list(docs.keys())}"
     assert "common_mistakes" in docs["tab_selection_overrides"]
     assert "include" in docs["tab_selection_overrides"]["common_mistakes"]
 
@@ -248,6 +248,6 @@ def test_generate_view_manifest_appears_exactly_once(tmp_path):
     output_dir = _run_new_product(tmp_path, "manifest-once")
     makefile = (output_dir / "Makefile").read_text(encoding="utf-8")
     count = makefile.count("generate-view-manifest:")
-    assert count == 1, (
-        f"Expected exactly 1 'generate-view-manifest:' target, found {count}"
-    )
+    assert (
+        count == 1
+    ), f"Expected exactly 1 'generate-view-manifest:' target, found {count}"

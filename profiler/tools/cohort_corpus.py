@@ -766,9 +766,11 @@ def select_tabs_from_inventory(
         breakdown_summary = {
             "total_token_matches": total_token_matches,
             "category_counts": cat_counts,
-            "avg_size_bonus": round(total_size_bonus / len(bucket["breakdowns"]), 2)
-            if bucket["breakdowns"]
-            else 0,
+            "avg_size_bonus": (
+                round(total_size_bonus / len(bucket["breakdowns"]), 2)
+                if bucket["breakdowns"]
+                else 0
+            ),
         }
 
         selected.append(
@@ -1207,9 +1209,7 @@ def _render_corpus_summary(
             status = (
                 "OK"
                 if successes > 0 and failures == 0
-                else "FAIL"
-                if failures > 0
-                else "N/A"
+                else "FAIL" if failures > 0 else "N/A"
             )
             lines.append(
                 f"- **{tab_title}** — {status} ({successes} ok, {failures} fail)"

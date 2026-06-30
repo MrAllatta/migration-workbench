@@ -25,7 +25,6 @@ from profiler.tools.behavioral_spec_validation import (
     validate_sign_off,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -308,9 +307,7 @@ class TestValidateSignOffRule11:
     def test_placeholder_detected(self):
         """A spec with REQUIRES_ELICITATION markers produces Rule 11 errors."""
         spec = _make_valid_spec()
-        spec.actors[0].time_pressures = [
-            "[REQUIRES_ELICITATION: What are peak times?]"
-        ]
+        spec.actors[0].time_pressures = ["[REQUIRES_ELICITATION: What are peak times?]"]
         errors = validate_sign_off(spec)
         rule_errors = [e for e in errors if "Rule 11" in e]
         assert len(rule_errors) == 1
@@ -656,36 +653,36 @@ class TestComputeCoverageMetrics:
         report = compute_coverage_metrics(spec)
         # Fixture: 1 actor, 0 events, 2 workflows (no data_entry/job_story),
         # 0 reports, both workflows have exceptions, coverage_map pct=100
-        assert report.data_coverage == 0.25      # (1+0) / max(2, 4)
-        assert report.formula_coverage == 0.0     # 0/2 with data_entry
-        assert report.structural_coverage == 1.0   # 100/100 from coverage_map
-        assert report.workflow_coverage == 0.0     # 0/2 with job_stories
-        assert report.exception_coverage == 1.0    # 2/2 workflows have exceptions
-        assert report.report_coverage == 0.0       # 0/2 reports
+        assert report.data_coverage == 0.25  # (1+0) / max(2, 4)
+        assert report.formula_coverage == 0.0  # 0/2 with data_entry
+        assert report.structural_coverage == 1.0  # 100/100 from coverage_map
+        assert report.workflow_coverage == 0.0  # 0/2 with job_stories
+        assert report.exception_coverage == 1.0  # 2/2 workflows have exceptions
+        assert report.report_coverage == 0.0  # 0/2 reports
 
     def test_partial_coverage(self):
         """Only structural_coverage varies with behavioral_coverage_pct."""
         spec = _make_valid_spec()
         spec.coverage_map.summary.behavioral_coverage_pct = 50.0
         report = compute_coverage_metrics(spec)
-        assert report.data_coverage == 0.25       # unchanged — artifact-based
-        assert report.structural_coverage == 0.5   # 50/100 from coverage_map
-        assert report.workflow_coverage == 0.0     # 0/2 — no job_stories on fixture
+        assert report.data_coverage == 0.25  # unchanged — artifact-based
+        assert report.structural_coverage == 0.5  # 50/100 from coverage_map
+        assert report.workflow_coverage == 0.0  # 0/2 — no job_stories on fixture
 
     def test_no_coverage_map(self):
         """Missing coverage_map falls back to steps-based structural."""
         spec = _make_valid_spec(coverage_map=None)
         report = compute_coverage_metrics(spec)
-        assert report.data_coverage == 0.25       # artifact-based, unaffected
-        assert report.structural_coverage == 0.0   # fallback: 0/2 workflows with steps
+        assert report.data_coverage == 0.25  # artifact-based, unaffected
+        assert report.structural_coverage == 0.0  # fallback: 0/2 workflows with steps
 
     def test_no_summary(self):
         """Missing summary falls back to steps-based structural."""
         spec = _make_valid_spec()
         spec.coverage_map.summary = None
         report = compute_coverage_metrics(spec)
-        assert report.data_coverage == 0.25       # artifact-based, unaffected
-        assert report.structural_coverage == 0.0   # fallback: 0/2 workflows with steps
+        assert report.data_coverage == 0.25  # artifact-based, unaffected
+        assert report.structural_coverage == 0.0  # fallback: 0/2 workflows with steps
 
 
 # ===================================================================

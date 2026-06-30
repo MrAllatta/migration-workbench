@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 from django.core.management.base import BaseCommand, CommandError  # noqa: E402
 
-from connectors.spreadsheet import guess_header_row, raw_sheet_to_row_lists  # noqa: E402
+from connectors.spreadsheet import (
+    guess_header_row,
+    raw_sheet_to_row_lists,
+)  # noqa: E402
 from workbook.partial_output import PartialOutputCollector  # noqa: E402
 from workbook.codegen.designed_model_detection import (  # noqa: E402
     find_column_overlap_groups,
@@ -32,7 +35,10 @@ from workbook.schema_contract import (  # noqa: E402
     _compute_bundle_paths,
     load_json,
 )
-from profiler.tools.enrichment_utils import _ENTITY_KEYWORDS, _to_pascal_case  # noqa: E402
+from profiler.tools.enrichment_utils import (
+    _ENTITY_KEYWORDS,
+    _to_pascal_case,
+)  # noqa: E402
 from workbook.tools.vertical_registry import (  # noqa: E402
     MIN_CONFIDENCE_THRESHOLD,
     apply_vertical_to_schema,

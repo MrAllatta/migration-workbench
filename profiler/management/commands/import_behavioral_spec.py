@@ -61,9 +61,7 @@ class Command(BaseCommand):
         try:
             spec = BehavioralSpec.from_yaml(str(spec_path))
         except Exception as exc:
-            raise CommandError(
-                f"Failed to parse behavioral spec: {exc}"
-            ) from exc
+            raise CommandError(f"Failed to parse behavioral spec: {exc}") from exc
 
         placeholders = spec.placeholders()
         if placeholders:
@@ -91,9 +89,7 @@ class Command(BaseCommand):
 
         # Confirm
         if not skip_confirm:
-            self.stdout.write(
-                f"This will inject the spec into {checkpoint_path}."
-            )
+            self.stdout.write(f"This will inject the spec into {checkpoint_path}.")
             answer = input("Continue? [y/N] ")
             if answer.lower() not in ("y", "yes"):
                 self.stdout.write(self.style.WARNING("Aborted."))
@@ -115,13 +111,9 @@ class Command(BaseCommand):
         try:
             state.save_checkpoint(str(checkpoint_path))
         except Exception as exc:
-            raise CommandError(
-                f"Failed to write checkpoint: {exc}"
-            ) from exc
+            raise CommandError(f"Failed to write checkpoint: {exc}") from exc
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Behavioral spec injected into {checkpoint_path}"
-            )
+            self.style.SUCCESS(f"Behavioral spec injected into {checkpoint_path}")
         )
         return None

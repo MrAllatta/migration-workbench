@@ -3,7 +3,6 @@ from pathlib import Path
 import shutil
 import yaml
 
-
 VENV_DIR = Path(".venv")
 WB_PATH = VENV_DIR / "bin" / "wb"
 DOMAIN_CONTEXT_PATH = Path("config/domain_context.yaml")
