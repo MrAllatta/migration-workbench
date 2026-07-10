@@ -648,3 +648,89 @@ def column_has_formula(column: dict[str, Any]) -> bool:
 def formula_text(column: dict[str, Any]) -> str:
     """Return the formula text from a Coda *column* dict, or an empty string if none."""
     return str(column.get("formulaText") or column.get("formula") or "")
+
+
+_RELATION_TYPES: set[str] = {"lookup", "person", "linked_relation"}
+
+
+def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Scan Coda column metadata and extract native relation columns.
+
+    Coda has three relationship primitives:
+
+    - **lookup** (format.type == "lookup") — explicit FK from one table to
+      another. The target table may be named in ``format.table`` or
+      ``format.foreignTable``.
+    - **linked_relation** — bidirectional / reverse lookup complement.
+    - **person** (format.type == "person") — person reference, flagged but
+      not yet promoted to ForeignKey.
+
+    Returns a list of relation dicts with keys:
+    ``column_name``, ``column_type``, ``target_table_name``,
+    ``target_table_id``, ``is_bidirectional``, ``notes``.
+    """
+    relations: list[dict[str, Any]] = []
+    for col in columns:
+        fmt = col.get("format") or {}
+        fmt_type = str(fmt.get("type") or "").lower()
+        if fmt_type not in _RELATION_TYPES:
+            continue
+
+        col_name = str(col.get("name") or col.get("id") or "")
+        entry: dict[str, Any] = {
+            "column_name": col_name,
+            "column_type": fmt_type,
+            "target_table_name": None,
+            "target_table_id": None,
+            "is_bidirectional": False,
+            "notes": [],
+        }
+
+        if fmt_type == "lookup":
+            # Coda API may name the target table in several ways.
+            target_table = (
+                fmt.get("table")
+                or fmt.get("foreignTable")
+                or fmt.get("targetTable")
+            )
+            if isinstance(target_table, dict):
+                entry["target_table_name"] = target_table.get("name")
+                entry["target_table_id"] = target_table.get("id")
+            elif isinstance(target_table, str):
+                entry["target_table_name"] = target_table
+            else:
+                entry["notes"].append(
+                    "lookup_target_table_not_exposed_in_api"
+                )
+            # Display column hints
+            display_col = fmt.get("displayColumn")
+            if isinstance(display_col, dict):
+                dc_name = display_col.get("name")
+                if dc_name:
+                    entry["notes"].append(f"display_column:{dc_name}")
+            elif isinstance(display_col, str):
+                entry["notes"].append(f"display_column:{display_col}")
+
+        elif fmt_type == "linked_relation":
+            entry["is_bidirectional"] = True
+            target_table = (
+                fmt.get("table")
+                or fmt.get("foreignTable")
+                or fmt.get("targetTable")
+            )
+            if isinstance(target_table, dict):
+                entry["target_table_name"] = target_table.get("name")
+                entry["target_table_id"] = target_table.get("id")
+            elif isinstance(target_table, str):
+                entry["target_table_name"] = target_table
+            source_table = fmt.get("sourceTable")
+            if isinstance(source_table, dict):
+                st_name = source_table.get("name")
+                if st_name:
+                    entry["notes"].append(f"source_table:{st_name}")
+
+        elif fmt_type == "person":
+            entry["notes"].append("person_reference_not_resolved_to_fk")
+
+        relations.append(entry)
+    return relations

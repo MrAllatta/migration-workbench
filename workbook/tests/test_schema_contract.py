@@ -320,3 +320,116 @@ def test_build_contract_adds_model_name():
     table = contract["tables"][0]
     assert "model_name" in table
     assert table["model_name"] == "SalesChannels"
+
+
+def test_build_contract_coda_relation_column_upgrades_to_fk():
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "Tasks",
+                "output_path": "reference/tasks.csv",
+                "required_headers": ["Name", "Project"],
+            },
+            {
+                "worksheet_title": "Projects",
+                "output_path": "reference/projects.csv",
+                "required_headers": ["Name"],
+            },
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "Tasks",
+            "columns": [
+                {
+                    "name": "Name",
+                    "format_type": "text",
+                    "has_formula": False,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+                {
+                    "name": "Project",
+                    "format_type": "lookup",
+                    "has_formula": False,
+                    "null_rate": 0.1,
+                    "is_relation_type": True,
+                },
+            ],
+            "relation_columns": [
+                {
+                    "column_name": "Project",
+                    "column_type": "lookup",
+                    "target_table_name": "Projects",
+                    "target_table_id": "t-proj",
+                    "is_bidirectional": False,
+                    "notes": [],
+                }
+            ],
+        }
+    }
+    contract = build_contract(
+        bundle,
+        table_profiles={"Tasks": tp},
+    )
+    tasks_table = contract["tables"][0]
+    assert tasks_table["bundle_worksheet_title"] == "Tasks"
+    proj_col = next(c for c in tasks_table["columns"] if c["source_column"] == "Project")
+    assert proj_col["django_field_class"] == "models.ForeignKey"
+    assert proj_col["django_field_kwargs"]["to"] == "Projects"
+    assert "coda_relation:lookup" in proj_col["notes"]
+    assert "fk_resolutions" in tasks_table
+    fk = tasks_table["fk_resolutions"]
+    assert any(f["field"] == "project" and f["target_model"] == "Projects" for f in fk)
+
+
+def test_build_contract_coda_relation_missing_target_uses_todo():
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "Items",
+                "output_path": "reference/items.csv",
+                "required_headers": ["Name", "Parent"],
+            }
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "Items",
+            "columns": [
+                {
+                    "name": "Name",
+                    "format_type": "text",
+                    "has_formula": False,
+                    "null_rate": 0.0,
+                },
+                {
+                    "name": "Parent",
+                    "format_type": "lookup",
+                    "has_formula": False,
+                    "null_rate": 0.2,
+                    "is_relation_type": True,
+                },
+            ],
+            "relation_columns": [
+                {
+                    "column_name": "Parent",
+                    "column_type": "lookup",
+                    "target_table_name": None,
+                    "target_table_id": None,
+                    "is_bidirectional": False,
+                    "notes": ["lookup_target_table_not_exposed_in_api"],
+                }
+            ],
+        }
+    }
+    contract = build_contract(bundle, table_profiles={"Items": tp})
+    table = contract["tables"][0]
+    parent_col = next(c for c in table["columns"] if c["source_column"] == "Parent")
+    assert parent_col["django_field_class"] == "models.ForeignKey"
+    assert parent_col["django_field_kwargs"]["to"] == "TODO_Parent"
+    assert "fk_resolutions" in table
+    fk = table["fk_resolutions"]
+    assert any(f["field"] == "parent" and f["target_model"] == "TODO_Parent" for f in fk)

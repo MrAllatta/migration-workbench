@@ -278,8 +278,8 @@ def index_tables_from_doc_profile(doc: dict[str, Any]) -> dict[str, dict[str, An
 
 def index_table_profile(
     payload: dict[str, Any],
-) -> tuple[str, dict[str, dict[str, Any]]]:
-    """Extract the table name and column index from a ``profile_coda_table`` artifact.
+) -> tuple[str, dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """Extract the table name, column index, and relation columns from a ``profile_coda_table`` artifact.
 
     Args:
         payload: Root dict from a ``profile_coda_table`` JSON artifact.
@@ -287,8 +287,9 @@ def index_table_profile(
             and ``"columns"`` keys.
 
     Returns:
-        tuple[str, dict[str, dict]]: ``(table_name, {col_name: col_dict})``
-        where *col_dict* is the raw profiler column summary.
+        tuple: ``(table_name, {col_name: col_dict}, relation_columns)``
+        where *col_dict* is the raw profiler column summary and
+        *relation_columns* is the list from ``summary["relation_columns"]``.
     """
     summary = payload.get("summary") or {}
     table_name = str(summary.get("table_name") or "")
@@ -297,7 +298,34 @@ def index_table_profile(
         n = str(c.get("name") or "")
         if n:
             col_meta[n] = c
-    return table_name, col_meta
+    relation_columns = summary.get("relation_columns") or []
+    return table_name, col_meta, relation_columns
+
+
+def _resolve_coda_relation_target(
+    relation: dict[str, Any],
+    table_name_to_model: dict[str, str],
+) -> str:
+    """Resolve a Coda relation target to a Django model name.
+
+    Uses the target table name from the Coda API when available,
+    falling back to a TODO placeholder.  The *table_name_to_model*
+    mapping is built from all bundle tabs so that lookups to tables
+    in the same doc resolve cleanly.
+    """
+    target_table_name = relation.get("target_table_name")
+    if target_table_name:
+        # Coda table names may have spaces; normalise to PascalCase.
+        model = _to_pascal_case(
+            re.sub(r"[^a-zA-Z0-9_]+", "_", target_table_name.lower()).strip("_")
+        )
+        # If the resolved name matches another bundle tab, use it directly.
+        if model in table_name_to_model.values():
+            return model
+        return model
+    # No target table name exposed by the API.
+    col_name = str(relation.get("column_name") or "")
+    return f"TODO_{_to_pascal_case(re.sub(r'[^a-zA-Z0-9_]+', '_', col_name.lower()).strip('_'))}"
 
 
 def build_contract(
@@ -356,6 +384,15 @@ def build_contract(
     contract_tables: list[dict[str, Any]] = []
     tabs = bundle_config.get("tabs") or []
 
+    # Build a mapping from normalised table name to model name for
+    # cross-table relation resolution inside the same doc.
+    table_name_to_model: dict[str, str] = {}
+    for tab in tabs:
+        title = str(tab.get("worksheet_title") or "")
+        output_path = str(tab.get("output_path") or "")
+        snake = model_name_from_output_path(output_path)
+        table_name_to_model[_to_pascal_case(snake)] = _to_pascal_case(snake)
+
     for tab in tabs:
         title = str(tab.get("worksheet_title") or "")
         output_path = str(tab.get("output_path") or "")
@@ -363,9 +400,10 @@ def build_contract(
 
         tp = (table_profiles or {}).get(title)
         col_meta: dict[str, dict[str, Any]] = {}
+        relation_columns: list[dict[str, Any]] = []
 
         if tp:
-            _, col_meta = index_table_profile(tp)
+            _, col_meta, relation_columns = index_table_profile(tp)
         elif title in doc_tables:
             col_meta = dict(doc_tables[title]["by_name"])
         else:
@@ -403,6 +441,62 @@ def build_contract(
 
         django_columns = _filter_section_headers(django_columns)
 
+        # Apply Coda relation column enrichment: upgrade lookup columns
+        # to ForeignKey and build fk_resolutions.
+        fk_resolutions: list[dict[str, Any]] = []
+        if relation_columns:
+            col_by_source: dict[str, dict[str, Any]] = {
+                c["source_column"]: c for c in django_columns
+            }
+            for rel in relation_columns:
+                col_name = rel.get("column_name")
+                if not col_name:
+                    continue
+                col_type = rel.get("column_type")
+                if col_type not in ("lookup", "linked_relation"):
+                    continue
+                col_def = col_by_source.get(col_name)
+                if col_def is None:
+                    # The relation column may not be in required_headers;
+                    # still record the FK resolution so the human sees it.
+                    target = _resolve_coda_relation_target(rel, table_name_to_model)
+                    field_name = suggested_field_name(col_name)
+                    fk_resolutions.append(
+                        {
+                            "field": field_name,
+                            "target_model": target,
+                            "target_field": "id",
+                            "confidence": "high" if rel.get("target_table_name") else "medium",
+                            "source": "coda_relation_column",
+                        }
+                    )
+                    continue
+                target = _resolve_coda_relation_target(rel, table_name_to_model)
+                col_def["django_field_class"] = "models.ForeignKey"
+                col_def["django_field_kwargs"] = {
+                    "to": target,
+                    "on_delete": "models.PROTECT",
+                    "null": True,
+                    "blank": True,
+                }
+                if "relation_target_todo" in str(col_def.get("notes", [])):
+                    col_def["notes"] = [
+                        n
+                        for n in col_def.get("notes", [])
+                        if not n.startswith("relation_target_todo")
+                    ]
+                col_def["notes"].append(f"coda_relation:{rel.get('column_type')}")
+                field_name = col_def.get("suggested_field_name") or suggested_field_name(col_name)
+                fk_resolutions.append(
+                    {
+                        "field": field_name,
+                        "target_model": target,
+                        "target_field": "id",
+                        "confidence": "high" if rel.get("target_table_name") else "medium",
+                        "source": "coda_relation_column",
+                    }
+                )
+
         snake_model = model_name_from_output_path(output_path)
         entry: dict[str, Any] = {
             "bundle_worksheet_title": title,
@@ -411,6 +505,8 @@ def build_contract(
             "bundle_output_path": output_path,
             "columns": django_columns,
         }
+        if fk_resolutions:
+            entry["fk_resolutions"] = fk_resolutions
 
         # Seed import_config for bundle-backed tables.
         if required:

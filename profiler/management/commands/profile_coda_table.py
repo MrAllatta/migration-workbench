@@ -13,6 +13,7 @@ from connectors.coda_source import (
     analyze_column_values,
     build_coda_session,
     column_has_formula,
+    extract_relation_columns,
     formula_text,
     get_doc,
     list_columns,
@@ -111,6 +112,7 @@ def summarize_coda_table(
                 ],
             }
 
+    relation_columns = extract_relation_columns(columns)
     return {
         "doc_name": doc_name,
         "table_id": table_id,
@@ -123,6 +125,7 @@ def summarize_coda_table(
         "data_row_count": max(len(grid) - 1, 0),
         "column_count": len(columns),
         "columns": col_summaries,
+        "relation_columns": relation_columns,
         "formula_column_count": len(formula_cols),
         "formula_columns": [
             {"name": c.get("name"), "formula_text": formula_text(c)}

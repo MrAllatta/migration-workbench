@@ -19,6 +19,9 @@ fly.toml
 .worktrees/
 .omo
 .omo.bak
+# Pi orchestration artifacts (transient) — prompts and briefs are tracked
+.pi/orchestration/session-logs/
+*.session-log.md
 *.bak
 docs/superpowers/
 profiler-signals.yaml
