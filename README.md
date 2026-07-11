@@ -273,226 +273,188 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
-### 0.5.3
+> Two version series intersect here. The **legacy series** was released to PyPI
+> through `0.9.3`; later development reset local numbering via `0.0.9` and
+> climbed back up. The legacy numbers stand — we do **not** rewrite git
+> history. Each entry is marked `(PyPI)` if it shipped to PyPI, or `(local)` if
+> released only as a git tag. For the full semver story and the PyPI-block
+> remediation policy, see
+> [docs/roadmap.md → Semver Recovery](docs/roadmap.md#semver-recovery-pypi-block).
+>
+> Eight headers in older versions of this file had no corresponding git tag
+> (`0.4.2`, `0.6.0`, `0.9.4`, and duplicate `0.5.0` / `0.4.0` / `0.3.0` /
+> `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
+> chronological order — under **Pre-reset untagged feature work** below.
 
-- **Coda formula classification:** New `classify_formula_columns()` in `connectors/coda_source.py` — heuristic taxonomy (row_formula, expansion_formula, hybrid, unknown) with confidence scoring. Classification flows into `shape_coda_table_structure()`, `profile_coda_table` JSON output, and `build_contract()` schema contracts (expansion_formula → `is_computed: true`). (connectors/coda_source.py, connectors/coda.py, profiler/management/commands/profile_coda_table.py, workbook/schema_contract.py)
-- **Coda relation column detection:** `extract_relation_columns()` parses lookup, linked_relation, and person column formats from the Coda API. Lookup columns upgrade to ForeignKey with resolved target table names in schema contracts. (connectors/coda_source.py, connectors/coda.py, workbook/schema_contract.py)
-- **`.pi/` simplified:** Portfolio, Brief, and Journal replace state-machine orchestration. No `state.yaml`, `done.yaml`, `boot.sh`, `ship.sh`, or phase lifecycle. AGENTS.md is harness-agnostic. (AGENTS.md, .pi/)
+### 0.5.3 (local)
+
+- **Coda formula classification:** New `classify_formula_columns()` in `connectors/coda_source.py` — heuristic taxonomy (`row_formula`, `expansion_formula`, `hybrid`, `unknown`) with confidence scoring. Classification flows into `shape_coda_table_structure()`, `profile_coda_table` JSON output, and `build_contract()` schema contracts (`expansion_formula` → `is_computed: true`).
+- **Coda relation column detection:** `extract_relation_columns()` parses `lookup`, `linked_relation`, and `person` column formats from the Coda API. Lookup columns upgrade to ForeignKey with resolved target table names in schema contracts.
+- **`.pi/` simplified:** Portfolio, Brief, and Journal replace state-machine orchestration. No `state.yaml`, `done.yaml`, `boot.sh`, `ship.sh`, or phase lifecycle. AGENTS.md is harness-agnostic.
 - **All 1620 tests pass, full chassis-gate green.**
 
-*Patch bump rather than minor: features are unit-tested but not yet validated end-to-end against a real Coda doc. The `vizcarra-profile-clients` mission is the gate. When that ships cleanly, the next version that exposes Coda profiling as a public capability can be a 0.6.0 minor.*
+*Patch bump rather than minor: features are unit-tested but not yet validated end-to-end against a real Coda doc. The `vizcarra-profile-clients` mission is the gate. When that ships cleanly against real Vizcarra data, it earns 0.6.0.*
 
-### 0.5.0
+### 0.5.2 (local)
 
-- **Formula dependency graph:** New `profiler/tools/formula_dependency.py` with `build_cell_graph()`, `build_sheet_dependency_graph()`, `compute_sheet_signals()`, and `build_dependency_report()` — cell-level and sheet-level dependency analysis using networkx. Orphaned-sheet detection, IMPORTRANGE/external workbook ref tracking, pattern→cell membership, and structured 7-signal reports. (profiler/tools/formula_dependency.py, profiler/tests/test_formula_dependency.py)
-- **networkx refactor:** Formula dependency graph internals refactored to `nx.DiGraph` — `assign_import_tiers()` in workbook.codegen.contract uses `nx.topological_generations` instead of hand-rolled Kahn. (workbook/codegen/contract.py)
-- **FK enrichment from sheet graph:** `enrich_fk_from_sheet_graph()` in profiler enrichment suggests FK targets on column profiles using weighted cross-sheet formula reference edges, wired into PipelineState enrichment. (profiler/tools/enrichment_utils.py, profiler/tools/pipeline_state.py)
-- **Contract review with dependency validation:** `wb contract review --dependency-artifact` validates `fk_lookup` targets against actual sheet-level edges from the dependency graph. (deployment/wb_cli.py, workbook/codegen/contract.py, workbook/tests/test_contract_review.py)
+- **Coda relation column detection:** `extract_relation_columns()` parses lookup, linked_relation, and person column formats. `shape_coda_table_structure()` and `profile_coda_table` JSON output include relation metadata; `build_contract()` upgrades lookup columns to ForeignKey (resolved target when the API exposes it, `TODO_<Name>` otherwise). 1610 tests pass.
+
+### 0.5.1 (local)
+
+- Version bump. No new features beyond 0.5.0.
+
+### 0.5.0 (local)
+
+- **Formula dependency graph:** New `profiler/tools/formula_dependency.py` with `build_cell_graph()`, `build_sheet_dependency_graph()`, `compute_sheet_signals()`, and `build_dependency_report()` — cell-level and sheet-level dependency analysis using networkx. Orphaned-sheet detection, IMPORTRANGE/external workbook ref tracking, pattern→cell membership, structured 7-signal reports.
+- **networkx refactor:** `assign_import_tiers()` in `workbook.codegen.contract` uses `nx.topological_generations` instead of hand-rolled Kahn.
+- **FK enrichment from sheet graph:** `enrich_fk_from_sheet_graph()` in profiler enrichment suggests FK targets using weighted cross-sheet formula reference edges, wired into PipelineState enrichment.
+- **Contract review with dependency validation:** `wb contract review --dependency-artifact` validates `fk_lookup` targets against actual sheet-level edges.
 - **networkx>=3.0 dependency** added to pyproject.toml.
 - **All 1280 tests pass, full chassis-gate green.**
 
-### 0.4.2
+### 0.4.1 (local)
 
-- **Dashboard archetype:** New `workbook/codegen/admin_generator.py` dashboard archetype generates summary cards and `changelist_view` override for role-based dashboard views. (workbook/codegen/admin_generator.py, workbook/templates/admin/workbench_dashboard/change_list.html, workbook/tests/test_admin_generator.py)
-- **View entity merge:** Merged view entity lookup in `workbook/codegen/manifest.py` picks the richest metadata from multi-view manifests — FK reverse count fields, date_hierarchy, and archetype hints merge correctly. (workbook/codegen/manifest.py, workbook/tests/test_admin_generator.py)
-- **inline_fields override:** `inline_fields` from codegen manifest override auto-truncation in admin TabularInline — only specified fields appear in the inline. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **FK reverse count fields:** `list_display` auto-generates reverse count fields (`{related_name}_count`) for FK relationships with a `related_name`. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **DateField date_hierarchy:** `date_hierarchy` auto-detected from the first DateField column in the contract. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **list_select_related for FKs:** Auto-generated `list_select_related` for all FK fields in `list_display`, preventing N+1 queries on admin list views. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **TabularInline show_change_link:** `show_change_link=True` set on all generated TabularInline classes for inline-edit navigation. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **Admin ordering from model_meta:** Explicit `ordering` set on admin classes from `model_meta.ordering` in the schema contract. (workbook/codegen/admin_generator.py, workbook/tests/test_admin_generator.py)
-- **save_on_top:** `save_on_top=True` added to all ModelAdmin classes. (workbook/codegen/admin_generator.py)
-- **Base audit command chassis:** New `importer/base_audit.py` module extracting shared audit infrastructure (CSV helpers, CsvMapping dataclass, BaseAuditCommand with completeness/accuracy phases) from product-repo duplication. Product repos extend `BaseAuditCommand` and supply only farm-specific CSV_MAPPINGS, `_resolve_record()`, and `_run_custom_phases()`. (importer/base_audit.py, importer/tests/test_base_audit.py)
-- **Farm audit-imports refactored:** Farm's `audit_imports.py` reduced from 941 to ~390 lines by removing duplicated helpers/CsvMapping/handle/add_arguments/phase logic — now extends `BaseAuditCommand` and imports shared infrastructure from `importer.base_audit`. (farm backend/apps/core/management/commands/audit_imports.py)
-- **Completeness phase robustness:** Fixed `_phase_completeness` in base command to handle read-back CSV row counts, natural-key dedup, and expected-gap-reason escalation (fail→warn instead of pass). (importer/base_audit.py)
-- **All tests pass, full chassis-gate green.**
-
-### 0.3.0
-
-- **Vertical template system:** New `vertical_registry` module with `load_vertical()`, `discover_verticals()`, `apply_vertical_to_schema()`, `apply_vertical_domain_context()`, `score_tab_against_templates()`, `merge_entity_template()`. Templates are versioned YAML manifests shipped under `workbook/verticals/` with overridable paths. (workbook/tools/vertical_registry.py)
-- **Farm vertical content:** 4 entity templates (Crop, FieldBlock, Season, PlantingPlan) with domain vocabulary/glossary, interaction role defaults, and signal thresholds — the first production vertical for migration engagements. (workbook/verticals/farm/)
-- **`--vertical` CLI:** New flag on `scaffold_workbook_schema`, `generate_discovery_interview`, and `merge_interaction_contract` commands. Vertical templates seed schema contracts, role presets, glossary hints, and signal thresholds. (workbook/management/commands/)
-- **`wb vertical list/show`:** New `wb` subcommands for listing available verticals and inspecting template details, with `--json` machine-readable output. (deployment/wb_cli.py)
-- **Template tab scoring:** `score_tab_against_templates()` computes title + field-overlap confidence against entity templates. `--apply-template-suggestions` auto-applies matches above threshold. (workbook/tools/vertical_registry.py)
-- **Discovery interview enrichment:** Vertical role presets and glossary terms flow into interview question rendering, pre-seeding role hints and field descriptions. (workbook/discovery.py)
-- **YAML robustness fixes:** `_normalise_null_keys()` handles PyYAML `null:` → `None` key parsing. Farm manifest quotes boolean-like YAML keys (`on:` → `"on"`). F541 f-string lint violations fixed. (workbook/tools/vertical_registry.py, workbook/codegen/admin_generator.py)
-- **52 new tests** across registry, farm vertical, CLI integration, and deployment — full chassis-gate green (959 passing).
-
-### 0.4.1
-
-- **resolve_field_mapping() accessor:** Public function in `workbook.codegen.contract` returning the effective field-name to source-column mapping from columns[] + import_config.column_map. Enables audit and drift-detection tools to trace model fields back to source headers without re-deriving mappings. (cb10934)
-- **Three scaffold template briefs completed:** Interaction contract pipeline docs, missing Make targets (`merge-interaction-contract`, `generate-source-config`), workflow docs (pipeline manifest, `generate-all`, `orient`, `profile-phase-validate`, `--force`, `--vertical`), vertical template awareness, and designed model detection workflow. All in commit 14fdbae.
-- **Farm contract columns[] populated for two models:** NurserySeedingSchedule and NurseryPotUpSchedule via `--table-profile` scaffold; farm `audit-imports`/`audit-imports-ci` Make targets added. (farm e55665a)
+- **resolve_field_mapping() accessor:** Public function in `workbook.codegen.contract` returning the effective field-name to source-column mapping.
+- **Three scaffold template briefs completed:** Interaction contract pipeline docs, missing Make targets (`merge-interaction-contract`, `generate-source-config`), workflow docs (pipeline manifest, `generate-all`, `orient`, `profile-phase-validate`, `--force`, `--vertical`).
+- **Farm contract columns[] populated for two models:** NurserySeedingSchedule and NurseryPotUpSchedule via `--table-profile` scaffold; farm `audit-imports`/`audit-imports-ci` Make targets added.
 - **All 1166+ tests pass, full chassis-gate green.**
 
-### 0.4.0
+### 0.4.0 (local)
 
-- **Tab classification and archetype matrix:** New `workbook/tools/archetype_matrix.py` — columns classified by archetype (editable, computed, status, filter). Archetype signals flow into view manifest and interaction contract scaffolding. (862b84e)
-- **Workflow dependency graph:** `wb generate manifest` now extracts forward dependencies between columns (computed → source) for ordering and validation. (865fbf3)
-- **Quality gate expansion v0.3:** CI gate expanded to v0.3 bar covering contract validation, scaffolding, and codegen. Admin generator preserves hand-written custom sections on regeneration via `preserve_custom_sections` logic. (87dbd38)
-- **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions for combining columns (default: space join). (retroactively documented)
-- **Contract composition:** Custom `!include` YAML tag resolves relative to including file's directory with cyclic-include detection.
-- **Import tier auto-assignment:** `assign_import_tiers()` topological-sorts FK dependency chains.
+- **Tab classification and archetype matrix:** New `workbook/tools/archetype_matrix.py` — columns classified by archetype (editable, computed, status, filter). Archetype signals flow into view manifest and interaction contract scaffolding.
+- **Workflow dependency graph:** `wb generate manifest` now extracts forward dependencies between columns (computed → source) for ordering and validation.
+- **Quality gate expansion v0.3:** CI gate expanded to v0.3 bar covering contract validation, scaffolding, and codegen. Admin generator preserves hand-written custom sections on regeneration via `preserve_custom_sections` logic.
 - **Contract diff/review/safety tools:** New `wb contract diff`, `wb contract review`, `wb contract safety` CLI subcommands.
 - **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` for regression detection.
 
-### 0.2.0
+### 0.4.0-round-1 (local)
 
-- **Interaction contract merge path:** `access_hints` from interaction contract flows through `merge_manifests` into the codegen manifest. The merge correctly indexes per-role supplement data (form/list/reference/dashboard) across all tabs — the `_index_interaction_contract()` method now returns role-specific supplement dicts instead of flat lists. (workbook/tools/manifest_merger.py)
-- **Admin generator maturity — status transitions, role views, YearWeekFilter:** Admin generator handles v3 codegen manifest with `list_editable`/`readonly_fields` validated against contract fields; FK fields excluded from `list_editable`, readonly from `autocomplete_fields`. Status transitions support list-valued transition arrays from v3 manifest. YearWeekFilter names are deduplicated per-model. (workbook/codegen/admin_generator.py)
-- **Interview-to-manifest pipeline fixes:** `merge_discovery_notes` correctly extracts role names from interview answers (Priority 2 `_resolve_role_hints` returns clean role names), `_resolve_status_transitions` robustly checks view manifest structure, and the merge uses per-role supplement rather than flat list. (workbook/tools/manifest_merger.py)
-- **Phase 4 bundle support for year-suffixed CSV bundles:** `import_historical` command extended to accept tab-named bundle directories containing year-suffixed CSV files. When a bundle has subdirectories named after tabs, the importer walks those directories, collects year-suffixed CSVs per tab, and processes them in year order — injecting `source_bundle_year` for each batch. Includes comprehensive test coverage. (importer/management/commands/import_historical.py)
+- Intermediate pre-0.4.0 checkpoint: quality gate expansion to v0.3, scaffold/contract fixes.
+
+### 0.4.0a1 (local)
+
+- Alpha checkpoint: tab classification, archetype matrix, permissions, consultant surface.
+
+### 0.3.1 (local)
+
+- Preserve hand-written custom sections on admin regeneration.
+
+### 0.3.0 (local)
+
+- **Vertical template system:** `vertical_registry` module with `load_vertical()`, `discover_verticals()`, `apply_vertical_to_schema()`, `apply_vertical_domain_context()`, `score_tab_against_templates()`, `merge_entity_template()`. Templates are versioned YAML manifests under `workbook/verticals/` with overridable paths.
+- **Farm vertical content:** 4 entity templates (Crop, FieldBlock, Season, PlantingPlan) with domain vocabulary, role presets, and signal thresholds — the first production vertical.
+- **`--vertical` CLI:** Flag on `scaffold_workbook_schema`, `generate_discovery_interview`, and `merge_interaction_contract`. Vertical templates seed contracts, role presets, glossary hints, and signal thresholds.
+- **`wb vertical list/show`:** New `wb` subcommands for listing available verticals and inspecting template details, with `--json` machine-readable output.
+- **52 new tests** across registry, farm vertical, CLI integration, and deployment — 959 chassis-gate tests passing.
+
+### 0.2.0 (local)
+
+- **Interaction contract merge path:** `access_hints` flows through `merge_manifests` into the codegen manifest; per-role supplement data indexed across all tabs.
+- **Admin generator maturity — status transitions, role views, YearWeekFilter:** Status transitions support list-valued transition arrays from v3 manifest. YearWeekFilter names deduplicated per model. `list_editable` / `readonly_fields` validated against contract fields; FK excluded from `list_editable`, readonly from `autocomplete_fields`.
+- **Interview-to-manifest pipeline fixes:** `merge_discovery_notes` extracts role names cleanly.
+- **Phase 4 bundle support for year-suffixed CSV bundles:** `import_historical` walks tab-named directories of year-suffixed CSVs, injecting `source_bundle_year` per batch.
 - **All 922 tests pass, full chassis-gate green.**
 
-### 0.1.0
+### 0.0.9 (local) — reset point
 
-- **PipelineState maturity:** Validation phase (`--phase validate`), config routing via `configure()`, `DecisionRecord` dataclass, version migration registry, post-init validation, `reset_bindings`/`validate_bindings` for guard-clause hygiene.
-- **Checkpoint checkpoint:** Source tree externalized to JSON artifact. Contract artifacts written as `.json` (not `.yaml`). Approved tabs extracted at any nesting depth.
-- **Profiler ergonomics:** Tab `exclude: true` mode, `score_cutoff` parameter, per-tab details in `tab_selection.json` output, per-workbook scoring overrides.
-- **Management command wiring:** `run_pipeline_state` delegates to `PipelineState` phase methods with real Google API service dispatch. `--domain-context` arg seeds `DomainKnowledge`. `--stop-before-deep` for partial runs.
-- **Type safety:** Three `basedpyright` fixes, ruff lint/format sweep of 47 files, packaging fix for bare `workbench/` directory.
-- **Version semantics:** `PipelineState.version` now independent of package version. See AGENTS.md for policy.
-- **Release discipline:** AGENTS.md documents solo release hygiene — merge = release, pre-release tagging, agents do not commit.
+- Reset local version numbering. Re-aligned docs to treat pre-reset PipelineState work as 0.0.x shipped. This is the thread that climbed back up to 0.5.3.
 
-### 0.9.4
+---
 
-- **PipelineState checkpoint system:** New `profiler/tools/pipeline_state.py` module with 4 lifecycle dataclasses (PipelineState, DiscoveryState, DeepProfileIndex, DomainKnowledge) and checkpoint I/O via `pipeline_state.checkpoint()` / `resume()`. Supports 4-phase state machine: discover → score_and_select → deep_profile → derive_contracts. Guard clauses prevent re-entering completed phases. Deep-profile index preserves entries on resume.
-- **`run_pipeline_state` management command:** `--config`, `--phase {discover,score_and_select,deep_profile,derive_contracts,all}`, `--checkpoint`. `--phase all` auto-skips completed phases. YAML checkpoint output at each gate.
-- **Makefile targets:** `profile-phase-discover`, `profile-phase-score`, `profile-phase-deep`, `profile-phase-derive`, `profile-phase-all` added to workbench and product-scaffold Makefiles via `workbook/makefile_targets.py`.
-- **Product scaffold:** PipelineState added to AGENTS.md human-judgment table, operator.md profiling docs, and scaffolded Makefile targets. `PIPELINE_CHECKPOINT` variable (defaults to `build/pipeline-state.yaml`) available for override.
+### Legacy series — published to PyPI (block active)
 
-### 0.9.3
+The early development line published versions to PyPI before the reset. The
+highest published version is **`0.9.3`**. PyPI currently blocks any new upload
+whose version is `<= 0.9.3`. See
+[docs/roadmap.md → Semver Recovery](docs/roadmap.md#semver-recovery-pypi-block).
 
-- **`model_name` in `build_contract()`:** bundle-config path now produces valid v2 contracts with `model_name` on every table.
-- **Makefile targets use `wb generate`:** scaffolded Makefile targets call `wb generate models/admin/import/manifest` instead of `$(MANAGE) generate_*`.
-- **`bundle_path` consistency through harden:** `_harden_contract()` preserves existing `bundle_path` and falls back to `_derive_bundle_path()` using model name.
-- **Fly.io deployment configs:** `fly.toml` (production) and `fly.preview.toml` (preview) with correct `internal_port`, volume mounts, and release command.
-- **Deploy workflow branch fix:** `.github/workflows/deploy.yml` and `deploy/spaces.yml` use `master` instead of `main`.
-- **PyPI publish gated on CI:** `publish-pypi.yml` verifies CI passed for the same SHA before building and publishing.
-- **Ruff lint in CI:** `ruff check` and `ruff format --check` step added to CI before `chassis-gate`.
-- **Import path fix:** `importer/tests/test_sample_guard.py` and `importer/tests.py` import from `importer.sample_guard` instead of `importer.base`.
-- **Doc coverage gate:** docstrings added to `workbook/makefile_targets.py` functions, `profiler/tools/enrichment_utils.py`, and management commands to pass the 80% interrogate threshold.
+### 0.9.3 (PyPI)
 
-### 0.9.2
+- `model_name` in `build_contract()`: bundle-config path produces valid v2 contracts.
+- Makefile targets use `wb generate` instead of `$(MANAGE) generate_*`.
+- Fly.io deployment configs: `fly.toml` and `fly.preview.toml`.
+- PyPI publish gated on CI: `publish-pypi.yml` verifies CI passed for the same SHA.
+- Ruff lint in CI; doc-coverage gate (80% interrogate).
 
-- **Rich profiling enrichment:** profiler enrichment functions for computed fields, FK candidates, import keys, and entity groupings (`profiler/tools/enrichment_utils.py`).
-- **Coda column enrichment:** `enrich_coda_columns` addsProfiler-column metadata for Coda sources.
-- **Cohort corpus enrichment propagation:** enrichment fields flow through scaffold contract generation (`suggested_entity`, `suggested_fk_target`, `is_computed`, `is_import_key_candidate`, `cross_tab_group`).
-- **Import key candidates from enrichment:** scaffold uses `is_import_key_candidate` to propose `unique_on` fields instead of always defaulting to the first column.
-- **Domain knowledge flag:** `scaffold_workbook_schema --domain-knowledge` loads entity-aware heuristics for contract generation.
-- **Scaffold polish:** createsuperuser Make target with env var support, admin URL redirect, sentinel marker in models.py template, PascalCase passthrough in `_to_pascal_case`.
-- **Makefile target deduplication:** shared `workbook/makefile_targets.py` module replaces inline Makefile template in `scripts/new_product.py`.
-- **Unified `wb` CLI:** `wb generate {models,admin,import,manifest}` and `wb validate contract` subcommands; Makefile targets use `wb` instead of `$(MANAGE)`.
-- **`*_auto.py` output convention:** `generate_models` writes `models_auto.py` with stub `models.py` re-export; `generate_admin` writes `admin_auto.py` with stub `admin.py`. Hand-edited files are never overwritten.
-- **`model_name` required:** every contract table must have an explicit `model_name` field; `get_model_name()` is a direct accessor, no derivation.
-- **Contract admin blocks authoritative:** `generate_admin` uses contract `admin:` blocks as-is; view manifest is enrichment only.
-- **`bundle_path` auto-derive:** scaffold always derives `import_config.bundle_path` from model name.
-- **`validate_contract` management command:** standalone contract validation without code generation.
-- **Clean error on missing `bundle_path`:** import generation gives actionable guidance instead of raw traceback.
-- **`--domain-knowledge` example YAML:** `domain-knowledge.example.yaml` shipped with scaffold output.
+### 0.9.2 (PyPI)
 
-### 0.9.1
+- Rich profiling enrichment for computed fields, FK candidates, import keys, entity groupings.
+- Coda column enrichment: `enrich_coda_columns`.
+- Enrichment propagation through scaffold contract generation.
+- Unified `wb` CLI: `wb generate {models,admin,import,manifest}` and `wb validate contract`.
+- `*_auto.py` output convention; hand-edited files never overwritten.
+- `model_name` required on every contract table; `validate_contract` management command.
 
-- **Makefile target deduplication:** shared `workbook/makefile_targets.py` module replaces inline Makefile template in product scaffold.
-- **Documentation coverage:** docstrings and module docs for connectors, profiler, deployment, and workbook.
-- **Documentation index:** `docs/INDEX.md` with cross-references.
-- **Pipeline manifest wiring:** `generate-pipeline-manifest` wired into `generate-all` Makefile target.
+### 0.9.1 (PyPI)
 
-### 0.9.0
+- Makefile target deduplication: shared `workbook/makefile_targets.py` replaces inline Makefile template.
+- Docstring and module doc coverage; `docs/INDEX.md` with cross-references.
+- `generate-pipeline-manifest` wired into `generate-all`.
 
-- **Live deploy with health gate:** `wb deploy <space> --env <env> --live` performs a real Fly deploy, polls `/healthz`, and records release events. Outcome taxonomy: `deploy_start`, `deploy_failed`, `deploy_succeeded_healthy`, `deploy_succeeded_unhealthy`.
-- **`--local` build flag:** `wb deploy --local` builds with local Docker instead of Fly remote builder.
-- **Release ID propagation:** After successful deploy, `RELEASE_ID` is set as a Fly secret for the health endpoint.
-- **Improved deploy diagnostics:** `--verbose` / `-v` streams fly deploy stderr/stdout; failed deploys include stderr tail and machine state capture.
-- **Product-aware settings detection:** `wb` auto-detects product repo settings at `backend/config/settings.py`; `--django-settings` flag for explicit override.
-- **Harden entrypoint:** Docker entrypoint now checks for `/data` volume before creating directories, with actionable error messages.
-- **Manifest validation relaxed:** Missing `preview` or `production` environment blocks no longer fail validation.
-- **Test reliability:** Subprocess calls in tests use `sys.executable` instead of hardcoded `"python"` for venv isolation.
-- **Scaffold improvements:** `deploy/spaces.yml` generated for new products; `deployment` app added to `INSTALLED_APPS`.
-- **Code review hardening:** `fly secrets set` always warns on failure; conflicting `--dry-run`/`--live` flags error out; missing `fly` CLI produces actionable install hint; machine state parsing handles non-array API responses.
+### 0.9.0 (PyPI)
 
-### 0.8.0
+- Live deploy with health gate: `wb deploy --live` polls `/healthz`, records release events.
+- `--local` build flag; release ID propagation as a Fly secret.
+- Improved deploy diagnostics; product-aware settings detection; hardened Docker entrypoint.
 
-- **Per-tier transaction savepoints:** `--tier-atomic` (default on) wraps each import tier in its own `transaction.atomic()` savepoint. A failing tier rolls back only its own rows; preceding tiers persist. `--no-tier-atomic` restores single-transaction behaviour.
-- **Per-row exception catching in generated imports:** Generated `_import_<model>()` methods now catch `IntegrityError` and other exceptions per row, recording structured errors instead of aborting the entire tier.
-- **New error codes:** `type_mismatch`, `unique_violation`, and `row_exception` in `FAILURE_SIGNATURE_OWNERSHIP` for structured escalation routing.
-- **Per-model row error counts in summary JSON:** Each model's outcome dict now includes `row_errors_count` for quick per-model error tallying.
-- **Expanded parsing edge-case handling:** Tests for `None`, whitespace-only, and common sentinel values (`"N/A"`, `"-"`) across all parsers.
-- **End-to-end import pipeline fixture:** `ExampleFarm`, `ExampleField`, `ExampleVariety` models with FK chains, `column_map` multi-source, `field_transforms`, and `field_parsers` exercising the full `generate_import` → `BaseImportCommand` pipeline.
-- **Bundle reader multi-source fix:** `iter_bundle_tab_rows` now correctly skips list-valued `column_map` entries instead of raising `TypeError`.
-- **Import pipeline smoke test in chassis-gate:** `generate_import` exercised with multi-model contract in CI.
+### 0.8.0 (PyPI)
 
-### 0.7.0
+- Per-tier transaction savepoints: `--tier-atomic` (default on); per-row exception catching.
+- New error codes: `type_mismatch`, `unique_violation`, `row_exception`.
+- End-to-end import pipeline fixture (ExampleFarm/ExampleField/ExampleVariety with FK chains).
+- Import pipeline smoke test in chassis-gate.
 
-- **Profile-to-contract bridge — designed model detection:** `scaffold_workbook_schema` now clusters tabs by overlapping column sets (>50% Jaccard-like overlap) and suggests designed/aggregate models with `source_tab: null`. New module `workbook.codegen.designed_model_detection`.
-- **Contract review checklist round-out:** `wb contract review` now checks FK lookup target existence, admin inlines target models, and computed_field snake_case naming conventions.
-- **`validate-contract` Make target:** Wired into scaffolded product Makefile; aggregates `check validate-contract` for CI.
-- **`corpus-codegen-report` Make target:** Runs contract review and Django system check on generated files; corpus feedback tracker doc for capturing papercuts.
+### 0.7.0 (PyPI)
 
-### 0.6.0
+- Profile-to-contract bridge — designed model detection: clusters tabs by overlapping column sets, suggests designed/aggregate models with `source_tab: null`. New module `workbook.codegen.designed_model_detection`.
+- Contract review checklist round-out; `validate-contract` and `corpus-codegen-report` Make targets.
 
-- **Reserved-character sanitization:** Tab names containing `|`, `:`, `\`, `/`, `*`, `?`, `"`, `<`, `>`, `%` are automatically sanitized to underscore at ingestion, with a logged warning.
-- **Tab exclusion by pattern:** Configurable `tab_exclude_patterns` in scoring heuristics — each entry specifies a regex pattern and penalty weight for matching tab titles.
-- **Column formula structure analysis:** Profiler classifies columns as `raw`, `row_formula`, `expansion_formula`, `hybrid`, or `empty`. Classification flows into tab scoring (`expansion_formula_ratio` penalty), schema contract field annotations, and column candidate shortlists.
+### 0.1.3 (PyPI)
 
-### 0.5.0
+- Version bump.
 
-- **Migration safety checks:** `wb contract safety --old contract-v1.yaml --new contract-v2.yaml` detects destructive changes (field removed, nullable→non-nullable → DANGER; class change, max_length decreased, unique=True added, non-nullable field without default → WARNING) with text and `--json` output.
-- **Null-key robustness:** `_diff_fields()` normalises YAML `null:` mapping keys to the string `"null"` to prevent `TypeError` during kwarg comparison.
+### 0.1.2 (PyPI)
 
-### 0.4.0
-
-- **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions for combining columns (default: space join).
-- **Contract composition:** Custom `!include` YAML tag resolves relative to including file's directory with cyclic-include detection.
-- **Auto-detect import tier ordering:** `assign_import_tiers()` topological sorts FK dependency chains; explicit tiers override auto-detection.
-- **Contract diff tool:** `wb contract diff --old contract-v1.yaml --new contract-v2.yaml` compares models, fields, and meta with text and JSON (`--json`) output.
-- **Schema review checklist:** `wb contract review --contract <yaml>` checks CharField max_length, nullable FK on_delete, missing unique_together, and str_template.
-- **Snapshot testing:** `make snapshot-codegen` / `make check-snapshots` stores generated output for regression detection.
-- **`check-generated` Makefile target:** py_compile validation of generated Python files.
-
-### 0.3.0
-
-- **Admin scaffold maturity:** `list_editable`, `autocomplete_fields`, `admin.inlines` field overrides, `--diff` flag for regeneration preview.
-- **Post-generation hook system:** `hooks.after_model`, `hooks.after_meta`, `hooks.extra_methods` in contract YAML inject Python source at well-defined points in generated model classes.
-- **`scaffold_designed_model` command:** Emit contract table skeletons for designed/aggregate models with no source tab.
-- **Admin `--diff` flag:** Preview changes before overwriting; forced regeneration shows diff of detected changes.
-
-### 0.2.0
-
-- **Contract schema v1.3:** `computed_fields` (rendered as `@property`), `is_abstract`, `source_tab: null` for designed models, `app_label` per table in `model_meta`.
-- **Makefile improvements:** `validate-contract`, `diff-generated`, `generate-admin-light`, `generate-admin`, `post-generate` targets.
-- **Codegen QoL:** `generate_models --diff`, contract validation warnings at codegen time, import generator skip notes.
-- Backport AbstractUser admin scaffold support from codegen pipeline.
-- Extend contract schema to v1.2: enums, admin config, `model_base`, richer `Meta`.
-- Initial codegen pipeline: `generate_models`, `generate_admin`, `generate_import` commands producing production Django files from hardened schema-contract YAML.
-- Import generator base class with override hooks.
-- `inject_project_local_config.sh` helper for per-checkout config injection.
-
-### 0.1.2
-
-- Default profile output directory: `data/profile_snapshots/`.
+- Default profile output directory `data/profile_snapshots/`.
 - Drive folder tree rendered as Markdown artifact.
 - Cohort corpus resume support with workbook index and HTTP 429 retry.
-- Skeleton config files and raw_notes bucket included in `new-product` scaffold.
 - New product scaffold emits fixed Makefile referencing editable workbench path.
-- Bundle reader integration with YAML config files.
 
-### 0.1.1
+### 0.1.1 (PyPI)
 
 - View manifest draft YAML artifact from profiler structural pass.
-- `structure.json` artifact from `pull_bundle` command — tab- and column-level metadata.
+- `structure.json` artifact from `pull_bundle` command.
 - New product scaffold defaults to PyPI `migration-workbench`.
-- `read_bundle_tab` wrapper for normalizing rows from bundle tab CSV.
-- Git init and initial commit after `new-product`.
-- Consolidated docs folder with cross-cutting operator notes.
-- Per-app READMEs at `connectors/`, `profiler/`, `importer/`, `workbook/`, `deployment/`.
+- Consolidated docs folder; per-app READMEs.
 
-### 0.1.0
+### 0.1.0 (PyPI) — first PyPI release
 
 - Initial scaffold: profile, import, bundle commands.
 - Project bootstrap scripting (`new-product`).
 - Google Sheets / Drive and Coda adapters.
 - Deployment documentation for Fly.io + Litestream.
+
+---
+
+### Pre-reset untagged feature work
+
+Prose preserved from older versions of this file that described real work but
+carried version numbers without corresponding git tags. Approximate
+chronological order; do not infer provenance from heading numbers.
+
+- **Migration safety checks:** `wb contract safety --old contract-v1.yaml --new contract-v2.yaml` detects destructive changes (field removed, nullable→non-nullable → DANGER; class change, max_length decreased, unique=True added, non-nullable field without default → WARNING). `_diff_fields()` normalises YAML `null:` keys.
+- **Multi-source column_map with field transforms:** `column_map` values can be lists of source headers; `field_transforms` block accepts lambda expressions.
+- **Contract composition:** `!include` YAML tag resolves relative to including file's directory with cyclic-include detection.
+- **Auto-detect import tier ordering:** `assign_import_tiers()` topological sorts FK dependency chains; explicit tiers override auto-detection.
+- **Contract diff / schema review / snapshot testing:** `wb contract diff`, `wb contract review`, `make snapshot-codegen` / `make check-snapshots`, `check-generated` Makefile target.
+- **Admin scaffold maturity (pre-reset):** `list_editable`, `autocomplete_fields`, `admin.inlines` field overrides, `--diff` flag for regeneration preview; post-generation hook system (`hooks.after_model`, `hooks.after_meta`, `hooks.extra_methods`); `scaffold_designed_model` command.
+- **Contract schema v1.3 (pre-reset):** `computed_fields` (rendered as `@property`), `is_abstract`, `source_tab: null` for designed models, `app_label` per table in `model_meta`. Codegen pipeline: `generate_models`, `generate_admin`, `generate_import`. Import generator base class with override hooks.
+- **Reserved-character tab sanitization:** Tab names containing `| : \ / * ? " < > %` automatically sanitized to underscore at ingestion.
+- **Tab exclusion by pattern:** `tab_exclude_patterns` in scoring heuristics — regex pattern + penalty weight.
+- **Column formula structure analysis:** Profiler classifies columns as `raw`, `row_formula`, `expansion_formula`, `hybrid`, `empty`; classification flows into tab scoring and schema contract field annotations.
+- **Dashboard archetype (admin):** `workbook/codegen/admin_generator.py` dashboard archetype (summary cards, `changelist_view` override); inline_fields override; FK reverse count fields in `list_display`; `date_hierarchy` from first DateField; `list_select_related` for FKs; TabularInline `show_change_link`; admin ordering from `model_meta.ordering`; `save_on_top=True`.
+- **Base audit command chassis:** `importer/base_audit.py` extracting shared audit infrastructure (`CSV_MAPPINGS`, `BaseAuditCommand`, completeness/accuracy phases). Farm `audit_imports.py` reduced from 941 to ~390 lines.
+- **PipelineState checkpoint system (pre-reset draft):** `profiler/tools/pipeline_state.py` with `PipelineState.checkpoint()` / `resume()`, 4-phase state machine, `run_pipeline_state` command, scaffolded Makefile targets.
 
 ## Non-goals
 
