@@ -1,7 +1,7 @@
 """Tests for Coda provider shape utilities."""
 
 from connectors.coda import shape_coda_table_structure
-from connectors.coda_source import extract_relation_columns
+from connectors.coda_source import extract_relation_columns, classify_formula_columns
 
 
 def test_shape_coda_table_structure_sanitizes_tab_name():
@@ -76,6 +76,94 @@ def test_extract_relation_columns_skips_plain_text():
     ]
     rels = extract_relation_columns(columns)
     assert rels == []
+
+
+def test_classify_formula_columns_row_formula():
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Total",
+            "formulaText": "thisRow.Price * thisRow.Quantity",
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["column_name"] == "Total"
+    assert result[0]["classification"] == "row_formula"
+    assert result[0]["confidence"] == "high"
+
+
+def test_classify_formula_columns_expansion_formula():
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Grand Total",
+            "formulaText": 'Sum([Orders].[Total]).Filter([Status] = "paid")',
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["classification"] == "expansion_formula"
+    assert result[0]["confidence"] == "high"
+
+
+def test_classify_formula_columns_hybrid():
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Weighted",
+            "formulaText": "thisRow.Price * Sum([Orders].[Quantity])",
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["classification"] == "hybrid"
+    assert result[0]["confidence"] == "medium"
+
+
+def test_classify_formula_columns_unknown():
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Mystery",
+            "formulaText": "CustomFunction(42)",
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["classification"] == "unknown"
+    assert result[0]["confidence"] == "low"
+
+
+def test_classify_formula_columns_skips_non_formula():
+    columns = [
+        {"id": "c-1", "name": "Plain", "format": {"type": "text"}},
+    ]
+    result = classify_formula_columns(columns)
+    assert result == []
+
+
+def test_shape_coda_table_structure_includes_formula_classifications():
+    columns = [
+        {"id": "c-1", "name": "Name", "format": {"type": "text"}},
+        {
+            "id": "c-2",
+            "name": "Total",
+            "formulaText": "thisRow.Price * thisRow.Quantity",
+        },
+    ]
+    result = shape_coda_table_structure(
+        None,
+        columns,
+        table_id="tbl-1",
+        table_name="Tasks",
+        table_position=0,
+    )
+    assert "formula_classifications" in result
+    fcs = result["formula_classifications"]
+    assert len(fcs) == 1
+    assert fcs[0]["column_name"] == "Total"
+    assert fcs[0]["classification"] == "row_formula"
 
 
 def test_extract_relation_columns_notes_missing_target():

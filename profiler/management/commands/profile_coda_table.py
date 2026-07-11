@@ -12,6 +12,7 @@ from django.core.management.base import BaseCommand, CommandError
 from connectors.coda_source import (
     analyze_column_values,
     build_coda_session,
+    classify_formula_columns,
     column_has_formula,
     extract_relation_columns,
     formula_text,
@@ -113,6 +114,7 @@ def summarize_coda_table(
             }
 
     relation_columns = extract_relation_columns(columns)
+    formula_classifications = classify_formula_columns(columns)
     return {
         "doc_name": doc_name,
         "table_id": table_id,
@@ -131,6 +133,7 @@ def summarize_coda_table(
             {"name": c.get("name"), "formula_text": formula_text(c)}
             for c in formula_cols
         ],
+        "formula_classifications": formula_classifications,
         "grid_preview_rows": min(25, len(grid)),
         "grid_preview": grid[: 1 + min(25, max(len(grid) - 1, 0))],
         "focus_column": focus,

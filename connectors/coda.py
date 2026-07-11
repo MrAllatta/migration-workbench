@@ -9,6 +9,7 @@ from connectors.base import ProviderAdapter
 from connectors.tab_name_utils import sanitize_tab_name
 from connectors.coda_source import (
     build_coda_session,
+    classify_formula_columns,
     column_has_formula,
     extract_relation_columns,
     list_columns,
@@ -61,6 +62,7 @@ def shape_coda_table_structure(
             }
         )
     relation_columns = extract_relation_columns(columns)
+    formula_classifications = classify_formula_columns(columns)
     return {
         "worksheet_title": sanitize_tab_name(table_name),
         "tab_position": table_position,
@@ -71,6 +73,7 @@ def shape_coda_table_structure(
         "total_cols": meta.get("columnCount") or (len(columns) or None),
         "columns": shaped_columns,
         "relation_columns": relation_columns,
+        "formula_classifications": formula_classifications,
         "named_ranges": [],
         "filter_views": [],
         "coda_table_id": table_id,

@@ -1,5 +1,6 @@
 from workbook.schema_contract import (
     build_contract,
+    index_table_profile,
     _filter_section_headers,
     _compute_fk_resolutions,
     _suggest_import_keys,
@@ -302,6 +303,152 @@ def test_compute_bundle_paths_without_year():
     ]
     result = _compute_bundle_paths(tables, year=None)
     assert result[0]["import_config"]["bundle_path"] == "crop_info.csv"
+
+
+def test_index_table_profile_returns_formula_classifications():
+    payload = {
+        "summary": {
+            "table_name": "Orders",
+            "columns": [
+                {"name": "Total", "format_type": "number", "has_formula": True},
+            ],
+            "relation_columns": [],
+            "formula_classifications": [
+                {
+                    "column_name": "Total",
+                    "formula_text": "Sum([Items].[Amount])",
+                    "classification": "expansion_formula",
+                    "confidence": "high",
+                }
+            ],
+        }
+    }
+    name, col_meta, rels, fcs = index_table_profile(payload)
+    assert name == "Orders"
+    assert len(fcs) == 1
+    assert fcs[0]["classification"] == "expansion_formula"
+
+
+def test_build_contract_marks_expansion_formula_as_computed():
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "Orders",
+                "output_path": "reference/orders.csv",
+                "required_headers": ["Total"],
+            }
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "Orders",
+            "columns": [
+                {
+                    "name": "Total",
+                    "format_type": "number",
+                    "has_formula": True,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+            ],
+            "relation_columns": [],
+            "formula_classifications": [
+                {
+                    "column_name": "Total",
+                    "formula_text": "Sum([Items].[Amount])",
+                    "classification": "expansion_formula",
+                    "confidence": "high",
+                }
+            ],
+        }
+    }
+    contract = build_contract(bundle, table_profiles={"Orders": tp})
+    table = contract["tables"][0]
+    total_col = next(c for c in table["columns"] if c["source_column"] == "Total")
+    assert total_col["is_computed"] is True
+    assert any("coda_formula:expansion_formula" in n for n in total_col["notes"])
+
+
+def test_build_contract_row_formula_gets_note_not_computed():
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "Orders",
+                "output_path": "reference/orders.csv",
+                "required_headers": ["Line Total"],
+            }
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "Orders",
+            "columns": [
+                {
+                    "name": "Line Total",
+                    "format_type": "number",
+                    "has_formula": True,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+            ],
+            "relation_columns": [],
+            "formula_classifications": [
+                {
+                    "column_name": "Line Total",
+                    "formula_text": "thisRow.Price * thisRow.Qty",
+                    "classification": "row_formula",
+                    "confidence": "high",
+                }
+            ],
+        }
+    }
+    contract = build_contract(bundle, table_profiles={"Orders": tp})
+    table = contract["tables"][0]
+    col = next(c for c in table["columns"] if c["source_column"] == "Line Total")
+    assert col["is_computed"] is False
+    assert any("coda_formula:row_formula" in n for n in col["notes"])
+
+
+def test_build_contract_hybrid_formula_gets_note():
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "Orders",
+                "output_path": "reference/orders.csv",
+                "required_headers": ["Weighted"],
+            }
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "Orders",
+            "columns": [
+                {
+                    "name": "Weighted",
+                    "format_type": "number",
+                    "has_formula": True,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+            ],
+            "relation_columns": [],
+            "formula_classifications": [
+                {
+                    "column_name": "Weighted",
+                    "formula_text": "thisRow.Price * Sum([Items].[Amount])",
+                    "classification": "hybrid",
+                    "confidence": "medium",
+                }
+            ],
+        }
+    }
+    contract = build_contract(bundle, table_profiles={"Orders": tp})
+    table = contract["tables"][0]
+    col = next(c for c in table["columns"] if c["source_column"] == "Weighted")
+    assert any("coda_formula:hybrid" in n for n in col["notes"])
 
 
 def test_build_contract_adds_model_name():

@@ -653,6 +653,90 @@ def formula_text(column: dict[str, Any]) -> str:
 _RELATION_TYPES: set[str] = {"lookup", "person", "linked_relation"}
 
 
+_EXPANSION_KEYWORDS: set[str] = {
+    "filter",
+    "count",
+    "sum",
+    "average",
+    "max",
+    "min",
+    "countif",
+    "sumif",
+    "averageif",
+    "counta",
+    "unique",
+    "lookup",
+    "runactions",
+    "modifyrows",
+    "addrow",
+    "deleterows",
+}
+
+_ROW_KEYWORDS: set[str] = {"thisrow"}
+
+
+def classify_formula_columns(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Classify Coda formula columns by heuristic taxonomy.
+
+    Coda formulas are column-level (not cell-level).  Each formula is
+    inspected for:
+
+    - **expansion_formula** — table-wide aggregations or bulk operations
+      (``Filter``, ``Count``, ``Sum``, ``Average``, ``Max``, ``Min``, etc.).
+    - **row_formula** — per-row logic referencing ``thisRow`` or simple
+      arithmetic / string ops without aggregation.
+    - **hybrid** — contains both expansion and row patterns.
+    - **unknown** — formula present but no recognizable pattern.
+
+    Returns a list of dicts with keys:
+    ``column_name``, ``formula_text`` (truncated), ``classification``,
+    ``confidence`` (``high`` | ``medium`` | ``low``).
+    """
+    classifications: list[dict[str, Any]] = []
+    for col in columns:
+        if not column_has_formula(col):
+            continue
+        text = formula_text(col)
+        if not text:
+            continue
+        col_name = str(col.get("name") or col.get("id") or "")
+        lower = text.lower()
+        tokens = re.findall(r"[a-zA-Z_]+", lower)
+
+        has_expansion = bool(_EXPANSION_KEYWORDS.intersection(tokens))
+        has_row = bool(_ROW_KEYWORDS.intersection(tokens))
+
+        # Table-qualified references without thisRow also signal expansion.
+        if not has_expansion:
+            table_dot_refs = re.search(r"\b[a-zA-Z_]+\.[a-zA-Z_]+\b", text)
+            if table_dot_refs and not has_row:
+                has_expansion = True
+
+        if has_expansion and has_row:
+            classification = "hybrid"
+            confidence = "medium"
+        elif has_expansion:
+            classification = "expansion_formula"
+            confidence = "high"
+        elif has_row:
+            classification = "row_formula"
+            confidence = "high"
+        else:
+            classification = "unknown"
+            confidence = "low"
+
+        preview = text[:200] + ("…" if len(text) > 200 else "")
+        classifications.append(
+            {
+                "column_name": col_name,
+                "formula_text": preview,
+                "classification": classification,
+                "confidence": confidence,
+            }
+        )
+    return classifications
+
+
 def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Scan Coda column metadata and extract native relation columns.
 

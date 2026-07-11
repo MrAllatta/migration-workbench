@@ -278,8 +278,8 @@ def index_tables_from_doc_profile(doc: dict[str, Any]) -> dict[str, dict[str, An
 
 def index_table_profile(
     payload: dict[str, Any],
-) -> tuple[str, dict[str, dict[str, Any]], list[dict[str, Any]]]:
-    """Extract the table name, column index, and relation columns from a ``profile_coda_table`` artifact.
+) -> tuple[str, dict[str, dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Extract the table name, column index, relation columns, and formula classifications from a ``profile_coda_table`` artifact.
 
     Args:
         payload: Root dict from a ``profile_coda_table`` JSON artifact.
@@ -287,9 +287,10 @@ def index_table_profile(
             and ``"columns"`` keys.
 
     Returns:
-        tuple: ``(table_name, {col_name: col_dict}, relation_columns)``
-        where *col_dict* is the raw profiler column summary and
-        *relation_columns* is the list from ``summary["relation_columns"]``.
+        tuple: ``(table_name, {col_name: col_dict}, relation_columns, formula_classifications)``
+        where *col_dict* is the raw profiler column summary,
+        *relation_columns* is the list from ``summary["relation_columns"]``,
+        and *formula_classifications* is the list from ``summary["formula_classifications"]``.
     """
     summary = payload.get("summary") or {}
     table_name = str(summary.get("table_name") or "")
@@ -299,7 +300,8 @@ def index_table_profile(
         if n:
             col_meta[n] = c
     relation_columns = summary.get("relation_columns") or []
-    return table_name, col_meta, relation_columns
+    formula_classifications = summary.get("formula_classifications") or []
+    return table_name, col_meta, relation_columns, formula_classifications
 
 
 def _resolve_coda_relation_target(
@@ -401,9 +403,10 @@ def build_contract(
         tp = (table_profiles or {}).get(title)
         col_meta: dict[str, dict[str, Any]] = {}
         relation_columns: list[dict[str, Any]] = []
+        formula_classifications: list[dict[str, Any]] = []
 
         if tp:
-            _, col_meta, relation_columns = index_table_profile(tp)
+            _, col_meta, relation_columns, formula_classifications = index_table_profile(tp)
         elif title in doc_tables:
             col_meta = dict(doc_tables[title]["by_name"])
         else:
@@ -440,6 +443,28 @@ def build_contract(
             )
 
         django_columns = _filter_section_headers(django_columns)
+
+        # Apply formula classification enrichment: mark expansion formulas as computed.
+        if formula_classifications:
+            col_by_source = {c["source_column"]: c for c in django_columns}
+            for fc in formula_classifications:
+                col_name = fc.get("column_name")
+                if not col_name:
+                    continue
+                col_def = col_by_source.get(col_name)
+                if col_def is None:
+                    continue
+                classification = fc.get("classification")
+                confidence = fc.get("confidence")
+                if classification == "expansion_formula":
+                    col_def["is_computed"] = True
+                    col_def["notes"].append(
+                        f"coda_formula:{classification} (confidence:{confidence})"
+                    )
+                elif classification in ("row_formula", "hybrid"):
+                    col_def["notes"].append(
+                        f"coda_formula:{classification} (confidence:{confidence})"
+                    )
 
         # Apply Coda relation column enrichment: upgrade lookup columns
         # to ForeignKey and build fk_resolutions.
