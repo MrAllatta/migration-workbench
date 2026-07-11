@@ -273,6 +273,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 ## Changelog
 
+### 0.5.3
+
+- **Coda formula classification:** New `classify_formula_columns()` in `connectors/coda_source.py` — heuristic taxonomy (row_formula, expansion_formula, hybrid, unknown) with confidence scoring. Classification flows into `shape_coda_table_structure()`, `profile_coda_table` JSON output, and `build_contract()` schema contracts (expansion_formula → `is_computed: true`). (connectors/coda_source.py, connectors/coda.py, profiler/management/commands/profile_coda_table.py, workbook/schema_contract.py)
+- **Coda relation column detection:** `extract_relation_columns()` parses lookup, linked_relation, and person column formats from the Coda API. Lookup columns upgrade to ForeignKey with resolved target table names in schema contracts. (connectors/coda_source.py, connectors/coda.py, workbook/schema_contract.py)
+- **`.pi/` simplified:** Portfolio, Brief, and Journal replace state-machine orchestration. No `state.yaml`, `done.yaml`, `boot.sh`, `ship.sh`, or phase lifecycle. AGENTS.md is harness-agnostic. (AGENTS.md, .pi/)
+- **All 1620 tests pass, full chassis-gate green.**
+
+*Patch bump rather than minor: features are unit-tested but not yet validated end-to-end against a real Coda doc. The `vizcarra-profile-clients` mission is the gate. When that ships cleanly, the next version that exposes Coda profiling as a public capability can be a 0.6.0 minor.*
+
 ### 0.5.0
 
 - **Formula dependency graph:** New `profiler/tools/formula_dependency.py` with `build_cell_graph()`, `build_sheet_dependency_graph()`, `compute_sheet_signals()`, and `build_dependency_report()` — cell-level and sheet-level dependency analysis using networkx. Orphaned-sheet detection, IMPORTRANGE/external workbook ref tracking, pattern→cell membership, and structured 7-signal reports. (profiler/tools/formula_dependency.py, profiler/tests/test_formula_dependency.py)
