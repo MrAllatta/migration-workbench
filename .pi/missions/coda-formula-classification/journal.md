@@ -67,3 +67,23 @@
 
 ### Blockers / Gaps
 - None.
+
+## 2026-07-11 — Session 3
+
+### What was done
+- Moved implementation from master to feature branch `feat/coda-formula-classification`.
+- Re-ran `make chassis-gate` on the branch: 1620 passed.
+- Squash-merged branch to master.
+- Deleted feature branch.
+- Updated `.pi/portfolio.md` to mark mission done.
+- Deleted stale `feat/coda-relation-column-profiler` branch.
+
+### Final master commits
+- `0c90325` feat(connectors): classify Coda formulas into row/expansion/hybrid taxonomy
+- `7ae7c02` docs: mark coda-formula-classification done in portfolio
+
+### Gate result
+- `make chassis-gate` on master: **1620 passed, 1 warning** ✅
+
+### Blockers / Gaps
+- None. Ready for version bump, changelog, tag, and release.
