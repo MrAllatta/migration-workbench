@@ -33,14 +33,19 @@ make chassis-gate    # the full CI gate: migrate, test, lint, smoke commands
 
 ## Ecosystem
 
-This repo operates as a two-person team: human + orchestrator agent. The orchestrator delegates to role-specific subagents (builder, reviewer, investigator, writer) via `task()` calls. The coordination protocol between human and orchestrator is defined in `.omo/protocol.md`:
+This repo operates as a one-person team with an agent harness. The human owns
+the roadmap and the product specs. The agent executes autonomously, reports
+outcomes, and keeps the commit log clean.
 
-| Queue | Writer → Reader | Purpose |
-|-------|----------------|---------|
-| `brief/<slug>.md` | Human → Orchestrator | "Build this." |
-| `done/<slug>.yaml` | Orchestrator → Human | "Done. Here's the diff and squash message." |
+The harness must provide:
 
-Subagent roles are defined by capability (not by repo). A builder may work in migration-workbench or farm as the task requires. See `.omo/protocol.md` for: subagent roles, workspace model, workflow, farm relationship, release model.
+- **Portfolio** — "What am I working on across all repos?"
+- **Brief** — "Build this." Human writes; agent executes.
+- **Journal** — "What happened." Agent appends only.
+
+No state machines, no done manifests, no orchestration scripts. Markdown files
+and git branches are enough. The harness decides how these artifacts are stored
+and discovered.
 
 ## Five apps
 
@@ -74,35 +79,19 @@ Each app has a `README.md` and a `tests/` directory. Read those before modifying
 This repo is maintained by one operator with agent assistance. The rules are
 deliberately minimal — just enough to prevent the common failure modes.
 
-**Squash before merge.** When an agent branch is ready, squash its commits into
-one meaningful commit before landing on `master`. The commit message tells a
-story, not a transcript of agent turns. Two workflows:
+**Feature branches insulate `master`.** Every mission gets a branch:
+`feat/<slug>`. The agent commits checkpoints on the branch, hammers out edge
+cases there, and only lands on `master` when `make chassis-gate` is green.
+No long-lived branches. Branches older than one week are either merged or
+deleted.
 
-```bash
-# Option A: merge --squash (simple, one command)
-git checkout master
-git merge --squash feature-branch
-git commit -m "feat(profiler): mature PipelineState with validation, config routing, DecisionRecord"
-
-# Option B: interactive rebase (more control)
-git checkout feature-branch
-git rebase -i master
-# squash fixup! and chore: into feat: commits, reword messages
-git checkout master
-git merge feature-branch --no-ff
-```
-
-The result on `master` reads like a changelog, not a chat log:
-
-```
-v0.1.0      feat(profiler): mature PipelineState with validation, config routing, DecisionRecord
-v0.0.9      feat(profiler): add PipelineState checkpoint model and Makefile scaffold
-v0.9.3      fix: model_name in build_contract, wb generate in Makefile targets, Fly.io deploy configs
-```
+**Commit messages are the agent's summary.** The agent writes the final
+squash commit message. It must tell a story, not read like a transcript of
+checkpoints. The human owns the roadmap; the agent owns the wording of the
+commit that implements it.
 
 **Merge = release.** Every merge to `master` that changes user-facing behavior
-gets a tag and a PyPI release. No long-lived branches. If it passes
-`make chassis-gate`, it ships.
+gets a tag and a PyPI release. If it passes `make chassis-gate`, it ships.
 
 **Two versions, never one.** `pyproject.toml` version is the package release.
 `PipelineState.version` is the checkpoint schema. They move independently.
@@ -120,7 +109,8 @@ git push origin master && git push origin v0.1.0
 product repo before you commit to a stable release, tag it `v0.1.0a1`. Product
 repos pin exactly (`==0.1.0a1`) to opt in.
 
-**Agents do not commit on `master`.** On feature branches only, agents commit freely with conventional commit messages as checkpoints. Agents must not push, tag, or rebase. After `make chassis-gate` passes, the agent squash-merges to master (`git merge --squash`), proposes a squash message, and shows the diff. The operator reviews, amends if needed, then pushes.
+**Agents do not push.** The agent commits, merges, and tags locally. The human
+pushes. If the human delegates push authority explicitly, the agent may push.
 
 ### Naming rules
 

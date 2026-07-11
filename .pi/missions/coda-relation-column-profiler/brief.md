@@ -20,7 +20,7 @@ migration-workbench
 - 1280+ tests pass; `make chassis-gate` is green
 
 ## Scope
-In-scope:
+### In-scope
 1. Coda API `listColumns` response parsing: detect `format.type == "lookup"` and `format.type == "person"`
 2. For lookup columns, extract `formula` or `displayColumn` metadata that reveals the target table
 3. For person columns, note the column as a `PersonReference` type (not yet FK, but flagged)
@@ -29,22 +29,22 @@ In-scope:
 6. Schema contract enrichment: wire `relation_columns` into `scaffold_workbook_schema` so that lookup columns emit `ForeignKey` with `to: TODO_<TargetModel>` (or resolved if table name maps cleanly)
 7. Add/update tests in `connectors/tests/test_coda_provider.py` or `workbook/tests/`
 
-Out-of-scope:
+### Out-of-scope
 - Cross-doc sync table resolution (docs outside the current doc)
 - Canvas or attachment column handling
 - Bidirectional sync or two-way relation mutation
 - Admin or UI codegen changes
 
 ## Success Criteria
-- [ ] `profile_coda_table` for a doc containing relation columns produces JSON with a `relation_columns` array
-- [ ] Each relation entry has: `column_name`, `column_type` (`lookup` | `linked_relation` | `person`), `target_table_name` (if known), `target_table_id` (if known), `is_bidirectional` (boolean)
-- [ ] `scaffold_workbook_schema` run on a Coda profile with relation columns emits `ForeignKey` fields for lookup columns, with `to` set to the PascalCase table name if resolvable, else `TODO_<TargetModel>`
-- [ ] `make chassis-gate` passes after changes
-- [ ] Existing Coda profile tests still pass (backward compatibility)
+- [x] `profile_coda_table` for a doc containing relation columns produces JSON with a `relation_columns` array
+- [x] Each relation entry has: `column_name`, `column_type` (`lookup` | `linked_relation` | `person`), `target_table_name` (if known), `target_table_id` (if known), `is_bidirectional` (boolean)
+- [x] `scaffold_workbook_schema` run on a Coda profile with relation columns emits `ForeignKey` fields for lookup columns, with `to` set to the PascalCase table name if resolvable, else `TODO_<TargetModel>`
+- [x] `make chassis-gate` passes after changes
+- [x] Existing Coda profile tests still pass (backward compatibility)
 
 ## Constraints
 - Do NOT modify the Google Sheets profiler or formula dependency graph modules.
-- Do NOT change the schema contract YAML format version — this is an enrichment to the profiler output that feeds into existing contract scaffolding.
+- Do NOT change the schema contract YAML format version.
 - Do NOT commit to master. Work in a feature branch per AGENTS.md.
 - If the Coda API does not expose target table names cleanly, document the limitation in the profile JSON's `notes` field rather than guessing.
 
@@ -53,5 +53,5 @@ Out-of-scope:
 - Coda relation docs: https://help.coda.io/hc/en-us/articles/39555878926861-Connect-tables-with-relation-columns
 - Coda cross-doc docs: https://help.coda.io/hc/en-us/articles/39555763704461-Set-up-Cross-doc-sync-tables
 
-## Next Brief Suggestion (after this completes)
+## Next Brief (suggested)
 `coda-formula-classification` — Coda formulas use named-object references (not cell coordinates). The current `scan_coda_formula_columns` command does not classify formulas into `row_formula`, `expansion_formula`, `hybrid` the way the Sheets profiler does. A follow-up brief should add formula taxonomy parity for Coda.

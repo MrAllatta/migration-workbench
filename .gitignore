@@ -19,8 +19,7 @@ fly.toml
 .worktrees/
 .omo
 .omo.bak
-# Pi orchestration artifacts (transient) — prompts and briefs are tracked
-.pi/orchestration/session-logs/
+# Pi orchestration artifacts (transient) — missions/ is tracked
 *.session-log.md
 *.bak
 docs/superpowers/
