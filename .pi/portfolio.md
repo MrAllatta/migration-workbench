@@ -2,7 +2,6 @@
 
 ## Active
 
-- `coda-formula-classification` — Taxonomy parity for Coda formulas. Test target: migration-workbench.
 - `vizcarra-profile-clients` — Run enhanced profiler on Vizcarra Guitars Clients table. Test target: vizcarra-guitars.
 - `wb-checklist-archetype` — Extract weekly checklist pattern from farm_ui. Test target: farm.
 
@@ -21,3 +20,4 @@ Patterns proven in engagements, waiting to become platform features:
 ## Done
 
 - `coda-relation-column-profiler` — Detect Coda relation columns and scaffold ForeignKey fields.
+- `coda-formula-classification` — Classify Coda formulas into row/expansion/hybrid taxonomy.
