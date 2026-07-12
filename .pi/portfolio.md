@@ -8,7 +8,7 @@
 
 ## Active
 
-- `wb-view-codegen-pipeline` (Track B, 0.7.3) — `wb generate views` CLI command, template package/product-skin overrides, wired into `generate-all`
+*None. The next mission is chosen at boot from the priority-ordered Next table.*
 
 ## Next
 
@@ -25,7 +25,7 @@ Track B sources — patterns proven in `farm_ui`, waiting to become codegen:
 - [x] ~~Weekly checklist view with HTMX toggles~~ → `wb-checklist-archetype` (0.6.1)
 - [x] ~~Role-based landing with summary cards~~ → `wb-landing-archetype` (0.6.3)
 - [x] ~~Dashboard archetype with alert counts~~ → `wb-dashboard-archetype` (0.7.2)
-- [ ] `wb generate views` command + template package (product-skin overrides) → `wb-view-codegen-pipeline` (0.7.3)
+- [x] ~~`wb generate views` command + template package (product-skin overrides)~~ → `wb-view-codegen-pipeline` (0.7.3)
 - [ ] Coverage/drift report command
 - [ ] Print-friendly weekly summary view
 
@@ -47,6 +47,7 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 
 ## Done
 
+- `wb-view-codegen-pipeline` — `wb generate views` CLI command with `--template-package` support, `base_template` on all archetypes, `{% block %}` override points in generated templates, `generate-views` wired into `generate-all`. 23 workbench unit tests + 2 farm real-data tests pass. (0.7.3, local)
 - `wb-dashboard-archetype` — Dashboard archetype with alert cards and detail tables, generated from YAML config. 27 workbench unit tests + 7 farm real-data tests pass. (0.7.2, local)
 - `vizcarra-views-deploy` — Profiled Work Orders/Instruments/ArchivedWorkOrders FK target tables, generated certified contracts + models/admin/import, deployed landing view. 25 tests pass in vizcarra-guitars. (0.7.1, local)
 - `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, released)
