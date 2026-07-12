@@ -14,7 +14,6 @@
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `vizcarra-views-deploy` | A | 0.7.1 | vizcarra-guitars |
 | `wb-dashboard-archetype` | B | 0.7.2 | farm |
 | `wb-view-codegen-pipeline` | B | 0.7.3 | farm |
 | `vizcarra-generated-ui` | B | 0.8.1 | vizcarra-guitars |
@@ -48,6 +47,7 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 
 ## Done
 
+- `vizcarra-views-deploy` — Profiled Work Orders/Instruments/ArchivedWorkOrders FK target tables, generated certified contracts + models/admin/import, deployed landing view. 25 tests pass in vizcarra-guitars. (0.7.1, local)
 - `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, released)
 - `wb-checklist-archetype` — Checklist archetype view generator with HTMX toggle, proven against real farm PlantingPlan data. (0.6.1, released)
 - `vizcarra-generate-import` — Codegen pipeline (models/admin/import) executed against validated Vizcarra Clients contract. Fixed comment-only computed-field expression bug. (0.6.2, released)
