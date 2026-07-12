@@ -1,4 +1,4 @@
-# brief: vizcarra-generated-ui (Track B, 0.8.1)
+# brief: vizcarra-generated-ui (Track A, 0.8.1)
 
 ## Context
 Track B (UI codegen extraction) has built the full view generation pipeline:

@@ -1,14 +1,15 @@
 # Portfolio — migration-workbench
 
-> Roadmap: [docs/roadmap.md](../../docs/roadmap.md). 1.0.0 = tabular system
-> replaced in the wild. Two tracks converge on it: Track A (Coda engagement
-> validation on Vizcarra) and Track B (UI codegen extraction from farm).
+> Roadmap: [docs/roadmap.md](../../docs/roadmap.md). 1.0.0 = both the farm
+> spreadsheet and the Vizcarra Coda doc replaced in the wild. Two tracks
+> converge on it: Track A (Coda engagement validation + cut-over on
+> Vizcarra) and Track B (UI codegen extraction from farm + farm cut-over).
 > Minors are earned by validation, not by adding code. Patches are
 > unit-tested only. Local line is in PyPI-block remediation until 1.0.0.
 
 ## Active
 
-`vizcarra-generated-ui` — Track B, 0.8.1. Consume the `wb generate views`
+`vizcarra-generated-ui` — Track A, 0.8.1. Consume the `wb generate views`
 pipeline on vizcarra-guitars: template package, regenerate landing view,
 add checklist/dashboard archetype views, real-data tests.
 
@@ -16,8 +17,14 @@ add checklist/dashboard archetype views, real-data tests.
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `vizcarra-generated-ui` | B | 0.8.1 | vizcarra-guitars |
-| `vizcarra-cutover` | — | 1.0.0 | vizcarra-guitars |
+| `vizcarra-people-type` | A | 0.8.2 | vizcarra-guitars |
+| `vizcarra-formula-parity` | A | 0.8.3 | vizcarra-guitars |
+| `vizcarra-import-pipeline` | A | 0.8.4 | vizcarra-guitars |
+| `farm-behavioral-codegen` | B | 0.8.5 | farm |
+| `farm-workflow-coverage` | B | 0.8.6 | farm |
+| `farm-data-migration` | B | 0.8.7 | farm |
+| `cutover-prep` | — | 0.9.4 | farm + vizcarra |
+| `cutover` | — | 1.0.0 | farm + vizcarra |
 
 ## Extraction Backlog
 
@@ -32,15 +39,22 @@ Track B sources — patterns proven in `farm_ui`, waiting to become codegen:
 
 ## Cross-Cutting Notes
 
-- Coda People type: needs workbench enrichment. Queue after relation columns (done in 0.5.3 unit-tested; awaits Vizcarra validation).
-- MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships checklist, landing, dashboard archetypes plus the full `wb generate views` pipeline (0.6.1/0.6.3/0.7.2/0.7.3). Next: `vizcarra-generated-ui` (0.8.1) consumes the pipeline on a second product repo, replacing hand-written Vizcarra views with generated ones.
-- **Track A gap:** After `vizcarra-views-deploy` (0.7.1), no Track A mission is planned until `vizcarra-cutover` (1.0.0). If 0.8.1 surfaces Coda-side issues, handle as patches or a new Track A mission — they do not block the UI codegen track.
+- MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships checklist, landing, dashboard archetypes plus the full `wb generate views` pipeline (0.6.1/0.6.3/0.7.2/0.7.3). `vizcarra-generated-ui` (0.8.1) consumes the pipeline on Vizcarra; Track B then applies the same pipeline back to farm (0.8.5–0.8.7) to retire the farm spreadsheet.
+- **Track A sequence to 1.0.0:** After `vizcarra-views-deploy` (0.7.1), four Coda-side validation missions harden Vizcarra for cutover:
+  1. `vizcarra-people-type` (0.8.2) — map Coda People columns to Django users.
+  2. `vizcarra-formula-parity` (0.8.3) — validate business-critical Coda formulas against generated computed fields.
+  3. `vizcarra-import-pipeline` (0.8.4) — repeatable, reconciled Coda→Django import.
+- **Track B sequence to 1.0.0:** After `wb-view-codegen-pipeline` (0.7.3), three farm missions close the cut-over gap:
+  1. `farm-behavioral-codegen` (0.8.5) — generate views directly from the MWBS behavioral spec.
+  2. `farm-workflow-coverage` (0.8.6) — map every farm spreadsheet workflow to a generated view.
+  3. `farm-data-migration` (0.8.7) — import and reconcile real farm spreadsheet data.
+- **Joint 1.0.0 gate:** `cutover-prep` (0.9.4) — dry-run, readiness checklist, runbook, go/no-go for both engagements. Then `cutover` (1.0.0) retires both the farm spreadsheet and the Vizcarra Coda doc.
 
 ## Semver policy
 
 - **Patch** — code written, unit-tested, `make chassis-gate` green. Not validated against real data.
 - **Minor** — capability proven end-to-end against real data in a product repo.
-- **1.0.0** — a real spreadsheet/Coda doc that a team relies on is now a generated Django app they use day-to-day.
+- **1.0.0** — both the farm spreadsheet and the Vizcarra Coda doc that teams rely on are now generated Django apps they use day-to-day.
 
 Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 [docs/roadmap.md → Semver Recovery](../../docs/roadmap.md#semver-recovery-pypi-block).

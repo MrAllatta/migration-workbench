@@ -286,6 +286,17 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.1 (local)
+
+- **Vizcarra-generated UI:** Consumed the ``wb generate views`` pipeline on
+  a second product repo (vizcarra-guitars). Created a Vizcarra template
+  package with ``base.html`` extending ``admin/base.html``. Regenerated the
+  landing view through the pipeline and added a dashboard archetype
+  (Instruments inventory with alert cards + detail table). Added
+  ``generate-views`` and ``generate-all`` Makefile targets. All 30 vizcarra
+  domain tests pass, proving the view codegen pipeline generalises beyond
+  the farm engagement. (feat/vizcarra-generated-ui, 5 new real-data tests)
+
 ### 0.7.3 (local)
 
 - **View codegen pipeline:** Added ``wb generate views`` CLI subcommand,
