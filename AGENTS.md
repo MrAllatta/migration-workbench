@@ -26,8 +26,12 @@ Or use `make bash` to enter a shell with `.env` loaded.
 
 ```bash
 make install         # venv + dev dependencies
+make hygiene         # session-start: check branches, portfolio, worktrees
+make finish          # session-end: gate + commit
 make chassis-gate    # the full CI gate: migrate, test, lint, smoke commands
 ```
+
+Session rituals are documented in `.pi/OPERATORS_CONTRACT.md`.
 
 `make chassis-gate` is the authoritative gate. PRs must pass it. See `docs/contributing.md` for individual test commands.
 

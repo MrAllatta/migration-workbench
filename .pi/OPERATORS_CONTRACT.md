@@ -66,6 +66,28 @@ release.
 
 ---
 
+## Session-Start Ritual — `make hygiene`
+
+Run before booting the next mission. This is the morning sweep: check
+that the world is as you left it before you build on top of it.
+
+```bash
+make hygiene
+```
+
+What it does:
+1. Detects uncommitted `.pi/portfolio.md` changes.
+2. Lists unmerged local branches older than five days.
+3. Finds orphaned `.worktrees/` directories.
+4. Shows stale remote-tracking refs (`origin/branch-name` that no
+   longer exists upstream).
+5. Advises if you are not on `master`.
+
+Exit 0 with "All clean." if nothing is wrong. Exit 1 with actionable
+warnings otherwise. Fix what it finds, then start the mission.
+
+---
+
 ## Session Ritual — `make finish`
 
 End of any work session. This is the daily hygiene that keeps the tree
