@@ -14,7 +14,6 @@
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `wb-view-codegen-pipeline` | B | 0.7.3 | farm |
 | `vizcarra-generated-ui` | B | 0.8.1 | vizcarra-guitars |
 | `vizcarra-cutover` | — | 1.0.0 | vizcarra-guitars |
 
@@ -32,8 +31,7 @@ Track B sources — patterns proven in `farm_ui`, waiting to become codegen:
 ## Cross-Cutting Notes
 
 - Coda People type: needs workbench enrichment. Queue after relation columns (done in 0.5.3 unit-tested; awaits Vizcarra validation).
-- MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships the checklist and landing archetypes (0.6.1/0.6.3) — Track B continues with dashboard, pipeline, and farm-skin override archetypes.
-- `wb-view-codegen-pipeline` (0.7.3) must wire a `wb generate views` command into `generate-all`. Vizcarra-generated-ui (0.8.1) consumes it; without it, Vizcarra would hand-write UI like farm did.
+- MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships checklist, landing, dashboard archetypes plus the full `wb generate views` pipeline (0.6.1/0.6.3/0.7.2/0.7.3). Next: `vizcarra-generated-ui` (0.8.1) consumes the pipeline on a second product repo, replacing hand-written Vizcarra views with generated ones.
 - **Track A gap:** After `vizcarra-views-deploy` (0.7.1), no Track A mission is planned until `vizcarra-cutover` (1.0.0). If 0.8.1 surfaces Coda-side issues, handle as patches or a new Track A mission — they do not block the UI codegen track.
 
 ## Semver policy

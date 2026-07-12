@@ -69,23 +69,3 @@ RELEASED. Squash-merged to master, tagged v0.7.3.
 - Per-archetype module name support in the generator still pending (avoids
   manual file rename when mixing archetypes).
 
-### 2026-07-12 — Working tree state (snapshot)
-At review time, the working tree contains uncommitted changes toward all three
-brief deliverables:
-- **`deployment/wb_cli.py`** — `_generate_views()` handler + `views` subcommand
-  parser added (deliverable #1: CLI command).
-- **`workbook/codegen/view_generator.py`** — `base_template` field added to
-  `ChecklistArchetype` and `LandingArchetype`; `{% block title %}`, archetype-
-  specific block overrides, and dynamic `base_template` rendering added to all
-  three template renderers (deliverable #2: template package / product-skin
-  overrides).
-- **`workbook/management/commands/generate_views.py`** — `_resolve_template_source()`
-  helper, `--template-package` argument, wiring passed through all three
-  archetype handlers (deliverable #2: override mechanism).
-- **`workbook/makefile_targets.py`** — `generate_views_block()` target with
-  conditional config-file detection, added to phonies and `generate-all`
-  dependency list (deliverable #3: generate-all wiring).
-
-Not yet done: tests (deliverable #4), farm real-data test, final gate,
-merge and tag. This snapshot was recorded at 19:14 UTC; verify `git diff`
-before continuing.
