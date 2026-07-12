@@ -286,6 +286,19 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.6.2 (local)
+
+- **Codegen pipeline proven against Vizcarra contract:** ``generate_models``,
+  ``generate_admin``, and ``generate_import`` produce valid Django code
+  from the Vizcarra Clients schema contract (46 columns, 4 FK resolutions,
+  1 computed field). 11 tests in vizcarra-guitars verify model structure,
+  admin registration, and import command parsing.
+- **Fix: computed-field expression with only a comment no longer causes
+  ``IndentationError``:** ``render_computed_property()`` now prepends
+  ``return None`` before comment-only expressions, ensuring the generated
+  ``@property`` method has at least one executable statement.
+- **All 1671 tests pass, full chassis-gate green.**
+
 ### 0.6.1 (local)
 
 - **Weekly checklist archetype (new codegen module):**
