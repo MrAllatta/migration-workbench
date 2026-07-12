@@ -286,6 +286,26 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.6.0 (local)
+
+- **Real-data validation of Coda profiler:** Both 0.5.3 platform patches
+  (relation columns + formula classification) run cleanly against the
+  Vizcarra Guitars Coda doc — 500 rows × 46 columns profiled from the
+  Clients table, 5 relation columns, 8 formula classifications.
+- **Page composition profiling (new):** `profile_coda_doc --pages` parses
+  Coda's page export-to-markdown to reveal which tables are embedded on
+  which pages. Maps 71 pages to their embedded tables. Work Order page
+  composes 9 tables; Data Export page exposes 8 normalized tables.
+- **Schema contract generated for Clients table:** All 6 required headers
+  mapped, 4 ForeignKey resolutions (Instruments×2, WorkOrders,
+  ArchivedWorkOrders), 1 computed field, import_config with 46-column
+  column_map.
+- **FK auto-detection fix:** Self-referencing FKs (`client_id` in Clients
+  table) and formula-derived column FKs are no longer auto-detected.
+  String concatenation operators (`+`, `&`, `Concatenate()`) classified as
+  `row_formula`.
+- **All 1628 tests pass, full chassis-gate green.**
+
 ### 0.5.3 (local)
 
 - **Coda formula classification:** New `classify_formula_columns()` in `connectors/coda_source.py` — heuristic taxonomy (`row_formula`, `expansion_formula`, `hybrid`, `unknown`) with confidence scoring. Classification flows into `shape_coda_table_structure()`, `profile_coda_table` JSON output, and `build_contract()` schema contracts (`expansion_formula` → `is_computed: true`).
