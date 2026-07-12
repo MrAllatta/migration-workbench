@@ -261,6 +261,27 @@ def _write_file(path: Path, content: str, *, force: bool) -> bool:
     return True
 
 
+def _resolve_template_source(
+    template_package: Path | None,
+    out_dir: Path,
+    template_path: str,
+    default_source: str,
+) -> str:
+    """Return the template source to write for ``template_path``.
+
+    If ``template_package`` is set and contains a file at the same relative
+    path as ``template_path``, the product override is used instead of the
+    generated default.  This lets product repos commit skinned templates in
+    a template package directory while still generating views and URLs.
+    """
+    if template_package is None:
+        return default_source
+    override_path = template_package / template_path
+    if override_path.is_file():
+        return override_path.read_text(encoding="utf-8")
+    return default_source
+
+
 def _load_landing_config(path: Path) -> list[LandingArchetype]:
     """Load landing archetypes from a YAML config file.
 
@@ -475,6 +496,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Strict-validate the contract before rendering",
         )
+        parser.add_argument(
+            "--template-package",
+            default=None,
+            help=(
+                "Path to a product template package directory. "
+                "If a template exists in the package at the same relative path "
+                "as the generated template, the package override is used."
+            ),
+        )
 
     def handle(self, *args, **options):
         """Load the contract, resolve archetypes, and write outputs."""
@@ -504,19 +534,35 @@ class Command(BaseCommand):
 
         out_dir = Path(options["out_dir"]).resolve()
         force = bool(options.get("force"))
+        template_package_raw = options.get("template_package")
+        template_package = (
+            Path(template_package_raw).resolve()
+            if template_package_raw
+            else None
+        )
+        if template_package is not None and not template_package.is_dir():
+            raise CommandError(
+                f"template package not found: {template_package}"
+            )
 
         app_label_default = _resolve_app_label(contract, options.get("app_label"))
         if archetype_checklist:
             self._handle_checklist(
-                contract_path, contract, out_dir, archetype_checklist, options, force
+                contract_path,
+                contract,
+                out_dir,
+                archetype_checklist,
+                options,
+                force,
+                template_package,
             )
         if archetype_landing:
             self._handle_landing(
-                out_dir, archetype_landing, force, app_label_default
+                out_dir, archetype_landing, force, app_label_default, template_package
             )
         if archetype_dashboard:
             self._handle_dashboard(
-                out_dir, archetype_dashboard, force, app_label_default
+                out_dir, archetype_dashboard, force, app_label_default, template_package
             )
 
     def _handle_checklist(
@@ -527,6 +573,7 @@ class Command(BaseCommand):
         archetype_value: str,
         options: dict[str, Any],
         force: bool,
+        template_package: Path | None = None,
     ) -> None:
         """Handle --archetype-checklist generation."""
         mode, targets = _parse_archetype_targets(archetype_value)
@@ -568,7 +615,10 @@ class Command(BaseCommand):
         # Write one template per archetype.
         for arch in archetypes:
             template_path = _template_output_path(out_dir, arch.template_path)
-            template_source = render_checklist_template_html(arch)
+            default_source = render_checklist_template_html(arch)
+            template_source = _resolve_template_source(
+                template_package, out_dir, arch.template_path, default_source
+            )
             template_written = _write_file(template_path, template_source, force=force)
             if template_written:
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
@@ -591,6 +641,7 @@ class Command(BaseCommand):
         config_path_str: str,
         force: bool,
         app_label: str = "core",
+        template_package: Path | None = None,
     ) -> None:
         """Handle --archetype-landing generation."""
         config_path = Path(config_path_str).resolve()
@@ -629,7 +680,10 @@ class Command(BaseCommand):
         # Write one template per archetype.
         for arch in archetypes:
             template_path = _template_output_path(out_dir, arch.template_path)
-            template_source = render_landing_template_html(arch)
+            default_source = render_landing_template_html(arch)
+            template_source = _resolve_template_source(
+                template_package, out_dir, arch.template_path, default_source
+            )
             template_written = _write_file(template_path, template_source, force=force)
             if template_written:
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
@@ -652,6 +706,7 @@ class Command(BaseCommand):
         config_path_str: str,
         force: bool,
         app_label: str = "core",
+        template_package: Path | None = None,
     ) -> None:
         """Handle --archetype-dashboard generation."""
         config_path = Path(config_path_str).resolve()
@@ -690,7 +745,10 @@ class Command(BaseCommand):
         # Write one template per archetype.
         for arch in archetypes:
             template_path = _template_output_path(out_dir, arch.template_path)
-            template_source = render_dashboard_template_html(arch)
+            default_source = render_dashboard_template_html(arch)
+            template_source = _resolve_template_source(
+                template_package, out_dir, arch.template_path, default_source
+            )
             template_written = _write_file(template_path, template_source, force=force)
             if template_written:
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))

@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 profile-phase-discover profile-phase-score profile-phase-deep profile-phase-derive profile-phase-all clean-profile validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke hygiene new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 profile-phase-discover profile-phase-score profile-phase-deep profile-phase-derive profile-phase-all clean-profile validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke hygiene new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-views generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -64,6 +64,8 @@ format:
 
 CONTRACT ?= build/schema-contract.yaml
 OUT ?= build/out.py
+VIEWS_DIR ?= build/_out/views
+TEMPLATE_PACKAGE ?= config/templates
 
 validate-contract:
 	wb validate contract --contract "$(CONTRACT)" $(if $(STRICT),--strict)
@@ -92,13 +94,31 @@ generate-admin:
 generate-import:
 	wb generate import --contract $(CONTRACT) --out $(OUT) $(if $(FORCE),--force)
 
+generate-views:
+	@if [ -f "config/checklist-config.yaml" ]; then \
+		wb generate views --contract $(CONTRACT) --out-dir $(VIEWS_DIR) \
+			--archetype-checklist auto \
+			--template-package $(TEMPLATE_PACKAGE) $(if $(FORCE),--force); \
+	fi
+	@if [ -f "config/landing-config.yaml" ]; then \
+		wb generate views --contract $(CONTRACT) --out-dir $(VIEWS_DIR) \
+			--archetype-landing config/landing-config.yaml \
+			--template-package $(TEMPLATE_PACKAGE) $(if $(FORCE),--force); \
+	fi
+	@if [ -f "config/dashboard-config.yaml" ]; then \
+		wb generate views --contract $(CONTRACT) --out-dir $(VIEWS_DIR) \
+			--archetype-dashboard config/dashboard-config.yaml \
+			--template-package $(TEMPLATE_PACKAGE) $(if $(FORCE),--force); \
+	fi
+	@echo "generate-views: skipped (no view config files found)"
+
 generate-view-manifest:
 	wb generate manifest --contract $(CONTRACT) $(if $(FORCE),--force)
 
 generate-pipeline-manifest:
 	$(MANAGE) generate_pipeline_manifest --contract $(CONTRACT) --corpus-config $${CORPUS_CONFIG:?CORPUS_CONFIG required} --out $${PIPELINE_MANIFEST_OUT:-build/pipeline_manifest.yaml} $(if $(FORCE),--force)
 
-generate-all: generate-models generate-view-manifest generate-admin generate-import generate-pipeline-manifest
+generate-all: generate-models generate-view-manifest generate-admin generate-import generate-views generate-pipeline-manifest
 	@echo "All code generation complete."
 
 post-generate:

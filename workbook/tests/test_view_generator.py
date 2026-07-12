@@ -169,6 +169,27 @@ class TestChecklistArchetype:
         )
         assert arch.status_badges == {"open": "custom-open"}
 
+    def test_base_template_defaults_to_base_html(self) -> None:
+        """Checklist archetype defaults to extending base.html."""
+        arch = ChecklistArchetype(
+            model="TaskPlan",
+            app_label="core",
+            year_field="planned_year",
+            week_field="planned_week",
+        )
+        assert arch.base_template == "base.html"
+
+    def test_base_template_customizable(self) -> None:
+        """Product repos can override base_template."""
+        arch = ChecklistArchetype(
+            model="TaskPlan",
+            app_label="core",
+            year_field="planned_year",
+            week_field="planned_week",
+            base_template="farm_ui/base.html",
+        )
+        assert arch.base_template == "farm_ui/base.html"
+
 
 # -- view source rendering --------------------------------------------------
 
@@ -384,6 +405,34 @@ class TestRenderChecklistTemplateHtml:
         """The empty state shows a colspan message."""
         html = render_checklist_template_html(archetype)
         assert "No records for this week" in html
+
+    def test_uses_base_template(self, archetype: ChecklistArchetype) -> None:
+        """The template extends the archetype's base_template."""
+        html = render_checklist_template_html(archetype)
+        assert '{% extends "base.html" %}' in html
+
+    def test_custom_base_template(self) -> None:
+        """When base_template is overridden, the template extends it."""
+        arch = ChecklistArchetype(
+            model="TaskPlan",
+            app_label="core",
+            year_field="planned_year",
+            week_field="planned_week",
+            base_template="farm_ui/base.html",
+        )
+        html = render_checklist_template_html(arch)
+        assert '{% extends "farm_ui/base.html" %}' in html
+
+    def test_has_block_override_points(self, archetype: ChecklistArchetype) -> None:
+        """The template exposes block override points for product skins."""
+        html = render_checklist_template_html(archetype)
+        assert "{% block title %}" in html
+        assert "{% block content %}" in html
+        assert "{% block checklist_heading %}" in html
+        assert "{% block checklist_week_nav %}" in html
+        assert "{% block checklist_table %}" in html
+        assert "{% block checklist_bottom_links %}" in html
+        assert "{% endblock %}" in html
 
 
 # -- combined modules -------------------------------------------------------
@@ -641,6 +690,18 @@ class TestLandingArchetype:
         assert card.link_url_name == "farm_ui_tasks"
         assert card.css_class == "card-warning"
 
+    def test_base_template_defaults_to_base_html(self) -> None:
+        """Landing archetype defaults to extending base.html."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        assert arch.base_template == "base.html"
+
+    def test_base_template_customizable(self) -> None:
+        """Product repos can override base_template on landing archetype."""
+        arch = LandingArchetype(
+            role="field_worker", title="Test", base_template="farm_ui/base.html"
+        )
+        assert arch.base_template == "farm_ui/base.html"
+
 
 class TestRenderLandingViewPy:
     """Landing view Python source renders and parses cleanly."""
@@ -764,6 +825,30 @@ class TestRenderLandingTemplateHtml:
         arch = LandingArchetype(role="field_worker", title="Field Ops")
         html = render_landing_template_html(arch)
         assert "No data available" in html or "{% empty %}" in html
+
+    def test_uses_base_template(self) -> None:
+        """The template extends the archetype's base_template."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        html = render_landing_template_html(arch)
+        assert '{% extends "base.html" %}' in html
+
+    def test_custom_base_template(self) -> None:
+        """When base_template is overridden, the template extends it."""
+        arch = LandingArchetype(
+            role="field_worker", title="Test", base_template="farm_ui/base.html"
+        )
+        html = render_landing_template_html(arch)
+        assert '{% extends "farm_ui/base.html" %}' in html
+
+    def test_has_block_override_points(self) -> None:
+        """The template exposes block override points for product skins."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        html = render_landing_template_html(arch)
+        assert "{% block title %}" in html
+        assert "{% block content %}" in html
+        assert "{% block landing_heading %}" in html
+        assert "{% block landing_summary_cards %}" in html
+        assert "{% endblock %}" in html
 
 
 class TestRenderLandingUrlPattern:
@@ -968,6 +1053,18 @@ class TestDashboardArchetype:
         assert arch.url_path == "stock/"
         assert arch.url_name == "dashboard_stock"
 
+    def test_base_template_defaults_to_base_html(self) -> None:
+        """Dashboard archetype defaults to extending base.html."""
+        arch = DashboardArchetype(name="inventory", title="Inventory")
+        assert arch.base_template == "base.html"
+
+    def test_base_template_customizable(self) -> None:
+        """Product repos can override base_template on dashboard archetype."""
+        arch = DashboardArchetype(
+            name="inventory", title="Inventory", base_template="farm_ui/base.html"
+        )
+        assert arch.base_template == "farm_ui/base.html"
+
 
 class TestRenderDashboardViewPy:
     """render_dashboard_view_py produces valid Python with alert cards and sections."""
@@ -1145,6 +1242,23 @@ class TestRenderDashboardTemplateHtml:
         html = render_dashboard_template_html(arch)
         assert "No alerts configured." in html
 
+    def test_has_block_override_points(self) -> None:
+        """The dashboard template exposes block override points for product skins."""
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory Dashboard",
+            alerts=[
+                AlertCard(label="Zero", count_expression="0", severity="warning"),
+            ],
+        )
+        html = render_dashboard_template_html(arch)
+        assert "{% block title %}" in html
+        assert "{% block content %}" in html
+        assert "{% block dashboard_heading %}" in html
+        assert "{% block dashboard_alert_cards %}" in html
+        assert "{% block dashboard_sections %}" in html
+        assert "{% endblock %}" in html
+
     def test_multiple_sections(self) -> None:
         arch = DashboardArchetype(
             name="multi",
@@ -1303,3 +1417,65 @@ class TestGenerateViewsCommandDashboard:
         assert "class InventoryDashboardView" in views_source
         template_source = (out_dir / "generated" / "dashboard_inventory.html").read_text(encoding="utf-8")
         assert "Inventory Dashboard" in template_source
+
+
+# -- template package resolution --------------------------------------------
+
+
+class TestResolveTemplateSource:
+    """_resolve_template_source decides whether to use a product override."""
+
+    def test_no_template_package_uses_default(self, tmp_path: Path) -> None:
+        """Without a template package, the default source is used."""
+        from workbook.management.commands.generate_views import (
+            _resolve_template_source,
+        )
+
+        out_dir = tmp_path / "out"
+        source = _resolve_template_source(None, out_dir, "test.html", "default")
+        assert source == "default"
+
+    def test_template_package_with_no_override_uses_default(
+        self, tmp_path: Path
+    ) -> None:
+        """When the template package doesn't contain the file, default is used."""
+        from workbook.management.commands.generate_views import (
+            _resolve_template_source,
+        )
+
+        package = tmp_path / "templates"
+        package.mkdir()
+        out_dir = tmp_path / "out"
+        source = _resolve_template_source(package, out_dir, "test.html", "default")
+        assert source == "default"
+
+    def test_template_package_override_is_used(self, tmp_path: Path) -> None:
+        """When the template package contains the file, its content is used."""
+        from workbook.management.commands.generate_views import (
+            _resolve_template_source,
+        )
+
+        package = tmp_path / "templates"
+        package.mkdir()
+        (package / "custom.html").write_text("override content", encoding="utf-8")
+        out_dir = tmp_path / "out"
+        source = _resolve_template_source(
+            package, out_dir, "custom.html", "default content"
+        )
+        assert source == "override content"
+
+    def test_template_package_with_nested_path(self, tmp_path: Path) -> None:
+        """Nested template paths work with the template package."""
+        from workbook.management.commands.generate_views import (
+            _resolve_template_source,
+        )
+
+        package = tmp_path / "templates"
+        nested = package / "generated"
+        nested.mkdir(parents=True)
+        (nested / "checklist.html").write_text("nested override", encoding="utf-8")
+        out_dir = tmp_path / "out"
+        source = _resolve_template_source(
+            package, out_dir, "generated/checklist.html", "default"
+        )
+        assert source == "nested override"

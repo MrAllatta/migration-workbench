@@ -99,6 +99,7 @@ def test_generate_all_block_includes_pipeline_manifest():
     assert "generate-view-manifest" in block
     assert "generate-admin" in block
     assert "generate-import" in block
+    assert "generate-views" in block
     assert "generate-pipeline-manifest" in block
 
 
@@ -185,6 +186,35 @@ def test_generate_view_manifest_appears_exactly_once_in_full_output():
     block = full_targets_block(MakeContext())
     count = block.count("generate-view-manifest:")
     assert count == 1, f"Expected exactly 1 generate-view-manifest target, got {count}"
+
+
+def test_generate_views_block_produces_target():
+    """generate_views_block() returns a Makefile target referencing wb generate views."""
+    from workbook.makefile_targets import generate_views_block
+
+    block = generate_views_block(MakeContext())
+    assert block.startswith("generate-views:")
+    assert "wb generate views" in block
+    assert "--template-package" in block
+    assert "cheatsheet-config" not in block  # no typos
+
+
+def test_generate_views_block_checks_config_files():
+    """The generate-views target checks for each config file before running."""
+    from workbook.makefile_targets import generate_views_block
+
+    block = generate_views_block(MakeContext())
+    assert "checklist-config.yaml" in block
+    assert "landing-config.yaml" in block
+    assert "dashboard-config.yaml" in block
+
+
+def test_phonies_includes_generate_views():
+    """generate-views appears in the phony targets list."""
+    from workbook.makefile_targets import phonies, MakeContext
+
+    names = phonies(MakeContext())
+    assert "generate-views" in names
 
 
 def test_codegen_tooling_uses_wb_for_codegen():

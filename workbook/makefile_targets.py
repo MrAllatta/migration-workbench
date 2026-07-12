@@ -55,6 +55,7 @@ def phonies(ctx: MakeContext) -> list[str]:
         "generate-models",
         "generate-admin",
         "generate-import",
+        "generate-views",
         "generate",
         "generate-view-manifest",
         "generate-pipeline-manifest",
@@ -162,6 +163,44 @@ def generate_import_block(ctx: MakeContext) -> str:
     )
 
 
+def generate_views_block(ctx: MakeContext) -> str:
+    """Return the generate-views Makefile target block.
+
+    Generates checklist/landing/dashboard views from archetype configs when
+    they exist.  Product repos can place skinned templates in
+    ``config/templates/`` (the template package) to override generated defaults.
+    """
+    return (
+        "generate-views:\n"
+        + _indent(
+            f"@if [ -f \"config/checklist-config.yaml\" ]; then \\n"
+            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'--out-dir "{ctx.core}/templates/generated" '
+            f'--archetype-checklist auto --template-package "config/templates" --force; \\n'
+            f"fi\n"
+        )
+        + _indent(
+            f"@if [ -f \"config/landing-config.yaml\" ]; then \\n"
+            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'--out-dir "{ctx.core}/templates/generated" '
+            f'--archetype-landing "config/landing-config.yaml" '
+            f'--template-package "config/templates" --force; \\n'
+            f"fi\n"
+        )
+        + _indent(
+            f"@if [ -f \"config/dashboard-config.yaml\" ]; then \\n"
+            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'--out-dir "{ctx.core}/templates/generated" '
+            f'--archetype-dashboard "config/dashboard-config.yaml" '
+            f'--template-package "config/templates" --force; \\n'
+            f"fi\n"
+        )
+        + _indent(
+            "@echo \"generate-views: skipped (no view config files found)\"\n"
+        )
+    )
+
+
 def generate_block(ctx: MakeContext) -> str:
     """Return the generate Makefile target (alias for models+admin+import)."""
     return "generate: generate-models generate-admin generate-import\n"
@@ -218,7 +257,7 @@ def generate_all_block(ctx: MakeContext) -> str:
     """Return the generate-all Makefile target block (runs every generator)."""
     return (
         "generate-all: generate-models generate-view-manifest merge-interaction-contract "
-        "generate-admin generate-import generate-pipeline-manifest\n"
+        "generate-admin generate-import generate-views generate-pipeline-manifest\n"
         + _indent(
             '@echo "All code generation complete. '
             "Run 'make check-generated' to verify.\""
@@ -740,6 +779,7 @@ def full_targets_block(ctx: MakeContext) -> str:
         generate_source_config_block(ctx),
         generate_admin_block(ctx),
         generate_import_block(ctx),
+        generate_views_block(ctx),
         generate_block(ctx),
         generate_view_manifest_block(ctx),
         generate_pipeline_manifest_block(ctx),

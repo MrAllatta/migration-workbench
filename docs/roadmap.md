@@ -155,6 +155,14 @@ UI patterns farm proved. They converge at `vizcarra-generated-ui`, where
 Vizcarra runs on workbench-generated views, then `vizcarra-cutover` replaces
 the Coda doc in the wild.
 
+**Track A status after 0.7.1:** The Coda pipeline is validated end-to-end
+on Vizcarra real data (profile → contract → codegen → import → deploy).
+No further Track A milestones are planned until `vizcarra-cutover` (1.0.0).
+If 0.8.1 testing surfaces Coda-side issues (edge cases in generated views,
+import mismatches, deployment config gaps), they are handled as patches on
+0.8.1 or a new Track A patch mission — they do not block the UI codegen
+track. This gap is tracked in `.pi/portfolio.md`.
+
 ---
 
 ## Shipped

@@ -458,6 +458,32 @@ def _generate_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _generate_views(args: argparse.Namespace) -> int:
+    _setup_django(getattr(args, "django_settings", None))
+    from django.core.management import call_command
+
+    kwargs: dict[str, Any] = {
+        "contract": args.contract,
+        "out_dir": args.out_dir,
+    }
+    if getattr(args, "app_label", None):
+        kwargs["app_label"] = args.app_label
+    if getattr(args, "archetype_checklist", None):
+        kwargs["archetype_checklist"] = args.archetype_checklist
+    if getattr(args, "archetype_landing", None):
+        kwargs["archetype_landing"] = args.archetype_landing
+    if getattr(args, "archetype_dashboard", None):
+        kwargs["archetype_dashboard"] = args.archetype_dashboard
+    if getattr(args, "template_package", None):
+        kwargs["template_package"] = args.template_package
+    if getattr(args, "force", None):
+        kwargs["force"] = args.force
+    if getattr(args, "validate", None):
+        kwargs["validate"] = args.validate
+    call_command("generate_views", **kwargs)
+    return 0
+
+
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest)
     try:
@@ -1148,6 +1174,19 @@ def _build_generate_parser(sub: argparse._SubParsersAction) -> None:
     manifest_cmd.add_argument("--structure", default=None)
     manifest_cmd.add_argument("--django-settings", default=None)
     manifest_cmd.set_defaults(func=_generate_manifest)
+
+    views_cmd = gen_sub.add_parser("views", help="Generate Django views, templates, and URLs")
+    views_cmd.add_argument("--contract", required=True)
+    views_cmd.add_argument("--out-dir", required=True)
+    views_cmd.add_argument("--app-label", default=None)
+    views_cmd.add_argument("--archetype-checklist", default=None)
+    views_cmd.add_argument("--archetype-landing", default=None)
+    views_cmd.add_argument("--archetype-dashboard", default=None)
+    views_cmd.add_argument("--template-package", default=None)
+    views_cmd.add_argument("--force", action="store_true")
+    views_cmd.add_argument("--validate", action="store_true")
+    views_cmd.add_argument("--django-settings", default=None)
+    views_cmd.set_defaults(func=_generate_views)
 
 
 def build_parser() -> argparse.ArgumentParser:

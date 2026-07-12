@@ -286,6 +286,18 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.7.3 (local)
+
+- **View codegen pipeline:** Added ``wb generate views`` CLI subcommand,
+  wiring the existing ``generate_views`` management command into the ``wb``
+  CLI with flags for checklist/landing/dashboard archetypes and
+  ``--template-package``. Added ``base_template`` to ``ChecklistArchetype``
+  and ``LandingArchetype`` and added ``{% block %}`` override points to all
+  generated templates (title, content, archetype-specific blocks). Added
+  ``generate-views`` Makefile target and wired it into ``generate-all``.
+  Proved ``--template-package`` override mechanism on real farm data.
+  (feat/wb-view-codegen-pipeline, 23 new tests)
+
 ### 0.7.2 (local)
 
 - **Dashboard archetype:** Added ``DashboardArchetype`` to the view generator

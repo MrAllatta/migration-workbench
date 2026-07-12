@@ -115,6 +115,11 @@ class ChecklistArchetype:
         back_url_name: Optional URL name to link back to (default None).
         back_url_label: Optional label for the back link (default "Back").
         print_url_name: Optional URL name to link to a print view (default None).
+        base_template: The Django template the generated template extends
+            (default ``"base.html"``).  Product repos should set this to
+            their project's base template (e.g. ``"farm_ui/base.html"``).
+            The template must define ``{% block content %}`` for the
+            generated view to render into.
     """
 
     model: str
@@ -143,6 +148,7 @@ class ChecklistArchetype:
     back_url_name: str | None = None
     back_url_label: str = "Back"
     print_url_name: str | None = None
+    base_template: str = "base.html"
 
     def __post_init__(self) -> None:
         # Default the toggle field to the status field if unset.
@@ -428,17 +434,25 @@ def render_checklist_template_html(archetype: ChecklistArchetype) -> str:
     if toggle_cell:
         body += "\n" + toggle_cell
 
-    template = f"""{{% extends "base.html" %}}
+    base_template = archetype.base_template
+    template = f"""{{% extends "{base_template}" %}}
+
+{{% block title %}}{title}{{% endblock %}}
 
 {{% block content %}}
+{{% block checklist_heading %}}
 <h1>{title} &mdash; Week {{{{ current_week }}}}, {{{{ current_year }}}}</h1>
+{{% endblock %}}
 
+{{% block checklist_week_nav %}}
 <div class="week-nav">
   <a href="?year={{{{ prev_year }}}}&amp;week={{{{ prev_week }}}}" class="btn btn-small">&larr; Prev Week</a>
   <a href="?year={{{{ next_year }}}}&amp;week={{{{ next_week }}}}" class="btn btn-small">Next Week &rarr;</a>
   <a href="." class="btn btn-small">This Week</a>
 </div>
+{{% endblock %}}
 
+{{% block checklist_table %}}
 <table class="data-table">
   <thead>
     <tr>
@@ -455,10 +469,13 @@ def render_checklist_template_html(archetype: ChecklistArchetype) -> str:
     {{% endfor %}}
   </tbody>
 </table>
+{{% endblock %}}
 
+{{% block checklist_bottom_links %}}
 <div style="margin-top: 1rem;">
 {bottom_links_block}
 </div>
+{{% endblock %}}
 {{% endblock %}}
 """
     return template
@@ -722,6 +739,11 @@ class LandingArchetype:
         url_name: URL pattern name. Default: ``"landing_{role}"``.
         back_url_name: Optional URL name for a "Back" link.
         back_url_label: Label for the back link (default "Back").
+        base_template: The Django template the generated template extends
+            (default ``"base.html"``).  Product repos should set this to
+            their project's base template (e.g. ``"farm_ui/base.html"``).
+            The template must define ``{% block content %}`` for the
+            generated view to render into.
     """
 
     role: str
@@ -732,6 +754,7 @@ class LandingArchetype:
     url_name: str = ""
     back_url_name: str | None = None
     back_url_label: str = "Back"
+    base_template: str = "base.html"
 
     def __post_init__(self) -> None:
         if not self.url_name and self.role:
@@ -814,11 +837,17 @@ def render_landing_template_html(archetype: LandingArchetype) -> str:
             f"{archetype.back_url_label}</a></div>"
         )
 
-    return f"""{{% extends "base.html" %}}
+    base_template = archetype.base_template
+    return f"""{{% extends "{base_template}" %}}
+
+{{% block title %}}{archetype.title}{{% endblock %}}
 
 {{% block content %}}
+{{% block landing_heading %}}
 <h1>{archetype.title}</h1>
+{{% endblock %}}
 
+{{% block landing_summary_cards %}}
 <div class="summary-cards">
   {{% for card in summary_cards %}}
   {{% if card.url %}}
@@ -835,6 +864,7 @@ def render_landing_template_html(archetype: LandingArchetype) -> str:
   <p>No data available.</p>
   {{% endfor %}}
 </div>
+{{% endblock %}}
 {back_link}
 {{% endblock %}}
 """
@@ -1190,9 +1220,14 @@ def render_dashboard_template_html(archetype: DashboardArchetype) -> str:
 
     template = f"""{{% extends "{base_template}" %}}
 
-{{% block content %}}
-<h1>{title}</h1>
+{{% block title %}}{title}{{% endblock %}}
 
+{{% block content %}}
+{{% block dashboard_heading %}}
+<h1>{title}</h1>
+{{% endblock %}}
+
+{{% block dashboard_alert_cards %}}
 <div class="summary-cards">
   {{% for alert in alerts %}}
   {{% if alert.url %}}
@@ -1209,7 +1244,11 @@ def render_dashboard_template_html(archetype: DashboardArchetype) -> str:
   <p>No alerts configured.</p>
   {{% endfor %}}
 </div>
+{{% endblock %}}
+
+{{% block dashboard_sections %}}
 {sections_html}
+{{% endblock %}}
 {back_link}
 {{% endblock %}}
 """
