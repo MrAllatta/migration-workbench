@@ -286,6 +286,23 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.6.3 (local)
+
+- **Landing archetype (role-based summary cards):** ``LandingArchetype``
+  + ``SummaryCard`` dataclasses in ``view_generator.py``. Generates
+  ``TemplateView`` with ``get_context_data()`` that evaluates card count
+  expressions, resolves URL names to paths via ``reverse()``, and builds
+  a ``summary_cards`` list for the template.
+- **Auto-detected model imports:** ``render_landing_views_auto_py()``
+  scans card count expressions for capitalized class names and generates
+  the correct ``from core.models import ...`` line automatically.
+- **``--archetype-landing <config>`` flag** in ``generate_views`` command.
+  Accepts a YAML config with role, title, and card definitions.
+- **Farm real-data test:** Generated ``FieldWorkerLandingView`` renders
+  summary cards with live counts (open tasks, current plantings, recent
+  events). 6 tests pass.
+- **All 1693 tests pass, full chassis-gate green.**
+
 ### 0.6.2 (local)
 
 - **Codegen pipeline proven against Vizcarra contract:** ``generate_models``,

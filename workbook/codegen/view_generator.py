@@ -678,3 +678,277 @@ def render_urls_auto_py(
         + body
         + "\n]\n"
     )
+
+
+# -- landing archetype ------------------------------------------------------
+
+
+@dataclass
+class SummaryCard:
+    """One summary card on a landing page dashboard.
+
+    Attributes:
+        label: Display text (e.g. "Open Tasks").
+        count_expression: Python expression for the card's value. Evaluated
+            at render time in ``get_context_data()``, so it typically
+            contains a Django ORM count call or an ``len()``.
+        link_url_name: Optional URL name the card links to.
+        css_class: Optional extra CSS class for conditional styling
+            (e.g. "card-warning", "card-success").
+    """
+
+    label: str
+    count_expression: str
+    link_url_name: str | None = None
+    css_class: str = ""
+
+
+@dataclass
+class LandingArchetype:
+    """Configuration for a generated role-based landing page.
+
+    The landing archetype produces a ``TemplateView`` subclass whose
+    ``get_context_data()`` populates a ``summary_cards`` list of dicts
+    (label, value, url_name, css_class) for the template to render in
+    a card grid.
+
+    Attributes:
+        role: Snake-case role identifier (e.g. ``"field_worker"``).
+        title: Page heading (e.g. "Field Ops — Today's Work").
+        cards: List of :class:`SummaryCard` instances.
+        template_path: Output template path relative to templates root.
+            Default: ``"generated/landing_{role}.html"``.
+        url_path: URL pattern path. Default: ``"{role}/"``.
+        url_name: URL pattern name. Default: ``"landing_{role}"``.
+        back_url_name: Optional URL name for a "Back" link.
+        back_url_label: Label for the back link (default "Back").
+    """
+
+    role: str
+    title: str
+    cards: list[SummaryCard] = field(default_factory=list)
+    template_path: str = ""
+    url_path: str = ""
+    url_name: str = ""
+    back_url_name: str | None = None
+    back_url_label: str = "Back"
+
+    def __post_init__(self) -> None:
+        if not self.url_name and self.role:
+            self.url_name = f"landing_{self.role}"
+        if not self.url_path and self.role:
+            self.url_path = f"{self.role.replace('_', '-')}/"
+        if not self.template_path and self.url_name:
+            self.template_path = f"generated/{self.url_name}.html"
+
+
+# -- landing rendering ------------------------------------------------------
+
+
+def render_landing_view_py(archetype: LandingArchetype) -> str:
+    """Render a ``TemplateView`` subclass for a role-based landing page.
+
+    The generated view has ``get_context_data()`` that:
+    1. Evaluates each :attr:`LandingArchetype.cards` count_expression
+    2. Resolves ``link_url_name`` to concrete URLs via ``reverse()``
+    3. Builds a ``summary_cards`` list of dicts (label, value, url, css_class)
+    4. Passes it to the template context
+    """
+    class_name = f"{_to_pascal_case(archetype.role)}LandingView"
+    has_urls = any(card.link_url_name for card in archetype.cards)
+    lines: list[str] = [
+        "",
+        "",
+        f"class {class_name}(LoginRequiredMixin, TemplateView):",
+        f'    template_name = "{archetype.template_path}"',
+        "",
+        "    def get_context_data(self, **kwargs):",
+        "        context = super().get_context_data(**kwargs)",
+    ]
+    if has_urls:
+        lines.append("        from django.urls import reverse")
+
+    card_vars: list[str] = []
+    card_dicts: list[str] = []
+    for idx, card in enumerate(archetype.cards):
+        var_name = f"_card_{idx}"
+        card_vars.append(f"        {var_name} = {card.count_expression}")
+        css = f', "css_class": "{card.css_class}"' if card.css_class else ""
+        if card.link_url_name:
+            card_dicts.append(
+                f'            {{"label": "{card.label}", "value": {var_name}'
+                f', "url": reverse("{card.link_url_name}")'
+                f'{css}}},'
+            )
+        else:
+            card_dicts.append(
+                f'            {{"label": "{card.label}", "value": {var_name}{css}}},'
+            )
+
+    if card_vars:
+        lines.extend(card_vars)
+        lines.append("")
+    lines.append('        context["summary_cards"] = [')
+    lines.extend(card_dicts)
+    lines.append("        ]")
+    lines.append("        return context")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_landing_template_html(archetype: LandingArchetype) -> str:
+    """Render a Django template for a landing page with summary cards.
+
+    The template renders a heading, a grid of summary cards (each showing
+    a value and label, optionally wrapping an ``<a>`` tag), and a back
+    link at the bottom.
+
+    Cards with a ``url`` key (pre-resolved by the view's ``get_context_data``
+    from ``link_url_name``) wrap each card in an ``<a>`` tag.
+    """
+    back_link = ""
+    if archetype.back_url_name:
+        back_link = (
+            '<div style="margin-top: 1rem;">'
+            f'<a href="{{% url {archetype.back_url_name!r} %}}" class="btn">'
+            f"{archetype.back_url_label}</a></div>"
+        )
+
+    return f"""{{% extends "base.html" %}}
+
+{{% block content %}}
+<h1>{archetype.title}</h1>
+
+<div class="summary-cards">
+  {{% for card in summary_cards %}}
+  {{% if card.url %}}
+  <a href="{{{{ card.url }}}}" class="card-link">
+  {{% endif %}}
+    <div class="card {{{{ card.css_class }}}}">
+      <div class="card-number">{{{{ card.value }}}}</div>
+      <div class="card-label">{{{{ card.label }}}}</div>
+    </div>
+  {{% if card.url %}}
+  </a>
+  {{% endif %}}
+  {{% empty %}}
+  <p>No data available.</p>
+  {{% endfor %}}
+</div>
+{back_link}
+{{% endblock %}}
+"""
+
+
+def render_landing_url_pattern(archetype: LandingArchetype) -> list[str]:
+    """Render URL pattern lines for a landing page.
+
+    Returns:
+        A list with one ``path()`` line ready for ``urlpatterns = [...]``.
+    """
+    if not archetype.url_path or not archetype.url_name:
+        return []
+    class_name = f"{_to_pascal_case(archetype.role)}LandingView"
+    return [
+        f'    path("{archetype.url_path}", {class_name}.as_view(), name="{archetype.url_name}"),',
+    ]
+
+
+def render_landing_views_auto_py(
+    archetypes: Sequence[LandingArchetype],
+    *,
+    extra_imports: Sequence[str] = (),
+    app_label: str = "core",
+) -> str:
+    """Render a complete ``views_auto.py`` module with multiple landing archetypes.
+
+    Includes ``TemplateView``/``LoginRequiredMixin`` imports, auto-detected
+    model imports based on capitalized identifiers in card count expressions,
+    and all generated view classes.
+
+    Args:
+        archetypes: Landing archetypes to render.
+        extra_imports: Additional import lines to include.
+        app_label: Django app label for the model import module
+            (default ``"core"``).
+    """
+    # Collect all model names from card expressions.
+    all_model_names: set[str] = set()
+    for arch in archetypes:
+        for card in arch.cards:
+            all_model_names.update(_extract_model_names(card.count_expression))
+
+    imports: list[str] = [
+        "from django.contrib.auth.mixins import LoginRequiredMixin",
+        "from django.views.generic import TemplateView",
+        "",
+    ]
+    if all_model_names:
+        sorted_names = sorted(all_model_names)
+        imports.append(f"from {app_label}.models import {', '.join(sorted_names)}")
+        imports.append("")
+    imports.extend(extra_imports)
+    imports.append("")
+
+    body_parts: list[str] = []
+    for arch in archetypes:
+        body_parts.append(render_landing_view_py(arch))
+    return "\n".join(imports) + "\n".join(body_parts)
+
+
+def render_landing_urls_auto_py(
+    archetypes: Sequence[LandingArchetype],
+) -> str:
+    """Render a complete ``urls_auto.py`` module with multiple landing archetypes."""
+    view_names: list[str] = []
+    for arch in archetypes:
+        view_names.append(f"{_to_pascal_case(arch.role)}LandingView")
+    imports = [
+        "from django.urls import include, path",
+        "",
+        f"from .views_auto import {', '.join(view_names)}",
+        "",
+        "",
+    ]
+    patterns: list[str] = []
+    for arch in archetypes:
+        patterns.extend(render_landing_url_pattern(arch))
+    body = "\n".join(patterns)
+    return (
+        "\n".join(imports)
+        + "urlpatterns = [\n"
+        + body
+        + "\n]\n"
+    )
+
+
+def _extract_model_names(expression: str) -> list[str]:
+    """Extract capitalized identifiers from *expression* that look like
+    Django model class names (not Python builtins, keywords, or common
+    Django identifiers).
+
+    Used by :func:`render_landing_views_auto_py` to generate the correct
+    ``from core.models import ...`` line for card count expressions.
+    """
+    import builtins
+    import keyword
+    import re
+    words = set(re.findall(r"[A-Z][a-zA-Z0-9_]+", expression))
+    blacklist = set(dir(builtins)) | set(keyword.kwlist)
+    blacklist |= {
+        "True", "False", "None",
+        "HttpResponse", "HttpRequest", "self", "request",
+        "Q", "F", "Count", "Sum", "Avg", "Min", "Max",
+        "Value", "Case", "When", "Subquery", "OuterRef",
+        "Exists", "ExpressionWrapper", "DurationExpression",
+        "LoginRequiredMixin", "TemplateView", "ListView",
+        "UserPassesTestMixin", "AccessMixin", "RedirectView",
+    }
+    return sorted(w for w in words if w not in blacklist)
+
+
+def _to_pascal_case(snake: str) -> str:
+    """Convert snake_case to PascalCase."""
+    if not snake:
+        return snake
+    return "".join(word.capitalize() for word in snake.split("_"))

@@ -10,7 +10,7 @@
 
 | Mission | Track | Earns | Test target | What it proves |
 |---------|-------|-------|-------------|----------------|
-| ~`vizcarra-generate-import`~ | A | 0.6.2 | vizcarra-guitars | Codegen pipeline produces working Django code from Vizcarra schema contract **[RELEASED 2026-07-11]** |
+| ~`wb-landing-archetype`~ | B | 0.6.3 | farm | Role-based landing page with summary cards extractable from view manifest **[READY 2026-07-11]** |
 
 ## Next
 
@@ -18,6 +18,7 @@
 |---------|-------|-------|-------------|
 | `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest (RELEASED)
 | ~`vizcarra-generate-import`~ | A | 0.6.2 | vizcarra-guitars | Codegen pipeline produces working Django code from Vizcarra contract (RELEASED)
+| `wb-landing-archetype` | B | 0.6.3 | farm | Role-based landing with summary cards (RELEASED) |
 | `vizcarra-views-deploy` | A | 0.7.1 | vizcarra-guitars |
 | `wb-landing-archetype` | B | 0.6.3 | farm |
 | `vizcarra-views-deploy` | A | 0.7.1 | vizcarra-guitars |
@@ -57,5 +58,6 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 - `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, released)
 - `wb-checklist-archetype` — Checklist archetype view generator with HTMX toggle, proven against real farm PlantingPlan data. (0.6.1, released)
 - `vizcarra-generate-import` — Codegen pipeline (models/admin/import) executed against validated Vizcarra Clients contract. Fixed comment-only computed-field expression bug. (0.6.2, released)
+- `wb-landing-archetype` — Role-based landing page archetype with summary cards, proven against real farm data. Auto-detects model imports from count expressions. (0.6.3, released)
 - `coda-formula-classification` — Classify Coda formulas into row/expansion/hybrid taxonomy. (0.5.3, local, unit-tested only)
 - `coda-relation-column-profiler` — Detect Coda relation columns and scaffold ForeignKey fields. (0.5.3, local, unit-tested only)

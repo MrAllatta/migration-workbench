@@ -26,10 +26,17 @@ from django.core.management import call_command
 from workbook.codegen.view_generator import (
     ChecklistArchetype,
     ChecklistColumn,
+    LandingArchetype,
+    SummaryCard,
     build_archetype_from_contract,
     render_checklist_template_html,
     render_checklist_url_pattern,
     render_checklist_view_py,
+    render_landing_template_html,
+    render_landing_url_pattern,
+    render_landing_urls_auto_py,
+    render_landing_view_py,
+    render_landing_views_auto_py,
     render_toggle_handler_py,
     render_urls_auto_py,
     render_views_auto_py,
@@ -589,3 +596,274 @@ class TestGenerateViewsCommand:
         views_source = (out_dir / "views_auto.py").read_text(encoding="utf-8")
         assert "class PlantingPlanChecklistView" in views_source
         assert "class TaskPlanChecklistView" in views_source
+
+
+# -- landing archetype tests ------------------------------------------------
+
+
+class TestLandingArchetype:
+    """LandingArchetype dataclass defaults."""
+
+    def test_default_url_name_from_role(self) -> None:
+        """When url_name is unset, it derives from role."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        assert arch.url_name == "landing_field_worker"
+
+    def test_default_url_path_from_role(self) -> None:
+        """When url_path is unset, it derives from role with hyphens."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        assert arch.url_path == "field-worker/"
+
+    def test_default_template_path(self) -> None:
+        """When template_path is unset, it derives from url_name."""
+        arch = LandingArchetype(role="field_worker", title="Test")
+        assert arch.template_path == "generated/landing_field_worker.html"
+
+    def test_summary_card_has_fields(self) -> None:
+        """A SummaryCard stores label, expression, link, and css_class."""
+        card = SummaryCard(
+            label="Open Tasks",
+            count_expression="TaskPlan.objects.filter(status='open').count()",
+            link_url_name="farm_ui_tasks",
+            css_class="card-warning",
+        )
+        assert card.label == "Open Tasks"
+        assert "filter(status='open')" in card.count_expression
+        assert card.link_url_name == "farm_ui_tasks"
+        assert card.css_class == "card-warning"
+
+
+class TestRenderLandingViewPy:
+    """Landing view Python source renders and parses cleanly."""
+
+    def test_renders_valid_python(self) -> None:
+        """The output must be valid Python (parses with ast.parse)."""
+        arch = LandingArchetype(
+            role="field_worker",
+            title="Field Ops",
+            cards=[
+                SummaryCard(
+                    label="Open Tasks",
+                    count_expression="42",
+                ),
+            ],
+        )
+        source = render_landing_view_py(arch)
+        ast.parse(source)
+
+    def test_includes_class_name(self) -> None:
+        """The class is named ``<PascalRole>LandingView``."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        source = render_landing_view_py(arch)
+        assert "class FieldWorkerLandingView" in source
+
+    def test_class_inherits_from_template_view(self) -> None:
+        """The class inherits from LoginRequiredMixin and TemplateView."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        source = render_landing_view_py(arch)
+        assert "LoginRequiredMixin" in source
+        assert "TemplateView" in source
+
+    def test_sets_template_name(self) -> None:
+        """The template_name matches the archetype's template_path."""
+        arch = LandingArchetype(
+            role="field_worker", title="Field Ops",
+        )
+        source = render_landing_view_py(arch)
+        assert 'template_name = "generated/landing_field_worker.html"' in source
+
+    def test_get_context_data_presents_summary_cards(self) -> None:
+        """The context has a ``summary_cards`` list of dicts."""
+        arch = LandingArchetype(
+            role="planner",
+            title="Planner Dashboard",
+            cards=[
+                SummaryCard(
+                    label="Open Tasks",
+                    count_expression="TaskPlan.objects.filter(status='open').count()",
+                    link_url_name="tasks",
+                ),
+                SummaryCard(
+                    label="Low Inventory",
+                    count_expression="len(InventoryLedger.objects.filter(...))",
+                    css_class="card-warning",
+                ),
+            ],
+        )
+        source = render_landing_view_py(arch)
+        ast.parse(source)
+        assert "summary_cards" in source
+        assert "Open Tasks" in source
+        assert "Low Inventory" in source
+        assert 'reverse("tasks")' in source
+        assert "card-warning" in source
+
+    def test_empty_cards_produces_empty_list(self) -> None:
+        """A landing with no cards still produces valid Python."""
+        arch = LandingArchetype(role="field_worker", title="Empty")
+        source = render_landing_view_py(arch)
+        ast.parse(source)
+        assert "summary_cards" in source
+
+    def test_card_value_is_computed_from_expression(self) -> None:
+        """The count_expression is rendered as a Python variable assignment."""
+        arch = LandingArchetype(
+            role="field_worker",
+            title="Field Ops",
+            cards=[
+                SummaryCard(
+                    label="Count",
+                    count_expression="sum([1, 2, 3])",
+                ),
+            ],
+        )
+        source = render_landing_view_py(arch)
+        assert "sum([1, 2, 3])" in source
+
+
+class TestRenderLandingTemplateHtml:
+    """Landing template HTML renders with the expected structure."""
+
+    def test_includes_title(self) -> None:
+        """The template shows the title in an <h1>."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        html = render_landing_template_html(arch)
+        assert "Field Ops" in html
+        assert "<h1>" in html
+
+    def test_includes_summary_cards_grid(self) -> None:
+        """The template has a ``summary-cards`` container."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        html = render_landing_template_html(arch)
+        assert 'class="summary-cards"' in html
+
+    def test_renders_card_labels_in_template(self) -> None:
+        """Card labels appear in the template (via ``{{ card.label }}``)."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        html = render_landing_template_html(arch)
+        assert "card.label" in html
+        assert "card.value" in html
+
+    def test_renders_card_url_when_present(self) -> None:
+        """When a card has a url_name, the template wraps in <a> tag."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        html = render_landing_template_html(arch)
+        assert "card.url" in html
+
+    def test_empty_state_message(self) -> None:
+        """An empty-state message appears when no cards are present."""
+        arch = LandingArchetype(role="field_worker", title="Field Ops")
+        html = render_landing_template_html(arch)
+        assert "No data available" in html or "{% empty %}" in html
+
+
+class TestRenderLandingUrlPattern:
+    """Landing URL pattern lines render correctly."""
+
+    def test_renders_path_with_name(self) -> None:
+        """The path() line has the correct URL and name."""
+        arch = LandingArchetype(
+            role="field_worker",
+            title="Field Ops",
+            url_path="field-worker/",
+            url_name="landing_field_worker",
+        )
+        lines = render_landing_url_pattern(arch)
+        joined = "\n".join(lines)
+        assert 'path("field-worker/"' in joined
+        assert 'name="landing_field_worker"' in joined
+
+    def test_returns_empty_when_no_url(self) -> None:
+        """An archetype without url_path returns no lines."""
+        # Unset role so post_init doesn't auto-assign url_path/url_name.
+        arch = LandingArchetype(
+            role="", title="Field Ops",
+            url_path="", url_name="",
+        )
+        assert render_landing_url_pattern(arch) == []
+
+
+class TestRenderLandingViewsAutoPy:
+    """Combined landing views_auto.py module."""
+
+    def test_combines_multiple_archetypes(self) -> None:
+        """Two archetypes produce two landing view classes."""
+        arch1 = LandingArchetype(role="field_worker", title="Field")
+        arch2 = LandingArchetype(role="planner", title="Planner")
+        source = render_landing_views_auto_py([arch1, arch2])
+        ast.parse(source)
+        assert "class FieldWorkerLandingView" in source
+        assert "class PlannerLandingView" in source
+
+    def test_includes_imports(self) -> None:
+        """The module imports LoginRequiredMixin and TemplateView."""
+        arch = LandingArchetype(role="field_worker", title="Field")
+        source = render_landing_views_auto_py([arch])
+        assert "LoginRequiredMixin" in source
+        assert "TemplateView" in source
+
+
+class TestRenderLandingUrlsAutoPy:
+    """Combined landing urls_auto.py module."""
+
+    def test_renders_urlpatterns_list(self) -> None:
+        """The output has a ``urlpatterns`` list with the archetype's path."""
+        arch = LandingArchetype(
+            role="field_worker", title="Field",
+            url_path="field-worker/", url_name="landing_field_worker",
+        )
+        source = render_landing_urls_auto_py([arch])
+        ast.parse(source)
+        assert "urlpatterns = [" in source
+        assert "field-worker/" in source
+
+
+class TestGenerateViewsCommandLanding:
+    """The ``generate_views`` management command handles ``--archetype-landing``."""
+
+    def test_landing_from_config(self, tmp_path: Path) -> None:
+        """``--archetype-landing <config.yaml>`` writes views, urls, and template."""
+        import yaml  # type: ignore[import-untyped]
+
+        # Write a minimal landing config.
+        config = {
+            "landings": [
+                {
+                    "role": "field_worker",
+                    "title": "Field Ops",
+                    "cards": [
+                        {
+                            "label": "Open Tasks",
+                            "count_expression": "42",
+                            "link_url_name": "tasks",
+                        },
+                    ],
+                },
+            ],
+        }
+        config_path = tmp_path / "landing-config.yaml"
+        config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+        # Provide a minimal contract (needed by the command even though not used for landing).
+        contract = {
+            "version": "1.3",
+            "tables": [],
+        }
+        contract_path = tmp_path / "contract.yaml"
+        contract_path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+
+        out_dir = tmp_path / "out_landing"
+        call_command(
+            "generate_views",
+            contract=str(contract_path),
+            out_dir=str(out_dir),
+            archetype_landing=str(config_path),
+            force=True,
+        )
+        assert (out_dir / "views_auto.py").exists()
+        assert (out_dir / "urls_auto.py").exists()
+        views_source = (out_dir / "views_auto.py").read_text(encoding="utf-8")
+        assert "class FieldWorkerLandingView" in views_source
+        # Title appears in template, not view source
+        template_source = (out_dir / "generated" / "landing_field_worker.html").read_text(encoding="utf-8")
+        assert "Field Ops" in template_source

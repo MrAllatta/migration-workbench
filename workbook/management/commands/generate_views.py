@@ -46,8 +46,13 @@ from workbook.codegen.contract import (
 from workbook.codegen.view_generator import (
     ChecklistArchetype,
     ChecklistColumn,
+    LandingArchetype,
+    SummaryCard,
     build_archetype_from_contract,
     render_checklist_template_html,
+    render_landing_template_html,
+    render_landing_urls_auto_py,
+    render_landing_views_auto_py,
     render_urls_auto_py,
     render_views_auto_py,
 )
@@ -249,10 +254,69 @@ def _write_file(path: Path, content: str, *, force: bool) -> bool:
     return True
 
 
+def _load_landing_config(path: Path) -> list[LandingArchetype]:
+    """Load landing archetypes from a YAML config file.
+
+    The config file should have a top-level ``landings`` list:
+
+    .. code-block:: yaml
+
+        landings:
+          - role: field_worker
+            title: "Field Ops"
+            cards:
+              - label: Open Tasks
+                count_expression: TaskPlan.objects.filter(status='open').count()
+                link_url_name: farm_ui_task_checklist
+              - label: Low Inventory
+                count_expression: "InventoryLedger.objects.filter(
+                    Q(quantity_on_hand__lte=F('threshold')) |
+                    Q(threshold__isnull=False, quantity_on_hand__isnull=True)
+                ).count()"
+                link_url_name: farm_ui_inventory
+                css_class: card-warning
+            back_url_name: farm_ui_root
+    """
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        raise CommandError("PyYAML is required for --archetype-landing")
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or "landings" not in raw:
+        raise CommandError(
+            "Landing config must have a top-level 'landings' list."
+        )
+
+    archetypes: list[LandingArchetype] = []
+    for entry in raw["landings"]:
+        if not isinstance(entry, dict):
+            continue
+        cards: list[SummaryCard] = []
+        for card in entry.get("cards") or []:
+            cards.append(
+                SummaryCard(
+                    label=str(card["label"]),
+                    count_expression=str(card["count_expression"]),
+                    link_url_name=str(card.get("link_url_name") or "") or None,
+                    css_class=str(card.get("css_class") or ""),
+                )
+            )
+        archetypes.append(
+            LandingArchetype(
+                role=str(entry["role"]),
+                title=str(entry.get("title") or f"{entry['role']} Dashboard"),
+                cards=cards,
+                back_url_name=str(entry.get("back_url_name") or "") or None,
+            )
+        )
+    return archetypes
+
+
 class Command(BaseCommand):
     help = (
-        "Generate Django ListView + template + URL patterns for one or more "
-        "weekly checklist archetypes, derived from a schema-contract YAML."
+        "Generate Django views + templates + URL patterns from schema "
+        "contracts and config files. Supports checklist and landing archetypes."
     )
 
     def add_arguments(self, parser):
@@ -286,6 +350,14 @@ class Command(BaseCommand):
             help="Alias for --archetype-checklist.",
         )
         parser.add_argument(
+            "--archetype-landing",
+            default=None,
+            help=(
+                "Path to a landing-config YAML. Generates TemplateView + "
+                "template with summary cards from the config."
+            ),
+        )
+        parser.add_argument(
             "--force",
             action="store_true",
             help="Overwrite existing output files without prompting",
@@ -312,13 +384,38 @@ class Command(BaseCommand):
                     f"contract validation failed: {'; '.join(errors)}"
                 )
 
-        archetype_value = options.get("archetype_checklist") or options.get("archetype")
-        if not archetype_value:
+        archetype_checklist = options.get("archetype_checklist") or options.get("archetype")
+        archetype_landing = options.get("archetype_landing")
+
+        if not archetype_checklist and not archetype_landing:
             raise CommandError(
-                "specify --archetype-checklist (or --archetype). "
-                "Use 'auto' or 'AppLabel.ModelName[,...]'."
+                "specify at least one archetype flag: "
+                "--archetype-checklist, --archetype, or --archetype-landing"
             )
 
+        out_dir = Path(options["out_dir"]).resolve()
+        force = bool(options.get("force"))
+
+        app_label_default = _resolve_app_label(contract, options.get("app_label"))
+        if archetype_checklist:
+            self._handle_checklist(
+                contract_path, contract, out_dir, archetype_checklist, options, force
+            )
+        if archetype_landing:
+            self._handle_landing(
+                out_dir, archetype_landing, force, app_label_default
+            )
+
+    def _handle_checklist(
+        self,
+        contract_path: Path,
+        contract: dict[str, Any],
+        out_dir: Path,
+        archetype_value: str,
+        options: dict[str, Any],
+        force: bool,
+    ) -> None:
+        """Handle --archetype-checklist generation."""
         mode, targets = _parse_archetype_targets(archetype_value)
         app_label_default = _resolve_app_label(contract, options.get("app_label"))
         if mode == "auto":
@@ -332,9 +429,6 @@ class Command(BaseCommand):
                 return
         else:
             archetypes = _build_archetypes(contract, app_label_default, targets)
-
-        out_dir = Path(options["out_dir"]).resolve()
-        force = bool(options.get("force"))
 
         # Write views_auto.py (combined module).
         views_source = render_views_auto_py(archetypes)
@@ -374,6 +468,67 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"generated {len(archetypes)} archetype(s) to {out_dir}"
+                f"generated {len(archetypes)} checklist archetype(s)"
+            )
+        )
+
+    def _handle_landing(
+        self,
+        out_dir: Path,
+        config_path_str: str,
+        force: bool,
+        app_label: str = "core",
+    ) -> None:
+        """Handle --archetype-landing generation."""
+        config_path = Path(config_path_str).resolve()
+        if not config_path.is_file():
+            raise CommandError(f"landing config not found: {config_path}")
+        archetypes = _load_landing_config(config_path)
+        if not archetypes:
+            raise CommandError(
+                "No landing archetypes defined in config (landings list is empty)."
+            )
+
+        # Write views_auto.py (combined module for landing views).
+        views_source = render_landing_views_auto_py(
+            archetypes, app_label=app_label,
+        )
+        views_path = out_dir / "views_auto.py"
+        views_written = _write_file(views_path, views_source, force=force)
+        if views_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {views_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {views_path} (exists, use --force)")
+            )
+
+        # Write urls_auto.py.
+        urls_source = render_landing_urls_auto_py(archetypes)
+        urls_path = out_dir / "urls_auto.py"
+        urls_written = _write_file(urls_path, urls_source, force=force)
+        if urls_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {urls_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {urls_path} (exists, use --force)")
+            )
+
+        # Write one template per archetype.
+        for arch in archetypes:
+            template_path = _template_output_path(out_dir, arch.template_path)
+            template_source = render_landing_template_html(arch)
+            template_written = _write_file(template_path, template_source, force=force)
+            if template_written:
+                self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"skipped {template_path} (exists, use --force)"
+                    )
+                )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"generated {len(archetypes)} landing archetype(s)"
             )
         )
