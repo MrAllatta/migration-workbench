@@ -8,17 +8,12 @@
 
 ## Active
 
-| Mission | Track | Earns | Test target |
-|---------|-------|-------|-------------|
-| `wb-dashboard-archetype` | B | 0.7.2 | farm |
-
-*Booted 2026-07-12. Dashboard archetype with alert counts, extracted from farm's hand-written dashboards.*
+*None. The next mission is chosen at boot from the priority-ordered Next table.*
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `wb-dashboard-archetype` | B | 0.7.2 | farm |
 | `wb-view-codegen-pipeline` | B | 0.7.3 | farm |
 | `vizcarra-generated-ui` | B | 0.8.1 | vizcarra-guitars |
 | `vizcarra-cutover` | — | 1.0.0 | vizcarra-guitars |
@@ -51,6 +46,7 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 
 ## Done
 
+- `wb-dashboard-archetype` — Dashboard archetype with alert cards and detail tables, generated from YAML config. 27 workbench unit tests + 7 farm real-data tests pass. (0.7.2, local)
 - `vizcarra-views-deploy` — Profiled Work Orders/Instruments/ArchivedWorkOrders FK target tables, generated certified contracts + models/admin/import, deployed landing view. 25 tests pass in vizcarra-guitars. (0.7.1, local)
 - `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, released)
 - `wb-checklist-archetype` — Checklist archetype view generator with HTMX toggle, proven against real farm PlantingPlan data. (0.6.1, released)
