@@ -143,6 +143,35 @@ def test_classify_formula_columns_skips_non_formula():
     assert result == []
 
 
+def test_classify_formula_columns_string_concat():
+    """Bare string concatenation (e.g. ``First+" "+Last``) is a row_formula."""
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Full Name",
+            "formulaText": 'First+" "+Last',
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["classification"] == "row_formula"
+    assert result[0]["confidence"] == "high"
+
+
+def test_classify_formula_columns_concatenate_function():
+    """``Concatenate()`` function signals a row-level string assembly."""
+    columns = [
+        {
+            "id": "c-1",
+            "name": "Display",
+            "formulaText": 'Concatenate(Description," ... ", [Flat Rate])',
+        }
+    ]
+    result = classify_formula_columns(columns)
+    assert len(result) == 1
+    assert result[0]["classification"] == "row_formula"
+
+
 def test_shape_coda_table_structure_includes_formula_classifications():
     columns = [
         {"id": "c-1", "name": "Name", "format": {"type": "text"}},

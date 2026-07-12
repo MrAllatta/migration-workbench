@@ -18,6 +18,8 @@ from connectors.coda_source import (
     resolve_doc_id,
 )
 
+from profiler.tools.page_profiler import profile_page_composition
+
 
 def summarize_table_meta(
     table: dict[str, Any], columns: list[dict[str, Any]] | None
@@ -76,6 +78,37 @@ def render_doc_tree(
     return "\n".join(lines) + "\n"
 
 
+def _render_page_tree(pages: list[dict[str, Any]]) -> str:
+    """Render page composition as a Markdown tree string.
+
+    Shows the page hierarchy and which tables are embedded on each page.
+    """
+    lines = ["", "## Page composition", ""]
+    for page in pages:
+        pname = page.get("name") or page.get("id")
+        parent = page.get("parent_page")
+        prefix = f"  (under {parent})" if parent else ""
+        lines.append(f"[page] {pname!r}{prefix}  (id={page.get('id')})")
+        if not page.get("has_content"):
+            err = page.get("export_error", "no content")
+            lines.append(f"    - (skipped: {err})")
+            continue
+        et_count = page.get("embedded_table_count", 0)
+        if et_count == 0:
+            lines.append("    - (no embedded tables)")
+            continue
+        for et in page.get("tables", []):
+            section = et.get("section") or "(no section)"
+            match = et.get("matched_table_name")
+            match_str = f"  →  {match}" if match else ""
+            cols = ", ".join(et.get("headers", [])[:6])
+            more = "…" if len(et.get("headers", [])) > 6 else ""
+            lines.append(
+                f"    - section={section!r}  cols=[{cols}{more}]  rows~{et.get('row_count_preview', 0)}{match_str}"
+            )
+    return "\n".join(lines) + "\n"
+
+
 class Command(BaseCommand):
     """Enumerate tables and views in a Coda doc (and optionally column metadata)."""
 
@@ -90,6 +123,11 @@ class Command(BaseCommand):
             "--no-columns",
             action="store_true",
             help="Skip per-table column enumeration",
+        )
+        parser.add_argument(
+            "--pages",
+            action="store_true",
+            help="Profile page composition (which tables are on which pages)",
         )
         parser.add_argument(
             "--out", default=None, help="Output JSON path (.md sibling is also written)"
@@ -131,15 +169,34 @@ class Command(BaseCommand):
                 continue
             tables_payload.append(summarize_table_meta(table, cols))
 
+        # Optionally profile page composition
+        page_composition = None
+        if options.get("pages"):
+            self.stdout.write("Profiling page composition…")
+            known_tables = {
+                (t.get("name") or ""): [
+                    c.get("name", "") for c in (t.get("columns") or [])
+                ]
+                for t in tables_payload
+                if t.get("columns")
+            }
+            page_composition = profile_page_composition(
+                session, doc_id, known_tables=known_tables
+            )
+            self.stdout.write(f"  profiled {len(page_composition)} pages")
+
         root = {
             "id": doc_meta.get("id"),
             "name": doc_meta.get("name"),
             "href": doc_meta.get("href"),
             "docSize": doc_meta.get("docSize"),
             "tables": tables_payload,
+            "page_composition": page_composition,
         }
 
         rendered = render_doc_tree(doc_meta, tables_payload)
+        if page_composition:
+            rendered += _render_page_tree(page_composition)
         out = options.get("out")
         if out:
             out_path = Path(out).resolve()

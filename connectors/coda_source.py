@@ -674,6 +674,14 @@ _EXPANSION_KEYWORDS: set[str] = {
 
 _ROW_KEYWORDS: set[str] = {"thisrow"}
 
+# Regex to detect string concatenation operators that indicate row-level logic
+# without requiring ``thisRow``.  Matches binary ``+`` between column references
+# or string literals (e.g. ``First+" "+Last``, ``A & B``).
+_ROW_CONCAT_PATTERN = re.compile(
+    r"""['\"][^'\"]*['\"]\s*[+&]|[+&]\s*['\"][^'\"]*['\"]""",
+    re.IGNORECASE,
+)
+
 
 def classify_formula_columns(columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Classify Coda formula columns by heuristic taxonomy.
@@ -711,6 +719,15 @@ def classify_formula_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
             table_dot_refs = re.search(r"\b[a-zA-Z_]+\.[a-zA-Z_]+\b", text)
             if table_dot_refs and not has_row:
                 has_expansion = True
+
+        # String concatenation operators (+ or & between quoted strings or
+        # column references) are a row-level operation even without thisRow.
+        has_concat = bool(_ROW_CONCAT_PATTERN.search(text))
+        # ``Concatenate()`` function also signals row-level string assembly.
+        if "concatenate" in tokens:
+            has_concat = True
+        if has_concat and not has_expansion:
+            has_row = True
 
         if has_expansion and has_row:
             classification = "hybrid"

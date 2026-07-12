@@ -89,6 +89,42 @@ def test_flag_fk_columns_detects_entity_names():
     assert columns[1].get("suggested_fk_target") == "Season"
 
 
+def test_flag_fk_columns_skips_self_reference():
+    """A column like ``client_id`` in the ``Clients`` table should not be
+    flagged as a FK — it's the table's own primary key."""
+    columns = [
+        {"suggested_field_name": "client_id", "source_column": "Client ID"},
+    ]
+    _flag_fk_columns(columns, table_name="Clients")
+    assert columns[0].get("suggested_fk_target") is None
+    assert columns[0].get("review_note") is None
+
+
+def test_flag_fk_columns_skips_formula_derived():
+    """A column with ``has_formula: True`` should not be auto-detected as
+    a FK — in Coda, formula columns are typically previews of an already-
+    mapped relation column."""
+    columns = [
+        {
+            "suggested_field_name": "instrument_id",
+            "source_column": "Instrument ID",
+            "has_formula": True,
+        },
+    ]
+    _flag_fk_columns(columns, table_name="Clients")
+    assert columns[0].get("suggested_fk_target") is None
+
+
+def test_flag_fk_columns_does_not_skip_foreign_fk():
+    """A column like ``farm_id`` in the ``Clients`` table should still be
+    flagged, because ``Farm`` is not the table's own model."""
+    columns = [
+        {"suggested_field_name": "farm_id", "source_column": "Farm ID"},
+    ]
+    _flag_fk_columns(columns, table_name="Clients")
+    assert columns[0].get("suggested_fk_target") == "Farm"
+
+
 def test_flag_computed_fields_moves_formula_columns():
     """Columns with formula_pattern row_formula or expansion_formula move to computed_fields."""
     table = {

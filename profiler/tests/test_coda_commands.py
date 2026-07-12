@@ -4,6 +4,63 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 
+from profiler.tools.page_profiler import (
+    parse_page_markdown_for_tables,
+    profile_page_composition,
+)
+
+
+def test_parse_page_markdown_finds_embedded_tables():
+    md = """# Work Order
+
+## Select work order
+
+| Client | Instrument | Status |
+| --- | --- | --- |
+| Pat Longmire | Martin | In Queue |
+
+## Jobs
+
+| Jobs | Hours | Total |
+| --- | --- | --- |
+| saddle shim | 1.0 | $50 |
+| fret dress | 0.5 | $25 |
+"""
+    tables = parse_page_markdown_for_tables(md)
+    assert len(tables) == 2
+    assert tables[0]["section"] == "Select work order"
+    assert tables[0]["headers"] == ["Client", "Instrument", "Status"]
+    assert tables[0]["sample_rows"][0] == ["Pat Longmire", "Martin", "In Queue"]
+    assert tables[1]["section"] == "Jobs"
+    assert tables[1]["row_count_preview"] == 2
+
+
+def test_parse_page_markdown_handles_no_tables():
+    md = "Some text without any tables.\n\nMore text.\n"
+    assert parse_page_markdown_for_tables(md) == []
+
+
+def test_profile_page_composition_smoke(monkeypatch):
+    """Smoke: profile_page_composition returns a stub list with --smoke-friendly behaviour."""
+    from profiler.tools import page_profiler
+
+    monkeypatch.setattr(page_profiler, "list_pages", lambda session, doc_id: [
+        {"id": "p1", "name": "Home", "parent": None, "type": "page"},
+        {"id": "p2", "name": "Work Order", "parent": {"id": "p1"}, "type": "page"},
+    ])
+
+    fake_session = object()
+    pages = profile_page_composition(
+        fake_session,
+        "docId",
+        known_tables={"Work Orders": ["Client", "Instrument"]},
+        skip_export=True,
+    )
+    assert len(pages) == 2
+    assert pages[0]["name"] == "Home"
+    assert pages[0]["has_content"] is False
+    assert pages[1]["parent_page"] == "Home"
+
 
 def test_profile_coda_doc_smoke():
     out = StringIO()

@@ -49,19 +49,26 @@ from workbook.tools.vertical_registry import (  # noqa: E402
 )
 
 
-def _flag_fk_columns(columns: list[dict]) -> None:
+def _flag_fk_columns(columns: list[dict], table_name: str | None = None) -> None:
     """Flag columns that look like FK references with suggested_fk_target.
 
     Detects: columns ending in '_id', or columns named after entity keywords.
     Skips columns that already have suggested_fk_target set by profiler enrichment.
+    Skips formula-derived columns (*has_formula* true) — in Coda these are
+    typically preview columns backed by a proper relation_column FK already.
+    Skips columns whose target matches the table's own model name (self-reference).
     Mutates columns in-place.
     """
     for col in columns:
         if col.get("suggested_fk_target"):
             continue
+        if col.get("has_formula"):
+            continue
         name = col.get("suggested_field_name", "")
         if name.endswith("_id"):
             target = _to_pascal_case(name[:-3])
+            if table_name and _to_pascal_case(table_name).lower().startswith(target.lower()):
+                continue
             col["suggested_fk_target"] = target
             col["review_note"] = f"Auto-detected FK: {target}"
         elif name.lower() in _ENTITY_KEYWORDS:
@@ -520,7 +527,7 @@ def _build_cohort_contract(
 
     _inject_designed_models(tables)
     for table in tables:
-        _flag_fk_columns(table.get("columns", []))
+        _flag_fk_columns(table.get("columns", []), table.get("model_name"))
         _flag_computed_fields(table)
 
     tables, collector = _validate_tables_for_scaffold(
@@ -1014,7 +1021,7 @@ class Command(BaseCommand):
         tables = contract.get("tables", [])
         _inject_designed_models(tables)
         for table in tables:
-            _flag_fk_columns(table.get("columns", []))
+            _flag_fk_columns(table.get("columns", []), table.get("model_name"))
             _flag_computed_fields(table)
 
         continue_on_error = bool(options.get("continue_on_error", False))

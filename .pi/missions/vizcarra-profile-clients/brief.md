@@ -41,6 +41,15 @@ migration-workbench (profiler/connector changes) + vizcarra-guitars (target)
 6. Profile the entire doc structure for reference (`profile_coda_doc`).
 7. If `relation_columns` or `formula_classifications` are missing or empty for
    the Clients table, debug and fix the profiler.
+8. **Page composition profiling** (added 2026-07-11): Profile which tables
+   are embedded on which pages using `profile_coda_doc --pages`. The Coda
+   REST API's page export-to-markdown endpoint (already implemented as
+   `export_page_markdown()` in `coda_source.py`) returns the full page with
+   all embedded tables; a new markdown parser in
+   `profiler/tools/page_profiler.py` extracts this composition. The output
+   maps each page to its embedded tables and tries to match them to known
+   table names. This unlocks Track B codegen (mirror Coda's page-as-UI in
+   generated Django views).
 
 ### Out-of-scope
 - Import pipeline (that's 0.6.2, `vizcarra-generate-import`)
@@ -57,6 +66,9 @@ migration-workbench (profiler/connector changes) + vizcarra-guitars (target)
 - [ ] `scaffold_workbook_schema --bundle-config configs/live-config.json --table-profile build/_out/coda-profile.json --out build/_out/schema-contract.yaml`
       produces a valid contract with all 6 required headers mapped to fields
 - [ ] A `profile_coda_doc` artifact is produced listing all tables in the doc
+- [ ] `profile_coda_doc --pages` produces a `page_composition` array mapping
+      each page to its embedded tables (with section names, column headers,
+      and matched table names where applicable)
 - [ ] `make chassis-gate` passes in workbench
 - [ ] All artifacts are committed to the feat/vizcarra-profile-clients branch
 
