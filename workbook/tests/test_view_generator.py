@@ -24,14 +24,23 @@ import pytest
 from django.core.management import call_command
 
 from workbook.codegen.view_generator import (
+    AlertCard,
     ChecklistArchetype,
     ChecklistColumn,
+    DashboardArchetype,
+    DetailColumn,
+    DetailSection,
     LandingArchetype,
     SummaryCard,
     build_archetype_from_contract,
     render_checklist_template_html,
     render_checklist_url_pattern,
     render_checklist_view_py,
+    render_dashboard_template_html,
+    render_dashboard_url_pattern,
+    render_dashboard_urls_auto_py,
+    render_dashboard_view_py,
+    render_dashboard_views_auto_py,
     render_landing_template_html,
     render_landing_url_pattern,
     render_landing_urls_auto_py,
@@ -867,3 +876,430 @@ class TestGenerateViewsCommandLanding:
         # Title appears in template, not view source
         template_source = (out_dir / "generated" / "landing_field_worker.html").read_text(encoding="utf-8")
         assert "Field Ops" in template_source
+
+
+# -- dashboard archetype tests ----------------------------------------------
+
+
+class TestAlertCard:
+    """AlertCard dataclass defaults and initialization."""
+
+    def test_minimal(self) -> None:
+        card = AlertCard(label="Zero Stock", count_expression="42")
+        assert card.label == "Zero Stock"
+        assert card.count_expression == "42"
+        assert card.severity == "info"
+        assert card.link_url_name is None
+
+    def test_full(self) -> None:
+        card = AlertCard(
+            label="Low Stock",
+            count_expression="Item.objects.filter(qty__lt=5).count()",
+            severity="warning",
+            link_url_name="inventory",
+        )
+        assert card.severity == "warning"
+        assert card.link_url_name == "inventory"
+
+
+class TestDetailColumn:
+    """DetailColumn dataclass and template cell rendering."""
+
+    def test_default_format(self) -> None:
+        col = DetailColumn(field="crop", label="Crop")
+        assert col.format == "value"
+        assert "default" in col.as_template_cell()
+
+    def test_fk_display_format(self) -> None:
+        col = DetailColumn(field="crop", label="Crop", format="fk_display")
+        cell = col.as_template_cell()
+        assert "row.crop" in cell
+        assert "default" not in cell
+
+    def test_choice_display_format(self) -> None:
+        col = DetailColumn(field="status", label="Status", format="choice_display")
+        cell = col.as_template_cell()
+        assert "get_status_display" in cell
+
+
+class TestDetailSection:
+    """DetailSection dataclass defaults."""
+
+    def test_minimal(self) -> None:
+        sec = DetailSection(title="Items", queryset_expression="Items.objects.all()")
+        assert sec.title == "Items"
+        assert sec.columns == []
+        assert sec.limit is None
+        assert sec.empty_message == "No records found."
+
+    def test_with_columns(self) -> None:
+        cols = [DetailColumn(field="name", label="Name")]
+        sec = DetailSection(
+            title="Items",
+            queryset_expression="Items.objects.all()",
+            columns=cols,
+            limit=50,
+            empty_message="No items.",
+        )
+        assert len(sec.columns) == 1
+        assert sec.limit == 50
+        assert sec.empty_message == "No items."
+
+
+class TestDashboardArchetype:
+    """DashboardArchetype dataclass and defaults."""
+
+    def test_minimal(self) -> None:
+        arch = DashboardArchetype(name="inventory", title="Inventory")
+        assert arch.name == "inventory"
+        assert arch.alerts == []
+        assert arch.sections == []
+        assert arch.url_path == "inventory/"
+        assert arch.url_name == "dashboard_inventory"
+        assert arch.template_path == "generated/dashboard_inventory.html"
+
+    def test_custom_url(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory Dashboard",
+            url_path="stock/",
+            url_name="dashboard_stock",
+        )
+        assert arch.url_path == "stock/"
+        assert arch.url_name == "dashboard_stock"
+
+
+class TestRenderDashboardViewPy:
+    """render_dashboard_view_py produces valid Python with alert cards and sections."""
+
+    def _compile_view(self, arch: DashboardArchetype) -> None:
+        source = render_dashboard_view_py(arch)
+        # Wrap in a minimal import preamble to make it compilable.
+        preamble = (
+            "from django.contrib.auth.mixins import LoginRequiredMixin\n"
+            "from django.views.generic import TemplateView\n"
+        )
+        compile(preamble + source, "<test>", "exec")
+
+    def test_alerts_only(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            alerts=[
+                AlertCard(label="Zero", count_expression="Item.objects.filter(qty=0).count()"),
+            ],
+        )
+        self._compile_view(arch)
+        source = render_dashboard_view_py(arch)
+        assert "class InventoryDashboardView" in source
+        assert '_alert_0 = Item.objects.filter(qty=0).count()' in source
+        assert 'context["alerts"]' in source
+
+    def test_alerts_with_urls(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            alerts=[
+                AlertCard(label="Zero", count_expression="42", link_url_name="items"),
+            ],
+        )
+        self._compile_view(arch)
+        source = render_dashboard_view_py(arch)
+        assert "from django.urls import reverse" in source
+        assert 'reverse("items")' in source
+
+    def test_alerts_with_sections(self) -> None:
+        arch = DashboardArchetype(
+            name="season",
+            title="Season",
+            alerts=[
+                AlertCard(label="Planned", count_expression="Plan.objects.count()"),
+            ],
+            sections=[
+                DetailSection(
+                    title="Events",
+                    queryset_expression="Event.objects.all()",
+                    columns=[
+                        DetailColumn(field="name", label="Name"),
+                    ],
+                ),
+            ],
+        )
+        self._compile_view(arch)
+        source = render_dashboard_view_py(arch)
+        assert 'context["section_0_title"]' in source
+        assert 'context["section_0_rows"]' in source
+        assert 'context["section_0_empty_message"]' in source
+        assert 'Event.objects.all()' in source
+
+    def test_multiple_sections(self) -> None:
+        arch = DashboardArchetype(
+            name="overview",
+            title="Overview",
+            alerts=[
+                AlertCard(label="A", count_expression="1"),
+            ],
+            sections=[
+                DetailSection(title="S1", queryset_expression="A.objects.all()"),
+                DetailSection(title="S2", queryset_expression="B.objects.all()"),
+            ],
+        )
+        self._compile_view(arch)
+        source = render_dashboard_view_py(arch)
+        assert 'section_0_title' in source
+        assert 'section_1_title' in source
+        assert 'section_1_rows' in source
+
+    def test_no_alerts(self) -> None:
+        arch = DashboardArchetype(
+            name="empty",
+            title="Empty Dashboard",
+            alerts=[],
+        )
+        self._compile_view(arch)
+        source = render_dashboard_view_py(arch)
+        assert 'context["alerts"] = []' in source
+
+
+class TestRenderDashboardTemplateHtml:
+    """render_dashboard_template_html produces a valid Django template."""
+
+    def test_template_structure(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory Dashboard",
+            alerts=[
+                AlertCard(label="Zero", count_expression="0", severity="warning"),
+            ],
+        )
+        html = render_dashboard_template_html(arch)
+        assert "Inventory Dashboard" in html
+        assert "{% extends" in html
+        assert "{% block content" in html
+        assert "{% endblock" in html
+        assert "summary-cards" in html
+        assert "card-{{ alert.severity }}" in html
+        assert "card-number" in html
+        assert "card-label" in html
+
+    def test_section_table_rendered(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            alerts=[],
+            sections=[
+                DetailSection(
+                    title="Items",
+                    queryset_expression="Item.objects.all()",
+                    columns=[
+                        DetailColumn(field="name", label="Name"),
+                        DetailColumn(field="crop", label="Crop", format="fk_display"),
+                    ],
+                ),
+            ],
+        )
+        html = render_dashboard_template_html(arch)
+        assert 'section_0_title' in html
+        assert 'section_0_rows' in html
+        assert 'section_0_empty_message' in html
+        assert '<th>Name</th>' in html
+        assert '<th>Crop</th>' in html
+        assert '{{ row.name|default:"—" }}' in html
+        assert '{{ row.crop }}' in html
+        assert 'data-table' in html
+
+    def test_section_limit_shown(self) -> None:
+        arch = DashboardArchetype(
+            name="test",
+            title="Test",
+            alerts=[],
+            sections=[
+                DetailSection(
+                    title="Items",
+                    queryset_expression="Item.objects.all()",
+                    limit=10,
+                ),
+            ],
+        )
+        html = render_dashboard_template_html(arch)
+        # The limit appears in the view source ([:10]), not the template.
+        assert 'section_0_rows' in html
+
+    def test_back_link(self) -> None:
+        arch = DashboardArchetype(
+            name="test",
+            title="Test",
+            back_url_name="home",
+            back_url_label="Back to Home",
+        )
+        html = render_dashboard_template_html(arch)
+        assert 'Back to Home' in html
+        assert 'reverse' not in html  # URL resolution happens in view, not template
+
+    def test_empty_alerts(self) -> None:
+        arch = DashboardArchetype(
+            name="test",
+            title="Test",
+            alerts=[],
+        )
+        html = render_dashboard_template_html(arch)
+        assert "No alerts configured." in html
+
+    def test_multiple_sections(self) -> None:
+        arch = DashboardArchetype(
+            name="multi",
+            title="Multi",
+            alerts=[],
+            sections=[
+                DetailSection(title="S1", queryset_expression="A.objects.all()"),
+                DetailSection(title="S2", queryset_expression="B.objects.all()"),
+            ],
+        )
+        html = render_dashboard_template_html(arch)
+        assert 'section_0_title' in html
+        assert 'section_0_rows' in html
+        assert 'section_1_title' in html
+        assert 'section_1_rows' in html
+
+
+class TestRenderDashboardUrlPattern:
+    """render_dashboard_url_pattern produces Django path() lines."""
+
+    def test_url_pattern(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            url_path="inventory/",
+            url_name="dashboard_inventory",
+        )
+        lines = render_dashboard_url_pattern(arch)
+        assert len(lines) == 1
+        assert 'path("inventory/"' in lines[0]
+        assert 'name="dashboard_inventory"' in lines[0]
+        assert 'InventoryDashboardView' in lines[0]
+
+    def test_no_url_empty(self) -> None:
+        arch = DashboardArchetype(name="inventory", title="Inventory")
+        # No explicit url_path means defaults are set via __post_init__.
+        lines = render_dashboard_url_pattern(arch)
+        assert len(lines) == 1
+        assert 'inventory/' in lines[0]
+
+
+class TestRenderDashboardViewsAuto:
+    """render_dashboard_views_auto_py produces a combined module."""
+
+    def test_auto_imports(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            alerts=[
+                AlertCard(label="Zero", count_expression="InventoryLedger.objects.filter(qty=0).count()"),
+                AlertCard(label="Low", count_expression="LowStock.objects.count()"),
+            ],
+        )
+        source = render_dashboard_views_auto_py([arch])
+        compile(source, "<test>", "exec")
+        assert "from django.contrib.auth.mixins import LoginRequiredMixin" in source
+        assert "from django.views.generic import TemplateView" in source
+        assert "InventoryLedger" in source
+        assert "LowStock" in source
+
+    def test_multiple_archetypes(self) -> None:
+        a1 = DashboardArchetype(
+            name="inv", title="Inv",
+            alerts=[AlertCard(label="Z", count_expression="X.objects.count()")],
+        )
+        a2 = DashboardArchetype(
+            name="sea", title="Sea",
+            alerts=[AlertCard(label="P", count_expression="Y.objects.count()")],
+        )
+        source = render_dashboard_views_auto_py([a1, a2])
+        compile(source, "<test>", "exec")
+        assert "class InvDashboardView" in source
+        assert "class SeaDashboardView" in source
+
+
+class TestRenderDashboardUrlsAuto:
+    """render_dashboard_urls_auto_py produces a combined URL module."""
+
+    def test_url_patterns(self) -> None:
+        arch = DashboardArchetype(
+            name="inventory",
+            title="Inventory",
+            url_path="inv/",
+            url_name="dashboard_inv",
+        )
+        source = render_dashboard_urls_auto_py([arch])
+        compile(source, "<test>", "exec")
+        assert "path(\"inv/\"" in source
+        assert "InventoryDashboardView" in source
+
+    def test_multiple(self) -> None:
+        a1 = DashboardArchetype(
+            name="inv", title="Inv",
+            alerts=[AlertCard(label="Z", count_expression="1")],
+        )
+        a2 = DashboardArchetype(
+            name="season", title="Season",
+            alerts=[AlertCard(label="P", count_expression="1")],
+        )
+        source = render_dashboard_urls_auto_py([a1, a2])
+        compile(source, "<test>", "exec")
+        assert "InvDashboardView" in source
+        assert "SeasonDashboardView" in source
+
+
+class TestGenerateViewsCommandDashboard:
+    """The ``generate_views`` command handles ``--archetype-dashboard``."""
+
+    def test_dashboard_from_config(self, tmp_path: Path) -> None:
+        """``--archetype-dashboard <config.yaml>`` writes views, urls, and template."""
+        import yaml  # type: ignore[import-untyped]
+
+        config = {
+            "dashboards": [
+                {
+                    "name": "inventory",
+                    "title": "Inventory Dashboard",
+                    "alerts": [
+                        {
+                            "label": "Zero Stock",
+                            "count_expression": "Item.objects.filter(qty=0).count()",
+                            "severity": "warning",
+                        },
+                    ],
+                    "sections": [
+                        {
+                            "title": "Items",
+                            "queryset_expression": "Item.objects.all()",
+                            "columns": [
+                                {"field": "name", "label": "Name"},
+                            ],
+                            "limit": 50,
+                        },
+                    ],
+                },
+            ],
+        }
+        config_path = tmp_path / "dashboard-config.yaml"
+        config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+        contract = {"version": "1.3", "tables": []}
+        contract_path = tmp_path / "contract.yaml"
+        contract_path.write_text(yaml.safe_dump(contract), encoding="utf-8")
+
+        out_dir = tmp_path / "out_dashboard"
+        call_command(
+            "generate_views",
+            contract=str(contract_path),
+            out_dir=str(out_dir),
+            archetype_dashboard=str(config_path),
+            force=True,
+        )
+        assert (out_dir / "views_auto.py").exists()
+        assert (out_dir / "urls_auto.py").exists()
+        views_source = (out_dir / "views_auto.py").read_text(encoding="utf-8")
+        assert "class InventoryDashboardView" in views_source
+        template_source = (out_dir / "generated" / "dashboard_inventory.html").read_text(encoding="utf-8")
+        assert "Inventory Dashboard" in template_source

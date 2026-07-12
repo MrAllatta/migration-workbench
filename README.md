@@ -286,6 +286,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.7.2 (local)
+
+- **Dashboard archetype:** Added ``DashboardArchetype`` to the view generator
+  (``AlertCard``, ``DetailSection``, ``DetailColumn``). Generates a
+  ``TemplateView`` + template with alert cards (label, value, severity) and
+  detail data tables. ``--archetype-dashboard`` flag reads a YAML config.
+  Proved on real farm ``InventoryLedger`` records (7 passing tests).
+  (feat/wb-dashboard-archetype, 27 workbench unit tests)
+
 ### 0.7.1 (local)
 
 - **Vizcarra domain app deployment:** Profiled all three FK target tables

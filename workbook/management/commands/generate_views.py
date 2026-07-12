@@ -44,12 +44,19 @@ from workbook.codegen.contract import (
     strict_validate_contract,
 )
 from workbook.codegen.view_generator import (
+    AlertCard,
     ChecklistArchetype,
     ChecklistColumn,
+    DashboardArchetype,
+    DetailColumn,
+    DetailSection,
     LandingArchetype,
     SummaryCard,
     build_archetype_from_contract,
     render_checklist_template_html,
+    render_dashboard_template_html,
+    render_dashboard_urls_auto_py,
+    render_dashboard_views_auto_py,
     render_landing_template_html,
     render_landing_urls_auto_py,
     render_landing_views_auto_py,
@@ -313,6 +320,99 @@ def _load_landing_config(path: Path) -> list[LandingArchetype]:
     return archetypes
 
 
+def _load_dashboard_config(path: Path) -> list[DashboardArchetype]:
+    """Load dashboard archetypes from a YAML config file.
+
+    The config file should have a top-level ``dashboards`` list:
+
+    .. code-block:: yaml
+
+        dashboards:
+          - name: inventory
+            title: Inventory Dashboard
+            alerts:
+              - label: Zero Stock
+                count_expression: InventoryLedger.objects.filter(quantity_on_hand=0).count()
+                severity: warning
+                link_url_name: farm_ui_inventory
+              - label: Total Items
+                count_expression: InventoryLedger.objects.count()
+                severity: info
+            sections:
+              - title: Inventory Items
+                queryset_expression: InventoryLedger.objects.select_related("crop").all()
+                limit: 50
+                empty_message: No inventory data.
+                columns:
+                  - field: crop
+                    label: Crop
+                    format: fk_display
+                  - field: quantity_on_hand
+                    label: On Hand
+                    format: value
+    """
+    try:
+        import yaml  # type: ignore[import-untyped]
+    except ImportError:
+        raise CommandError("PyYAML is required for --archetype-dashboard")
+
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or "dashboards" not in raw:
+        raise CommandError(
+            "Dashboard config must have a top-level 'dashboards' list."
+        )
+
+    archetypes: list[DashboardArchetype] = []
+    for entry in raw["dashboards"]:
+        if not isinstance(entry, dict):
+            continue
+
+        alerts: list[AlertCard] = []
+        for alert in entry.get("alerts") or []:
+            alerts.append(
+                AlertCard(
+                    label=str(alert["label"]),
+                    count_expression=str(alert["count_expression"]),
+                    severity=str(alert.get("severity") or "info"),
+                    link_url_name=str(alert.get("link_url_name") or "") or None,
+                )
+            )
+
+        sections: list[DetailSection] = []
+        for sec in entry.get("sections") or []:
+            columns: list[DetailColumn] = []
+            for col in sec.get("columns") or []:
+                columns.append(
+                    DetailColumn(
+                        field=str(col["field"]),
+                        label=str(col["label"]),
+                        format=str(col.get("format") or "value"),
+                    )
+                )
+            sections.append(
+                DetailSection(
+                    title=str(sec["title"]),
+                    queryset_expression=str(sec["queryset_expression"]),
+                    columns=columns,
+                    limit=sec.get("limit"),
+                    empty_message=str(sec.get("empty_message") or "No records found."),
+                )
+            )
+
+        archetypes.append(
+            DashboardArchetype(
+                name=str(entry["name"]),
+                title=str(entry.get("title") or entry["name"]),
+                alerts=alerts,
+                sections=sections,
+                back_url_name=str(entry.get("back_url_name") or "") or None,
+                app_label=str(entry.get("app_label") or "core"),
+                base_template=str(entry.get("base_template") or "base.html"),
+            )
+        )
+    return archetypes
+
+
 class Command(BaseCommand):
     help = (
         "Generate Django views + templates + URL patterns from schema "
@@ -358,6 +458,14 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--archetype-dashboard",
+            default=None,
+            help=(
+                "Path to a dashboard-config YAML with a top-level 'dashboards' list. "
+                "Generates TemplateView + template with alert cards and detail tables."
+            ),
+        )
+        parser.add_argument(
             "--force",
             action="store_true",
             help="Overwrite existing output files without prompting",
@@ -386,11 +494,12 @@ class Command(BaseCommand):
 
         archetype_checklist = options.get("archetype_checklist") or options.get("archetype")
         archetype_landing = options.get("archetype_landing")
+        archetype_dashboard = options.get("archetype_dashboard")
 
-        if not archetype_checklist and not archetype_landing:
+        if not archetype_checklist and not archetype_landing and not archetype_dashboard:
             raise CommandError(
                 "specify at least one archetype flag: "
-                "--archetype-checklist, --archetype, or --archetype-landing"
+                "--archetype-checklist, --archetype, --archetype-landing, or --archetype-dashboard"
             )
 
         out_dir = Path(options["out_dir"]).resolve()
@@ -404,6 +513,10 @@ class Command(BaseCommand):
         if archetype_landing:
             self._handle_landing(
                 out_dir, archetype_landing, force, app_label_default
+            )
+        if archetype_dashboard:
+            self._handle_dashboard(
+                out_dir, archetype_dashboard, force, app_label_default
             )
 
     def _handle_checklist(
@@ -530,5 +643,66 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"generated {len(archetypes)} landing archetype(s)"
+            )
+        )
+
+    def _handle_dashboard(
+        self,
+        out_dir: Path,
+        config_path_str: str,
+        force: bool,
+        app_label: str = "core",
+    ) -> None:
+        """Handle --archetype-dashboard generation."""
+        config_path = Path(config_path_str).resolve()
+        if not config_path.is_file():
+            raise CommandError(f"dashboard config not found: {config_path}")
+        archetypes = _load_dashboard_config(config_path)
+        if not archetypes:
+            raise CommandError(
+                "No dashboard archetypes defined in config (dashboards list is empty)."
+            )
+
+        # Write views_auto.py (combined module for dashboard views).
+        views_source = render_dashboard_views_auto_py(
+            archetypes, app_label=app_label,
+        )
+        views_path = out_dir / "views_auto.py"
+        views_written = _write_file(views_path, views_source, force=force)
+        if views_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {views_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {views_path} (exists, use --force)")
+            )
+
+        # Write urls_auto.py.
+        urls_source = render_dashboard_urls_auto_py(archetypes)
+        urls_path = out_dir / "urls_auto.py"
+        urls_written = _write_file(urls_path, urls_source, force=force)
+        if urls_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {urls_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {urls_path} (exists, use --force)")
+            )
+
+        # Write one template per archetype.
+        for arch in archetypes:
+            template_path = _template_output_path(out_dir, arch.template_path)
+            template_source = render_dashboard_template_html(arch)
+            template_written = _write_file(template_path, template_source, force=force)
+            if template_written:
+                self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"skipped {template_path} (exists, use --force)"
+                    )
+                )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"generated {len(archetypes)} dashboard archetype(s)"
             )
         )

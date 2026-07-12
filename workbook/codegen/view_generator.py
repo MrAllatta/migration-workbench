@@ -922,6 +922,384 @@ def render_landing_urls_auto_py(
     )
 
 
+# -- dashboard archetype ------------------------------------------------------
+
+
+@dataclass
+class AlertCard:
+    """One alert card on a dashboard view.
+
+    Attributes:
+        label: Display text (e.g. "Zero Stock").
+        count_expression: Python expression that evaluates to the card's
+            count at render time (typically a Django ORM count call).
+        severity: CSS severity class (``info``, ``success``, ``warning``,
+            ``danger``).
+        link_url_name: Optional URL name the card links to.
+    """
+
+    label: str
+    count_expression: str
+    severity: str = "info"
+    link_url_name: str | None = None
+
+
+@dataclass
+class DetailColumn:
+    """One column in a dashboard detail section table.
+
+    Attributes:
+        field: Model field name (e.g. ``"crop"``).
+        label: Column header (e.g. "Crop").
+        format: Cell format (``"value"``, ``"fk_display"``,
+            ``"choice_display"``).
+    """
+
+    field: str
+    label: str
+    format: str = "value"
+
+    def as_template_cell(self) -> str:
+        """Render the Django template expression for one cell."""
+        if self.format == "fk_display":
+            return f"{{{{ row.{self.field} }}}}"
+        if self.format == "choice_display":
+            return f"{{{{ row.get_{self.field}_display }}}}"
+        return f"{{{{ row.{self.field}|default:\"—\" }}}}"
+
+
+@dataclass
+class DetailSection:
+    """One detail section (title + data table) in a dashboard.
+
+    Attributes:
+        title: Section heading (e.g. "Inventory Items").
+        queryset_expression: Python expression that evaluates to a
+            QuerySet or list of model instances at render time.
+        columns: Columns to display in the section table.
+        limit: Maximum rows to display (default ``None`` = no limit).
+        empty_message: Text shown when the queryset is empty.
+    """
+
+    title: str
+    queryset_expression: str
+    columns: list[DetailColumn] = field(default_factory=list)
+    limit: int | None = None
+    empty_message: str = "No records found."
+
+
+@dataclass
+class DashboardArchetype:
+    """Configuration for a generated dashboard ``TemplateView``.
+
+    The dashboard archetype produces a ``TemplateView`` whose
+    ``get_context_data()`` evaluates alert count expressions and section
+    queryset expressions, then passes them to a generated template with
+    an alert card grid and one or more detail data tables.
+
+    Attributes:
+        name: Internal identifier (snake_case, used for URL defaults).
+        title: Page heading (e.g. "Inventory Dashboard").
+        alerts: Alert cards to render at the top of the dashboard.
+        sections: Detail sections with tables below the alerts.
+        template_path: Output template path relative to templates root.
+            Default: ``"generated/dashboard_{name}.html"``.
+        url_path: URL pattern path. Default: ``"{name}/"``.
+        url_name: URL pattern name. Default: ``"dashboard_{name}"``.
+        back_url_name: Optional URL name for a back link.
+        back_url_label: Label for the back link (default "Back").
+        app_label: Django app label for model imports (default ``"core"``).
+        base_template: The Django template the generated template extends
+            (default ``"base.html"``).  Product repos should set this to
+            their project's base template (e.g. ``"farm_ui/base.html"``).
+    """
+
+    name: str
+    title: str
+    alerts: list[AlertCard] = field(default_factory=list)
+    sections: list[DetailSection] = field(default_factory=list)
+    template_path: str = ""
+    url_path: str = ""
+    url_name: str = ""
+    back_url_name: str | None = None
+    back_url_label: str = "Back"
+    app_label: str = "core"
+    base_template: str = "base.html"
+
+    def __post_init__(self) -> None:
+        if not self.url_name and self.name:
+            self.url_name = f"dashboard_{self.name}"
+        if not self.url_path and self.name:
+            self.url_path = f"{self.name.replace('_', '-')}/"
+        if not self.template_path and self.url_name:
+            self.template_path = f"generated/{self.url_name}.html"
+
+
+# -- dashboard view source --------------------------------------------------
+
+
+def render_dashboard_view_py(archetype: DashboardArchetype) -> str:
+    """Render the Python source for a dashboard ``TemplateView`` subclass.
+
+    The generated view has ``get_context_data()`` that:
+    1. Evaluates each :attr:`DashboardArchetype.alerts` count expression
+    2. Resolves ``link_url_name`` to concrete URLs via ``reverse()``
+    3. Builds an ``alerts`` context list of dicts
+    4. Evaluates each :attr:`DashboardArchetype.sections` queryset
+       expression, applies ``limit``, and builds context variables
+       ``section_{idx}_title``, ``section_{idx}_rows``, etc.
+    """
+    class_name = f"{_to_pascal_case(archetype.name)}DashboardView"
+
+    # Check if any alert has a URL (needs reverse import).
+    has_urls = any(alert.link_url_name for alert in archetype.alerts)
+
+    lines: list[str] = [
+        "",
+        "",
+        f"class {class_name}(LoginRequiredMixin, TemplateView):",
+        f'    template_name = "{archetype.template_path}"',
+        "",
+        "    def get_context_data(self, **kwargs):",
+        "        context = super().get_context_data(**kwargs)",
+    ]
+    if has_urls:
+        lines.append("        from django.urls import reverse")
+
+    # --- Evaluate alert expressions.
+    alert_vars: list[str] = []
+    alert_dicts: list[str] = []
+    for idx, alert in enumerate(archetype.alerts):
+        var_name = f"_alert_{idx}"
+        alert_vars.append(f"        {var_name} = {alert.count_expression}")
+        css = f'"{alert.severity}"'
+        if alert.link_url_name:
+            alert_dicts.append(
+                f'            {{"label": "{alert.label}", "value": {var_name}'
+                f', "severity": {css}'
+                f', "url": reverse("{alert.link_url_name}")}}, '
+            )
+        else:
+            alert_dicts.append(
+                f'            {{"label": "{alert.label}", "value": {var_name}'
+                f', "severity": {css}}}, '
+            )
+
+    if alert_vars:
+        lines.append("")
+        lines.extend(alert_vars)
+        lines.append("")
+        lines.append('        context["alerts"] = [')
+        lines.extend(alert_dicts)
+        lines.append("        ]")
+    else:
+        lines.append('        context["alerts"] = []')
+
+    # --- Evaluate section querysets.
+    for idx, section in enumerate(archetype.sections):
+        lines.append("")
+        lines.append(f'        context["section_{idx}_title"] = {section.title!r}')
+        limit_expr = f"[:{section.limit}]" if section.limit else ""
+        lines.append(
+            f'        context["section_{idx}_rows"] = '
+            f'{section.queryset_expression}{limit_expr}'
+        )
+        lines.append(
+            f'        context["section_{idx}_empty_message"] = '
+            f'{section.empty_message!r}'
+        )
+        lines.append(f'        context["section_{idx}_colspan"] = {len(section.columns)}')
+
+    lines.append("        return context")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# -- dashboard template -----------------------------------------------------
+
+
+def render_dashboard_template_html(archetype: DashboardArchetype) -> str:
+    """Render the Django template HTML for the dashboard archetype.
+
+    The template:
+    - Extends ``base.html`` (project default)
+    - Renders an ``<h1>`` with the dashboard title
+    - Renders a grid of alert cards with severity CSS classes
+    - For each detail section, renders a heading + data table with
+      the configured columns
+    - Shows a back link at the bottom
+
+    Each section's table is hard-coded at generation time with the
+    column field references.  To change columns, re-generate.
+    """
+    title = archetype.title
+
+    # --- Build section table blocks.
+    section_blocks: list[str] = []
+    for idx, section in enumerate(archetype.sections):
+        cols = len(section.columns)
+        # Column headers.
+        headers = "\n".join(
+            f'        <th>{col.label}</th>'
+            for col in section.columns
+        )
+        # Column body cells.
+        body_cells = []
+        for col in section.columns:
+            if col.format == "fk_display":
+                body_cells.append(f'      <td>{{{{ row.{col.field} }}}}</td>')
+            elif col.format == "choice_display":
+                body_cells.append(f'      <td>{{{{ row.get_{col.field}_display }}}}</td>')
+            else:
+                body_cells.append(f'      <td>{{{{ row.{col.field}|default:"—" }}}}</td>')
+        body = "\n".join(body_cells)
+
+        block_parts = [
+            "",
+            f"<h2>{{{{ section_{idx}_title }}}}</h2>",
+            '<table class="data-table">',
+            "  <thead>",
+            "    <tr>",
+            headers,
+            "    </tr>",
+            "  </thead>",
+            "  <tbody>",
+            f"    {{% for row in section_{idx}_rows %}}",
+            "    <tr>",
+            body,
+            "    </tr>",
+            f"    {{% empty %}}",
+            f'    <tr><td colspan="{cols}">{{{{ section_{idx}_empty_message }}}}</td></tr>',
+            f"    {{% endfor %}}",
+            "  </tbody>",
+            "</table>",
+        ]
+        section_blocks.append("\n".join(block_parts))
+
+    sections_html = "\n".join(section_blocks)
+
+    base_template = archetype.base_template
+
+    back_link = ""
+    if archetype.back_url_name:
+        back_link = (
+            '\n<div style="margin-top: 1rem;">'
+            f'<a href="{{% url {archetype.back_url_name!r} %}}" class="btn">'
+            f"{archetype.back_url_label}</a></div>"
+        )
+
+    template = f"""{{% extends "{base_template}" %}}
+
+{{% block content %}}
+<h1>{title}</h1>
+
+<div class="summary-cards">
+  {{% for alert in alerts %}}
+  {{% if alert.url %}}
+  <a href="{{{{ alert.url }}}}" class="card-link">
+  {{% endif %}}
+    <div class="card card-{{{{ alert.severity }}}}">
+      <div class="card-number">{{{{ alert.value }}}}</div>
+      <div class="card-label">{{{{ alert.label }}}}</div>
+    </div>
+  {{% if alert.url %}}
+  </a>
+  {{% endif %}}
+  {{% empty %}}
+  <p>No alerts configured.</p>
+  {{% endfor %}}
+</div>
+{sections_html}
+{back_link}
+{{% endblock %}}
+"""
+    return template
+
+
+# -- dashboard URL patterns -------------------------------------------------
+
+
+def render_dashboard_url_pattern(archetype: DashboardArchetype) -> list[str]:
+    """Render URL pattern lines for a dashboard view.
+
+    Returns:
+        A list with one ``path()`` line ready for ``urlpatterns = [...]``.
+    """
+    if not archetype.url_path or not archetype.url_name:
+        return []
+    class_name = f"{_to_pascal_case(archetype.name)}DashboardView"
+    return [
+        f'    path("{archetype.url_path}", {class_name}.as_view(), name="{archetype.url_name}"),',
+    ]
+
+
+# -- dashboard combined modules ---------------------------------------------
+
+
+def render_dashboard_views_auto_py(
+    archetypes: Sequence[DashboardArchetype],
+    *,
+    extra_imports: Sequence[str] = (),
+    app_label: str = "core",
+) -> str:
+    """Render a complete ``views_auto.py`` with multiple dashboard archetypes.
+
+    Includes ``TemplateView``/``LoginRequiredMixin`` imports, auto-detected
+    model imports from count and queryset expressions, and all generated
+    view classes.
+    """
+    # Collect all model names from alert and section expressions.
+    all_model_names: set[str] = set()
+    for arch in archetypes:
+        for alert in arch.alerts:
+            all_model_names.update(_extract_model_names(alert.count_expression))
+        for section in arch.sections:
+            all_model_names.update(_extract_model_names(section.queryset_expression))
+
+    imports: list[str] = [
+        "from django.contrib.auth.mixins import LoginRequiredMixin",
+        "from django.views.generic import TemplateView",
+        "",
+    ]
+    if all_model_names:
+        sorted_names = sorted(all_model_names)
+        imports.append(f"from {app_label}.models import {', '.join(sorted_names)}")
+        imports.append("")
+    imports.extend(extra_imports)
+    imports.append("")
+
+    body_parts: list[str] = []
+    for arch in archetypes:
+        body_parts.append(render_dashboard_view_py(arch))
+    return "\n".join(imports) + "\n".join(body_parts)
+
+
+def render_dashboard_urls_auto_py(
+    archetypes: Sequence[DashboardArchetype],
+) -> str:
+    """Render a complete ``urls_auto.py`` with multiple dashboard archetypes."""
+    view_names: list[str] = []
+    for arch in archetypes:
+        view_names.append(f"{_to_pascal_case(arch.name)}DashboardView")
+    imports = [
+        "from django.urls import include, path",
+        "",
+        f"from .views_auto import {', '.join(view_names)}",
+        "",
+        "",
+    ]
+    patterns: list[str] = []
+    for arch in archetypes:
+        patterns.extend(render_dashboard_url_pattern(arch))
+    body = "\n".join(patterns)
+    return (
+        "\n".join(imports)
+        + "urlpatterns = [\n"
+        + body
+        + "\n]\n"
+    )
+
+
 def _extract_model_names(expression: str) -> list[str]:
     """Extract capitalized identifiers from *expression* that look like
     Django model class names (not Python builtins, keywords, or common
