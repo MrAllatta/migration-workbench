@@ -286,6 +286,17 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.7.1 (local)
+
+- **Vizcarra domain app deployment:** Profiled all three FK target tables
+  (Work Orders, Instruments, Archived Work Orders) from the Coda doc.
+  Generated certified schema contracts, Django models (4 models, 345 lines),
+  admin registration (all 4 models), and import command (1723 lines).
+  Migrations run cleanly. 25 tests pass in `vizcarra-guitars`, including
+  model CRUD, FK assignment, CSV import pipeline, and generated views.
+- **Landing view deployed:** Generated ``AdminLandingView`` at
+  ``/domain/admin/`` showing summary cards with counts from each table.
+
 ### 0.6.3 (local)
 
 - **Landing archetype (role-based summary cards):** ``LandingArchetype``
