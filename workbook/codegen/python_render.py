@@ -262,7 +262,14 @@ def render_computed_property(
     else:
         lines.append(f"{pad}def {safe_name}(self):")
     if expression:
-        for line in expression.strip().split("\n"):
+        expr_lines = expression.strip().split("\n")
+        has_statement = any(
+            line.strip() and not line.strip().startswith("#")
+            for line in expr_lines
+        )
+        if not has_statement:
+            lines.append(f"{pad * 2}return None  # TODO: {name}")
+        for line in expr_lines:
             lines.append(f"{pad * 2}{line}")
     else:
         lines.append(f"{pad * 2}...")

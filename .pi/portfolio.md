@@ -10,13 +10,13 @@
 
 | Mission | Track | Earns | Test target | What it proves |
 |---------|-------|-------|-------------|----------------|
-| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest **[READY 2026-07-11: 1671 passed, farm test green. Awaiting squash-merge]** |
+| `vizcarra-generate-import` | A | 0.6.2 | vizcarra-guitars | Codegen pipeline (models/admin/import) produces working Django code from Vizcarra schema contract **[BOOTED 2026-07-11]** |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest (PROVEN, ready for squash-merge)
+| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest (RELEASED)
 | `vizcarra-generate-import` | A | 0.6.2 | vizcarra-guitars |
 | `wb-landing-archetype` | B | 0.6.3 | farm |
 | `vizcarra-views-deploy` | A | 0.7.1 | vizcarra-guitars |
