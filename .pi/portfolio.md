@@ -9,9 +9,7 @@
 
 ## Active
 
-`vizcarra-generated-ui` — Track A, 0.8.1. Consume the `wb generate views`
-pipeline on vizcarra-guitars: template package, regenerate landing view,
-add checklist/dashboard archetype views, real-data tests.
+*None. The next mission is chosen at boot from the priority-ordered Next table.*
 
 ## Next
 
@@ -40,7 +38,7 @@ Track B sources — patterns proven in `farm_ui`, waiting to become codegen:
 ## Cross-Cutting Notes
 
 - MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships checklist, landing, dashboard archetypes plus the full `wb generate views` pipeline (0.6.1/0.6.3/0.7.2/0.7.3). `vizcarra-generated-ui` (0.8.1) consumes the pipeline on Vizcarra; Track B then applies the same pipeline back to farm (0.8.5–0.8.7) to retire the farm spreadsheet.
-- **Track A sequence to 1.0.0:** After `vizcarra-views-deploy` (0.7.1), four Coda-side validation missions harden Vizcarra for cutover:
+- **Track A sequence to 1.0.0:** After `vizcarra-views-deploy` (0.7.1), three Coda-side validation missions harden Vizcarra for cutover:
   1. `vizcarra-people-type` (0.8.2) — map Coda People columns to Django users.
   2. `vizcarra-formula-parity` (0.8.3) — validate business-critical Coda formulas against generated computed fields.
   3. `vizcarra-import-pipeline` (0.8.4) — repeatable, reconciled Coda→Django import.
@@ -61,6 +59,7 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 
 ## Done
 
+- `vizcarra-generated-ui` — Vizcarra-guitars consumes the `wb generate views` pipeline: template package with Vizcarra brand base template, regenerated landing view, dashboard archetype for Instruments (alert cards + detail table). 5 new real-data tests in vizcarra-guitars (30 total pass). Proves the view codegen pipeline generalises beyond farm. (0.8.1, local)
 - `wb-view-codegen-pipeline` — `wb generate views` CLI command with `--template-package` support, `base_template` on all archetypes, `{% block %}` override points in generated templates, `generate-views` wired into `generate-all`. 23 workbench unit tests + 2 farm real-data tests pass. (0.7.3, local)
 - `wb-dashboard-archetype` — Dashboard archetype with alert cards and detail tables, generated from YAML config. 27 workbench unit tests + 7 farm real-data tests pass. (0.7.2, local)
 - `vizcarra-views-deploy` — Profiled Work Orders/Instruments/ArchivedWorkOrders FK target tables, generated certified contracts + models/admin/import, deployed landing view. 25 tests pass in vizcarra-guitars. (0.7.1, local)
