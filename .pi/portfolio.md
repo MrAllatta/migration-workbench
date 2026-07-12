@@ -8,7 +8,11 @@
 
 ## Active
 
-*None. The next mission is chosen at boot from the priority-ordered Next table.*
+| Mission | Track | Earns | Test target |
+|---------|-------|-------|-------------|
+| `wb-dashboard-archetype` | B | 0.7.2 | farm |
+
+*Booted 2026-07-12. Dashboard archetype with alert counts, extracted from farm's hand-written dashboards.*
 
 ## Next
 
