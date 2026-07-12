@@ -50,3 +50,9 @@ Booted.
 - Workbench: feat/vizcarra-generated-ui (1 uncommitted code change — version bump + changelog)
 - Vizcarra-guitars: feat/vizcarra-generated-ui (1 commit, 14 files, 280 lines added)
 - Vizcarra-guitars: 30 domain tests pass
+
+### 2026-07-12 — Released
+- Squash-merged to master on both repos.
+- Tagged v0.8.1 on workbench.
+- Feature branch deleted.
+- Portfolio marked Done.
