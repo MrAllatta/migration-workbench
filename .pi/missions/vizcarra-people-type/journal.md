@@ -14,3 +14,8 @@ Planned.
 - Brief written: workbench profiler enrichment for People columns, user mapping
   in vizcarra-guitars, real-data import tests.
 - Precondition: complete after `vizcarra-generated-ui` (0.8.1).
+
+### 2026-07-12 — Booted
+- `master` chassis-gate: 1743 passed, exit code 0.
+- Worktree `../migration-workbench-vizcarra-people-type` created on branch `feat/vizcarra-people-type`.
+- Portfolio marked Active: `vizcarra-people-type` (Track A, 0.8.2).

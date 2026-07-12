@@ -9,7 +9,9 @@
 
 ## Active
 
-*None. The next mission is chosen at boot from the priority-ordered Next table.*
+| Mission | Track | Earns | Test target |
+|---------|-------|-------|-------------|
+| `vizcarra-people-type` | A | 0.8.2 | vizcarra-guitars |
 
 ## Next
 
