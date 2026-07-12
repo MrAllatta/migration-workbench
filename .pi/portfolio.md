@@ -10,13 +10,13 @@
 
 | Mission | Track | Earns | Test target | What it proves |
 |---------|-------|-------|-------------|----------------|
-| `vizcarra-profile-clients` | A | 0.6.0 | vizcarra-guitars | Coda profiler produces a valid contract against real data **[READY 2026-07-11: 1623 passed, artifacts written, awaiting squash-merge]** |
-| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest |
+| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest **[READY 2026-07-11: 1671 passed, farm test green. Awaiting squash-merge]** |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
+| `wb-checklist-archetype` | B | 0.6.1 | farm | Weekly checklist + HTMX toggle extractable from contract + view manifest (PROVEN, ready for squash-merge)
 | `vizcarra-generate-import` | A | 0.6.2 | vizcarra-guitars |
 | `wb-landing-archetype` | B | 0.6.3 | farm |
 | `vizcarra-views-deploy` | A | 0.7.1 | vizcarra-guitars |
@@ -53,6 +53,7 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 
 ## Done
 
-- `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, ready for squash-merge and release)
+- `vizcarra-profile-clients` — Coda profiler + page composition + schema contract against real Vizcarra Guitars Coda doc. (0.6.0, released)
+- `wb-checklist-archetype` — Checklist archetype view generator with HTMX toggle, proven against real farm PlantingPlan data. (0.6.1, ready for squash-merge)
 - `coda-formula-classification` — Classify Coda formulas into row/expansion/hybrid taxonomy. (0.5.3, local, unit-tested only)
 - `coda-relation-column-profiler` — Detect Coda relation columns and scaffold ForeignKey fields. (0.5.3, local, unit-tested only)
