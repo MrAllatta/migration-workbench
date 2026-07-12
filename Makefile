@@ -40,6 +40,16 @@ test:
 check:
 	$(MANAGE) check
 
+# ---------------------------------------------------------------------------
+# Session and release hygiene — see .pi/OPERATORS_CONTRACT.md
+# ---------------------------------------------------------------------------
+
+finish:
+	.pi/scripts/finish_session.sh
+
+release:
+	.pi/scripts/release.sh $(VERSION)
+
 manifest-lint:
 	$(PYTHON) -m deployment.wb_cli --manifest deploy/spaces.yml --json manifest lint
 
