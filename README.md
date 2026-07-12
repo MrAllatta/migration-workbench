@@ -286,6 +286,24 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.6.1 (local)
+
+- **Weekly checklist archetype (new codegen module):**
+  ``workbook/codegen/view_generator.py`` renders Django ListView +
+  Django template + URL patterns for the weekly checklist pattern
+  (year/week filterable table with HTMX toggle button). Proves the
+  view codegen pipeline on real farm data.
+- **``generate_views`` management command:**
+  ``--archetype-checklist auto`` discovers contract tables with
+  ``planned_year``/``planned_week`` fields; ``--archetype-checklist
+  AppLabel.ModelName`` targets specific models. Writes
+  ``views_auto.py``, ``urls_auto.py``, and template files.
+- **Farm real-data test:** Generated ``PlantingPlanChecklistView``
+  installed in farm repo. 6 tests prove login enforcement, year+week
+  heading, data table rendering, empty state, and week navigation
+  against real PlantingPlan records.
+- **All 1671 tests pass, full chassis-gate green.**
+
 ### 0.6.0 (local)
 
 - **Real-data validation of Coda profiler:** Both 0.5.3 platform patches
