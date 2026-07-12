@@ -8,7 +8,9 @@
 
 ## Active
 
-*None. The next mission is chosen at boot from the priority-ordered Next table.*
+`vizcarra-generated-ui` — Track B, 0.8.1. Consume the `wb generate views`
+pipeline on vizcarra-guitars: template package, regenerate landing view,
+add checklist/dashboard archetype views, real-data tests.
 
 ## Next
 
