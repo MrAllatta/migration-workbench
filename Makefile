@@ -8,7 +8,7 @@ MANAGE = $(PYTHON) manage.py
 PYTEST = $(PYTHON) -m pytest
 BLACK = $(VENV)/bin/black
 
-.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 profile-phase-discover profile-phase-score profile-phase-deep profile-phase-derive profile-phase-all clean-profile validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
+.PHONY: install migrate reset-migrations run shell manage test check doc-coverage format pull-bundle snapshot-bundle import-preflight import-apply load-data push-data pull-preflight pull-apply chassis-gate profile-coda-preflight profile-coda-corpus profile-coda-canvas profile-cohort-corpus profile-cohort-corpus-phase1 profile-cohort-corpus-phase2 profile-cohort-corpus-phase3 profile-phase-discover profile-phase-score profile-phase-deep profile-phase-derive profile-phase-all clean-profile validate-domain-context draft-domain-context extract-workbook-codes orient manifest-lint health-smoke hygiene new-product publish validate-contract diff-generated generate-models generate-admin-light generate-admin generate-import generate-view-manifest generate-pipeline-manifest generate-all post-generate check-generated snapshot-codegen check-snapshots drift-check docker-build fly-launch fly-volume fly-secrets fly-deploy preflight
 
 install:
 	$(PIP) install -e ".[dev]"
@@ -43,6 +43,9 @@ check:
 # ---------------------------------------------------------------------------
 # Session and release hygiene — see .pi/OPERATORS_CONTRACT.md
 # ---------------------------------------------------------------------------
+
+hygiene:
+	.pi/scripts/hygiene.sh
 
 finish:
 	.pi/scripts/finish_session.sh
