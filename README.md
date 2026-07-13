@@ -286,6 +286,22 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.2 (local)
+
+- **Vizcarra People Type (Track A):** Coda ``People`` columns are now
+  detected by the profiler (``is_user_reference=True``, ``target_table_name=
+  'auth.User'``) and upgraded to ``ForeignKey(auth.User)`` by the schema
+  contract builder.  ``extract_relation_columns`` emits an explicit
+  ``is_user_reference`` flag for person-format columns, and
+  ``build_contract`` consumes it to scaffold ``ForeignKey(to='auth.User')``
+  instead of ``TextField``.  The model generator already renders
+  ``ForeignKey('auth.User', ...)`` correctly (quoted cross-app lazy
+  reference).  The product repo (vizcarra-guitars) provides a
+  ``get_or_create_coda_user`` utility that parses Coda JSON-LD person
+  payloads and resolves them to Django ``User`` records during import.
+  (feat/vizcarra-people-type, 6 new workbench tests + 25 new product-repo
+  tests)
+
 ### 0.8.1 (local)
 
 - **Vizcarra-generated UI:** Consumed the ``wb generate views`` pipeline on
