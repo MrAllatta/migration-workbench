@@ -286,6 +286,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.7 (local)
+
+- **Farm Data Migration (Track B):** Crop alias resolution eliminates 674
+  stale-FK errors in the import pipeline.  New ``config/crop_aliases.csv``,
+  ``_resolve_crop_name`` / ``_get_or_create_crop_by_alias`` in
+  ``imports_auto.py``.  Real-data reconciliation tests validate the full
+  import against the 121-CSV bundle (27 166 rows, 0 errors).
+  Farm suite: 204 tests.
+
 ### 0.8.6 (local)
 
 - **Farm Workflow Coverage (Track B):** View-manifest-driven list view
