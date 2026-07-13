@@ -11,13 +11,12 @@
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `farm-behavioral-codegen` | B | 0.8.5 | farm |
+| `farm-workflow-coverage` | B | 0.8.6 | farm |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `farm-workflow-coverage` | B | 0.8.6 | farm |
 | `farm-data-migration` | B | 0.8.7 | farm |
 | `cutover-prep` | — | 0.9.4 | farm + vizcarra |
 | `cutover` | — | 1.0.0 | farm + vizcarra |
@@ -70,3 +69,4 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 - `vizcarra-people-type` — Coda People columns mapped to Django users. Profiler detects person columns (is_user_reference=True), contract upgrades to ForeignKey(auth.User), product repo resolves Coda JSON-LD to User records during import. 6 new workbench tests + 25 new product-repo tests. (0.8.2, local)
 - `vizcarra-formula-parity` — Business-critical Work Orders formulas validated against 552 real Coda rows. Five compute_* methods on WorkOrders model with real-data parity tests. Taxable?, Total, Top 5, Tax at 100% agreement; Paid? at 83% (94 rows have manual Coda overrides). 17 unit tests + 6 real-data tests. (0.8.3, local)
 - `vizcarra-import-pipeline` — Full Coda→Django import pipeline for 4 tables (Clients, WorkOrders, Instruments, ArchivedWorkOrders). Compound unique key, FK nullification, date tolerance, reconciliation post-check. 2232 records imported with 0 errors. (0.8.4, local)
+- `farm-behavioral-codegen` — MWBS-to-archetype adapter bridges behavioral spec to view codegen. Derives farm MWBS YAML from existing artifacts. 14 real-data parity tests validate generated views against 5 hand-written farm_ui views. (0.8.5, local)
