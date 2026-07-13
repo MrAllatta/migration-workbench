@@ -286,6 +286,19 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.5 (local)
+
+- **Farm Behavioral Codegen (Track B):** MWBS-to-archetype adapter bridges
+  the behavioral spec (``Actor``, ``Report``, ``WorkflowStep``) to the view
+  codegen pipeline (landing, list archetypes).  New
+  ``workbook/codegen/mwbs_to_archetype.py`` and
+  ``workbook/codegen/list_generator.py`` modules.  Farm behavioral spec
+  derived from existing contract + view manifest.  14 real-data parity
+  tests validate generated views against farm's hand-written
+  ``PlannerLandingView``, ``FieldWorkerLandingView``,
+  ``NurseryWorkerLandingView``, ``CropListView``, and
+  ``FieldBlockListView``.
+
 ### 0.8.4 (local)
 
 - **Vizcarra Import Pipeline (Track A):** Full Coda→Django import for 4
