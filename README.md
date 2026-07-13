@@ -286,6 +286,17 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.3 (local)
+
+- **Vizcarra Formula Parity (Track A):** Business-critical Work Orders
+  formulas validated against 552 real Coda rows.  Five ``compute_*``
+  methods added to the ``WorkOrders`` model (``compute_taxable``,
+  ``compute_paid``, ``compute_top_5``, ``compute_tax``, ``compute_total``)
+  with a shared ``_parse_decimal`` helper for Coda currency-formatted
+  strings.  All formulas achieve ≥83% parity, with Taxable?, Total, Top 5,
+  and Tax at 100% against real data.  23 new tests (17 unit + 6 real-data),
+  78 total passing in vizcarra-guitars.
+
 ### 0.8.2 (local)
 
 - **Vizcarra People Type (Track A):** Coda ``People`` columns are now
