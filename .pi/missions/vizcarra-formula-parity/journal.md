@@ -4,7 +4,7 @@ Track A 0.8.3 — Validate business-critical Coda formulas against generated
 computed fields on real Vizcarra data.
 
 ## Status
-Planned.
+Released (merged to master, tagged v0.8.3).
 
 ## Branch
 `feat/vizcarra-formula-parity`
@@ -40,3 +40,10 @@ Planned.
   - `Storage Fee` — needs duration parsing for `Length of Storage`
 - vizcarra-guitars: 78 tests pass.
 - Workbench: 1747 pass, chassis-gate green.
+
+### 2026-07-13 — Released
+- Squash-merged to master on both repos.
+- Tagged v0.8.3 on workbench.
+- Feature branches deleted.
+- Workbench re-pinned in vizcarra-guitars.
+- 78 tests pass on master.
