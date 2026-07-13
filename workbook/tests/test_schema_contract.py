@@ -531,6 +531,75 @@ def test_build_contract_coda_relation_column_upgrades_to_fk():
     assert any(f["field"] == "project" and f["target_model"] == "Projects" for f in fk)
 
 
+def test_build_contract_coda_person_column_upgrades_to_auth_user_fk():
+    """Person columns with is_user_reference are upgraded to ForeignKey(auth.User).
+
+    When extract_relation_columns detects a format.type == 'person' column,
+    it emits is_user_reference=True and target_table_name='auth.User'.
+    build_contract must consume this and set the column's field class to
+    ForeignKey with to='auth.User'.
+    """
+    bundle = {
+        "provider": "coda",
+        "tabs": [
+            {
+                "worksheet_title": "WorkOrders",
+                "output_path": "domain/work_orders.csv",
+                "required_headers": ["Title", "Created By"],
+            }
+        ],
+    }
+    tp = {
+        "summary": {
+            "table_name": "WorkOrders",
+            "columns": [
+                {
+                    "name": "Title",
+                    "format_type": "text",
+                    "has_formula": False,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+                {
+                    "name": "Created By",
+                    "format_type": "person",
+                    "has_formula": False,
+                    "null_rate": 0.0,
+                    "is_relation_type": False,
+                },
+            ],
+            "relation_columns": [
+                {
+                    "column_name": "Created By",
+                    "column_type": "person",
+                    "target_table_name": "auth.User",
+                    "target_table_id": None,
+                    "is_bidirectional": False,
+                    "is_user_reference": True,
+                    "notes": ["person_reference_resolved_to_auth_user"],
+                }
+            ],
+        }
+    }
+    contract = build_contract(bundle, table_profiles={"WorkOrders": tp})
+    orders_table = contract["tables"][0]
+    assert orders_table["bundle_worksheet_title"] == "WorkOrders"
+    creator_col = next(
+        c for c in orders_table["columns"] if c["source_column"] == "Created By"
+    )
+    assert creator_col["django_field_class"] == "models.ForeignKey"
+    assert creator_col["django_field_kwargs"]["to"] == "auth.User"
+    assert "coda_relation:person" in creator_col["notes"]
+    assert "fk_resolutions" in orders_table
+    fk = orders_table["fk_resolutions"]
+    assert any(
+        f["field"] == "created_by"
+        and f["target_model"] == "auth.User"
+        and f["source"] == "coda_relation_column"
+        for f in fk
+    )
+
+
 def test_build_contract_coda_relation_missing_target_uses_todo():
     bundle = {
         "provider": "coda",

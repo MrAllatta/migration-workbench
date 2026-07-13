@@ -231,6 +231,22 @@ def test_render_field_foreign_key_todo():
     assert "TODO_TargetModel" in result
 
 
+def test_render_field_foreign_key_auth_user():
+    """ForeignKey to auth.User is rendered as quoted string 'auth.User'.
+
+    Django supports cross-app FK references via the 'app_label.ModelName'
+    lazy string syntax.  Since 'auth.User' is not a bare Python identifier,
+    render_field wraps it in repr() which produces the quoted form.
+    """
+    result = render_field(
+        "created_by",
+        "models.ForeignKey",
+        {"to": "auth.User", "on_delete": "models.PROTECT", "null": True, "blank": True},
+    )
+    assert "created_by = models.ForeignKey('auth.User'" in result
+    assert "on_delete=models.PROTECT" in result
+
+
 def test_render_field_no_kwargs():
     result = render_field("notes", "models.TextField", {})
     assert result.strip() == "notes = models.TextField()"

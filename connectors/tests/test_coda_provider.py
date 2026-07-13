@@ -207,3 +207,28 @@ def test_extract_relation_columns_notes_missing_target():
     assert len(rels) == 1
     assert rels[0]["target_table_name"] is None
     assert "lookup_target_table_not_exposed_in_api" in rels[0]["notes"]
+
+
+def test_extract_relation_columns_flags_person_as_user_reference():
+    """Person-type columns are user references, not domain-table lookups.
+
+    The contract scaffold treats ``is_user_reference=True`` rows as a signal
+    to render ``ForeignKey(settings.AUTH_USER_MODEL)`` rather than chasing a
+    domain target.  ``target_table_name`` is set to the canonical auth model
+    so downstream callers can resolve it without special-casing format.type.
+    """
+    columns = [
+        {
+            "id": "c-owner",
+            "name": "Owner",
+            "format": {"type": "person"},
+        },
+    ]
+    rels = extract_relation_columns(columns)
+    assert len(rels) == 1
+    owner = rels[0]
+    assert owner["column_name"] == "Owner"
+    assert owner["column_type"] == "person"
+    assert owner["is_user_reference"] is True
+    assert owner["target_table_name"] == "auth.User"
+    assert owner["target_table_id"] is None

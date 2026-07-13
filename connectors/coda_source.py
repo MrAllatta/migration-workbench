@@ -763,12 +763,16 @@ def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
       another. The target table may be named in ``format.table`` or
       ``format.foreignTable``.
     - **linked_relation** — bidirectional / reverse lookup complement.
-    - **person** (format.type == "person") — person reference, flagged but
-      not yet promoted to ForeignKey.
+    - **person** (format.type == "person") — person reference to a Coda
+      user.  Flagged with ``is_user_reference=True`` and
+      ``target_table_name="auth.User"`` so the schema contract can render
+      ``ForeignKey(settings.AUTH_USER_MODEL)`` without chasing a domain
+      target.
 
     Returns a list of relation dicts with keys:
     ``column_name``, ``column_type``, ``target_table_name``,
-    ``target_table_id``, ``is_bidirectional``, ``notes``.
+    ``target_table_id``, ``is_bidirectional``, ``is_user_reference``,
+    ``notes``.
     """
     relations: list[dict[str, Any]] = []
     for col in columns:
@@ -831,7 +835,9 @@ def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
                     entry["notes"].append(f"source_table:{st_name}")
 
         elif fmt_type == "person":
-            entry["notes"].append("person_reference_not_resolved_to_fk")
+            entry["is_user_reference"] = True
+            entry["target_table_name"] = "auth.User"
+            entry["notes"].append("person_reference_resolved_to_auth_user")
 
         relations.append(entry)
     return relations

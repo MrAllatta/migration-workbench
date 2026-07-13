@@ -478,13 +478,22 @@ def build_contract(
                 if not col_name:
                     continue
                 col_type = rel.get("column_type")
-                if col_type not in ("lookup", "linked_relation"):
+
+                # Determine FK target and note based on relation type.
+                is_user = bool(rel.get("is_user_reference"))
+                if col_type == "person" and is_user:
+                    target = "auth.User"
+                    relation_note = "coda_relation:person"
+                elif col_type in ("lookup", "linked_relation"):
+                    target = _resolve_coda_relation_target(rel, table_name_to_model)
+                    relation_note = f"coda_relation:{col_type}"
+                else:
                     continue
+
                 col_def = col_by_source.get(col_name)
                 if col_def is None:
                     # The relation column may not be in required_headers;
                     # still record the FK resolution so the human sees it.
-                    target = _resolve_coda_relation_target(rel, table_name_to_model)
                     field_name = suggested_field_name(col_name)
                     fk_resolutions.append(
                         {
@@ -496,7 +505,7 @@ def build_contract(
                         }
                     )
                     continue
-                target = _resolve_coda_relation_target(rel, table_name_to_model)
+
                 col_def["django_field_class"] = "models.ForeignKey"
                 col_def["django_field_kwargs"] = {
                     "to": target,
@@ -510,8 +519,11 @@ def build_contract(
                         for n in col_def.get("notes", [])
                         if not n.startswith("relation_target_todo")
                     ]
-                col_def["notes"].append(f"coda_relation:{rel.get('column_type')}")
-                field_name = col_def.get("suggested_field_name") or suggested_field_name(col_name)
+                col_def["notes"].append(relation_note)
+                field_name = (
+                    col_def.get("suggested_field_name")
+                    or suggested_field_name(col_name)
+                )
                 fk_resolutions.append(
                     {
                         "field": field_name,
