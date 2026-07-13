@@ -302,6 +302,13 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
   (feat/vizcarra-people-type, 6 new workbench tests + 25 new product-repo
   tests)
 
+- **Parsing fix:** ``parse_iso_date`` now strips the time + timezone
+  portion of ISO 8601 datetime strings (``2026-04-25T00:00:00.000-07:00``)
+  to extract just the date. Coda emits datetime values even for
+  ``DateField``-modeled columns; this fix unblocks real-data imports
+  where a date column arrives with full ISO datetime data.
+  (1 new test)
+
 ### 0.8.1 (local)
 
 - **Vizcarra-generated UI:** Consumed the ``wb generate views`` pipeline on
