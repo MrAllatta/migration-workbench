@@ -286,6 +286,13 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.9.4 (local)
+
+- **Cutover Prep (Joint):** Final readiness gate before 1.0.0.
+  Readiness report, two engagement-specific runbooks, and go/no-go
+  decision recorded.  Verdict: **GO** for 1.0.0.
+  Three minor farm gaps documented for pre-cutover patch.
+
 ### 0.8.7 (local)
 
 - **Farm Data Migration (Track B):** Crop alias resolution eliminates 674
