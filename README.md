@@ -286,6 +286,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.6 (local)
+
+- **Farm Workflow Coverage (Track B):** View-manifest-driven list view
+  generation.  ``workbook/codegen/manifest_loader.py`` loads and normalises
+  view-manifest entries; ``generate_views --archetype-list-from-manifest``
+  emits one ``ListView`` subclass per unique entity.  Farm's 72-entry
+  manifest produces 14 unique views covering all spreadsheet workflows.
+  Coverage report written to ``build/_out/workflow-coverage.md``.
+
 ### 0.8.5 (local)
 
 - **Farm Behavioral Codegen (Track B):** MWBS-to-archetype adapter bridges

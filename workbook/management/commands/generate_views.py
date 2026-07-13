@@ -43,6 +43,15 @@ from workbook.codegen.contract import (
     load_contract_unvalidated,
     strict_validate_contract,
 )
+from workbook.codegen.list_generator import (
+    ListArchetype,
+    render_list_url_pattern,
+    render_list_view_py,
+)
+from workbook.codegen.manifest_loader import (
+    load_view_manifest,
+    manifest_to_list_archetype,
+)
 from workbook.codegen.view_generator import (
     AlertCard,
     ChecklistArchetype,
@@ -487,6 +496,15 @@ class Command(BaseCommand):
             ),
         )
         parser.add_argument(
+            "--archetype-list-from-manifest",
+            default=None,
+            help=(
+                "Path to a view-manifest YAML.  Generates one ListView subclass + "
+                "template + URL pattern per manifest entry.  Requires a schema "
+                "contract with model definitions matching manifest entities."
+            ),
+        )
+        parser.add_argument(
             "--force",
             action="store_true",
             help="Overwrite existing output files without prompting",
@@ -525,11 +543,18 @@ class Command(BaseCommand):
         archetype_checklist = options.get("archetype_checklist") or options.get("archetype")
         archetype_landing = options.get("archetype_landing")
         archetype_dashboard = options.get("archetype_dashboard")
+        archetype_list_from_manifest = options.get("archetype_list_from_manifest")
 
-        if not archetype_checklist and not archetype_landing and not archetype_dashboard:
+        if (
+            not archetype_checklist
+            and not archetype_landing
+            and not archetype_dashboard
+            and not archetype_list_from_manifest
+        ):
             raise CommandError(
                 "specify at least one archetype flag: "
-                "--archetype-checklist, --archetype, --archetype-landing, or --archetype-dashboard"
+                "--archetype-checklist, --archetype, --archetype-landing, "
+                "--archetype-dashboard, or --archetype-list-from-manifest"
             )
 
         out_dir = Path(options["out_dir"]).resolve()
@@ -563,6 +588,15 @@ class Command(BaseCommand):
         if archetype_dashboard:
             self._handle_dashboard(
                 out_dir, archetype_dashboard, force, app_label_default, template_package
+            )
+        if archetype_list_from_manifest:
+            self._handle_list_from_manifest(
+                contract,
+                out_dir,
+                archetype_list_from_manifest,
+                force,
+                app_label_default,
+                template_package,
             )
 
     def _handle_checklist(
@@ -762,5 +796,160 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"generated {len(archetypes)} dashboard archetype(s)"
+            )
+        )
+
+    def _handle_list_from_manifest(
+        self,
+        contract: dict[str, Any],
+        out_dir: Path,
+        manifest_path_str: str,
+        force: bool,
+        app_label: str = "core",
+        template_package: Path | None = None,
+    ) -> None:
+        """Handle --archetype-list-from-manifest generation.
+
+        Reads a view-manifest YAML and emits one ListView subclass + URL
+        pattern + template per manifest entry.  Each entry's ``entity``
+        is matched to a contract ``model_name`` to resolve the model.
+        """
+        manifest_path = Path(manifest_path_str).resolve()
+        if not manifest_path.is_file():
+            raise CommandError(f"view manifest not found: {manifest_path}")
+
+        try:
+            manifest_entries = load_view_manifest(manifest_path)
+        except Exception as exc:
+            raise CommandError(f"failed to load view manifest: {exc}") from exc
+
+        if not manifest_entries:
+            raise CommandError("no views in manifest (empty 'views' list)")
+
+        # Build a model name → columns lookup from the contract
+        contract_columns: dict[str, list[str]] = {}
+        for table in contract.get("tables", []):
+            if not isinstance(table, dict):
+                continue
+            mname = table.get("model_name") or table.get("suggested_model_name")
+            if not mname:
+                continue
+            columns = []
+            for col in table.get("columns", []):
+                if isinstance(col, dict):
+                    col_name = col.get("name") or col.get("column_name")
+                    if col_name:
+                        columns.append(col_name)
+            contract_columns[mname] = columns
+
+        # Build list archetypes for each manifest entry, deduplicating by
+        # derived model name (entries that share an entity collapse to one).
+        seen_models: set[str] = set()
+        archetypes: list[ListArchetype] = []
+        skipped: list[tuple[str, str]] = []  # (entry_name, reason)
+        for entry in manifest_entries:
+            entity = entry.get("entity", "") or ""
+            # Derive model name from entity
+            parts = entity.replace("-", "_").split("_")
+            model_name = "".join(p.capitalize() for p in parts if p)
+            if not model_name:
+                skipped.append((entry.get("name", "?"), "no entity"))
+                continue
+            if model_name not in contract_columns and not contract_columns:
+                # No contract tables; just use the derived model name
+                pass
+            if model_name in seen_models:
+                skipped.append((entry.get("name", "?"), f"duplicate model {model_name}"))
+                continue
+            seen_models.add(model_name)
+            try:
+                archetype = manifest_to_list_archetype(
+                    entry, model_name=model_name
+                )
+            except Exception as exc:
+                skipped.append((entry.get("name", "?"), str(exc)))
+                continue
+            archetypes.append(archetype)
+
+        if not archetypes:
+            raise CommandError(
+                f"no archetypes could be derived from manifest ({len(skipped)} skipped)"
+            )
+
+        # Write views_auto.py: combined module of all list view classes
+        views_lines: list[str] = [
+            "\"\"\"Auto-generated list views from view-manifest.yaml.\"\"\"",
+            "from django.contrib.auth.mixins import LoginRequiredMixin",
+            "from django.views.generic import ListView",
+            "",
+        ]
+        for arch in archetypes:
+            views_source = render_list_view_py(arch)
+            # Strip the class header of redundant import lines
+            for line in views_source.splitlines():
+                if line.startswith("class ") or line.startswith("    "):
+                    if line.strip():
+                        views_lines.append(line)
+            views_lines.append("")
+
+        views_path = out_dir / "views_auto.py"
+        views_written = _write_file(views_path, "\n".join(views_lines), force=force)
+        if views_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {views_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {views_path} (exists, use --force)")
+            )
+
+        # Write urls_auto.py: combined module of all list URL patterns
+        urls_lines: list[str] = [
+            "\"\"\"Auto-generated URLs from view-manifest.yaml.\"\"\"",
+            "from django.urls import path",
+            "",
+            "from .views_auto import (",
+        ]
+        for arch in archetypes:
+            class_name = f"{arch.model}ListView"
+            urls_lines.append(f"    {class_name},")
+        urls_lines.append(")")
+        urls_lines.append("")
+        urls_lines.append("urlpatterns = [")
+        for arch in archetypes:
+            urls_lines.append(f"    {render_list_url_pattern(arch)}")
+        urls_lines.append("]")
+
+        urls_path = out_dir / "urls_auto.py"
+        urls_written = _write_file(urls_path, "\n".join(urls_lines), force=force)
+        if urls_written:
+            self.stdout.write(self.style.SUCCESS(f"wrote {urls_path}"))
+        else:
+            self.stdout.write(
+                self.style.WARNING(f"skipped {urls_path} (exists, use --force)")
+            )
+
+        # Write one template per archetype (simple list template)
+        for arch in archetypes:
+            template_path = out_dir / arch.template_path
+            template_path.parent.mkdir(parents=True, exist_ok=True)
+            template_source = (
+                "{% extends \"base.html\" %}\n"
+                "{% block content %}\n"
+                f"  <h1>{{{{ {arch.context_object_name}|length }}}} {arch.title} entries</h1>\n"
+                "{% endblock %}\n"
+            )
+            if _write_file(template_path, template_source, force=force):
+                self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
+            else:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"skipped {template_path} (exists, use --force)"
+                    )
+                )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"generated {len(archetypes)} list archetype(s) "
+                f"from {len(manifest_entries)} manifest entries "
+                f"({len(skipped)} skipped: {dict(skipped[:3])})"
             )
         )
