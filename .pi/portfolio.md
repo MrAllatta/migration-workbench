@@ -18,14 +18,6 @@
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
 | `farm-workflow-coverage` | B | 0.8.6 | farm |
-| `farm-workflow-coverage` | B | 0.8.6 | farm |
-| `farm-data-migration` | B | 0.8.7 | farm |
-| `cutover-prep` | — | 0.9.4 | farm + vizcarra |
-| `cutover` | — | 1.0.0 | farm + vizcarra |
-| `vizcarra-formula-parity` | A | 0.8.3 | vizcarra-guitars |
-| `vizcarra-import-pipeline` | A | 0.8.4 | vizcarra-guitars |
-| `farm-behavioral-codegen` | B | 0.8.5 | farm |
-| `farm-workflow-coverage` | B | 0.8.6 | farm |
 | `farm-data-migration` | B | 0.8.7 | farm |
 | `cutover-prep` | — | 0.9.4 | farm + vizcarra |
 | `cutover` | — | 1.0.0 | farm + vizcarra |
