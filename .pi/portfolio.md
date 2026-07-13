@@ -11,13 +11,13 @@
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `cutover-prep` | — | 0.9.4 | farm + vizcarra |
+| `cutover` | — | 1.0.0 | farm + vizcarra |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `cutover` | — | 1.0.0 | farm + vizcarra |
+| — | — | — | — |
 
 ## Extraction Backlog
 
@@ -70,3 +70,4 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 - `farm-behavioral-codegen` — MWBS-to-archetype adapter bridges behavioral spec to view codegen. Derives farm MWBS YAML from existing artifacts. 14 real-data parity tests validate generated views against 5 hand-written farm_ui views. (0.8.5, local)
 - `farm-workflow-coverage` — View-manifest-driven list view generation for all 72 farm spreadsheet workflows. ``manifest_loader.py`` + ``generate_views --archetype-list-from-manifest``. 14 unique entity-based views emitted; coverage report + real-data validation tests. (0.8.6, local)
 - `farm-data-migration` — Crop alias resolution eliminates 674 stale-FK errors in farm import pipeline. ``config/crop_aliases.csv`` + ``_resolve_crop_name``/``_get_or_create_crop_by_alias``. Real-data reconciliation tests validate full bundle import (27 166 rows, 0 errors). (0.8.7, local)
+- `cutover-prep` — Joint readiness gate for both engagements. Readiness report, two runbooks (Vizcarra + farm), go/no-go decision (GO). All pre-cutover sequences complete. (0.9.4, local)
