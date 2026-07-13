@@ -11,13 +11,12 @@
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `farm-workflow-coverage` | B | 0.8.6 | farm |
+| `farm-data-migration` | B | 0.8.7 | farm |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `farm-data-migration` | B | 0.8.7 | farm |
 | `cutover-prep` | — | 0.9.4 | farm + vizcarra |
 | `cutover` | — | 1.0.0 | farm + vizcarra |
 
@@ -70,3 +69,4 @@ Local releases are tag-only until 1.0.0 (PyPI blocks uploads `≤ 0.9.3`). See
 - `vizcarra-formula-parity` — Business-critical Work Orders formulas validated against 552 real Coda rows. Five compute_* methods on WorkOrders model with real-data parity tests. Taxable?, Total, Top 5, Tax at 100% agreement; Paid? at 83% (94 rows have manual Coda overrides). 17 unit tests + 6 real-data tests. (0.8.3, local)
 - `vizcarra-import-pipeline` — Full Coda→Django import pipeline for 4 tables (Clients, WorkOrders, Instruments, ArchivedWorkOrders). Compound unique key, FK nullification, date tolerance, reconciliation post-check. 2232 records imported with 0 errors. (0.8.4, local)
 - `farm-behavioral-codegen` — MWBS-to-archetype adapter bridges behavioral spec to view codegen. Derives farm MWBS YAML from existing artifacts. 14 real-data parity tests validate generated views against 5 hand-written farm_ui views. (0.8.5, local)
+- `farm-workflow-coverage` — View-manifest-driven list view generation for all 72 farm spreadsheet workflows. ``manifest_loader.py`` + ``generate_views --archetype-list-from-manifest``. 14 unique entity-based views emitted; coverage report + real-data validation tests. (0.8.6, local)
