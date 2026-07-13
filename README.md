@@ -286,6 +286,16 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.8.4 (local)
+
+- **Vizcarra Import Pipeline (Track A):** Full Coda→Django import for 4
+  tables validated and reconciled.  Compound unique key ``(first, last)``
+  for Clients (was ``first`` only — 11 duplicate errors eliminated).
+  FK string nullification prevents ``Cannot assign`` errors from unresolved
+  Coda lookup columns.  Post-import reconciliation compares processed vs
+  CSV row counts (567 + 552 + 819 + 294 = 2232 records, 0 errors).
+  Instruments and ArchivedWorkOrders bundle pulled from Coda.
+
 ### 0.8.3 (local)
 
 - **Vizcarra Formula Parity (Track A):** Business-critical Work Orders
