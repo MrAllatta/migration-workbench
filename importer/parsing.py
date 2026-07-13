@@ -141,6 +141,10 @@ def parse_iso_date(date_str):
         ValueError: If *date_str* does not match any supported format.
     """
     cleaned = str(date_str).strip()
+    # Strip time + timezone from ISO 8601 datetime (e.g. 2026-04-25T00:00:00.000-07:00)
+    date_only = cleaned.partition("T")[0].strip()
+    if date_only:
+        cleaned = date_only
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y"):
         try:
             return datetime.strptime(cleaned, fmt).date()

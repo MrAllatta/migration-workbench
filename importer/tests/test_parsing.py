@@ -68,3 +68,16 @@ def test_parse_iso_date_still_rejects_garbage():
 
 def test_parse_iso_date_single_digit_month_day():
     assert parse_iso_date("1/5/2023") == date(2023, 1, 5)
+
+
+def test_parse_iso_date_strips_iso_datetime():
+    """ISO 8601 datetime strings (with time and timezone) yield the date part.
+
+    Coda's DateTime-typed columns emit values like
+    ``2026-04-25T00:00:00.000-07:00`` even when the schema contract models
+    the column as a ``DateField``.  The parser must accept such values and
+    return just the date component.
+    """
+    assert parse_iso_date("2026-04-25T00:00:00.000-07:00") == date(2026, 4, 25)
+    assert parse_iso_date("2026-04-25T00:00:00Z") == date(2026, 4, 25)
+    assert parse_iso_date("2026-04-25") == date(2026, 4, 25)
