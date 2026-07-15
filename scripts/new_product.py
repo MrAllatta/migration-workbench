@@ -723,6 +723,41 @@ def render_agents_md(provider: str) -> str:
 
 > **Generated file.** Do not edit directly. To update, modify `scripts/new_product.py` in migration-workbench and regenerate.
 
+## Your mission
+
+You are here to **replace a spreadsheet (or Coda doc) with a generated Django
+app that humans use as their system of record.** The workbench provides the
+tools. This repo holds the specifications that drive the tools.
+
+Your job is not to generate code. Your job is to enrich specifications
+until the generated app is complete enough that a human can do their job
+without the source spreadsheet. The generated code is an output; the
+specification is the artifact.
+
+**The methodology is documented at:**
+[Product Build Methodology](https://github.com/anomalyco/migration-workbench/blob/master/docs/product-build-methodology.md)
+
+It defines six phases, each enriching one specification layer:
+
+| Phase | Layer | Artifact |
+|-------|-------|----------|
+| 0 | Profile & baseline | `build/pipeline-state.yaml` |
+| 1 | Domain Knowledge | `config/domain_context.yaml` |
+| 2 | Schema Contract | `build/schema-contract.yaml` |
+| 3 | Behavioral Spec (MWBS) | `build/behavioral-spec.yaml` |
+| 4 | Interaction Contract | `build/interaction-contract.yaml` |
+| 5 | View Manifest | `build/view-manifest.yaml` |
+| 6 | Validation & iteration | Generated app vs. source spreadsheet |
+
+**This repo's progress through those phases is tracked in**
+`docs/build-roadmap.md` — read it first, update it as each layer reaches
+completion.
+
+**Core discipline:** When the generated app falls short, the fix is in the
+spec, not in the generated code. Patching a generated Django template is a
+symptom that the specification didn't capture something. Enrich the spec and
+regenerate.
+
 ## Repo identity
 
 This is a **scaffolded product repository** built on [migration-workbench](https://pypi.org/project/migration-workbench/). It embeds the workbench as a PyPI dependency and provides its own Django project at `backend/` (`config.settings`, `manage.py`, `apps/core/`). The workbench apps (`connectors`, `profiler`, `importer`, `workbook`) are listed in `INSTALLED_APPS`.
@@ -1247,6 +1282,77 @@ Re-profile after source changes; note date and what changed.
 """
 
 
+def render_build_roadmap_md(product_name: str) -> str:
+    return f"""# Build Roadmap — {product_name}
+
+> **Methodology:** [Product Build Methodology](https://github.com/anomalyco/migration-workbench/blob/master/docs/product-build-methodology.md)
+> **Source:** [Google Sheets / Coda]
+> **Target:** Generated Django app replacing the source
+
+This is the living checklist for building this product app. Each phase enriches
+one specification layer. Phases are sequential on first pass but iterative in
+practice — gaps found in validation may return to earlier phases.
+
+The core discipline: **the spec is the artifact, not the generated code.**
+When the generated app falls short, enrich the spec and regenerate. Never
+patch generated Django templates.
+
+## Phase 0 — Profile and baseline
+- [ ] Profiler run complete, PipelineState checkpoint exists
+- [ ] Tab selection reviewed and approved
+- [ ] Initial schema contract generated
+- [ ] Initial behavioral spec generated
+
+## Phase 1 — Domain Knowledge
+- [ ] Domain context YAML authored: domain, vocabulary, year scope
+- [ ] Entity definitions complete: every business entity has name, source tabs, fields, import key
+- [ ] Glossary covers all column header abbreviations
+
+## Phase 2 — Schema Contract
+- [ ] Every column in approved tabs has a field in the contract
+- [ ] Every FK resolved (no TODO_TargetModel)
+- [ ] Compound import keys defined where needed
+- [ ] Contract validates; generate-models produces runnable models_auto.py
+
+## Phase 3 — Behavioral Spec (MWBS)
+- [ ] Actors are real human roles with responsibilities and time pressures
+- [ ] Every recurring human task has a workflow entry with job story, actor, frequency, steps
+- [ ] Every status column in the spreadsheet is captured as a Decision
+- [ ] Exceptions documented for known failure modes
+- [ ] Business rules defined for cross-cutting constraints
+- [ ] Reports defined for print/summary artifacts
+- [ ] Acceptance criteria written for every workflow
+- [ ] Coverage map shows \u226580% of spreadsheet interactions mapped
+
+## Phase 4 — Interaction Contract
+- [ ] Every role has documented weekly actions
+- [ ] Status transitions defined per entity
+- [ ] Alert rules defined
+- [ ] Workflow-to-view mapping complete
+
+## Phase 5 — View Manifest
+- [ ] Every workflow has a corresponding view entry
+- [ ] Archetypes correct (list, form, dashboard, checklist, print)
+- [ ] Editable/computed fields specified
+- [ ] Generated views render with real data
+
+## Phase 6 — Validation
+- [ ] Full test suite passes
+- [ ] Every workflow from behavioral spec can be completed in generated app
+- [ ] Acceptance criteria pass
+- [ ] Drift check: re-profile source vs. generated schema
+- [ ] Human sign-off: spreadsheet can be frozen
+
+## Gap Log
+
+Record gaps found during validation and their resolution:
+
+| Date | Gap | Classification | Resolution |
+|------|-----|---------------|------------|
+|      |     |               |            |
+"""
+
+
 def render_raw_notes_readme() -> str:
     return """# Raw client notes
 
@@ -1479,6 +1585,7 @@ def scaffold(
         ("README.md", render_readme_md(product_kebab, provider)),
         ("docs/operator.md", render_operator_md(product_kebab)),
         ("docs/schema-contract.md", render_schema_contract_md(product_kebab)),
+        ("docs/build-roadmap.md", render_build_roadmap_md(product_kebab)),
         ("docs/domain-knowledge.example.yaml", render_domain_knowledge_example_yaml()),
         ("data/raw_notes/README.md", render_raw_notes_readme()),
         (".gitignore", render_gitignore()),

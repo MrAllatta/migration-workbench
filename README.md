@@ -286,12 +286,23 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.9.5 (local)
+
+- **Roadmap Correction:** The workbench roadmap was an engine roadmap; the
+  client engagements (Vizcarra Guitars and farm) now have their own product
+  roadmaps in `docs/product-roadmaps.md`. Semver minors are integers, so
+  `0.10.0`, `0.11.0`, etc. are valid and will be used for product-validated
+  milestones before `1.0.0`. `0.9.4` is reclassified as engine-ready, not
+  product-ready.
+
 ### 0.9.4 (local)
 
-- **Cutover Prep (Joint):** Final readiness gate before 1.0.0.
+- **Cutover Prep (Joint):** Joint readiness gate for engine capability.
   Readiness report, two engagement-specific runbooks, and go/no-go
-  decision recorded.  Verdict: **GO** for 1.0.0.
-  Three minor farm gaps documented for pre-cutover patch.
+  decision recorded. Verdict: **GO** for engine readiness.
+  Subsequent product enrichment (Vizcarra: 6→18 tables, 2→39 views,
+  0→2186 transaction rows; full signed-off MWBS) proved that product-ready
+  is a separate milestone mapped in `docs/product-roadmaps.md`.
 
 ### 0.8.7 (local)
 

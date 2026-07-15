@@ -12,12 +12,38 @@ Version history and direction.
 1.0.0                  Both engagements replaced in the wild      ← target
 ```
 
+## Semver correction
+
+Semver minor versions are integers, not decimal digits. After `0.9.x` comes
+`0.10.0`, then `0.11.0`, and so on. We are **not** forced to jump to `1.0.0`
+once the patch digit fills up. This roadmap now uses the full `0.10.0+` space
+for product-validated milestones before `1.0.0`.
+
+## Product roadmaps are now first-class
+
+This document remains the **engine** roadmap — it tracks workbench capabilities
+(profiler adapters, codegen archetypes, CLI commands). The engagements
+themselves need their own roadmaps:
+
+- [Vizcarra Guitars product roadmap →](product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django)
+- [Farm product roadmap →](product-roadmaps.md#engagement-b-farm-google-sheets--django)
+
+The engine roadmap below references those product roadmaps for the milestones
+that earn the next minor. A workbench minor is earned by validation in a
+product repo, and the validation criteria are defined by the product roadmap,
+not by an engine feature landing.
+
 ## Definition of 1.0.0
 
-**Two tabular systems that teams rely on — one Google Sheets engagement (farm)
+**Both tabular systems that teams rely on — one Google Sheets engagement (farm)
 and one Coda engagement (vizcarra-guitars) — are now generated Django apps they
-use day-to-day. The workbench proved it can replace both spreadsheets and Coda
-docs in the wild.**
+use day-to-day, and the consultant playbook for repeating that outcome is
+proven.**
+
+`1.0.0` is a **product and business milestone**, not an engine completeness
+milestone. The engine reached capability-readiness at `0.9.4`; the engagements
+still have specification enrichment, validation, parallel runs, and cutover
+work to do. That work is mapped in [product-roadmaps.md](product-roadmaps.md).
 
 This means:
 
@@ -91,18 +117,44 @@ Patch numbers under each collision-free minor absorb the granular fixes real
 data surfaces. See *Semver Recovery* for why `0.7.0`, `0.8.0`, and
 `0.9.0`–`0.9.3` are skipped.
 
+### Post-0.9.4 product milestones
+
+`0.9.4` proved the workbench engine was capable of supporting both
+engagements. The engagements themselves still need specification enrichment,
+validation, parallel runs, and cutover. Those milestones live in
+[product-roadmaps.md](product-roadmaps.md); the engine versions that validate
+them are recorded here.
+
+| Version | Track | Mission | Proves | Test target |
+|---------|-------|---------|-------|-------------|
+| 0.10.0  | A     | `vizcarra-acceptance-validation` | Every signed-off workflow can be completed in the generated app; acceptance criteria pass; drift check clean | vizcarra-guitars |
+| 0.10.0  | B     | `farm-behavioral-elicitation` | Real actors, workflows, decisions, exceptions, rules, reports, and acceptance criteria signed off by farm team | farm |
+| 0.11.0  | A     | `vizcarra-parallel-run` | One week of live parallel use next to Coda with no blocking defects | vizcarra-guitars |
+| 0.11.0  | B     | `farm-interaction-contract` | Weekly actions, status transitions, alerts, and workflow-to-view mapping complete | farm |
+| 0.12.0  | A     | `vizcarra-coda-retired` | Coda doc is read-only; team uses Django app for all workflows | vizcarra-guitars |
+| 0.12.0  | B     | `farm-generated-views-wired` | Generated views replace hand-written `farm_ui/` views for core workflows; real-data parity tests pass | farm |
+| 0.13.0  | A     | `vizcarra-operational-maturity` | Print tags, alert tuning, mobile workflows validated post-cutover | vizcarra-guitars |
+| 0.13.0  | B     | `farm-data-reconciliation` | Latest spreadsheet bundle imports and reconciles cleanly | farm |
+| 0.14.0  | B     | `farm-spreadsheet-retired` | Google Sheets are read-only archive; team uses Django app for full weekly cycle | farm |
+| 0.15.0  | B     | `farm-operational-maturity` | CSV/print views, mobile field checklist, performance, alert tuning validated post-cutover | farm |
+| 1.0.0   | —     | `product-market-fit` | Both engagements retired; consultant playbook proven; engine ready for third engagement | farm + vizcarra |
+
+The A and B tracks now advance independently. A workbench minor is earned
+when either track completes its milestone against real product data.
+
 ### Semver policy
 
 | Bump | Criteria |
 |------|----------|
 | **Patch** 0.x.y+1 | Code written, unit-tested, `make chassis-gate` green. **Not validated against real data.** Bug fixes, docs, internal completions, archetype extractions proven only on the source engagement. |
-| **Minor** 0.x+1.0 | A capability **proven end-to-end against real data in a product repo**. The minor is *earned by validation*, not by adding code. Code alone is a patch. |
-| **1.0.0** | Both full engagements replaced: the farm spreadsheet and the Vizcarra Coda doc that teams rely on are now generated Django apps they use day-to-day. |
+| **Minor** 0.x+1.0 | A capability **proven end-to-end against real data in a product repo**. The minor is *earned by validation*, not by adding code. Code alone is a patch. `x` is an integer: after `0.9.x` comes `0.10.0`, `0.11.0`, etc. |
+| **1.0.0** | Both engagements retired per their product roadmaps; the consultant playbook is proven; the workbench is ready to support a third engagement without heroic effort. |
 
 The core inversion: **minors are not for features, they are for proven
-capabilities.** The 0.5.3 Coda work is a patch because it is unit-tested
+product capabilities.** The 0.5.3 Coda work is a patch because it is unit-tested
 only. `vizcarra-profile-clients` running cleanly against real Vizcarra data is
-what earns 0.6.0.
+what earns 0.6.0. The post-0.9.4 minors are defined in
+[product-roadmaps.md](product-roadmaps.md).
 
 ---
 
@@ -128,11 +180,13 @@ operator, not pushed to PyPI). We catch up monotonically:
   next minors.
 - After `0.6.x`, the next free numbers are `0.7.1`+ (skipping `0.7.0`),
   `0.8.1`+ (skipping `0.8.0`), `0.9.4`+ (skipping `0.9.0`–`0.9.3`),
-  then `1.0.0`.
+  then `0.10.0`, `0.11.0`, and so on. `1.0.0` is reserved for the product
+  market-fit milestone defined above.
 - The first PyPI-publishable release is **`1.0.0`** — the first version
   that exceeds `0.9.3` and meets the 1.0.0 definition.
 - Patch numbers under each collision-free minor are fine (e.g. `0.7.1`,
   `0.7.2`; `0.7.0` is the only collision in that series).
+- Minors are integers: `0.10.0` is valid and follows `0.9.x` naturally.
 
 The full changelog in `README.md` is a single reverse-chronological
 timeline. The legacy numbers stand — we do **not** rewrite git history. Once
@@ -147,44 +201,51 @@ PyPI's latest by design.**
 ## Dependency Graph
 
 ```
-Track A (Vizcarra)                    Track B (farm)
-vizcarra-profile ─► vizcarra-import   checklist ─► landing ─► dashboard ─► view-codegen
-        │                                     (patterns extracted from farm_ui)
-        ▼                                     │
-vizcarra-views-deploy                       ▼
-        │                          farm-behavioral-codegen
-        ▼                                     │
-vizcarra-generated-ui                       ▼
-        │                          farm-workflow-coverage
-        ▼                                     │
-vizcarra-people-type ─► vizcarra-formula-parity   ▼
-        │                          farm-data-migration
-        ▼                                     │
-vizcarra-import-pipeline                    ▼
-        │                          cutover-prep ◄───────┐
-        │                                     │          │
-        └─────────────────────────────────────┴──────────┘
-                               │
-                               ▼
-                            cutover ──► 1.0.0
+Engine (workbench)                    Engagement A (Vizcarra)              Engagement B (farm)
+0.9.4 engine-ready                    0.10.0 acceptance-validation          0.10.0 behavioral-elicitation
+     │                                      │                                    │
+     │                                      ▼                                    ▼
+     │                                0.11.0 parallel-run                0.11.0 interaction-contract
+     │                                      │                                    │
+     │                                      ▼                                    ▼
+     │                                0.12.0 coda-retired                 0.12.0 generated-views-wired
+     │                                      │                                    │
+     │                                      ▼                                    ▼
+     │                                0.13.0 operational-maturity          0.13.0 data-reconciliation
+     │                                                                               │
+     │                                                                               ▼
+     │                                                                          0.14.0 spreadsheet-retired
+     │                                                                               │
+     │                                                                               ▼
+     │                                                                          0.15.0 operational-maturity
+     │                                      │                                    │
+     └──────────────────────────────────────┴────────────────────────────────────┘
+                                                 │
+                                                 ▼
+                                           1.0.0 product-market-fit
 ```
 
 Track A validates the pipeline on a Coda-sourced engagement. Track B extracts
 UI patterns from farm's hand-written `farm_ui/`, hardens them into workbench
-codegen, and then applies that codegen back to farm to retire the farm
-spreadsheet. The two tracks run in parallel after 0.7.3; both must complete
-their product-repo validation missions before the joint `cutover-prep`
-(0.9.4) and `cutover` (1.0.0) milestones.
+codegen, and then applies that codegen back to farm. The two tracks run in
+parallel after 0.9.4. The engagement milestones are defined in
+[product-roadmaps.md](product-roadmaps.md); each product-validated milestone
+earns the corresponding workbench minor. Both engagements must reach
+retirement before `1.0.0`. Cross-cutting workbench capabilities (e.g.,
+`wb drift check`, acceptance-test runner, print-view archetype) are pulled
+forward by whichever engagement needs them first.
 
-**Track status after 0.7.3:** The view codegen pipeline is complete (CLI,
-template package, `generate-all` wiring). Track A's Coda-validation missions
-(`vizcarra-generated-ui` through `vizcarra-import-pipeline`, 0.8.1—0.8.4)
-harden Vizcarra for cut-over. Track B's farm missions
-(`farm-behavioral-codegen`, `farm-workflow-coverage`, `farm-data-migration`,
-0.8.5—0.8.7) close the gap between hand-written `farm_ui/` and a fully
-generated, spreadsheet-replacing farm app. If any mission surfaces workbench
-gaps, they are fixed upstream and the product repo's version pin is bumped
-per the patching boundary contract.
+**Track status after 0.9.4:** The engine is ready. The workbench can profile,
+codegen, import, and serve views against both Coda and Sheets data. Both
+engagements have completed the engine-side validation missions (Vizcarra
+0.8.1—0.8.4; farm 0.8.5—0.8.7). The next work is **product-side**: spec
+enrichment, validation, parallel runs, and cutover for each engagement. The
+Vizcarra session of 2026-07-14 proved that even after the engine is "ready,"
+specification enrichment can be substantial (6→18 tables, 2→39 views, 0→2186
+transaction rows, full MWBS sign-off). Product milestones now own the
+timeline. If a product mission surfaces workbench gaps, they are fixed
+upstream and the product repo's version pin is bumped per the patching
+boundary contract.
 
 ---
 

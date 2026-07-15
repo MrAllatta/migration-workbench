@@ -19,8 +19,10 @@
 | [Interaction Contract](interaction-contract.md) | adopter | Three-layer UI/workflow contract: profiler signals, human contract, codegen manifest |
 | [Pipeline State](pipeline-state.md) | implementer | Layered profiler runtime state and checkpoint design |
 | [Pipeline Manifest Reference](pipeline-manifest.md) | operator | Machine-generated execution plan format |
-| [Roadmap](roadmap.md) | all | Milestone history and direction (0.5.3 shipped, two tracks on 1.0.0) |
+| [Roadmap](roadmap.md) | all | Engine milestone history and direction |
+| [Product Roadmaps](product-roadmaps.md) | all | Per-engagement milestones: what each product repo must reach before its tabular system is retired |
 | [Agent Harness](agent-harness.md) | all | Design philosophy: agent does everything that does not require judgment, alerting the human for the judgment |
+| [Product Build Methodology](product-build-methodology.md) | operator | Phased specification enrichment: from mechanical profile to spreadsheet-replacing app |
 
 ## Operations
 
