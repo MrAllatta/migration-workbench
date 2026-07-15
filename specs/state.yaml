@@ -1,0 +1,33 @@
+active_flow: planning
+active_epic_id: null
+active_story_id: null
+active_bug_id: null
+release:
+  target_version: null
+  last_tag: null
+  last_publish: null
+epic_cycle:
+  current_step: null
+  next_skill: null
+  completed_steps: []
+bug_cycle:
+  current_step: null
+  completed_steps: []
+git:
+  branch: feat/product-roadmaps
+  hash: f4f216b
+handoff:
+  last_step_completed: "Created ADR-002 (consultancy as proving ground) and initialized specs/state.yaml"
+  open_decisions:
+    - "Confirm whether to adopt full bigpowers specs/ structure (release-plan.yaml, epics/) or keep lightweight state.yaml only"
+    - "Define vertical template ladder priority order (3-5 archetypes)"
+    - "Set services vs. product investment ratio glide path"
+    - "Determine partner playbook scope and certification level"
+    - "AGENTS.md says 'no state machines' but session-state skill adds state.yaml/cycle counters — resolve tension by adding learned-preferences fence to AGENTS.md?"
+  required_reading:
+    - AGENTS.md
+    - docs/roadmap.md
+    - docs/product-roadmaps.md
+    - specs/adr/001-platform-vision-and-archetype-seams.md
+    - specs/adr/002-consultancy-as-proving-ground.md
+  next_skill: scope-work

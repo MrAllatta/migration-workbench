@@ -297,6 +297,25 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
   milestones before `1.0.0`. `0.9.4` is reclassified as engine-ready, not
   product-ready.
 
+- **Architecture Hardening Roadmap:** Added §0.9.5–0.9.x architecture-hardening
+  sprint to `docs/roadmap.md` — 8 planned patches splitting God objects into
+  deep modules, sequenced by risk and dependency. Updated post-1.0.0 horizons,
+  risk register, dependency graph.
+
+- **Platform Vision ADR:** `specs/adr/001-platform-vision-and-archetype-seams.md`
+  records the decision that the workbench is evolving from a migration tool into
+  a platform for generating bespoke served apps from behavioral specifications.
+  Archetypes are the platform seam; architecture hardening is the prerequisite
+  for product velocity.
+
+- **View Archetype Decoupling (0.9.5 mission):** Split the 1,371-line
+  `workbook/codegen/view_generator.py` into three archetype packages under
+  `workbook/views/{checklist,landing,dashboard}/`. Each archetype owns its
+  own dataclasses, renderers, templates, URL patterns, and combined modules.
+  The old module is a backward-compatible re-export. 109 existing tests pass
+  unchanged; full `make chassis-gate` (1771 tests, smoke commands, manifest
+  lint) green.
+
 ### 0.9.4 (local)
 
 - **Cutover Prep (Joint):** Joint readiness gate for engine capability.
