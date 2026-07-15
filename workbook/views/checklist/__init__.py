@@ -5,6 +5,7 @@ farm_ui's ``checklists.py`` (TaskChecklistView, PlantingChecklistView,
 NurseryChecklistView).
 """
 
+from workbook.views import registry
 from workbook.views.checklist.archetype import ChecklistArchetype, ChecklistColumn
 from workbook.views.checklist.bundles import (
     build_archetype_from_contract,
@@ -28,3 +29,6 @@ __all__ = [
     "render_views_auto_py",
     "render_urls_auto_py",
 ]
+
+# Register this archetype with the registry.
+registry.register("checklist", "workbook.views.checklist")

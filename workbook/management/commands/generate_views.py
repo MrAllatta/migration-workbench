@@ -43,16 +43,20 @@ from workbook.codegen.contract import (
     load_contract_unvalidated,
     strict_validate_contract,
 )
-from workbook.codegen.list_generator import (
-    ListArchetype,
-    render_list_url_pattern,
-    render_list_view_py,
-)
 from workbook.codegen.manifest_loader import (
     load_view_manifest,
     manifest_to_list_archetype,
 )
-from workbook.codegen.view_generator import (
+from workbook.views import registry
+
+# Load list archetype from the registry instead of importing directly.
+# This is the first archetype dispatch path to use the registry.
+_list_module = registry.load("list")
+ListArchetype = _list_module.ListArchetype
+render_list_view_py = _list_module.render_list_view_py
+render_list_url_pattern = _list_module.render_list_url_pattern
+
+from workbook.codegen.view_generator import (  # noqa: E402
     AlertCard,
     ChecklistArchetype,
     ChecklistColumn,

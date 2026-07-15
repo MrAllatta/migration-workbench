@@ -286,6 +286,23 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.9.6 (local)
+
+- **View Archetype Registry:** Introduced `workbook/views/registry.py` with
+  a `ViewArchetype` protocol (duck-typed) and a registration API. Each
+  archetype package (checklist, landing, dashboard, list) self-registers
+  on import. `generate_views` loads the list archetype through the registry
+  as a proof point. 18 new tests cover built-in registration, explicit
+  overrides, and self-registration.
+
+- **List Archetype Moved:** Created `workbook/views/list/` package that
+  re-exports from `workbook.codegen.list_generator`, bringing the last
+  archetype into the `workbook/views/` tree. Existing imports continue
+  to work.
+
+- **Archetype Registry Tests:** `workbook/tests/test_view_registry.py`
+  validates all registry operations.
+
 ### 0.9.5 (local)
 
 - **Roadmap Correction:** The workbench roadmap was an engine roadmap; the

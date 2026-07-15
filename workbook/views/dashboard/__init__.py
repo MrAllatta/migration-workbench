@@ -4,6 +4,7 @@ Produces ``TemplateView`` subclasses that evaluate alert count expressions
 and section queryset expressions in ``get_context_data()``.
 """
 
+from workbook.views import registry
 from workbook.views.dashboard.archetype import (
     AlertCard,
     DashboardArchetype,
@@ -26,3 +27,6 @@ __all__ = [
     "render_dashboard_views_auto_py",
     "render_dashboard_urls_auto_py",
 ]
+
+# Register this archetype with the registry.
+registry.register("dashboard", "workbook.views.dashboard")
