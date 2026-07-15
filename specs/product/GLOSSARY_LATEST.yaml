@@ -1,0 +1,73 @@
+# mirror — AGENTS.md §Domain vocabulary is canonical
+# Bigpowers adapter: ubiquitous language for skills that need
+# domain naming (define-language, model-domain).
+
+version: 1
+
+terms:
+  # Core concepts
+  - term: bundle
+    definition: "Normalised source data pulled from a tabular source (Coda doc, Google Sheets). A bundle contains one or more tabs, each tab is a list of rows."
+    also_known_as: [bundle_tab, tab_row, bundle_config]
+
+  - term: profile
+    definition: "Read-only inspection of a tabular source. Produces a profile_doc with column profiles, type inferences, FK candidates."
+    also_known_as: [profile_doc, doc_profile, column_profile, profiler_output]
+
+  - term: structure
+    definition: "Structural map of the source data: tab entries, column entries, types. A plan-ahead artifact that informs the schema contract."
+    also_known_as: [structure_artifact, tab_entry, column_entry]
+
+  - term: schema_contract
+    definition: "The agreed-upon data model — tables, fields, types, FKs, computed fields, choices. Subject to human review before codegen."
+    also_known_as: [contract_table, suggested_model_name, suggested_field_name, field_slug]
+
+  - term: model_scaffold
+    definition: "Generated Django model code from a schema contract. Includes all fields, FKs, computed properties, and model metadata."
+    also_known_as: [admin_scaffold, import_scaffold]
+
+  - term: view_manifest
+    definition: "Declares which views to generate per archetype, their URL patterns, actor permissions, and workflow ordering."
+    also_known_as: [view_entry, workflow_hints]
+
+  - term: pipeline_state
+    definition: "Checkpoint object that records the current phase of the profile → contract → codegen → deploy pipeline. Used to resume interrupted work."
+    also_known_as: [checkpoint, discovery_state]
+
+  - term: interaction_contract
+    definition: "Describes how humans interact with the generated app: weekly actions per role, status transitions, alert rules, notification thresholds."
+    also_known_as: [domain_knowledge, interaction_contract]
+
+  # Methodology phases
+  - term: discovery_interview
+    definition: "Conversational elicitation of behavioral spec from a domain expert. Produces discovery_summary."
+    also_known_as: [discovery_summary]
+
+  - term: behavioral_spec
+    definition: "MWBS (Machine-Writeable Behavioral Spec) describing actors, workflows, decisions, business rules, reports, and acceptance criteria."
+    also_known_as: [mwbs, behavioral_spec]
+
+  # Architecture
+  - term: archetype
+    definition: "A view primitive (checklist, landing, dashboard, list, reference, print). Each archetype has a config dataclass, view source renderer, template renderer, and URL pattern renderer."
+    also_known_as: [view_archetype, archetype_label]
+
+  - term: chassis_gate
+    definition: "The authoritative CI gate: migrate, test, lint, smoke commands. Must pass before any merge."
+    also_known_as: [make chassis-gate]
+
+  # Platform
+  - term: engine
+    definition: "The migration-workbench package itself — the reusable platform that generates apps. Distinct from generated product apps."
+    also_known_as: [workbench, platform]
+
+  - term: product_repo
+    definition: "A customer-specific Django project that depends on migration-workbench. Contains only thin config, product templates, and vertical-specific code."
+    also_known_as: [engagement_repo, customer_repo]
+
+  - term: proving_ground
+    definition: "A live customer engagement that funds platform R&D and generates learning about what the engine needs next."
+    also_known_as: [funded_experiment]
+
+  - term: mirror_layer
+    definition: "Thin specifications in specs/ that mirror canonical docs/ artifacts so bigpowers skills can discover and operate on the project without docs/ being the source of truth."

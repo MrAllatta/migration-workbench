@@ -1,0 +1,93 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers adapter: maps engagement scope boundaries so skills
+# (plan-work, scope-work) can check what's in/out without reading
+# the full product-roadmaps doc.
+
+version: 1
+north_star: >
+  A platform for generating bespoke served Django apps from behavioral
+  specifications. Profile any tabular source → model behavior →
+  design interaction → generate views → validate → deploy.
+
+success_criteria:
+  - "Both farm spreadsheet and Vizcarra Coda doc retired in the wild"
+  - "Consultant playbook proven: a non-operator can scope and deliver a known-vertical engagement"
+  - "Engine supports a third engagement without heroic effort"
+  - "Archetype registry lets product repos register custom view archetypes"
+  - "Services/product investment ratio has glided to 20/80"
+
+in_scope:
+  # Engine hardening (patching boundary — workbench only)
+  - description: "View generator decoupled into per-archetype modules (checklist, landing, dashboard)"
+    id: "EN-001"
+    source: "docs/roadmap.md#095-view-archetype-decoupling"
+  - description: "ViewArchetype protocol and registry for dispatch by label"
+    id: "EN-002"
+    source: "docs/roadmap.md#096-view-archetype-registry"
+  - description: "CLI commands split from wb_cli.py into deployment/commands/"
+    id: "EN-003"
+    source: "docs/roadmap.md#097-cli-router-split"
+  - description: "Contract layer split into loading, accessors, validation, diff"
+    id: "EN-004"
+    source: "docs/roadmap.md#098-contract-layer-split"
+  - description: "Provider-agnostic CorpusPipeline abstraction"
+    id: "EN-005"
+    source: "docs/roadmap.md#099-corpus-pipeline-abstraction"
+  - description: "PipelineState decoupled into checkpoint + phase modules"
+    id: "EN-006"
+    source: "docs/roadmap.md#0910-pipeline-state-decoupling"
+  - description: "Reference archetype generator"
+    id: "EN-007"
+    source: "docs/roadmap.md#0911-reference-archetype"
+  - description: "Print view archetype generator"
+    id: "EN-008"
+    source: "docs/roadmap.md#0912-print-view-archetype"
+
+  # Product engagement: Vizcarra Guitars (Track A)
+  - description: "Behavior model drives codegen producing 38 manifest views, 39 view classes, 58 templates"
+    id: "VI-001"
+    source: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+  - description: "Human completes core shop workflows in generated app (intake → evaluation → queue → bench → billing → pickup → archive)"
+    id: "VI-002"
+    source: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+  - description: "One week parallel run alongside Coda with no blocking defects"
+    id: "VI-003"
+    source: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+  - description: "Coda doc retired to read-only; team uses generated Django app day-to-day"
+    id: "VI-004"
+    source: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+
+  # Product engagement: farm (Track B)
+  - description: "Farm sheets and farm_ui/ patterns expressed as behavior model and generated app"
+    id: "FA-001"
+    source: "docs/product-roadmaps.md#engagement-b-farm-google-sheets--django"
+  - description: "Human completes core weekly farm workflows in generated app (Monday Field Walk → harvest → pack → nursery → orders)"
+    id: "FA-002"
+    source: "docs/product-roadmaps.md#engagement-b-farm-google-sheets--django"
+  - description: "One week parallel run alongside Sheets with no blocking defects"
+    id: "FA-003"
+    source: "docs/product-roadmaps.md#engagement-b-farm-google-sheets--django"
+  - description: "Google Sheets retired to read-only archive; team uses generated Django app for full weekly cycle"
+    id: "FA-004"
+    source: "docs/product-roadmaps.md#engagement-b-farm-google-sheets--django"
+
+out_of_scope:
+  - description: "Self-service migration (no UI for non-technical users to run the pipeline)"
+    reason: "1.0.0 non-goal; consultant-led engagement model"
+  - description: "Multi-tenant hosting platform"
+    reason: "1.0.0 non-goal; each engagement deploys its own app"
+  - description: "Real-time bidirectional sync with source"
+    reason: "1.0.0 non-goal; one-way import at cutover"
+  - description: "Non-Django codegen targets (React, Rails, etc.)"
+    reason: "1.0.0 non-goal; Django-first platform"
+  - description: "Plugin ecosystem for third-party extensions"
+    reason: "Post-1.0.0 horizon (1.x)"
+  - description: "Custom vertical outside farm and Vizcarra before 1.0.0"
+    reason: "Third engagement is post-1.0.0 by definition"
+
+constraints:
+  - "All generated code must compile and serve (smoke test) for existing product repos"
+  - "No customer-specific logic enters the engine — product repo only"
+  - "PyPI releases blocked until 1.0.0 (highest PyPI version is 0.9.3; local is 0.5.3)"
+  - "Minor versions earned by product-repo validation, not by code addition"
+  - "Architecture hardening patches (0.9.5–0.9.x) need only chassis-gate green"

@@ -1,0 +1,58 @@
+# mirror — docs/roadmap.md and docs/product-roadmaps.md are canonical
+# Bigpowers adapter: tracks story/epic status for skills that need
+# to know what's done, in progress, or blocked.
+#
+# This file is updated by the agent as work progresses. Only the
+# active story/epic status is tracked here; the full history lives
+# in the canonical docs and git log.
+
+active:
+  epic_id: e03
+  story_id: null
+  status: not_started
+  started_at: null
+  blocked_reason: null
+
+epics:
+  - id: e01
+    title: "view-archetype-decoupling"
+    status: shipped                     # 0.9.5 on master
+  - id: e02
+    title: "view-archetype-registry"
+    status: shipped                     # 0.9.6 on master
+  - id: e03
+    title: "cli-router-split"
+    status: not_started
+  - id: e04
+    title: "contract-layer-split"
+    status: not_started
+  - id: e05
+    title: "corpus-pipeline-abstraction"
+    status: not_started
+  - id: e06
+    title: "pipeline-state-decoupling"
+    status: not_started
+  - id: e07
+    title: "reference-archetype"
+    status: not_started
+  - id: e08
+    title: "print-view-archetype"
+    status: not_started
+  - id: e09
+    title: "vizcarra-behavior-model-codegen"
+    status: not_started
+  - id: e10
+    title: "vizcarra-generated-app-validation"
+    status: not_started
+  - id: e11
+    title: "vizcarra-parallel-run"
+    status: not_started
+  - id: e12
+    title: "vizcarra-coda-retired"
+    status: not_started
+  - id: e13
+    title: "vizcarra-operational-maturity"
+    status: not_started
+  - id: e14
+    title: "product-market-fit"
+    status: not_started

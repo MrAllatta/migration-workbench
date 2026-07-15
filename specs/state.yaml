@@ -1,33 +1,34 @@
-active_flow: planning
-active_epic_id: null
+active_flow: build_epic
+active_epic_id: e03
 active_story_id: null
 active_bug_id: null
 release:
-  target_version: null
-  last_tag: null
+  target_version: "0.9.7"
+  last_tag: "v0.9.6"
   last_publish: null
 epic_cycle:
   current_step: null
-  next_skill: null
+  next_skill: develop-tdd
   completed_steps: []
 bug_cycle:
   current_step: null
   completed_steps: []
 git:
-  branch: feat/product-roadmaps
-  hash: f4f216b
+  branch: master
+  hash: eca7334
 handoff:
-  last_step_completed: "Created ADR-002 (consultancy as proving ground) and initialized specs/state.yaml"
+  last_step_completed: "Survey-context validated mirror layer; caught stale state.yaml; e01 (0.9.5) and e02 (0.9.6) already shipped on master"
   open_decisions:
-    - "Confirm whether to adopt full bigpowers specs/ structure (release-plan.yaml, epics/) or keep lightweight state.yaml only"
+    - "Create minimal epics/ stubs for bigpowers skills that expect them, or keep epics/ absent and rely on release-plan.yaml only?"
     - "Define vertical template ladder priority order (3-5 archetypes)"
     - "Set services vs. product investment ratio glide path"
     - "Determine partner playbook scope and certification level"
-    - "AGENTS.md says 'no state machines' but session-state skill adds state.yaml/cycle counters — resolve tension by adding learned-preferences fence to AGENTS.md?"
+    - "AGENTS.md says 'no state machines' — add learned-preferences fence or let specs/ sit as read-only mirror?"
   required_reading:
     - AGENTS.md
     - docs/roadmap.md
-    - docs/product-roadmaps.md
-    - specs/adr/001-platform-vision-and-archetype-seams.md
+    - specs/release-plan.yaml
+    - specs/execution-status.yaml
+    - specs/product/SCOPE_LATEST.yaml
     - specs/adr/002-consultancy-as-proving-ground.md
-  next_skill: scope-work
+  next_skill: survey-context

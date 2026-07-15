@@ -1,0 +1,33 @@
+# mirror — specs/adr/001 and specs/adr/002 are canonical
+# Bigpowers adapter: concise vision statement for skills that
+# need the north star without reading entire ADRs.
+
+version: 1
+north_star: >
+  Profile the source → model behavior → design interaction →
+  generate a served app → validate → deploy.
+
+  migration-workbench is a platform for generating bespoke served
+  Django apps from behavioral specifications. The source could be
+  Coda, Google Sheets, Airtable, Notion, or a direct interview.
+  The output is a running Django app that replaces whatever tabular
+  world the customer came from.
+
+vision:
+  - "Any tabular system of record can be replaced by a generated Django app"
+  - "The workbench engine is the repeatable harness; product engagement are the proving grounds"
+  - "Each engagement funds the R&D and extracts the learning"
+  - "By 1.0.0, a certified consultant can run a known-vertical engagement using the playbook alone"
+
+archetypes:
+  - checklist
+  - landing
+  - dashboard
+  - list
+  - reference
+  - print
+  - form
+
+adr_references:
+  - "specs/adr/001-platform-vision-and-archetype-seams.md"
+  - "specs/adr/002-consultancy-as-proving-ground.md"

@@ -1,0 +1,123 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers adapter: maps engine version milestones as epics so
+# bigpowers skills (build-epic, verify-work, release-branch) can
+# discover what's in flight and what's next.
+
+release:
+  next_version: "0.9.7"
+  last_tag: "v0.9.6"
+  last_publish: null            # PyPI blocked until 1.0.0; releases are local git tags
+
+epics:
+  # ─── Architecture hardening (0.9.5–0.9.x) ─────────────────────
+  # These are engine-internal refactors proven by chassis-gate, not
+  # by product-repo validation. They earn no minor on their own.
+
+  - id: e01
+    title: "view-archetype-decoupling"
+    wsjf: 30
+    file: "docs/roadmap.md#095-view-archetype-decoupling"
+    target_version: "0.9.5"
+    test_target: workbench
+    status: shipped
+
+  - id: e02
+    title: "view-archetype-registry"
+    wsjf: 28
+    file: "docs/roadmap.md#096-view-archetype-registry"
+    target_version: "0.9.6"
+    test_target: workbench
+    status: shipped
+
+  - id: e03
+    title: "cli-router-split"
+    wsjf: 18
+    file: "docs/roadmap.md#097-cli-router-split"
+    target_version: "0.9.7"
+    test_target: workbench
+
+  - id: e04
+    title: "contract-layer-split"
+    wsjf: 20
+    file: "docs/roadmap.md#098-contract-layer-split"
+    target_version: "0.9.8"
+    test_target: workbench
+
+  - id: e05
+    title: "corpus-pipeline-abstraction"
+    wsjf: 22
+    file: "docs/roadmap.md#099-corpus-pipeline-abstraction"
+    target_version: "0.9.9"
+    test_target: workbench
+
+  - id: e06
+    title: "pipeline-state-decoupling"
+    wsjf: 20
+    file: "docs/roadmap.md#0910-pipeline-state-decoupling"
+    target_version: "0.9.10"
+    test_target: workbench
+
+  - id: e07
+    title: "reference-archetype"
+    wsjf: 15
+    file: "docs/roadmap.md#0911-reference-archetype"
+    target_version: "0.9.11"
+    test_target: workbench
+
+  - id: e08
+    title: "print-view-archetype"
+    wsjf: 15
+    file: "docs/roadmap.md#0912-print-view-archetype"
+    target_version: "0.9.12"
+    test_target: workbench
+
+  # ─── Product-validated milestones (0.10.0+) ──────────────────
+  # Each minor is earned by validation in a product repo against
+  # real data. See docs/product-roadmaps.md for acceptance criteria.
+
+  - id: e09
+    title: "vizcarra-behavior-model-codegen"
+    wsjf: 40
+    file: "docs/product-roadmaps.md#product-milestones"
+    target_version: "0.10.0"
+    test_target: vizcarra-guitars
+    double_colon: "farm-behavior-model-codegen"
+
+  - id: e10
+    title: "vizcarra-generated-app-validation"
+    wsjf: 35
+    file: "docs/product-roadmaps.md#product-milestones"
+    target_version: "0.11.0"
+    test_target: vizcarra-guitars
+    double_colon: "farm-generated-app-validation"
+
+  - id: e11
+    title: "vizcarra-parallel-run"
+    wsjf: 30
+    file: "docs/product-roadmaps.md#product-milestones"
+    target_version: "0.12.0"
+    test_target: vizcarra-guitars
+    double_colon: "farm-parallel-run"
+
+  - id: e12
+    title: "vizcarra-coda-retired"
+    wsjf: 50
+    file: "docs/product-roadmaps.md#product-milestones"
+    target_version: "0.13.0"
+    test_target: vizcarra-guitars
+    double_colon: "farm-spreadsheet-retired"
+
+  - id: e13
+    title: "vizcarra-operational-maturity"
+    wsjf: 20
+    file: "docs/product-roadmaps.md#product-milestones"
+    target_version: "0.14.0"
+    test_target: vizcarra-guitars
+    double_colon: "farm-operational-maturity"
+
+  - id: e14
+    title: "product-market-fit"
+    wsjf: 100
+    file: "docs/roadmap.md#definition-of-100"
+    target_version: "1.0.0"
+    test_target: "farm + vizcarra"

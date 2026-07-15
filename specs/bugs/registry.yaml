@@ -1,0 +1,8 @@
+# mirror — bugs are tracked in the product repo's issue tracker or
+# as fix-bug investigations in specs/bugs/BUG-*.md when investigated.
+# This file is the registry index.
+#
+# bigpowers fix-bug skill reads this to discover existing bugs.
+# Empty = no known active investigations.
+
+bugs: []
