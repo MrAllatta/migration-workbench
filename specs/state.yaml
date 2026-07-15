@@ -30,4 +30,4 @@ handoff:
     - specs/execution-status.yaml
     - specs/product/SCOPE_LATEST.yaml
     - specs/adr/002-consultancy-as-proving-ground.md
-  next_skill: survey-context
+  next_skill: kickoff-branch
