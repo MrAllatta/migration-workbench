@@ -112,10 +112,11 @@ opening Coda.
 
 | Product milestone | Likely workbench need |
 |-------------------|----------------------|
-| 0.10.0 | `wb drift check`; acceptance-test runner harness; print-view archetype; computed-field dependency graph. |
-| 0.11.0 | Import idempotency / morning re-import command; discrepancy log template. |
+| 0.10.0 | View archetype registry (0.9.6); `wb drift check`; acceptance-test runner harness; print-view archetype; computed-field dependency graph. |
+| 0.11.0 | Import idempotency / morning re-import command; discrepancy log template; contract-layer split (0.9.8) for drift-check accuracy. |
 | 0.12.0 | Read-only source export/archive helper; cutover runbook template. |
 | 0.13.0 | Mobile-responsive template defaults; alert-tuning DSL or config. |
+| 0.14.0 | Corpus-pipeline abstraction (0.9.9) for post-cutover profiling; PipelineState decoupling (0.9.10) for reliable re-run. |
 
 ---
 
@@ -195,11 +196,11 @@ This means farm and Vizcarra need the same sequence of capabilities:
 
 | Product milestone | Likely workbench need |
 |-------------------|----------------------|
-| 0.10.0 | MWBS elicitor improvements; workflow template library; actor/responsibility scaffolding from view names; checklist/landing/dashboard/print archetype completeness; wiring helper for generated views. |
-| 0.11.0 | Acceptance-test runner; drift check; alias-resolution diagnostics. |
+| 0.10.0 | View archetype registry (0.9.6); reference archetype (0.9.11); MWBS elicitor improvements; workflow template library; actor/responsibility scaffolding from view names; checklist/landing/dashboard/print archetype completeness; wiring helper for generated views. |
+| 0.11.0 | Acceptance-test runner; drift check; alias-resolution diagnostics; contract-layer split (0.9.8) for reliable re-validation. |
 | 0.12.0 | Import idempotency / morning re-import command; discrepancy log template. |
-| 0.13.0 | Archive/export helper for Google Sheets; cutover runbook template. |
-| 0.14.0 | Mobile checklist archetype; CSV/print view archetype; alert-tuning DSL. |
+| 0.13.0 | Archive/export helper for Google Sheets; cutover runbook template; corpus-pipeline abstraction (0.9.9) for clean re-profile. |
+| 0.14.0 | Mobile checklist archetype; CSV/print view archetype; alert-tuning DSL; PipelineState decoupling (0.9.10) for reliable cutover diagnostics. |
 
 ---
 
@@ -211,6 +212,12 @@ and more expressive for both engagements.
 
 Likely cross-cutting capabilities:
 
+- **Architecture hardening** — split large files (`view_generator.py`,
+  `wb_cli.py`, `contract.py`, `pipeline_state.py`, corpus orchestrators)
+  into deep modules with small interfaces so product-repo pressure does
+  not collapse the codebase. See `docs/roadmap.md` §0.9.5–0.9.x.
+- **View archetype registry** — dispatch checklist, landing, dashboard,
+  list, reference, and print archetypes by label from the view manifest.
 - **`wb drift check`** — compare a re-profiled source against the current
   schema contract and import counts.
 - **Acceptance-test runner** — execute the acceptance criteria in a
@@ -239,7 +246,7 @@ Rough mapping:
 | Workbench version | Product milestone it enables or validates |
 |-------------------|--------------------------------------------|
 | 0.9.4 | Engine capability and joint cutover-prep. |
-| 0.9.5–0.9.x | Patches for gaps surfaced by product roadmaps (drift command, wiring helper, elicitor fixes). |
+| 0.9.5–0.9.x | Architecture hardening + patches for gaps surfaced by product roadmaps (view archetype decoupling/registry, CLI/contract splits, corpus pipeline, PipelineState, drift command, wiring helper, elicitor fixes). |
 | 0.10.0 | Behavior model → codegen → generated app proven in one engagement. |
 | 0.11.0 | Generated app validated against real human workflows in one engagement. |
 | 0.12.0–0.14.0 | Acceptance, parallel run, and source retirement in each engagement. |

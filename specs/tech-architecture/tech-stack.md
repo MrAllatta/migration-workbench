@@ -121,11 +121,23 @@ SourceConfig (JSON)  →  connectors/ProviderRouter  →  GoogleSheetsAdapter | 
 1. **Large files carrying too many responsibilities:**
    - `profiler/tools/pipeline_state.py` (~3,000 lines) — checkpoint lifecycle, migrations,
      phase orchestration, contract derivation, signal output, validation.
+     **Planned: split into checkpoint + phase modules (0.9.10, see `docs/roadmap.md`)**
    - `profiler/tools/cohort_corpus.py` (~2,000 lines) and `profiler/tools/coda_corpus.py`
      — multi-doc profiling orchestration + heuristic scoring.
+     **Planned: extract shared `CorpusPipeline` (0.9.9)**
    - `deployment/wb_cli.py` (~1,400 lines) — CLI surface, contract review, deploy,
      vertical/ecosystem commands, generation helpers.
+     **Planned: split into command-group modules (0.9.7)**
    - `workbook/codegen/admin_generator.py` (~1,500 lines) — admin rendering logic.
+     **Candidate for 0.9.13+ policy/rendering split**
+   - `workbook/codegen/view_generator.py` (~1,400 lines) — three archetype renderers
+     in one file.
+     **Planned: split into `workbook/views/{checklist,landing,dashboard}/` (0.9.5)**
+   - `workbook/codegen/contract.py` (~1,250 lines) — loader, accessors, validation, diff.
+     **Planned: split into `workbook/contract/` (0.9.8)**
+
+   The 0.9.5–0.9.x patch series is a dedicated architecture-hardening sprint
+   (see `docs/roadmap.md`). Split targets are sequenced by risk and dependency.
 
 2. **Broad exception handling is pervasive.** Many management commands and profiler
    tools use bare `except Exception` (often with `# noqa: BLE001`) to keep pipelines
@@ -175,6 +187,12 @@ SourceConfig (JSON)  →  connectors/ProviderRouter  →  GoogleSheetsAdapter | 
 11. **Real-data validation rule.** Track B patches and Track A minors require a real-data
     test in a product repo, not just workbench unit tests. This makes release gating
     dependent on external repo state and env vars (`CODA_API_TOKEN`, Google credentials).
+
+12. **Platform trajectory.** The workbench is evolving from a migration tool into a
+    **platform for generating bespoke served apps** from behavioral specifications
+    (see `specs/adr/001-platform-vision-and-archetype-seams.md`). The archetype
+    registry (0.9.6) and deep-module refactors (0.9.5–0.9.x) are the first steps
+    toward a plugin-ready, provider-agnostic codegen platform.
 
 ## When to Re-run This Analysis
 

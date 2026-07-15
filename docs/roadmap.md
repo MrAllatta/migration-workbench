@@ -107,6 +107,56 @@ Patch numbers under each collision-free minor absorb the granular fixes real
 data surfaces. See *Semver Recovery* for why `0.7.0`, `0.8.0`, and
 `0.9.0`–`0.9.3` are skipped.
 
+### 0.9.5–0.9.x: Architecture hardening for product pressure
+
+`0.9.4` proved the engine works against real data, but the next product
+milestones (`0.10.0` behavior-model-codegen) will push the codebase harder
+than the current structure can absorb. The product repos are pulling for:
+
+- New archetypes (reference, print, mobile checklist).
+- New provider abstractions (the corpus pipeline must not be Sheets-specific).
+- New CLI commands (`wb drift check`, acceptance-test runner).
+- Richer contract layers that can be diffed, validated, and merged safely.
+
+The workbench is also revealing a larger trajectory: it is evolving from a
+**migration tool** into a **platform for generating bespoke served apps**
+from behavioral specifications. That platform needs stable seams.
+
+The 0.9.5–0.9.x patch series is therefore a deliberate architecture-hardening
+sprint. Patches here are internal refactors and new archetypes proven by
+`make chassis-gate`, not by product-repo validation. They earn no minor on
+their own, but they unblock the minors that follow.
+
+| Version | Mission | What it hardens | Test target |
+|---------|---------|-----------------|-------------|
+| 0.9.5 | `view-archetype-decoupling` | Split `workbook/codegen/view_generator.py` into `workbook/views/{checklist,landing,dashboard}/`; keep `view_generator.py` as a re-export file. | workbench |
+| 0.9.6 | `view-archetype-registry` | Introduce `workbook/views/registry.py` and a `ViewArchetype` protocol so `generate_views` dispatches by archetype label instead of importing each archetype directly. | workbench |
+| 0.9.7 | `cli-router-split` | Split `deployment/wb_cli.py` into `deployment/commands/{manifest,contract,generate,deploy,vertical,ecosystem,drift}.py`; keep `wb_cli.py` as a router. | workbench |
+| 0.9.8 | `contract-layer-split` | Split `workbook/codegen/contract.py` into `workbook/contract/{loading,accessors,validation,diff}.py`; keep `contract.py` as a re-export file. | workbench |
+| 0.9.9 | `corpus-pipeline-abstraction` | Extract a provider-agnostic `CorpusPipeline` from `profiler/tools/cohort_corpus.py` and `profiler/tools/coda_corpus.py`; Sheets and Coda become adapters. | workbench |
+| 0.9.10 | `pipeline-state-decoupling` | Split `profiler/tools/pipeline_state.py` into a thin `PipelineState` checkpoint object plus phase modules under `profiler/pipeline/phases/`. | workbench |
+| 0.9.11 | `reference-archetype` | Implement the `reference` archetype generator that the archetype matrix already recognizes but no code emits. | workbench |
+| 0.9.12 | `print-view-archetype` | Implement a `print` archetype for tags, pack lists, and weekly summaries. | workbench |
+
+These are **sequenced by risk and dependency**:
+
+1. `view-archetype-decoupling` is first because the seams are already visible
+   and the file is actively churned by both product tracks.
+2. `view-archetype-registry` follows immediately because both engagements
+   need `generate_views` to dispatch cleanly by archetype label from the view
+   manifest.
+3. `cli-router-split` and `contract-layer-split` are mechanical wins that
+   reduce the daily friction of adding commands and contract features.
+4. `corpus-pipeline-abstraction` and `pipeline-state-decoupling` are deeper;
+   they come after the surface seams are proven.
+5. `reference-archetype` and `print-view-archetype` close known gaps in the
+   archetype matrix and product roadmaps.
+
+Architecture-hardening patches may be **released without product-repo
+validation**, but they must not break product repos. Each patch includes a
+smoke test that the generated artifacts for farm and vizcarra still compile
+and serve.
+
 ### Post-0.9.4 product milestones
 
 `0.9.4` proved the workbench engine was capable of supporting both
@@ -195,7 +245,9 @@ PyPI's latest by design.**
 Engine (workbench)                    Engagement A (Vizcarra)              Engagement B (farm)
 0.9.4 engine-ready                    0.10.0 behavior-model-codegen         0.10.0 behavior-model-codegen
      │                                      │                                    │
-     │                                      ▼                                    ▼
+0.9.5–0.9.x architecture hardening  ────┼────────────────────────────────────┤
+(view archetypes, CLI, contract,      │                                    │
+ corpus pipeline, PipelineState)      ▼                                    ▼
      │                                0.11.0 generated-app-validation       0.11.0 generated-app-validation
      │                                      │                                    │
      │                                      ▼                                    ▼
@@ -271,17 +323,27 @@ real data. See git history for the 0.0.x changelog.
 | Coda data is too messy for clean profile | Medium | High | Profiler already reads relation columns and formula taxonomy (0.5.3). Vizcarra is the gate. |
 | Workbench has hidden Sheets-specific assumptions | Medium | High | Track A (Vizcarra) exists specifically to catch this. |
 | UI archetypes extracted from farm are too farm-specific | Medium | High | Track B extraction briefs require generic templates with product-skin override blocks. |
+| Large files / God objects slow product changes | High | High | 0.9.5–0.9.x architecture-hardening sprint; deep modules with small interfaces; archetype registry. |
 | Solo consultant time is the bottleneck | Certain | High | The workbench exists to amplify consultant time. Generated UI is the largest single force multiplier. |
 
 ---
 
 ## Post-1.0.0 Horizons
 
-Directions the roadmap points toward after cold-client readiness is proven:
+After 1.0.0, the workbench shifts from "prove the playbook" to "make the
+playbook scalable and, eventually, self-service." The platform vision —
+generating bespoke served apps from behavioral specifications — is built in
+stages:
 
-- **1.x** — Third engagement; prospecting assessment tool.
-- **2.x** — Hosted consultant console; multi-client dashboard.
-- **3.x** — Self-service feasibility report for prospects; referral network.
+- **1.x** — Third engagement; archetype plugin system; vertical marketplace
+  (farm, vizcarra, and one new vertical share the same archetype registry);
+  provider-adapter marketplace (Airtable, Notion, direct interview as source).
+- **2.x** — Hosted consultant console; multi-client dashboard; reusable
+  archetype templates; prospecting assessment tool; telemetry on generated
+  app usage.
+- **3.x** — Self-service feasibility report for prospects; referral network;
+  limited no-code customization of generated apps (skin, alert thresholds,
+  status workflows).
 
 ---
 
