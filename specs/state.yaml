@@ -15,11 +15,10 @@ bug_cycle:
   completed_steps: []
 git:
   branch: master
-  hash: eca7334
+  hash: 51dd5a2
 handoff:
-  last_step_completed: "Survey-context validated mirror layer; caught stale state.yaml; e01 (0.9.5) and e02 (0.9.6) already shipped on master"
+  last_step_completed: "Epic stubs committed (51dd5a2); full bigpowers specs/ structure now present — state.yaml, release-plan, execution-status, product/, epics/, bugs/, adr/"
   open_decisions:
-    - "Create minimal epics/ stubs for bigpowers skills that expect them, or keep epics/ absent and rely on release-plan.yaml only?"
     - "Define vertical template ladder priority order (3-5 archetypes)"
     - "Set services vs. product investment ratio glide path"
     - "Determine partner playbook scope and certification level"
