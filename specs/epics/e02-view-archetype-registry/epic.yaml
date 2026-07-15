@@ -1,0 +1,20 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e02
+title: "view-archetype-registry"
+status: shipped
+target_version: "0.9.6"
+test_target: workbench
+canonical: "docs/roadmap.md#096-view-archetype-registry"
+description: |
+  Introduce workbook/views/registry.py and a ViewArchetype protocol so
+  generate_views dispatches by archetype label instead of importing
+  each archetype directly.
+verify: "make chassis-gate"
+
+shipped:
+  commit: "eca7334"
+  message: "feat(views): view archetype registry and self-registration (0.9.6)"
+
+stories: []

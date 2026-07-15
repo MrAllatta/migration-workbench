@@ -1,0 +1,35 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e06
+title: "pipeline-state-decoupling"
+status: not_started
+target_version: "0.9.10"
+test_target: workbench
+canonical: "docs/roadmap.md#0910-pipeline-state-decoupling"
+description: |
+  Split profiler/tools/pipeline_state.py into a thin PipelineState
+  checkpoint object plus phase modules under profiler/pipeline/phases/.
+verify: "make chassis-gate"
+
+stories:
+  - id: e06s01
+    title: "Identify PipelineState responsibilities"
+    tasks:
+      - description: "Find checkpoint persistence and phase logic"
+        verify: "wc -l profiler/tools/pipeline_state.py"
+  - id: e06s02
+    title: "Extract profiler/pipeline/state.py (checkpoint only)"
+    tasks:
+      - description: "Thin object holding phase results"
+        verify: "make chassis-gate"
+  - id: e06s03
+    title: "Extract phase modules under profiler/pipeline/phases/"
+    tasks:
+      - description: "One module per phase: profile, contract, codegen, import, deploy"
+        verify: "make chassis-gate"
+  - id: e06s04
+    title: "Wire phases into a PipelineState checkpoint pattern"
+    tasks:
+      - description: "Each phase reads from and writes to PipelineState"
+        verify: "make chassis-gate"

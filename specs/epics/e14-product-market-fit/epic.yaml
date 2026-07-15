@@ -1,0 +1,31 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e14
+title: "product-market-fit"
+status: not_started
+target_version: "1.0.0"
+test_target: "farm + vizcarra"
+canonical: "docs/roadmap.md#definition-of-100"
+description: |
+  Both farm spreadsheet and Vizcarra Coda doc retired in the wild;
+  consultant playbook proven; engine ready for a third engagement
+  without heroic effort.
+verify: "make chassis-gate"
+
+stories:
+  - id: e14s01
+    title: "Both engagements retired"
+    tasks:
+      - description: "e12 (Vizcarra coda-retired) and e12 farm-spreadsheet-retired both done"
+        verify: "make chassis-gate"
+  - id: e14s02
+    title: "Consultant playbook proven"
+    tasks:
+      - description: "A non-operator can run a known-vertical engagement using the playbook"
+        verify: "make chassis-gate"
+  - id: e14s03
+    title: "Engine ready for third engagement"
+    tasks:
+      - description: "Workbench supports a new vertical without heroic effort"
+        verify: "make chassis-gate"

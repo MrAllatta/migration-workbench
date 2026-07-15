@@ -1,0 +1,42 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e10
+title: "vizcarra-generated-app-validation"
+status: not_started
+target_version: "0.11.0"
+test_target: vizcarra-guitars
+parallel_track: farm-generated-app-validation
+canonical: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+description: |
+  A human can complete the core shop workflows in the generated app.
+  Workflow hand-checks pass for intake, evaluation, queue, bench work,
+  billing, time tracking, archive; acceptance suites pass; drift check clean.
+verify: "make chassis-gate"
+
+stories:
+  - id: e10s01
+    title: "Intake workflow hand-check"
+    tasks:
+      - description: "A human can complete a new instrument intake"
+        verify: "make chassis-gate"
+  - id: e10s02
+    title: "Evaluation workflow hand-check"
+    tasks:
+      - description: "Evaluate, scope, and price a new instrument"
+        verify: "make chassis-gate"
+  - id: e10s03
+    title: "Queue and bench workflow hand-check"
+    tasks:
+      - description: "Move work through queue and bench"
+        verify: "make chassis-gate"
+  - id: e10s04
+    title: "Billing workflow hand-check"
+    tasks:
+      - description: "Bill and complete a transaction"
+        verify: "make chassis-gate"
+  - id: e10s05
+    title: "Acceptance suite passes"
+    tasks:
+      - description: "Behavioral spec acceptance criteria all pass"
+        verify: "wb acceptance"

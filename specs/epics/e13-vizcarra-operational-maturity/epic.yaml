@@ -1,0 +1,32 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e13
+title: "vizcarra-operational-maturity"
+status: not_started
+target_version: "0.14.0"
+test_target: vizcarra-guitars
+parallel_track: farm-operational-maturity
+canonical: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+description: |
+  Post-cutover refinements are validated. Print tags tested on real
+  labels; alert thresholds tuned with team feedback; mobile workflow
+  (phone/tablet) smoke-tested; performance acceptable on shop Wi-Fi.
+verify: "make chassis-gate"
+
+stories:
+  - id: e13s01
+    title: "Print tags tested on real labels"
+    tasks:
+      - description: "Print archetype produces usable shop labels"
+        verify: "make chassis-gate"
+  - id: e13s02
+    title: "Alert thresholds tuned"
+    tasks:
+      - description: "Alert rules reviewed and adjusted with team feedback"
+        verify: "make chassis-gate"
+  - id: e13s03
+    title: "Mobile workflow smoke-tested"
+    tasks:
+      - description: "Phone and tablet workflows work on shop Wi-Fi"
+        verify: "make chassis-gate"

@@ -1,0 +1,33 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e11
+title: "vizcarra-parallel-run"
+status: not_started
+target_version: "0.12.0"
+test_target: vizcarra-guitars
+parallel_track: farm-parallel-run
+canonical: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+description: |
+  The app is trustworthy enough to run live alongside Coda without
+  blocking daily work. One full business week of parallel use;
+  discrepancies logged and triaged; no blocking defects; data
+  re-imports cleanly each morning.
+verify: "make chassis-gate"
+
+stories:
+  - id: e11s01
+    title: "Run one full business week in parallel"
+    tasks:
+      - description: "Both Coda and Django app used for the same workflows"
+        verify: "make chassis-gate"
+  - id: e11s02
+    title: "Log and triage discrepancies"
+    tasks:
+      - description: "Discrepancy log template; structured logging"
+        verify: "make chassis-gate"
+  - id: e11s03
+    title: "Morning re-import runs cleanly"
+    tasks:
+      - description: "Idempotent re-import each morning"
+        verify: "make chassis-gate"

@@ -1,0 +1,20 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+# The full breakdown lives in docs/roadmap.md.
+
+id: e01
+title: "view-archetype-decoupling"
+status: shipped
+target_version: "0.9.5"
+test_target: workbench
+canonical: "docs/roadmap.md#095-view-archetype-decoupling"
+description: |
+  Split workbook/codegen/view_generator.py into per-archetype modules
+  (checklist, landing, dashboard); keep view_generator.py as re-export.
+verify: "make chassis-gate"
+
+shipped:
+  commit: "f4f80db"
+  message: "feat(views): complete view archetype decoupling (0.9.5) — landing and dashboard packages"
+
+stories: []

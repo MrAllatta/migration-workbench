@@ -1,0 +1,56 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+# Two parallel tracks: Track A (Vizcarra) and Track B (farm).
+# Either track earning the milestone ships the workbench minor.
+
+id: e09
+title: "vizcarra-behavior-model-codegen"
+status: not_started
+target_version: "0.10.0"
+test_target: vizcarra-guitars
+parallel_track: farm-behavior-model-codegen
+canonical: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+description: |
+  The signed-off behavior model drives codegen that produces the nuanced
+  views Coda requires: status-driven lists, detail forms with computed
+  totals, time tracking, build ledger, billing, print tags. Any codegen
+  gaps needed for Coda-specific expressions are fixed upstream.
+verify: "make chassis-gate"
+
+stories:
+  - id: e09s01
+    title: "Codegen hardening"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Prove the codegen is complete enough that every Coda expression has a generated equivalent"
+        verify: "make chassis-gate && (cd ../vizcarra-guitars && make chassis-gate)"
+  - id: e09s02
+    title: "Formula parity re-check"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Validate computed-field behavior against latest Coda pull"
+        verify: "make chassis-gate"
+  - id: e09s03
+    title: "Drift check"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Re-profile Coda vs. generated schema and record counts"
+        verify: "wb drift check"
+  - id: e09s04
+    title: "Workflow hand-checks"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Human completes intake → evaluation → queue → in-progress → completed → picked up → billed"
+        verify: "make chassis-gate"
+  - id: e09s05
+    title: "Phase 0/1 catch-up"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Write build/pipeline-state.yaml and config/domain_context.yaml"
+        verify: "make chassis-gate"
+  - id: e09s06
+    title: "Keith's operational questions"
+    canonical: "docs/product-roadmaps.md#work-to-close-before-0100"
+    tasks:
+      - description: "Confirm status order; validate orphan priorities; verify alert thresholds"
+        verify: "make chassis-gate"

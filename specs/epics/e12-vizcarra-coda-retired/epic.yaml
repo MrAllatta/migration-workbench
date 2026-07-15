@@ -1,0 +1,32 @@
+# mirror — docs/product-roadmaps.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e12
+title: "vizcarra-coda-retired"
+status: not_started
+target_version: "0.13.0"
+test_target: vizcarra-guitars
+parallel_track: farm-spreadsheet-retired
+canonical: "docs/product-roadmaps.md#engagement-a-vizcarra-guitars-coda--django"
+description: |
+  Coda is no longer the system of record. Coda permissions set to
+  read-only; team uses Django app for intake, status changes, billing,
+  and archive; rollback window expired without rollback.
+verify: "make chassis-gate"
+
+stories:
+  - id: e12s01
+    title: "Set Coda permissions to read-only"
+    tasks:
+      - description: "Coda doc permissions tightened to read-only"
+        verify: "make chassis-gate"
+  - id: e12s02
+    title: "Team uses Django app for all workflows"
+    tasks:
+      - description: "Full work cycle in the generated app"
+        verify: "make chassis-gate"
+  - id: e12s03
+    title: "Rollback window expires without rollback"
+    tasks:
+      - description: "Two weeks of post-cutover operation"
+        verify: "make chassis-gate"

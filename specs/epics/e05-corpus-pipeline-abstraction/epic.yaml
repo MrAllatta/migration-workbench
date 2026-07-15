@@ -1,0 +1,40 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e05
+title: "corpus-pipeline-abstraction"
+status: not_started
+target_version: "0.9.9"
+test_target: workbench
+canonical: "docs/roadmap.md#099-corpus-pipeline-abstraction"
+description: |
+  Extract a provider-agnostic CorpusPipeline from profiler/tools/cohort_corpus.py
+  and profiler/tools/coda_corpus.py; Sheets and Coda become adapters.
+verify: "make chassis-gate"
+
+stories:
+  - id: e05s01
+    title: "Identify CorpusPipeline interface"
+    tasks:
+      - description: "Find common operations across Sheets and Coda corpora"
+        verify: "wc -l profiler/tools/cohort_corpus.py profiler/tools/coda_corpus.py"
+  - id: e05s02
+    title: "Implement CorpusPipeline protocol"
+    tasks:
+      - description: "Define the abstract interface in profiler/pipeline/"
+        verify: "make chassis-gate"
+  - id: e05s03
+    title: "Refactor cohort_corpus.py to Sheets adapter"
+    tasks:
+      - description: "Sheets-specific logic stays in the adapter"
+        verify: "make chassis-gate"
+  - id: e05s04
+    title: "Refactor coda_corpus.py to Coda adapter"
+    tasks:
+      - description: "Coda-specific logic stays in the adapter"
+        verify: "make chassis-gate"
+  - id: e05s05
+    title: "Wire adapters into CorpusPipeline"
+    tasks:
+      - description: "Pipeline dispatches to adapter by provider type"
+        verify: "make chassis-gate"

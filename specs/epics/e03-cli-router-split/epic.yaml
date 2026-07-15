@@ -1,0 +1,45 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e03
+title: "cli-router-split"
+status: not_started
+target_version: "0.9.7"
+test_target: workbench
+canonical: "docs/roadmap.md#097-cli-router-split"
+description: |
+  Split deployment/wb_cli.py into deployment/commands/{manifest,contract,
+  generate,deploy,vertical,ecosystem,drift}.py; keep wb_cli.py as router.
+verify: "make chassis-gate"
+
+stories:
+  - id: e03s01
+    title: "Inventory wb_cli.py subcommands and groups"
+    canonical: "docs/roadmap.md#097-cli-router-split"
+    tasks:
+      - description: "Identify command groups and their boundary seams"
+        verify: "wc -l deployment/wb_cli.py"   # baseline before split
+  - id: e03s02
+    title: "Extract manifest commands"
+    canonical: "docs/roadmap.md#097-cli-router-split"
+    tasks:
+      - description: "Move manifest subcommands to deployment/commands/manifest.py"
+        verify: "make chassis-gate"
+  - id: e03s03
+    title: "Extract contract commands"
+    canonical: "docs/roadmap.md#097-cli-router-split"
+    tasks:
+      - description: "Move contract subcommands to deployment/commands/contract.py"
+        verify: "make chassis-gate"
+  - id: e03s04
+    title: "Extract generate, deploy, vertical, ecosystem, drift commands"
+    canonical: "docs/roadmap.md#097-cli-router-split"
+    tasks:
+      - description: "Move remaining command groups to their own modules"
+        verify: "make chassis-gate"
+  - id: e03s05
+    title: "Reduce wb_cli.py to a router"
+    canonical: "docs/roadmap.md#097-cli-router-split"
+    tasks:
+      - description: "wb_cli.py dispatches to command modules by name"
+        verify: "make chassis-gate"

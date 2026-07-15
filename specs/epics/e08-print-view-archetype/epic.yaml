@@ -1,0 +1,34 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e08
+title: "print-view-archetype"
+status: not_started
+target_version: "0.9.12"
+test_target: workbench
+canonical: "docs/roadmap.md#0912-print-view-archetype"
+description: |
+  Implement a print archetype for tags, pack lists, and weekly summaries.
+verify: "make chassis-gate"
+
+stories:
+  - id: e08s01
+    title: "Design print archetype config"
+    tasks:
+      - description: "Dataclass with size, layout, field selection"
+        verify: "make chassis-gate"
+  - id: e08s02
+    title: "Implement view source renderer"
+    tasks:
+      - description: "Generate print-optimized DetailView subclass"
+        verify: "make chassis-gate"
+  - id: e08s03
+    title: "Implement print template renderer"
+    tasks:
+      - description: "Print stylesheet and minimal HTML"
+        verify: "make chassis-gate"
+  - id: e08s04
+    title: "Self-register with ViewArchetype registry"
+    tasks:
+      - description: "Add to workbook/views/registry.py"
+        verify: "make chassis-gate"

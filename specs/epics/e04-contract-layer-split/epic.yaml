@@ -1,0 +1,45 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e04
+title: "contract-layer-split"
+status: not_started
+target_version: "0.9.8"
+test_target: workbench
+canonical: "docs/roadmap.md#098-contract-layer-split"
+description: |
+  Split workbook/codegen/contract.py into workbook/contract/{loading,
+  accessors,validation,diff}.py; keep contract.py as a re-export file.
+verify: "make chassis-gate"
+
+stories:
+  - id: e04s01
+    title: "Identify contract layer seams"
+    tasks:
+      - description: "Find loading, accessor, validation, and diff responsibilities"
+        verify: "wc -l workbook/codegen/contract.py"
+  - id: e04s02
+    title: "Extract workbook/contract/loading.py"
+    tasks:
+      - description: "YAML loading and bundle parsing"
+        verify: "make chassis-gate"
+  - id: e04s03
+    title: "Extract workbook/contract/accessors.py"
+    tasks:
+      - description: "Field and model lookup helpers"
+        verify: "make chassis-gate"
+  - id: e04s04
+    title: "Extract workbook/contract/validation.py"
+    tasks:
+      - description: "Contract validation rules"
+        verify: "make chassis-gate"
+  - id: e04s05
+    title: "Extract workbook/contract/diff.py"
+    tasks:
+      - description: "Drift detection between contract versions"
+        verify: "make chassis-gate"
+  - id: e04s06
+    title: "Reduce contract.py to re-exports"
+    tasks:
+      - description: "Backwards-compatible shim"
+        verify: "make chassis-gate"

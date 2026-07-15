@@ -1,0 +1,40 @@
+# mirror — docs/roadmap.md is canonical
+# Bigpowers stub: epic title and reference for bigpowers skills.
+
+id: e07
+title: "reference-archetype"
+status: not_started
+target_version: "0.9.11"
+test_target: workbench
+canonical: "docs/roadmap.md#0911-reference-archetype"
+description: |
+  Implement the reference archetype generator that the archetype matrix
+  already recognizes but no code emits.
+verify: "make chassis-gate"
+
+stories:
+  - id: e07s01
+    title: "Design reference archetype config"
+    tasks:
+      - description: "Dataclass describing a reference list view"
+        verify: "make chassis-gate"
+  - id: e07s02
+    title: "Implement view source renderer"
+    tasks:
+      - description: "Generate ListView subclass"
+        verify: "make chassis-gate"
+  - id: e07s03
+    title: "Implement template renderer"
+    tasks:
+      - description: "Generate reference.html template"
+        verify: "make chassis-gate"
+  - id: e07s04
+    title: "Implement URL pattern renderer"
+    tasks:
+      - description: "Wire reference view into urls_auto.py"
+        verify: "make chassis-gate"
+  - id: e07s05
+    title: "Self-register with ViewArchetype registry"
+    tasks:
+      - description: "Add to workbook/views/registry.py"
+        verify: "make chassis-gate"
