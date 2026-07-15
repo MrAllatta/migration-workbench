@@ -70,28 +70,18 @@ real-time sync, non-Django targets, Postgres at scale, plugin ecosystem.
 
 ---
 
-## Current Work: 0.6.0+ — Two Tracks Converge on 1.0.0
+## Track history: 0.6.0 → 0.9.4
 
-**Track A (Coda engagement validation)** hardens the Vizcarra Guitars Coda
-engagement for cut-over. Each Track A milestone earns a minor by validating
-one segment against real Vizcarra data.
+These milestones built the workbench's capability to profile, codegen,
+import, and serve views against both Coda and Sheets. Track A proved the
+pipeline on a Coda-sourced engagement; Track B extracted UI patterns from
+farm's hand-written `farm_ui/` and turned them into codegen archetypes.
 
-**Track B (UI codegen extraction + farm cut-over)** extracts the UI patterns
-farm's hand-written `farm_ui/` proved, turns them into workbench codegen, and
-applies that codegen back to farm to retire the farm spreadsheet. Farm is both
-the proving ground and the first cut-over target.
+The engine is now ready. The forward work is product-side: see
+[Post-0.9.4 product milestones](#post-094-product-milestones) below and
+[product-roadmaps.md](product-roadmaps.md).
 
-`farm_ui/` has 15 templates, 5 view modules, role landings, weekly checklists
-with HTMX toggles, dashboards, print views — all hand-written. The MWBS
-schema (`profiler/tools/behavioral_spec.py`) already ships the semantic
-input for UI generation: `Actor`, `JobStory`, `WorkflowStep`,
-`BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. Nothing
-in `workbook/codegen/` consumes it (`model_generator.py`,
-`admin_generator.py`, `import_generator.py` — no `view_generator` or
-`template_generator`). Track B closes that gap. Each Track B milestone earns
-a patch (validated on farm) that feeds into the next engagement.
-
-### Milestone Table
+### Milestone table
 
 | Version | Track | Mission | Proves | Test target |
 |---------|-------|---------|-------|-------------|
@@ -127,20 +117,21 @@ them are recorded here.
 
 | Version | Track | Mission | Proves | Test target |
 |---------|-------|---------|-------|-------------|
-| 0.10.0  | A     | `vizcarra-acceptance-validation` | Every signed-off workflow can be completed in the generated app; acceptance criteria pass; drift check clean | vizcarra-guitars |
-| 0.10.0  | B     | `farm-behavioral-elicitation` | Real actors, workflows, decisions, exceptions, rules, reports, and acceptance criteria signed off by farm team | farm |
-| 0.11.0  | A     | `vizcarra-parallel-run` | One week of live parallel use next to Coda with no blocking defects | vizcarra-guitars |
-| 0.11.0  | B     | `farm-interaction-contract` | Weekly actions, status transitions, alerts, and workflow-to-view mapping complete | farm |
-| 0.12.0  | A     | `vizcarra-coda-retired` | Coda doc is read-only; team uses Django app for all workflows | vizcarra-guitars |
-| 0.12.0  | B     | `farm-generated-views-wired` | Generated views replace hand-written `farm_ui/` views for core workflows; real-data parity tests pass | farm |
-| 0.13.0  | A     | `vizcarra-operational-maturity` | Print tags, alert tuning, mobile workflows validated post-cutover | vizcarra-guitars |
-| 0.13.0  | B     | `farm-data-reconciliation` | Latest spreadsheet bundle imports and reconciles cleanly | farm |
-| 0.14.0  | B     | `farm-spreadsheet-retired` | Google Sheets are read-only archive; team uses Django app for full weekly cycle | farm |
-| 0.15.0  | B     | `farm-operational-maturity` | CSV/print views, mobile field checklist, performance, alert tuning validated post-cutover | farm |
+| 0.10.0  | A     | `vizcarra-behavior-model-codegen` | Signed-off MWBS drives codegen that produces the nuanced Coda-equivalent views; any codegen gaps fixed upstream | vizcarra-guitars |
+| 0.10.0  | B     | `farm-behavior-model-codegen` | Farm sheets and `farm_ui/` patterns are expressed as a behavior model and generated app; codegen gaps fixed upstream | farm |
+| 0.11.0  | A     | `vizcarra-generated-app-validation` | Human can complete core shop workflows in the generated app; acceptance criteria pass; drift check clean | vizcarra-guitars |
+| 0.11.0  | B     | `farm-generated-app-validation` | Human can complete core weekly farm workflows in the generated app; parity with `farm_ui/` reference views | farm |
+| 0.12.0  | A     | `vizcarra-parallel-run` | One week of live parallel use next to Coda with no blocking defects | vizcarra-guitars |
+| 0.12.0  | B     | `farm-parallel-run` | One week of live parallel use next to Sheets with no blocking defects | farm |
+| 0.13.0  | A     | `vizcarra-coda-retired` | Coda doc is read-only; team uses Django app for all workflows | vizcarra-guitars |
+| 0.13.0  | B     | `farm-spreadsheet-retired` | Google Sheets are read-only archive; team uses Django app for full weekly cycle | farm |
+| 0.14.0  | A     | `vizcarra-operational-maturity` | Print tags, alert tuning, mobile workflows validated post-cutover | vizcarra-guitars |
+| 0.14.0  | B     | `farm-operational-maturity` | CSV/print views, mobile field checklist, performance, alert tuning validated post-cutover | farm |
 | 1.0.0   | —     | `product-market-fit` | Both engagements retired; consultant playbook proven; engine ready for third engagement | farm + vizcarra |
 
-The A and B tracks now advance independently. A workbench minor is earned
-when either track completes its milestone against real product data.
+The A and B tracks advance in parallel through the same capability loop.
+A workbench minor is earned when either track completes its milestone
+against real product data.
 
 ### Semver policy
 
@@ -202,22 +193,19 @@ PyPI's latest by design.**
 
 ```
 Engine (workbench)                    Engagement A (Vizcarra)              Engagement B (farm)
-0.9.4 engine-ready                    0.10.0 acceptance-validation          0.10.0 behavioral-elicitation
+0.9.4 engine-ready                    0.10.0 behavior-model-codegen         0.10.0 behavior-model-codegen
      │                                      │                                    │
      │                                      ▼                                    ▼
-     │                                0.11.0 parallel-run                0.11.0 interaction-contract
+     │                                0.11.0 generated-app-validation       0.11.0 generated-app-validation
      │                                      │                                    │
      │                                      ▼                                    ▼
-     │                                0.12.0 coda-retired                 0.12.0 generated-views-wired
+     │                                0.12.0 parallel-run                    0.12.0 parallel-run
      │                                      │                                    │
      │                                      ▼                                    ▼
-     │                                0.13.0 operational-maturity          0.13.0 data-reconciliation
-     │                                                                               │
-     │                                                                               ▼
-     │                                                                          0.14.0 spreadsheet-retired
-     │                                                                               │
-     │                                                                               ▼
-     │                                                                          0.15.0 operational-maturity
+     │                                0.13.0 coda-retired                    0.13.0 spreadsheet-retired
+     │                                      │                                    │
+     │                                      ▼                                    ▼
+     │                                0.14.0 operational-maturity            0.14.0 operational-maturity
      │                                      │                                    │
      └──────────────────────────────────────┴────────────────────────────────────┘
                                                  │
@@ -225,15 +213,15 @@ Engine (workbench)                    Engagement A (Vizcarra)              Engag
                                            1.0.0 product-market-fit
 ```
 
-Track A validates the pipeline on a Coda-sourced engagement. Track B extracts
-UI patterns from farm's hand-written `farm_ui/`, hardens them into workbench
-codegen, and then applies that codegen back to farm. The two tracks run in
-parallel after 0.9.4. The engagement milestones are defined in
-[product-roadmaps.md](product-roadmaps.md); each product-validated milestone
-earns the corresponding workbench minor. Both engagements must reach
-retirement before `1.0.0`. Cross-cutting workbench capabilities (e.g.,
-`wb drift check`, acceptance-test runner, print-view archetype) are pulled
-forward by whichever engagement needs them first.
+Both engagements run the same capability loop: profile and behavior model the
+source, design the UI expressions, push required codegen upstream, generate
+the app, validate it against real workflows, then cut over. Vizcarra's source
+material is a Coda doc; farm's is a Google Sheets corpus plus the `farm_ui/`
+reference views that revealed the need for behavior modeling in the first
+place. Each product-validated milestone earns the corresponding workbench
+minor. Cross-cutting workbench capabilities (e.g., `wb drift check`,
+acceptance-test runner, print-view archetype) are pulled forward by whichever
+engagement needs them first.
 
 **Track status after 0.9.4:** The engine is ready. The workbench can profile,
 codegen, import, and serve views against both Coda and Sheets data. Both

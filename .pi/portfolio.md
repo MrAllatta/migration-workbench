@@ -11,21 +11,23 @@
 
 ## Active
 
-The engine is ready (0.9.4). The next work is product-side specification
-enrichment and validation in the two engagements. Tracks A and B advance
-independently; the first product-validated milestone earns 0.10.0.
+The engine is ready (0.9.4). The next work is the same for both
+engagements: refine the profile and behavior model, design the UI
+expressions, push the required codegen upstream, generate the app, and
+validate it against real workflows. Tracks A and B advance in parallel; the
+first product-validated milestone earns 0.10.0.
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `vizcarra-acceptance-validation` | A | 0.10.0 | vizcarra-guitars |
-| `farm-behavioral-elicitation` | B | 0.10.0 | farm |
+| `vizcarra-behavior-model-codegen` | A | 0.10.0 | vizcarra-guitars |
+| `farm-behavior-model-codegen` | B | 0.10.0 | farm |
 
 ## Next
 
 | Mission | Track | Earns | Test target |
 |---------|-------|-------|-------------|
-| `vizcarra-parallel-run` | A | 0.11.0 | vizcarra-guitars |
-| `farm-interaction-contract` | B | 0.11.0 | farm |
+| `vizcarra-generated-app-validation` | A | 0.11.0 | vizcarra-guitars |
+| `farm-generated-app-validation` | B | 0.11.0 | farm |
 
 ## Extraction Backlog
 
@@ -41,9 +43,9 @@ Track B sources — patterns proven in `farm_ui`, waiting to become codegen:
 ## Cross-Cutting Notes
 
 - MWBS behavioral spec (`profiler/tools/behavioral_spec.py`) ships the semantic input for UI generation: `Actor`, `JobStory`, `WorkflowStep`, `BehavioralEvent`, `BusinessRule`, `Report`, `AcceptanceCriterion`. `workbook/codegen/view_generator.py` now ships checklist, landing, dashboard archetypes plus the full `wb generate views` pipeline (0.6.1/0.6.3/0.7.2/0.7.3). The vizcarra session of 2026-07-14 consumed the pipeline and enriched the spec to 1,691 lines of behavioral spec, 998 lines of view manifest, and 545 lines of interaction contract.
-- **0.9.4 revision:** `cutover-prep` (0.9.4) proved the engine was capable, not that the engagements were ready to cut over. The recent Vizcarra session (2026-07-14) enriched the behavioral spec, interaction contract, and view manifest, producing 39 view classes and 58 templates *after* 0.9.4. Engagement milestones now live in [docs/product-roadmaps.md](../../docs/product-roadmaps.md).
-- **Track A sequence (revised):** Vizcarra now moves through `vizcarra-acceptance-validation` (0.10.0) → `vizcarra-parallel-run` (0.11.0) → `vizcarra-coda-retired` (0.12.0) → `vizcarra-operational-maturity` (0.13.0).
-- **Track B sequence (revised):** Farm now moves through `farm-behavioral-elicitation` (0.10.0) → `farm-interaction-contract` (0.11.0) → `farm-generated-views-wired` (0.12.0) → `farm-data-reconciliation` (0.13.0) → `farm-spreadsheet-retired` (0.14.0) → `farm-operational-maturity` (0.15.0).
+- **0.9.4 revision:** `cutover-prep` (0.9.4) proved the engine was capable. The recent Vizcarra session (2026-07-14) enriched the behavioral spec, interaction contract, and view manifest, producing 39 view classes and 58 templates *after* 0.9.4 — showing the real work is behavior model → codegen → generated app, not just engine capability. Engagement milestones now live in [docs/product-roadmaps.md](../../docs/product-roadmaps.md).
+- **Track A sequence (revised):** Vizcarra now moves through `vizcarra-behavior-model-codegen` (0.10.0) → `vizcarra-generated-app-validation` (0.11.0) → `vizcarra-parallel-run` (0.12.0) → `vizcarra-coda-retired` (0.13.0) → `vizcarra-operational-maturity` (0.14.0).
+- **Track B sequence (revised):** Farm now moves through `farm-behavior-model-codegen` (0.10.0) → `farm-generated-app-validation` (0.11.0) → `farm-parallel-run` (0.12.0) → `farm-spreadsheet-retired` (0.13.0) → `farm-operational-maturity` (0.14.0).
 - **Joint 1.0.0 gate:** Both engagements retired and the consultant playbook proven. See [docs/product-roadmaps.md](../../docs/product-roadmaps.md).
 
 ## Semver policy

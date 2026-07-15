@@ -290,8 +290,10 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 
 - **Roadmap Correction:** The workbench roadmap was an engine roadmap; the
   client engagements (Vizcarra Guitars and farm) now have their own product
-  roadmaps in `docs/product-roadmaps.md`. Semver minors are integers, so
-  `0.10.0`, `0.11.0`, etc. are valid and will be used for product-validated
+  roadmaps in `docs/product-roadmaps.md`. Both engagements are vehicles for
+  the same loop: profile → behavior model → UI design → codegen → generated
+  app → validation → cutover. Semver minors are integers, so `0.10.0`,
+  `0.11.0`, etc. are valid and will be used for product-validated
   milestones before `1.0.0`. `0.9.4` is reclassified as engine-ready, not
   product-ready.
 
