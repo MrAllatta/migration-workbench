@@ -92,14 +92,14 @@ Five Django apps:
 
 ```mermaid
 flowchart LR
-  sourceConfig[SourceConfigJSON] --> pullBundle[PullBundleCommand];
-  pullBundle --> providerRouter[ProviderRouter];
-  providerRouter --> adapters[GoogleSheets_or_Coda];
-  adapters --> rawRows[RawRows];
-  rawRows --> normalizer[SpreadsheetNormalizer];
-  normalizer --> bundle[NormalizedBundle];
-  bundle --> importer[BaseImportCommandSubclass];
-  importer --> summary[SummaryArtifactJSON]
+  sourceConfig["SourceConfigJSON"] --> pullBundle["PullBundleCommand"];
+  pullBundle --> providerRouter["ProviderRouter"];
+  providerRouter --> adapters["GoogleSheets_or_Coda"];
+  adapters --> rawRows["RawRows"];
+  rawRows --> normalizer["SpreadsheetNormalizer"];
+  normalizer --> bundle["NormalizedBundle"];
+  bundle --> importer["BaseImportCommandSubclass"];
+  importer --> summary["SummaryArtifactJSON"]
 ```
 
 

@@ -17,16 +17,16 @@ See the repository [README](../README.md) for the documentation map; Fly hosting
 
 ```mermaid
 flowchart LR
-  sourceConfig[SourceConfigJSON] --> pullBundle[PullBundleCommand]
-  pullBundle --> providerRouter[ProviderRouter]
-  providerRouter --> googleSheetsAdapter[GoogleSheetsAdapter]
-  providerRouter --> codaAdapter[CodaAdapter]
-  googleSheetsAdapter --> rawRows[RawRows]
+  sourceConfig["SourceConfigJSON"] --> pullBundle["PullBundleCommand"]
+  pullBundle --> providerRouter["ProviderRouter"]
+  providerRouter --> googleSheetsAdapter["GoogleSheetsAdapter"]
+  providerRouter --> codaAdapter["CodaAdapter"]
+  googleSheetsAdapter --> rawRows["RawRows"]
   codaAdapter --> rawRows
-  rawRows --> normalizer[SpreadsheetNormalizer]
-  normalizer --> bundle[NormalizedBundleCSVManifest]
-  bundle --> importer[BaseImportCommandSubclass]
-  importer --> summary[SummaryArtifactJSON_v1_0]
+  rawRows --> normalizer["SpreadsheetNormalizer"]
+  normalizer --> bundle["NormalizedBundleCSVManifest"]
+  bundle --> importer["BaseImportCommandSubclass"]
+  importer --> summary["SummaryArtifactJSON_v1_0"]
 ```
 
 ## Profiler commands (read-only)
