@@ -5,4 +5,19 @@
 # bigpowers fix-bug skill reads this to discover existing bugs.
 # Empty = no known active investigations.
 
-bugs: []
+bugs:
+  - id: BUG-001
+    title: ".omo/ agent-harness directory leaked into core workbench runtime"
+    file: specs/bugs/BUG-001-omo-harness-leak.md
+    status: under_review
+    severity: high
+    component: workbook/tools/queue_protocol.py, deployment/commands/ecosystem.py
+    discovered: 2026-07-16
+
+  - id: BUG-002
+    title: "test_run_pipeline_state_resume calls real Google auth in CI"
+    file: specs/bugs/BUG-002-google-credentials-test-fragility.md
+    status: under_review
+    severity: high
+    component: profiler/tests/test_run_pipeline_state_command.py, connectors/google_sheets.py
+    discovered: 2026-07-16
