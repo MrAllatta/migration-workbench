@@ -32,9 +32,11 @@ stories:
   - id: e03s03
     title: "Extract contract commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Move contract subcommands to deployment/commands/contract.py"
         verify: "make chassis-gate"
+        status: passing
   - id: e03s04
     title: "Extract generate, deploy, vertical, ecosystem, drift commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
