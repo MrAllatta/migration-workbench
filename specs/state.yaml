@@ -1,13 +1,13 @@
 active_flow: build_epic
 active_epic_id: e03
-active_story_id: null
+active_story_id: e03s01
 active_bug_id: null
 release:
   target_version: 0.9.7
   last_tag: v0.9.6
   last_publish: null
 epic_cycle:
-  current_step: null
+  current_step: develop-tdd
   next_skill: develop-tdd
   completed_steps:
   - kickoff-branch
@@ -16,9 +16,9 @@ bug_cycle:
   completed_steps: []
 git:
   branch: feat/e03-cli-router-split
-  hash: 0d6737e
+  hash: 7611892
 handoff:
-  last_step_completed: "kickoff-branch: worktree created, chassis-gate green (1789 passed, 0 failed)"
+  last_step_completed: "develop-tdd: e03s01 inventory — RED test written; inventory file does not yet exist"
   open_decisions:
   - Define vertical template ladder priority order (3-5 archetypes)
   - Set services vs. product investment ratio glide path
@@ -33,3 +33,5 @@ handoff:
   - specs/product/SCOPE_LATEST.yaml
   - specs/adr/002-consultancy-as-proving-ground.md
   next_skill: develop-tdd
+  story_id: e03s01
+  baseline_tests: 1789
