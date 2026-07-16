@@ -26,3 +26,6 @@ docs/superpowers/
 profiler-signals.yaml
 .ruff_cache/
 .coverage
+
+# Extensions
+.pi/extensions/*/node_modules/
