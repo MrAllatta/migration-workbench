@@ -117,268 +117,26 @@ def _render_output(payload: dict[str, Any], as_json: bool) -> int:
     return 0 if payload["ok"] else 1
 
 
-# Manifest command group was extracted to deployment.commands.manifest
-# in e03s02. Re-export here so existing callers and tests continue to
-# work unchanged. The function reference is the same object as
-# ``deployment.commands.manifest._manifest_lint``; the contract is
-# pinned by
-# ``deployment/tests/test_cli_manifest_extract.py::test_reimport_preserves_handler_reference``.
+# Command groups extracted to deployment.commands.* during the
+# cli-router-split epic (e03). Re-export here so existing callers and
+# tests continue to work unchanged. The function references are the
+# same objects as those in the commands modules.
+from deployment.commands.contract import (  # noqa: E402
+    _contract_diff,
+    _contract_review,
+    _contract_safety,
+    _contract_validate,
+    build_contract_parser,
+)
 from deployment.commands.manifest import (  # noqa: E402
     _manifest_lint,
     build_manifest_parser,
 )
 
 
-def _contract_review(args: argparse.Namespace) -> int:
-    _setup_django(settings_module=getattr(args, "django_settings", None))
-    from workbook.codegen.contract import load_contract, review_contract
 
-    try:
-        contract = load_contract(args.contract)
-    except Exception as exc:
-        return _render_output(
-            {
-                "ok": False,
-                "error_code": ERROR_CODES["unexpected"],
-                "message": str(exc),
-            },
-            args.json,
-        )
+# Contract command group extracted to deployment.commands.contract in e03s03.
 
-    dependency_artifact = None
-    if args.dependency_artifact:
-        with open(args.dependency_artifact) as f:
-            dependency_artifact = json.load(f)
-
-    issues = review_contract(contract, dependency_artifact=dependency_artifact)
-    if not issues:
-        return _render_output(
-            {
-                "ok": True,
-                "error_code": None,
-                "message": f"No issues found in {args.contract}.",
-            },
-            args.json,
-        )
-
-    if args.json:
-        message = (
-            f"{len(issues)} issue(s) found (exit-zero)."
-            if args.exit_zero
-            else f"{len(issues)} issue(s) found."
-        )
-        return _render_output(
-            {
-                "ok": args.exit_zero,
-                "error_code": None,
-                "message": message,
-                "details": issues,
-            },
-            args.json,
-        )
-
-    print(f"Found {len(issues)} issue(s) in {args.contract}:")
-    for issue in issues:
-        location = (
-            f"{issue['table']}.{issue['field']}" if issue["field"] else issue["table"]
-        )
-        print(f"  - {location}: {issue['message']}")
-    return 0 if args.exit_zero else 1
-
-
-def _contract_diff(args: argparse.Namespace) -> int:
-    _setup_django(settings_module=getattr(args, "django_settings", None))
-    from workbook.codegen.contract import diff_contracts, load_contract
-
-    try:
-        old_contract = load_contract(args.old)
-        new_contract = load_contract(args.new)
-    except Exception as exc:
-        return _render_output(
-            {
-                "ok": False,
-                "error_code": ERROR_CODES["unexpected"],
-                "message": str(exc),
-            },
-            args.json,
-        )
-
-    diffs = diff_contracts(old_contract, new_contract)
-
-    if not diffs:
-        return _render_output(
-            {
-                "ok": True,
-                "error_code": None,
-                "message": "Contracts are identical.",
-            },
-            args.json,
-        )
-
-    if args.json:
-        return _render_output(
-            {
-                "ok": True,
-                "error_code": None,
-                "message": "Differences found.",
-                "diffs": diffs,
-            },
-            args.json,
-        )
-
-    lines: list[str] = []
-
-    if diffs.get("models_added") or diffs.get("models_removed"):
-        lines.append("=== Models ===")
-        if diffs.get("models_added"):
-            lines.append(f"  Added:   {', '.join(diffs['models_added'])}")
-        if diffs.get("models_removed"):
-            lines.append(f"  Removed: {', '.join(diffs['models_removed'])}")
-        lines.append("")
-
-    for model_name in sorted(diffs.get("model_diffs") or {}):
-        md = diffs["model_diffs"][model_name]
-        lines.append(f"=== Model: {model_name} ===")
-
-        if md.get("fields_added"):
-            lines.append("  Fields added:")
-            for f in md["fields_added"]:
-                kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(
-                    f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})"
-                )
-
-        if md.get("fields_removed"):
-            lines.append("  Fields removed:")
-            for f in md["fields_removed"]:
-                kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(
-                    f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})"
-                )
-
-        if md.get("fields_changed"):
-            lines.append("  Fields changed:")
-            for fc in md["fields_changed"]:
-                parts = [f"~ {fc['name']}"]
-                if fc.get("class") and fc["class"]["old"] != fc["class"]["new"]:
-                    old_cls = _short_class(fc["class"]["old"])
-                    new_cls = _short_class(fc["class"]["new"])
-                    parts.append(f"{old_cls} -> {new_cls}")
-                for kw, v in (fc.get("kwargs") or {}).items():
-                    old_v = _fmt_value(v["old"])
-                    new_v = _fmt_value(v["new"])
-                    parts.append(f"{kw}: {old_v} -> {new_v}")
-                lines.append("    " + ", ".join(parts))
-
-        if md.get("meta_changed"):
-            lines.append("  Meta changes:")
-            for key, v in md["meta_changed"].items():
-                old_v = _fmt_value(v["old"])
-                new_v = _fmt_value(v["new"])
-                lines.append(f"    ~ {key}: {old_v} -> {new_v}")
-
-        lines.append("")
-
-    print("\n".join(lines).rstrip())
-    return 0
-
-
-def _short_class(raw: str) -> str:
-    return raw.removeprefix("models.")
-
-
-def _fmt_kwargs(kwargs: dict) -> str:
-    if not kwargs:
-        return ""
-    pairs = ", ".join(f"{k}={v!r}" for k, v in sorted(kwargs.items()))
-    return f", {pairs}"
-
-
-def _fmt_value(val: Any) -> str:
-    if val is None:
-        return "None"
-    if isinstance(val, str):
-        return val
-    if isinstance(val, (list, dict)):
-        return str(val)
-    return repr(val)
-
-
-def _contract_safety(args: argparse.Namespace) -> int:
-    _setup_django(settings_module=getattr(args, "django_settings", None))
-    from workbook.codegen.contract import (
-        diff_contracts,
-        load_contract,
-        migration_safety_checks,
-    )
-
-    try:
-        old_contract = load_contract(args.old)
-        new_contract = load_contract(args.new)
-    except Exception as exc:
-        return _render_output(
-            {
-                "ok": False,
-                "error_code": ERROR_CODES["drift_check"],
-                "message": str(exc),
-            },
-            args.json,
-        )
-
-    diffs = diff_contracts(old_contract, new_contract)
-    issues = migration_safety_checks(diffs)
-
-    if args.json:
-        return _render_output(
-            {
-                "ok": len(issues) == 0,
-                "error_code": None,
-                "message": (
-                    f"{len(issues)} migration risk(s) found."
-                    if issues
-                    else "No migration risks detected."
-                ),
-                "details": issues,
-            },
-            args.json,
-        )
-
-    if not issues:
-        print("No migration risks detected — contracts are safe.")
-        return 0
-
-    danger = [i for i in issues if i["severity"] == "DANGER"]
-    warning = [i for i in issues if i["severity"] == "WARNING"]
-
-    if danger:
-        print(f"=== DANGER ({len(danger)}) ===")
-        for i in danger:
-            loc = f"{i['model']}.{i['field']}" if i["field"] else i["model"]
-            print(f"  {loc}: {i['message']}")
-    if warning:
-        print(f"=== WARNING ({len(warning)}) ===")
-        for i in warning:
-            loc = f"{i['model']}.{i['field']}" if i["field"] else i["model"]
-            print(f"  {loc}: {i['message']}")
-
-    print(f"\n{len(issues)} total migration risk(s) found.")
-    return 0 if not danger else 1
-
-
-def _contract_validate(args: argparse.Namespace) -> int:
-    _setup_django(getattr(args, "django_settings", None))
-    from django.core.management import call_command
-
-    kwargs = {"contract": args.contract}
-    if getattr(args, "strict", False):
-        kwargs["strict"] = True
-    if getattr(args, "dump_json", False):
-        kwargs["dump_json"] = True
-    try:
-        call_command("validate_contract", **kwargs)
-        return 0
-    except SystemExit as exc:
-        return exc.code if isinstance(exc.code, int) else 1
 
 
 def _generate_models(args: argparse.Namespace) -> int:
@@ -1202,66 +960,7 @@ def build_parser() -> argparse.ArgumentParser:
     # implementation and specs/inventory/cli-router.yaml for the
     # extraction roadmap.
     build_manifest_parser(sub)
-
-    contract_cmd = sub.add_parser("contract", help="Schema contract operations")
-    contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)
-    review_cmd = contract_sub.add_parser(
-        "review", help="Run design-review checklist on a schema contract YAML"
-    )
-    review_cmd.add_argument(
-        "--contract", required=True, help="Path to schema-contract YAML"
-    )
-    review_cmd.add_argument(
-        "--exit-zero",
-        action="store_true",
-        help="Return exit code 0 even when issues are found.",
-    )
-    review_cmd.add_argument(
-        "--django-settings",
-        default=None,
-        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
-    )
-    review_cmd.add_argument(
-        "--dependency-artifact",
-        type=str,
-        default=None,
-        help="Path to a dependency artifact JSON from the profiler, for FK validation",
-    )
-    review_cmd.set_defaults(func=_contract_review)
-
-    diff_cmd = contract_sub.add_parser(
-        "diff", help="Compare two schema contracts and show differences"
-    )
-    diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
-    diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    diff_cmd.add_argument(
-        "--django-settings",
-        default=None,
-        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
-    )
-    diff_cmd.set_defaults(func=_contract_diff)
-
-    safety_cmd = contract_sub.add_parser(
-        "safety", help="Check contract changes for migration safety risks"
-    )
-    safety_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
-    safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    safety_cmd.add_argument(
-        "--django-settings",
-        default=None,
-        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
-    )
-    safety_cmd.set_defaults(func=_contract_safety)
-
-    validate_cmd = contract_sub.add_parser(
-        "validate", help="Validate a schema contract (structural checks)"
-    )
-    validate_cmd.add_argument("--contract", required=True)
-    validate_cmd.add_argument("--json", action="store_true")
-    validate_cmd.add_argument("--exit-zero", action="store_true")
-    validate_cmd.add_argument("--strict", action="store_true")
-    validate_cmd.add_argument("--django-settings", default=None)
-    validate_cmd.set_defaults(func=_contract_validate)
+    build_contract_parser(sub)
 
     drift_cmd = sub.add_parser("drift", help="Drift detection operations")
     drift_sub = drift_cmd.add_subparsers(dest="drift_command", required=True)
