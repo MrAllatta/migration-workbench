@@ -1103,9 +1103,9 @@ def render_admin_py(
     inline_class_names: set[str] = (
         set()
     )  # Track which inline classes we've already emitted.
-    ensure_groups_defs: list[str] = (
-        []
-    )  # _ensure_*_groups() functions for permission-based access.
+    ensure_groups_defs: list[
+        str
+    ] = []  # _ensure_*_groups() functions for permission-based access.
     admin_class_parts: list[str] = []
 
     for table in tables:

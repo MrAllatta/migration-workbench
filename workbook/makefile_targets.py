@@ -173,31 +173,29 @@ def generate_views_block(ctx: MakeContext) -> str:
     return (
         "generate-views:\n"
         + _indent(
-            f"@if [ -f \"config/checklist-config.yaml\" ]; then \\n"
-            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'@if [ -f "config/checklist-config.yaml" ]; then \\n'
+            f'    wb generate views --contract "{ctx.contract}" '
             f'--out-dir "{ctx.core}/templates/generated" '
             f'--archetype-checklist auto --template-package "config/templates" --force; \\n'
             f"fi\n"
         )
         + _indent(
-            f"@if [ -f \"config/landing-config.yaml\" ]; then \\n"
-            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'@if [ -f "config/landing-config.yaml" ]; then \\n'
+            f'    wb generate views --contract "{ctx.contract}" '
             f'--out-dir "{ctx.core}/templates/generated" '
             f'--archetype-landing "config/landing-config.yaml" '
             f'--template-package "config/templates" --force; \\n'
             f"fi\n"
         )
         + _indent(
-            f"@if [ -f \"config/dashboard-config.yaml\" ]; then \\n"
-            f"    wb generate views --contract \"{ctx.contract}\" "
+            f'@if [ -f "config/dashboard-config.yaml" ]; then \\n'
+            f'    wb generate views --contract "{ctx.contract}" '
             f'--out-dir "{ctx.core}/templates/generated" '
             f'--archetype-dashboard "config/dashboard-config.yaml" '
             f'--template-package "config/templates" --force; \\n'
             f"fi\n"
         )
-        + _indent(
-            "@echo \"generate-views: skipped (no view config files found)\"\n"
-        )
+        + _indent('@echo "generate-views: skipped (no view config files found)"\n')
     )
 
 

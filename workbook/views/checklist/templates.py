@@ -41,7 +41,7 @@ def render_checklist_template_html(archetype: ChecklistArchetype) -> str:
     for col in archetype.columns:
         cell = col.as_template_cell()
         if col.format == "value":
-            cell = f"      <td>{{{{ row.{col.field}|default:\"—\" }}}}</td>"
+            cell = f'      <td>{{{{ row.{col.field}|default:"—" }}}}</td>'
         else:
             cell = f"      <td>{cell.replace('{{', '{{ ').replace('}}', ' }}').strip()}</td>"
         body_cells.append(cell)

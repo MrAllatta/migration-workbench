@@ -794,9 +794,7 @@ def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
         if fmt_type == "lookup":
             # Coda API may name the target table in several ways.
             target_table = (
-                fmt.get("table")
-                or fmt.get("foreignTable")
-                or fmt.get("targetTable")
+                fmt.get("table") or fmt.get("foreignTable") or fmt.get("targetTable")
             )
             if isinstance(target_table, dict):
                 entry["target_table_name"] = target_table.get("name")
@@ -804,9 +802,7 @@ def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
             elif isinstance(target_table, str):
                 entry["target_table_name"] = target_table
             else:
-                entry["notes"].append(
-                    "lookup_target_table_not_exposed_in_api"
-                )
+                entry["notes"].append("lookup_target_table_not_exposed_in_api")
             # Display column hints
             display_col = fmt.get("displayColumn")
             if isinstance(display_col, dict):
@@ -819,9 +815,7 @@ def extract_relation_columns(columns: list[dict[str, Any]]) -> list[dict[str, An
         elif fmt_type == "linked_relation":
             entry["is_bidirectional"] = True
             target_table = (
-                fmt.get("table")
-                or fmt.get("foreignTable")
-                or fmt.get("targetTable")
+                fmt.get("table") or fmt.get("foreignTable") or fmt.get("targetTable")
             )
             if isinstance(target_table, dict):
                 entry["target_table_name"] = target_table.get("name")

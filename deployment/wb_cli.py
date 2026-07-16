@@ -133,11 +133,6 @@ def _render_output(payload: dict[str, Any], as_json: bool) -> int:
     return 0 if payload["ok"] else 1
 
 
-
-
-
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Construct and return the ``wb`` argument parser.
 

@@ -518,7 +518,9 @@ class BaseAuditCommand(BaseCommand):
                     else (
                         "\u26a0"
                         if status == "warn"
-                        else "\u2717" if status == "fail" else "\u2139"
+                        else "\u2717"
+                        if status == "fail"
+                        else "\u2139"
                     )
                 )
                 self.stdout.write(
@@ -647,7 +649,9 @@ class BaseAuditCommand(BaseCommand):
                     else (
                         "\u26a0"
                         if status == "warn"
-                        else "\u2717" if status == "fail" else "\u2139"
+                        else "\u2717"
+                        if status == "fail"
+                        else "\u2139"
                     )
                 )
                 self.stdout.write(
@@ -672,7 +676,9 @@ class BaseAuditCommand(BaseCommand):
         overall_status = (
             "fail"
             if has_mismatch and any(c["status"] == "fail" for c in checks)
-            else "warn" if has_mismatch else "pass"
+            else "warn"
+            if has_mismatch
+            else "pass"
         )
         return {"status": overall_status, "checks": checks}
 

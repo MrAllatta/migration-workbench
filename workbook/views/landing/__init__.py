@@ -6,7 +6,10 @@ configured count expressions and resolves URLs for a card-grid template.
 
 from workbook.views import registry
 from workbook.views.landing.archetype import LandingArchetype, SummaryCard
-from workbook.views.landing.modules import render_landing_urls_auto_py, render_landing_views_auto_py
+from workbook.views.landing.modules import (
+    render_landing_urls_auto_py,
+    render_landing_views_auto_py,
+)
 from workbook.views.landing.templates import render_landing_template_html
 from workbook.views.landing.urls import render_landing_url_pattern
 from workbook.views.landing.views import render_landing_view_py

@@ -144,9 +144,9 @@ class TestReviewContract:
         }
         issues = review_contract(contract)
         assert len(issues) > 0, "Expected at least one issue from multi-FK contract"
-        assert all(
-            "rule_id" in issue for issue in issues
-        ), f"Missing rule_id in issues: {issues}"
+        assert all("rule_id" in issue for issue in issues), (
+            f"Missing rule_id in issues: {issues}"
+        )
 
     def test_suppress_review_warning_multiple_fk_without_unique(self):
         """Allow suppressing specific review warnings per table by rule_id."""
@@ -372,12 +372,12 @@ def test_validate_contract_tables_with_exceptions():
     from workbook.codegen.contract import validate_contract_tables
 
     warnings = validate_contract_tables(contract)
-    assert any(
-        "missing id" in w for w in warnings
-    ), f"Expected warning about missing id, got: {warnings}"
-    assert any(
-        "missing condition" in w for w in warnings
-    ), f"Expected warning about missing condition, got: {warnings}"
-    assert any(
-        "invalid severity" in w for w in warnings
-    ), f"Expected warning about invalid severity, got: {warnings}"
+    assert any("missing id" in w for w in warnings), (
+        f"Expected warning about missing id, got: {warnings}"
+    )
+    assert any("missing condition" in w for w in warnings), (
+        f"Expected warning about missing condition, got: {warnings}"
+    )
+    assert any("invalid severity" in w for w in warnings), (
+        f"Expected warning about invalid severity, got: {warnings}"
+    )

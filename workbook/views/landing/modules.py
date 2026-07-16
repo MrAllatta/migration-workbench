@@ -73,9 +73,4 @@ def render_landing_urls_auto_py(
     for arch in archetypes:
         patterns.extend(render_landing_url_pattern(arch))
     body = "\n".join(patterns)
-    return (
-        "\n".join(imports)
-        + "urlpatterns = [\n"
-        + body
-        + "\n]\n"
-    )
+    return "\n".join(imports) + "urlpatterns = [\n" + body + "\n]\n"

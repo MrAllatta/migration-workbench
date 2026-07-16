@@ -15,7 +15,10 @@ from workbook.views.checklist.bundles import (
 )
 from workbook.views.checklist.templates import render_checklist_template_html
 from workbook.views.checklist.urls import render_checklist_url_pattern
-from workbook.views.checklist.views import render_checklist_view_py, render_toggle_handler_py
+from workbook.views.checklist.views import (
+    render_checklist_view_py,
+    render_toggle_handler_py,
+)
 
 __all__ = [
     "ChecklistColumn",

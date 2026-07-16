@@ -61,9 +61,9 @@ def test_scaffold_stores_app_label_in_contract(tmp_path, monkeypatch):
     contract = yaml.safe_load(out.read_text())
     for table in contract.get("tables", []):
         meta = table.get("model_meta", {})
-        assert (
-            meta.get("app_label") == "testapp"
-        ), f"Expected app_label='testapp', got {meta.get('app_label')!r}"
+        assert meta.get("app_label") == "testapp", (
+            f"Expected app_label='testapp', got {meta.get('app_label')!r}"
+        )
 
 
 def test_flag_fk_columns_detects_id_suffix():

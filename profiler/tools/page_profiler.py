@@ -34,10 +34,7 @@ _HEADING = re.compile(r"^#{2,3}\s+(.+)$", re.MULTILINE)
 
 def _parse_table_block(header_line: str, body: str) -> dict[str, Any]:
     """Parse one GFM table block into a dict with *headers* and *sample_rows*."""
-    headers = [
-        c.strip()
-        for c in header_line.strip().strip("|").split("|")
-    ]
+    headers = [c.strip() for c in header_line.strip().strip("|").split("|")]
     rows: list[list[str]] = []
     for line in body.strip().split("\n"):
         line = line.strip()
@@ -155,9 +152,7 @@ def profile_page_composition(
     all_pages = list_pages(session, doc_id)
 
     # Build a lookup of page_id → page_name for parent resolution
-    page_names: dict[str, str] = {
-        p["id"]: p.get("name", "") for p in all_pages
-    }
+    page_names: dict[str, str] = {p["id"]: p.get("name", "") for p in all_pages}
 
     pages_out: list[dict[str, Any]] = []
     for p in all_pages[:max_pages]:

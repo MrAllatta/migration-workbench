@@ -12,7 +12,10 @@ from typing import Any, Sequence
 from workbook.codegen.python_render import to_python_identifier
 from workbook.views.checklist.archetype import ChecklistArchetype, ChecklistColumn
 from workbook.views.checklist.urls import render_checklist_url_pattern
-from workbook.views.checklist.views import render_checklist_view_py, render_toggle_handler_py
+from workbook.views.checklist.views import (
+    render_checklist_view_py,
+    render_toggle_handler_py,
+)
 from workbook.views.utils import to_snake_case
 
 
@@ -75,7 +78,12 @@ def _auto_columns(contract_table: dict[str, Any]) -> list[ChecklistColumn]:
             continue
         seen.add(field_name)
         # Skip year/week fields (handled by nav, not table)
-        if field_name in ("planned_year", "planned_week", "seeding_year", "seeding_week"):
+        if field_name in (
+            "planned_year",
+            "planned_week",
+            "seeding_year",
+            "seeding_week",
+        ):
             continue
         # Skip the PK (auto-numbered, not user-meaningful)
         if field_name in ("id", "pk"):
@@ -86,9 +94,13 @@ def _auto_columns(contract_table: dict[str, Any]) -> list[ChecklistColumn]:
         # Heuristic: FK field shows __str__ of related object
         is_fk = (col.get("class") or "").endswith("ForeignKey")
         if is_fk:
-            columns.append(ChecklistColumn(field=field_name, label=label, format="fk_display"))
+            columns.append(
+                ChecklistColumn(field=field_name, label=label, format="fk_display")
+            )
         else:
-            columns.append(ChecklistColumn(field=field_name, label=label, format="value"))
+            columns.append(
+                ChecklistColumn(field=field_name, label=label, format="value")
+            )
     return columns
 
 
@@ -105,7 +117,9 @@ def _auto_select_related(contract_table: dict[str, Any]) -> list[str]:
     return result
 
 
-def _auto_ordering(contract_table: dict[str, Any], select_related: Sequence[str]) -> list[str]:
+def _auto_ordering(
+    contract_table: dict[str, Any], select_related: Sequence[str]
+) -> list[str]:
     """Auto-derive ordering: prefer the first FK field."""
     if select_related:
         return [select_related[0]]
@@ -138,7 +152,10 @@ def render_checklist_bundle(
 # defined in templates.py.  The import is at function call time so it's fine.
 def render_checklist_template_html(archetype: ChecklistArchetype) -> str:
     """Re-export of template rendering for bundle use."""
-    from workbook.views.checklist.templates import render_checklist_template_html as _render
+    from workbook.views.checklist.templates import (
+        render_checklist_template_html as _render,
+    )
+
     return _render(archetype)
 
 
@@ -173,9 +190,7 @@ def render_views_auto_py(
         app = arch.app_label
         seen_apps.setdefault(app, set()).add(arch.model)
     for app, models in sorted(seen_apps.items()):
-        model_imports.append(
-            f"from {app}.models import {', '.join(sorted(models))}"
-        )
+        model_imports.append(f"from {app}.models import {', '.join(sorted(models))}")
 
     # Shared helper.
     helper = '''
@@ -200,7 +215,9 @@ def _resolve_week_year(request):
         if toggle:
             body_parts.append(toggle)
 
-    return "\n".join(imports) + "\n".join(model_imports) + helper + "\n".join(body_parts)
+    return (
+        "\n".join(imports) + "\n".join(model_imports) + helper + "\n".join(body_parts)
+    )
 
 
 def render_urls_auto_py(
@@ -227,9 +244,4 @@ def render_urls_auto_py(
     for arch in archetypes:
         patterns.extend(render_checklist_url_pattern(arch))
     body = "\n".join(patterns)
-    return (
-        "\n".join(imports)
-        + "urlpatterns = [\n"
-        + body
-        + "\n]\n"
-    )
+    return "\n".join(imports) + "urlpatterns = [\n" + body + "\n]\n"

@@ -104,6 +104,8 @@ def _ecosystem_health(args: argparse.Namespace) -> int:
     if total_malformed:
         print(f"Total malformed: {total_malformed}")
     return 0
+
+
 def _ecosystem_ack(args: argparse.Namespace) -> int:
     """Acknowledge a queue entry as consumed (or active).
 
@@ -178,30 +180,16 @@ def _ecosystem_ack(args: argparse.Namespace) -> int:
 
 def build_ecosystem_parser(sub: argparse._SubParsersAction) -> None:
     """Wire the ``ecosystem`` subparser into *sub*."""
-    eco_cmd = sub.add_parser(
-        "ecosystem", help="Ecosystem operations"
-    )
-    eco_sub = eco_cmd.add_subparsers(
-        dest="ecosystem_command", required=True
-    )
+    eco_cmd = sub.add_parser("ecosystem", help="Ecosystem operations")
+    eco_sub = eco_cmd.add_subparsers(dest="ecosystem_command", required=True)
 
-    health_cmd = eco_sub.add_parser(
-        "health", help="Check ecosystem health"
-    )
-    health_cmd.add_argument(
-        "--json", action="store_true", help="Output as JSON"
-    )
+    health_cmd = eco_sub.add_parser("health", help="Check ecosystem health")
+    health_cmd.add_argument("--json", action="store_true", help="Output as JSON")
     health_cmd.set_defaults(func=_ecosystem_health)
 
-    ack_cmd = eco_sub.add_parser(
-        "ack", help="Acknowledge a queue entry"
-    )
-    ack_cmd.add_argument(
-        "queue", help="Queue name to acknowledge"
-    )
-    ack_cmd.add_argument(
-        "filename", help="Entry filename to acknowledge"
-    )
+    ack_cmd = eco_sub.add_parser("ack", help="Acknowledge a queue entry")
+    ack_cmd.add_argument("queue", help="Queue name to acknowledge")
+    ack_cmd.add_argument("filename", help="Entry filename to acknowledge")
     ack_cmd.add_argument(
         "--django-settings",
         default=None,

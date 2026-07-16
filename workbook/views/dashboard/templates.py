@@ -28,18 +28,19 @@ def render_dashboard_template_html(archetype: DashboardArchetype) -> str:
     section_blocks: list[str] = []
     for idx, section in enumerate(archetype.sections):
         cols = len(section.columns)
-        headers = "\n".join(
-            f'        <th>{col.label}</th>'
-            for col in section.columns
-        )
+        headers = "\n".join(f"        <th>{col.label}</th>" for col in section.columns)
         body_cells = []
         for col in section.columns:
             if col.format == "fk_display":
-                body_cells.append(f'      <td>{{{{ row.{col.field} }}}}</td>')
+                body_cells.append(f"      <td>{{{{ row.{col.field} }}}}</td>")
             elif col.format == "choice_display":
-                body_cells.append(f'      <td>{{{{ row.get_{col.field}_display }}}}</td>')
+                body_cells.append(
+                    f"      <td>{{{{ row.get_{col.field}_display }}}}</td>"
+                )
             else:
-                body_cells.append(f'      <td>{{{{ row.{col.field}|default:"—" }}}}</td>')
+                body_cells.append(
+                    f'      <td>{{{{ row.{col.field}|default:"—" }}}}</td>'
+                )
         body = "\n".join(body_cells)
 
         block_parts = [

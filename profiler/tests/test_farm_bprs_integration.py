@@ -328,9 +328,9 @@ class TestFarmBPRSIntegration:
                 crop_cluster = cluster
                 break
 
-        assert (
-            crop_cluster is not None
-        ), f"No cluster found containing Crop Planner 2025; got clusters: {clusters}"
+        assert crop_cluster is not None, (
+            f"No cluster found containing Crop Planner 2025; got clusters: {clusters}"
+        )
         cluster_tabs = crop_cluster["tabs"]
         assert "Crop Planner 2026" in cluster_tabs, (
             f"Crop Planner 2026 not in same cluster as Crop Planner 2025; "
@@ -399,9 +399,9 @@ class TestFarmBPRSIntegration:
 
         assert ps.schema_contract is not None
         tables = ps.schema_contract.get("tables") or []
-        assert (
-            len(tables) >= 2
-        ), f"Expected at least 2 schema contract tables, got {len(tables)}: {tables}"
+        assert len(tables) >= 2, (
+            f"Expected at least 2 schema contract tables, got {len(tables)}: {tables}"
+        )
 
     def test_test_scaffold_is_valid_python(self, tmp_path):
         """The test_scaffold string compiles as valid Python."""
@@ -469,6 +469,6 @@ class TestFarmBPRSIntegration:
         assert ps.validation_record.reviewed_by == "integration_test"
         # Verify the pipeline ran cleanly — no failed approvals.
         for approval in ps.validation_record.approvals:
-            assert (
-                approval.get("outcome") != "failed"
-            ), f"Approval {approval} recorded a failure outcome."
+            assert approval.get("outcome") != "failed", (
+                f"Approval {approval} recorded a failure outcome."
+            )

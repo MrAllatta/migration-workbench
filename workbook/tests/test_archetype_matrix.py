@@ -420,9 +420,9 @@ class TestConfidenceScore:
             row_count=100,
             expansion_formula_ratio=0.0,
         )
-        assert (
-            confidence < 0.30
-        ), f"Ambiguous tab should have low confidence, got {confidence}"
+        assert confidence < 0.30, (
+            f"Ambiguous tab should have low confidence, got {confidence}"
+        )
 
 
 # ---------------------------------------------------------------------------

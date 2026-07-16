@@ -109,8 +109,7 @@ class TestInferenceRulesCatalog:
         """All confidence weights are between 0.0 and 1.0."""
         for rule in INFERENCE_RULES:
             assert 0.0 <= rule.confidence_weight <= 1.0, (
-                f"Rule {rule.id} has weight {rule.confidence_weight} "
-                f"outside [0.0, 1.0]"
+                f"Rule {rule.id} has weight {rule.confidence_weight} outside [0.0, 1.0]"
             )
 
     def test_lookup_rule_found(self):

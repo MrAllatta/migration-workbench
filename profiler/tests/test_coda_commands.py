@@ -44,10 +44,14 @@ def test_profile_page_composition_smoke(monkeypatch):
     """Smoke: profile_page_composition returns a stub list with --smoke-friendly behaviour."""
     from profiler.tools import page_profiler
 
-    monkeypatch.setattr(page_profiler, "list_pages", lambda session, doc_id: [
-        {"id": "p1", "name": "Home", "parent": None, "type": "page"},
-        {"id": "p2", "name": "Work Order", "parent": {"id": "p1"}, "type": "page"},
-    ])
+    monkeypatch.setattr(
+        page_profiler,
+        "list_pages",
+        lambda session, doc_id: [
+            {"id": "p1", "name": "Home", "parent": None, "type": "page"},
+            {"id": "p2", "name": "Work Order", "parent": {"id": "p1"}, "type": "page"},
+        ],
+    )
 
     fake_session = object()
     pages = profile_page_composition(

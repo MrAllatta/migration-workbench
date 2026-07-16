@@ -40,12 +40,12 @@ def test_wb_vertical_list_json_returns_valid_json():
     )
     payload = json.loads(result.stdout)
     assert payload["ok"] is True, f"Expected ok=True, got: {payload}"
-    assert (
-        "verticals" in payload
-    ), f"Expected 'verticals' key in payload, got: {payload}"
-    assert isinstance(
-        payload["verticals"], list
-    ), f"Expected verticals to be list, got: {payload['verticals']}"
+    assert "verticals" in payload, (
+        f"Expected 'verticals' key in payload, got: {payload}"
+    )
+    assert isinstance(payload["verticals"], list), (
+        f"Expected verticals to be list, got: {payload['verticals']}"
+    )
     # Should have at least example and farm
     names = [v.get("name") for v in payload["verticals"]]
     assert "example" in names, f"Expected 'example' in vertical names, got: {names}"

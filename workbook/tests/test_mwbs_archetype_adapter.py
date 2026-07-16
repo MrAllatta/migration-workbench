@@ -15,7 +15,10 @@ import ast
 
 
 from profiler.tools.behavioral_spec import Actor, Report, WorkflowStep
-from workbook.codegen.mwbs_to_archetype import landing_from_actor, list_from_workflow_step
+from workbook.codegen.mwbs_to_archetype import (
+    landing_from_actor,
+    list_from_workflow_step,
+)
 from workbook.codegen.view_generator import LandingArchetype, SummaryCard
 
 
@@ -51,7 +54,9 @@ class TestLandingFromActor:
         assert isinstance(archetype, LandingArchetype)
         assert archetype.role == "planner_manager"
         assert "Planner" in archetype.title
-        assert len(archetype.cards) == len(actor.responsibilities) + 1  # 4 cards + recent events
+        assert (
+            len(archetype.cards) == len(actor.responsibilities) + 1
+        )  # 4 cards + recent events
         # Check each responsibility maps to a SummaryCard with a count expression
         for card in archetype.cards:
             assert isinstance(card, SummaryCard)

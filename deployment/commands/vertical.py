@@ -14,6 +14,8 @@ import argparse
 
 
 from workbook.tools.vertical_registry import discover_verticals, load_vertical
+
+
 def _vertical_list(args: argparse.Namespace) -> int:
     """List available vertical templates."""
     from deployment.wb_cli import ERROR_CODES, _render_output  # noqa: PLC0415
@@ -57,6 +59,7 @@ def _vertical_list(args: argparse.Namespace) -> int:
             },
             args.json,
         )
+
 
 def _vertical_show(args: argparse.Namespace) -> int:
     """Show details of a vertical template."""
@@ -172,22 +175,14 @@ def _vertical_show(args: argparse.Namespace) -> int:
 
 def build_vertical_parser(sub: argparse._SubParsersAction) -> None:
     """Wire the ``vertical`` subparser into *sub*."""
-    vert_cmd = sub.add_parser(
-        "vertical", help="Vertical template operations"
-    )
-    vert_sub = vert_cmd.add_subparsers(
-        dest="vertical_command", required=True
-    )
+    vert_cmd = sub.add_parser("vertical", help="Vertical template operations")
+    vert_sub = vert_cmd.add_subparsers(dest="vertical_command", required=True)
 
     list_cmd = vert_sub.add_parser("list", help="List vertical templates")
-    list_cmd.add_argument(
-        "--json", action="store_true", help="Output as JSON"
-    )
+    list_cmd.add_argument("--json", action="store_true", help="Output as JSON")
     list_cmd.set_defaults(func=_vertical_list)
 
-    show_cmd = vert_sub.add_parser(
-        "show", help="Show details of a vertical template"
-    )
+    show_cmd = vert_sub.add_parser("show", help="Show details of a vertical template")
     show_cmd.add_argument("--json", action="store_true", help="Output as JSON")
     show_cmd.add_argument("name", help="Vertical template name")
     show_cmd.set_defaults(func=_vertical_show)

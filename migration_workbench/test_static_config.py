@@ -20,9 +20,9 @@ WHITENOISE_BACKEND = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 def test_whitenoise_middleware_present():
-    assert (
-        WHITENOISE_MW in settings.MIDDLEWARE
-    ), f"{WHITENOISE_MW!r} missing from MIDDLEWARE"
+    assert WHITENOISE_MW in settings.MIDDLEWARE, (
+        f"{WHITENOISE_MW!r} missing from MIDDLEWARE"
+    )
 
 
 def test_whitenoise_middleware_immediately_after_security():
@@ -53,6 +53,6 @@ def test_no_legacy_staticfiles_storage_setting():
 def test_static_root_dirname():
     """STATIC_ROOT must point to a directory named 'staticfiles' (matches .gitignore and Dockerfile)."""
     assert settings.STATIC_ROOT is not None, "STATIC_ROOT is not configured"
-    assert (
-        Path(settings.STATIC_ROOT).name == "staticfiles"
-    ), f"STATIC_ROOT directory name must be 'staticfiles', got {Path(settings.STATIC_ROOT).name!r}"
+    assert Path(settings.STATIC_ROOT).name == "staticfiles", (
+        f"STATIC_ROOT directory name must be 'staticfiles', got {Path(settings.STATIC_ROOT).name!r}"
+    )

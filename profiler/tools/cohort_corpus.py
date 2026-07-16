@@ -1209,7 +1209,9 @@ def _render_corpus_summary(
             status = (
                 "OK"
                 if successes > 0 and failures == 0
-                else "FAIL" if failures > 0 else "N/A"
+                else "FAIL"
+                if failures > 0
+                else "N/A"
             )
             lines.append(
                 f"- **{tab_title}** — {status} ({successes} ok, {failures} fail)"

@@ -11,7 +11,10 @@ from workbook.views.dashboard.archetype import (
     DetailColumn,
     DetailSection,
 )
-from workbook.views.dashboard.modules import render_dashboard_urls_auto_py, render_dashboard_views_auto_py
+from workbook.views.dashboard.modules import (
+    render_dashboard_urls_auto_py,
+    render_dashboard_views_auto_py,
+)
 from workbook.views.dashboard.templates import render_dashboard_template_html
 from workbook.views.dashboard.urls import render_dashboard_url_pattern
 from workbook.views.dashboard.views import render_dashboard_view_py

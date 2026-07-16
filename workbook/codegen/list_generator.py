@@ -172,13 +172,9 @@ def render_list_view_py(archetype: ListArchetype) -> str:
     # Add filter lines to get_queryset
     for filter_field in archetype.filters:
         var_name = f"_{filter_field}_filter"
-        lines.append(
-            f"        {var_name} = self.request.GET.get({filter_field!r}, '')"
-        )
+        lines.append(f"        {var_name} = self.request.GET.get({filter_field!r}, '')")
         lines.append(f"        if {var_name}:")
-        lines.append(
-            f"            qs = qs.filter({filter_field}={var_name})"
-        )
+        lines.append(f"            qs = qs.filter({filter_field}={var_name})")
 
     # Ordering
     if archetype.ordering:
@@ -188,11 +184,13 @@ def render_list_view_py(archetype: ListArchetype) -> str:
         lines.append("        return qs")
 
     # get_context_data
-    lines.extend([
-        "",
-        "    def get_context_data(self, **kwargs):",
-        "        context = super().get_context_data(**kwargs)",
-    ])
+    lines.extend(
+        [
+            "",
+            "    def get_context_data(self, **kwargs):",
+            "        context = super().get_context_data(**kwargs)",
+        ]
+    )
 
     # Filter option expressions
     filter_lines = _build_filter_expressions(archetype)

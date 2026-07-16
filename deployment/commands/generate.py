@@ -34,6 +34,7 @@ def _generate_models(args: argparse.Namespace) -> int:
     call_command("generate_models", **kwargs)
     return 0
 
+
 def _generate_admin(args: argparse.Namespace) -> int:
     from deployment.wb_cli import _setup_django  # noqa: PLC0415
 
@@ -53,6 +54,7 @@ def _generate_admin(args: argparse.Namespace) -> int:
     call_command("generate_admin", **kwargs)
     return 0
 
+
 def _generate_import(args: argparse.Namespace) -> int:
     from deployment.wb_cli import _setup_django  # noqa: PLC0415
 
@@ -70,6 +72,7 @@ def _generate_import(args: argparse.Namespace) -> int:
     call_command("generate_import", **kwargs)
     return 0
 
+
 def _generate_manifest(args: argparse.Namespace) -> int:
     from deployment.wb_cli import _setup_django  # noqa: PLC0415
 
@@ -85,6 +88,7 @@ def _generate_manifest(args: argparse.Namespace) -> int:
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
     call_command("scaffold_view_manifest", **kwargs)
     return 0
+
 
 def _generate_views(args: argparse.Namespace) -> int:
     from deployment.wb_cli import _setup_django  # noqa: PLC0415
@@ -112,6 +116,7 @@ def _generate_views(args: argparse.Namespace) -> int:
         kwargs["validate"] = args.validate
     call_command("generate_views", **kwargs)
     return 0
+
 
 def build_generate_parser(sub: argparse._SubParsersAction) -> None:
     """Add 'generate {models,admin,import,manifest}' subcommands to *sub*."""
@@ -154,7 +159,9 @@ def build_generate_parser(sub: argparse._SubParsersAction) -> None:
     manifest_cmd.add_argument("--django-settings", default=None)
     manifest_cmd.set_defaults(func=_generate_manifest)
 
-    views_cmd = gen_sub.add_parser("views", help="Generate Django views, templates, and URLs")
+    views_cmd = gen_sub.add_parser(
+        "views", help="Generate Django views, templates, and URLs"
+    )
     views_cmd.add_argument("--contract", required=True)
     views_cmd.add_argument("--out-dir", required=True)
     views_cmd.add_argument("--app-label", default=None)
@@ -166,4 +173,3 @@ def build_generate_parser(sub: argparse._SubParsersAction) -> None:
     views_cmd.add_argument("--validate", action="store_true")
     views_cmd.add_argument("--django-settings", default=None)
     views_cmd.set_defaults(func=_generate_views)
-

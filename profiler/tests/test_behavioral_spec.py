@@ -1,6 +1,5 @@
 """Tests for the MWBS BehavioralSpec dataclass layer."""
 
-
 from profiler.tools.behavioral_spec import (
     MWBS_SPEC_VERSION,
     AcceptanceCriterion,

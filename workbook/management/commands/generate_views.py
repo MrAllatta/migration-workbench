@@ -175,7 +175,10 @@ def _column_from_contract(
             continue
         seen.add(field_name)
         if field_name in (
-            "planned_year", "planned_week", "seeding_year", "seeding_week"
+            "planned_year",
+            "planned_week",
+            "seeding_year",
+            "seeding_week",
         ):
             continue
         if field_name in ("id", "pk"):
@@ -239,10 +242,9 @@ def _auto_archetypes(
         model_name = table.get("model_name") or table.get("name")
         if not model_name:
             continue
-        app_label = (
-            (table.get("model_meta") or {}).get("app_label")
-            or app_label_default
-        )
+        app_label = (table.get("model_meta") or {}).get(
+            "app_label"
+        ) or app_label_default
         columns = _column_from_contract(table)
         archetype = build_archetype_from_contract(
             model=model_name,
@@ -325,9 +327,7 @@ def _load_landing_config(path: Path) -> list[LandingArchetype]:
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or "landings" not in raw:
-        raise CommandError(
-            "Landing config must have a top-level 'landings' list."
-        )
+        raise CommandError("Landing config must have a top-level 'landings' list.")
 
     archetypes: list[LandingArchetype] = []
     for entry in raw["landings"]:
@@ -392,9 +392,7 @@ def _load_dashboard_config(path: Path) -> list[DashboardArchetype]:
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or "dashboards" not in raw:
-        raise CommandError(
-            "Dashboard config must have a top-level 'dashboards' list."
-        )
+        raise CommandError("Dashboard config must have a top-level 'dashboards' list.")
 
     archetypes: list[DashboardArchetype] = []
     for entry in raw["dashboards"]:
@@ -540,11 +538,11 @@ class Command(BaseCommand):
         if options.get("validate"):
             errors = strict_validate_contract(contract)
             if errors:
-                raise CommandError(
-                    f"contract validation failed: {'; '.join(errors)}"
-                )
+                raise CommandError(f"contract validation failed: {'; '.join(errors)}")
 
-        archetype_checklist = options.get("archetype_checklist") or options.get("archetype")
+        archetype_checklist = options.get("archetype_checklist") or options.get(
+            "archetype"
+        )
         archetype_landing = options.get("archetype_landing")
         archetype_dashboard = options.get("archetype_dashboard")
         archetype_list_from_manifest = options.get("archetype_list_from_manifest")
@@ -565,14 +563,10 @@ class Command(BaseCommand):
         force = bool(options.get("force"))
         template_package_raw = options.get("template_package")
         template_package = (
-            Path(template_package_raw).resolve()
-            if template_package_raw
-            else None
+            Path(template_package_raw).resolve() if template_package_raw else None
         )
         if template_package is not None and not template_package.is_dir():
-            raise CommandError(
-                f"template package not found: {template_package}"
-            )
+            raise CommandError(f"template package not found: {template_package}")
 
         app_label_default = _resolve_app_label(contract, options.get("app_label"))
         if archetype_checklist:
@@ -662,15 +656,11 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
             else:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"skipped {template_path} (exists, use --force)"
-                    )
+                    self.style.WARNING(f"skipped {template_path} (exists, use --force)")
                 )
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"generated {len(archetypes)} checklist archetype(s)"
-            )
+            self.style.SUCCESS(f"generated {len(archetypes)} checklist archetype(s)")
         )
 
     def _handle_landing(
@@ -693,7 +683,8 @@ class Command(BaseCommand):
 
         # Write views_auto.py (combined module for landing views).
         views_source = render_landing_views_auto_py(
-            archetypes, app_label=app_label,
+            archetypes,
+            app_label=app_label,
         )
         views_path = out_dir / "views_auto.py"
         views_written = _write_file(views_path, views_source, force=force)
@@ -727,15 +718,11 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
             else:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"skipped {template_path} (exists, use --force)"
-                    )
+                    self.style.WARNING(f"skipped {template_path} (exists, use --force)")
                 )
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"generated {len(archetypes)} landing archetype(s)"
-            )
+            self.style.SUCCESS(f"generated {len(archetypes)} landing archetype(s)")
         )
 
     def _handle_dashboard(
@@ -758,7 +745,8 @@ class Command(BaseCommand):
 
         # Write views_auto.py (combined module for dashboard views).
         views_source = render_dashboard_views_auto_py(
-            archetypes, app_label=app_label,
+            archetypes,
+            app_label=app_label,
         )
         views_path = out_dir / "views_auto.py"
         views_written = _write_file(views_path, views_source, force=force)
@@ -792,15 +780,11 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
             else:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"skipped {template_path} (exists, use --force)"
-                    )
+                    self.style.WARNING(f"skipped {template_path} (exists, use --force)")
                 )
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"generated {len(archetypes)} dashboard archetype(s)"
-            )
+            self.style.SUCCESS(f"generated {len(archetypes)} dashboard archetype(s)")
         )
 
     def _handle_list_from_manifest(
@@ -863,13 +847,13 @@ class Command(BaseCommand):
                 # No contract tables; just use the derived model name
                 pass
             if model_name in seen_models:
-                skipped.append((entry.get("name", "?"), f"duplicate model {model_name}"))
+                skipped.append(
+                    (entry.get("name", "?"), f"duplicate model {model_name}")
+                )
                 continue
             seen_models.add(model_name)
             try:
-                archetype = manifest_to_list_archetype(
-                    entry, model_name=model_name
-                )
+                archetype = manifest_to_list_archetype(entry, model_name=model_name)
             except Exception as exc:
                 skipped.append((entry.get("name", "?"), str(exc)))
                 continue
@@ -882,7 +866,7 @@ class Command(BaseCommand):
 
         # Write views_auto.py: combined module of all list view classes
         views_lines: list[str] = [
-            "\"\"\"Auto-generated list views from view-manifest.yaml.\"\"\"",
+            '"""Auto-generated list views from view-manifest.yaml."""',
             "from django.contrib.auth.mixins import LoginRequiredMixin",
             "from django.views.generic import ListView",
             "",
@@ -907,7 +891,7 @@ class Command(BaseCommand):
 
         # Write urls_auto.py: combined module of all list URL patterns
         urls_lines: list[str] = [
-            "\"\"\"Auto-generated URLs from view-manifest.yaml.\"\"\"",
+            '"""Auto-generated URLs from view-manifest.yaml."""',
             "from django.urls import path",
             "",
             "from .views_auto import (",
@@ -936,7 +920,7 @@ class Command(BaseCommand):
             template_path = out_dir / arch.template_path
             template_path.parent.mkdir(parents=True, exist_ok=True)
             template_source = (
-                "{% extends \"base.html\" %}\n"
+                '{% extends "base.html" %}\n'
                 "{% block content %}\n"
                 f"  <h1>{{{{ {arch.context_object_name}|length }}}} {arch.title} entries</h1>\n"
                 "{% endblock %}\n"
@@ -945,9 +929,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"wrote {template_path}"))
             else:
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"skipped {template_path} (exists, use --force)"
-                    )
+                    self.style.WARNING(f"skipped {template_path} (exists, use --force)")
                 )
 
         self.stdout.write(

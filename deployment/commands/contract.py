@@ -44,7 +44,11 @@ def _contract_review(args: argparse.Namespace) -> int:
     issues = review_contract(contract, dependency_artifact=dependency_artifact)
     if not issues:
         return _render_output(
-            {"ok": True, "error_code": None, "message": f"No issues found in {args.contract}."},
+            {
+                "ok": True,
+                "error_code": None,
+                "message": f"No issues found in {args.contract}.",
+            },
             args.json,
         )
 
@@ -55,7 +59,12 @@ def _contract_review(args: argparse.Namespace) -> int:
             else f"{len(issues)} issue(s) found."
         )
         return _render_output(
-            {"ok": args.exit_zero, "error_code": None, "message": message, "details": issues},
+            {
+                "ok": args.exit_zero,
+                "error_code": None,
+                "message": message,
+                "details": issues,
+            },
             args.json,
         )
 
@@ -107,10 +116,21 @@ def _contract_diff(args: argparse.Namespace) -> int:
 
     diffs = diff_contracts(old_contract, new_contract)
     if not diffs:
-        return _render_output({"ok": True, "error_code": None, "message": "Contracts are identical."}, args.json)
+        return _render_output(
+            {"ok": True, "error_code": None, "message": "Contracts are identical."},
+            args.json,
+        )
 
     if args.json:
-        return _render_output({"ok": True, "error_code": None, "message": "Differences found.", "diffs": diffs}, args.json)
+        return _render_output(
+            {
+                "ok": True,
+                "error_code": None,
+                "message": "Differences found.",
+                "diffs": diffs,
+            },
+            args.json,
+        )
 
     lines: list[str] = []
     if diffs.get("models_added") or diffs.get("models_removed"):
@@ -128,25 +148,35 @@ def _contract_diff(args: argparse.Namespace) -> int:
             lines.append("  Fields added:")
             for f in md["fields_added"]:
                 kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+                lines.append(
+                    f"    + {f['name']} ({_short_class(f['class'])}{kwargs_str})"
+                )
         if md.get("fields_removed"):
             lines.append("  Fields removed:")
             for f in md["fields_removed"]:
                 kwargs_str = _fmt_kwargs(f.get("kwargs", {}))
-                lines.append(f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})")
+                lines.append(
+                    f"    - {f['name']} ({_short_class(f['class'])}{kwargs_str})"
+                )
         if md.get("fields_changed"):
             lines.append("  Fields changed:")
             for fc in md["fields_changed"]:
                 parts = [f"~ {fc['name']}"]
                 if fc.get("class") and fc["class"]["old"] != fc["class"]["new"]:
-                    parts.append(f"{_short_class(fc['class']['old'])} -> {_short_class(fc['class']['new'])}")
+                    parts.append(
+                        f"{_short_class(fc['class']['old'])} -> {_short_class(fc['class']['new'])}"
+                    )
                 for kw, v in (fc.get("kwargs") or {}).items():
-                    parts.append(f"{kw}: {_fmt_value(v['old'])} -> {_fmt_value(v['new'])}")
+                    parts.append(
+                        f"{kw}: {_fmt_value(v['old'])} -> {_fmt_value(v['new'])}"
+                    )
                 lines.append("    " + ", ".join(parts))
         if md.get("meta_changed"):
             lines.append("  Meta changes:")
             for key, v in md["meta_changed"].items():
-                lines.append(f"    ~ {key}: {_fmt_value(v['old'])} -> {_fmt_value(v['new'])}")
+                lines.append(
+                    f"    ~ {key}: {_fmt_value(v['old'])} -> {_fmt_value(v['new'])}"
+                )
         lines.append("")
     print("\n".join(lines).rstrip())
     return 0
@@ -157,7 +187,11 @@ def _contract_safety(args: argparse.Namespace) -> int:
     from deployment.wb_cli import _render_output, ERROR_CODES, _setup_django  # noqa: PLC0415
 
     _setup_django(settings_module=getattr(args, "django_settings", None))
-    from workbook.codegen.contract import diff_contracts, load_contract, migration_safety_checks
+    from workbook.codegen.contract import (
+        diff_contracts,
+        load_contract,
+        migration_safety_checks,
+    )
 
     try:
         old_contract = load_contract(args.old)
@@ -176,7 +210,9 @@ def _contract_safety(args: argparse.Namespace) -> int:
             {
                 "ok": len(issues) == 0,
                 "error_code": None,
-                "message": f"{len(issues)} migration risk(s) found." if issues else "No migration risks detected.",
+                "message": f"{len(issues)} migration risk(s) found."
+                if issues
+                else "No migration risks detected.",
                 "details": issues,
             },
             args.json,
@@ -233,29 +269,60 @@ def build_contract_parser(sub: argparse._SubParsersAction) -> None:
     contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)
 
     # review
-    review_cmd = contract_sub.add_parser("review", help="Run design-review checklist on a schema contract YAML")
-    review_cmd.add_argument("--contract", required=True, help="Path to schema-contract YAML")
-    review_cmd.add_argument("--exit-zero", action="store_true", help="Return exit code 0 even when issues are found.")
-    review_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
-    review_cmd.add_argument("--dependency-artifact", type=str, default=None, help="Path to a dependency artifact JSON from the profiler, for FK validation")
+    review_cmd = contract_sub.add_parser(
+        "review", help="Run design-review checklist on a schema contract YAML"
+    )
+    review_cmd.add_argument(
+        "--contract", required=True, help="Path to schema-contract YAML"
+    )
+    review_cmd.add_argument(
+        "--exit-zero",
+        action="store_true",
+        help="Return exit code 0 even when issues are found.",
+    )
+    review_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
+    review_cmd.add_argument(
+        "--dependency-artifact",
+        type=str,
+        default=None,
+        help="Path to a dependency artifact JSON from the profiler, for FK validation",
+    )
     review_cmd.set_defaults(func=_contract_review)
 
     # diff
-    diff_cmd = contract_sub.add_parser("diff", help="Compare two schema contracts and show differences")
+    diff_cmd = contract_sub.add_parser(
+        "diff", help="Compare two schema contracts and show differences"
+    )
     diff_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     diff_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    diff_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    diff_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     diff_cmd.set_defaults(func=_contract_diff)
 
     # safety
-    safety_cmd = contract_sub.add_parser("safety", help="Check contract changes for migration safety risks")
+    safety_cmd = contract_sub.add_parser(
+        "safety", help="Check contract changes for migration safety risks"
+    )
     safety_cmd.add_argument("--old", required=True, help="Path to older contract YAML")
     safety_cmd.add_argument("--new", required=True, help="Path to newer contract YAML")
-    safety_cmd.add_argument("--django-settings", default=None, help="Django settings module (e.g. config.settings). Auto-detected for product repos.")
+    safety_cmd.add_argument(
+        "--django-settings",
+        default=None,
+        help="Django settings module (e.g. config.settings). Auto-detected for product repos.",
+    )
     safety_cmd.set_defaults(func=_contract_safety)
 
     # validate
-    validate_cmd = contract_sub.add_parser("validate", help="Validate a schema contract (structural checks)")
+    validate_cmd = contract_sub.add_parser(
+        "validate", help="Validate a schema contract (structural checks)"
+    )
     validate_cmd.add_argument("--contract", required=True)
     validate_cmd.add_argument("--json", action="store_true")
     validate_cmd.add_argument("--exit-zero", action="store_true")

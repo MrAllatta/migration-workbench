@@ -31,9 +31,9 @@ def test_generate_models_reads_app_label_from_contract(tmp_path):
     )
 
     source = out_path.read_text()
-    assert (
-        "# App label: myapp" in source
-    ), f"Expected header comment to use 'myapp', got:\n{source}"
+    assert "# App label: myapp" in source, (
+        f"Expected header comment to use 'myapp', got:\n{source}"
+    )
     assert 'db_table = "myapp_Widget"' in source
 
 

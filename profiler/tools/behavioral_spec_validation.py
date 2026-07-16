@@ -300,8 +300,7 @@ def validate_sign_off(spec: BehavioralSpec) -> list[str]:
         errors.append("Rule 2: project is missing (status cannot be checked)")
     elif spec.project.status != "signed_off":
         errors.append(
-            f"Rule 2: project.status must be 'signed_off', "
-            f"got '{spec.project.status}'"
+            f"Rule 2: project.status must be 'signed_off', got '{spec.project.status}'"
         )
 
     # ---- Rule 3: operator.name ----
@@ -351,7 +350,7 @@ def validate_sign_off(spec: BehavioralSpec) -> list[str]:
     for workflow in spec.workflows:
         if not workflow.priority:
             errors.append(
-                f"Rule 9: workflow '{workflow.id}' must have " f"a non-zero priority"
+                f"Rule 9: workflow '{workflow.id}' must have a non-zero priority"
             )
 
     # ---- Rule 10: decision information_system_must_provide ----

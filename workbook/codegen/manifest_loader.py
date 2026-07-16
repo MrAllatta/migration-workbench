@@ -46,7 +46,9 @@ def load_view_manifest(path: str | Path) -> list[dict[str, Any]]:
 
     views = data["views"]
     if not isinstance(views, list):
-        raise ValueError(f"View manifest 'views' must be a list, got {type(views).__name__}")
+        raise ValueError(
+            f"View manifest 'views' must be a list, got {type(views).__name__}"
+        )
 
     # Normalise each entry: ensure all optional fields exist
     normalized: list[dict[str, Any]] = []
@@ -141,8 +143,9 @@ def manifest_to_list_archetype(
     if contract_tables and resolved_model in contract_tables:
         col_data = contract_tables[resolved_model]
         if isinstance(col_data, dict) and "columns" in col_data:
-            columns = [c["column_name"] for c in col_data["columns"]
-                       if isinstance(c, dict)]
+            columns = [
+                c["column_name"] for c in col_data["columns"] if isinstance(c, dict)
+            ]
     if not columns:
         columns = _derive_columns(entity, resolved_model)
 

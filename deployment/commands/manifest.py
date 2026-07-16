@@ -70,10 +70,6 @@ def build_manifest_parser(sub: argparse._SubParsersAction) -> None:
     ``deployment.wb_cli.build_parser``).
     """
     manifest_cmd = sub.add_parser("manifest", help="Manifest operations")
-    manifest_sub = manifest_cmd.add_subparsers(
-        dest="manifest_command", required=True
-    )
-    lint_cmd = manifest_sub.add_parser(
-        "lint", help="Validate deployment manifest"
-    )
+    manifest_sub = manifest_cmd.add_subparsers(dest="manifest_command", required=True)
+    lint_cmd = manifest_sub.add_parser("lint", help="Validate deployment manifest")
     lint_cmd.set_defaults(func=_manifest_lint)

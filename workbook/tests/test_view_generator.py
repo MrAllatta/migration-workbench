@@ -64,7 +64,9 @@ def archetype() -> ChecklistArchetype:
         year_field="planned_year",
         week_field="planned_week",
         columns=[
-            ChecklistColumn(field="category", label="Category", format="choice_display"),
+            ChecklistColumn(
+                field="category", label="Category", format="choice_display"
+            ),
             ChecklistColumn(field="field_block", label="Block", format="fk_display"),
             ChecklistColumn(field="crop", label="Crop", format="fk_display"),
         ],
@@ -217,13 +219,17 @@ class TestRenderChecklistViewPy:
         source = render_checklist_view_py(archetype)
         assert 'template_name = "farm_ui/checklist_tasks.html"' in source
 
-    def test_queryset_filters_by_year_and_week(self, archetype: ChecklistArchetype) -> None:
+    def test_queryset_filters_by_year_and_week(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """``get_queryset`` filters by the configured year_field and week_field."""
         source = render_checklist_view_py(archetype)
         assert "planned_year=year" in source
         assert "planned_week=week" in source
 
-    def test_queryset_applies_select_related(self, archetype: ChecklistArchetype) -> None:
+    def test_queryset_applies_select_related(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """``get_queryset`` calls ``select_related`` with the configured FKs."""
         source = render_checklist_view_py(archetype)
         assert ".select_related(" in source
@@ -237,24 +243,33 @@ class TestRenderChecklistViewPy:
         assert "'status'" in source
         assert "'category'" in source
 
-    def test_context_data_calculates_prev_next(self, archetype: ChecklistArchetype) -> None:
+    def test_context_data_calculates_prev_next(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """``get_context_data`` includes prev_year, prev_week, next_year, next_week."""
         source = render_checklist_view_py(archetype)
         for token in (
-            "current_year", "current_week",
-            "prev_year", "prev_week",
-            "next_year", "next_week",
+            "current_year",
+            "current_week",
+            "prev_year",
+            "prev_week",
+            "next_year",
+            "next_week",
         ):
             assert token in source
 
-    def test_context_data_handles_year_boundary(self, archetype: ChecklistArchetype) -> None:
+    def test_context_data_handles_year_boundary(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """The week-52 boundary wraps to week 1 of the next year."""
         source = render_checklist_view_py(archetype)
         assert "week >= 52" in source
         assert 'context["next_week"] = 1' in source
         assert "year + 1" in source
 
-    def test_context_data_handles_week_1_boundary(self, archetype: ChecklistArchetype) -> None:
+    def test_context_data_handles_week_1_boundary(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """The week-1 boundary wraps to week 52 of the previous year."""
         source = render_checklist_view_py(archetype)
         assert "week <= 1" in source
@@ -285,7 +300,9 @@ class TestRenderToggleHandlerPy:
         source = render_toggle_handler_py(archetype)
         ast.parse(source)
 
-    def test_handler_decorated_with_post_and_login_required(self, archetype: ChecklistArchetype) -> None:
+    def test_handler_decorated_with_post_and_login_required(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """The handler has ``@require_POST`` and ``@login_required`` decorators."""
         source = render_toggle_handler_py(archetype)
         assert "@require_POST" in source
@@ -296,7 +313,9 @@ class TestRenderToggleHandlerPy:
         source = render_toggle_handler_py(archetype)
         assert 'obj.status = "done" if obj.status == "open" else "open"' in source
 
-    def test_handler_saves_with_update_fields(self, archetype: ChecklistArchetype) -> None:
+    def test_handler_saves_with_update_fields(
+        self, archetype: ChecklistArchetype
+    ) -> None:
         """The handler saves only the toggled field."""
         source = render_toggle_handler_py(archetype)
         assert "obj.save(update_fields=['status'])" in source
@@ -329,7 +348,7 @@ class TestRenderChecklistUrlPattern:
         lines = render_checklist_url_pattern(archetype)
         joined = "\n".join(lines)
         assert 'path("field/tasks/"' in joined
-        assert "name=\"farm_ui_task_checklist\"" in joined
+        assert 'name="farm_ui_task_checklist"' in joined
 
     def test_renders_toggle_path(self, archetype: ChecklistArchetype) -> None:
         """The toggle handler path() line is present."""
@@ -514,7 +533,9 @@ class TestRenderUrlsAutoPy:
 class TestBuildArchetypeFromContract:
     """``build_archetype_from_contract`` derives columns, select_related, ordering."""
 
-    def test_auto_columns_excludes_year_week(self, contract_table: dict[str, Any]) -> None:
+    def test_auto_columns_excludes_year_week(
+        self, contract_table: dict[str, Any]
+    ) -> None:
         """Year/week fields are not promoted into the table columns."""
         arch = build_archetype_from_contract(
             model="PlantingPlan",
@@ -525,7 +546,9 @@ class TestBuildArchetypeFromContract:
         assert "planned_year" not in column_fields
         assert "planned_week" not in column_fields
 
-    def test_auto_columns_includes_fk_with_fk_display(self, contract_table: dict[str, Any]) -> None:
+    def test_auto_columns_includes_fk_with_fk_display(
+        self, contract_table: dict[str, Any]
+    ) -> None:
         """FK fields get ``format="fk_display"`` for related-object rendering."""
         arch = build_archetype_from_contract(
             model="PlantingPlan",
@@ -536,7 +559,9 @@ class TestBuildArchetypeFromContract:
         assert any(c.field == "crop" for c in fk_columns)
         assert any(c.field == "field_block" for c in fk_columns)
 
-    def test_auto_select_related_lists_all_fks(self, contract_table: dict[str, Any]) -> None:
+    def test_auto_select_related_lists_all_fks(
+        self, contract_table: dict[str, Any]
+    ) -> None:
         """All FK fields end up in ``select_related``."""
         arch = build_archetype_from_contract(
             model="PlantingPlan",
@@ -547,7 +572,9 @@ class TestBuildArchetypeFromContract:
         assert "crop" in arch.select_related
         assert "field_block" in arch.select_related
 
-    def test_auto_ordering_prefers_first_fk(self, contract_table: dict[str, Any]) -> None:
+    def test_auto_ordering_prefers_first_fk(
+        self, contract_table: dict[str, Any]
+    ) -> None:
         """Ordering prefers the first FK field."""
         arch = build_archetype_from_contract(
             model="PlantingPlan",
@@ -556,7 +583,9 @@ class TestBuildArchetypeFromContract:
         )
         assert arch.ordering and arch.ordering[0] in arch.select_related
 
-    def test_explicit_columns_override_auto(self, contract_table: dict[str, Any]) -> None:
+    def test_explicit_columns_override_auto(
+        self, contract_table: dict[str, Any]
+    ) -> None:
         """Explicit columns replace auto-derived ones."""
         explicit = [ChecklistColumn(field="notes", label="Notes")]
         arch = build_archetype_from_contract(
@@ -737,7 +766,8 @@ class TestRenderLandingViewPy:
     def test_sets_template_name(self) -> None:
         """The template_name matches the archetype's template_path."""
         arch = LandingArchetype(
-            role="field_worker", title="Field Ops",
+            role="field_worker",
+            title="Field Ops",
         )
         source = render_landing_view_py(arch)
         assert 'template_name = "generated/landing_field_worker.html"' in source
@@ -871,8 +901,10 @@ class TestRenderLandingUrlPattern:
         """An archetype without url_path returns no lines."""
         # Unset role so post_init doesn't auto-assign url_path/url_name.
         arch = LandingArchetype(
-            role="", title="Field Ops",
-            url_path="", url_name="",
+            role="",
+            title="Field Ops",
+            url_path="",
+            url_name="",
         )
         assert render_landing_url_pattern(arch) == []
 
@@ -903,8 +935,10 @@ class TestRenderLandingUrlsAutoPy:
     def test_renders_urlpatterns_list(self) -> None:
         """The output has a ``urlpatterns`` list with the archetype's path."""
         arch = LandingArchetype(
-            role="field_worker", title="Field",
-            url_path="field-worker/", url_name="landing_field_worker",
+            role="field_worker",
+            title="Field",
+            url_path="field-worker/",
+            url_name="landing_field_worker",
         )
         source = render_landing_urls_auto_py([arch])
         ast.parse(source)
@@ -959,7 +993,9 @@ class TestGenerateViewsCommandLanding:
         views_source = (out_dir / "views_auto.py").read_text(encoding="utf-8")
         assert "class FieldWorkerLandingView" in views_source
         # Title appears in template, not view source
-        template_source = (out_dir / "generated" / "landing_field_worker.html").read_text(encoding="utf-8")
+        template_source = (
+            out_dir / "generated" / "landing_field_worker.html"
+        ).read_text(encoding="utf-8")
         assert "Field Ops" in template_source
 
 
@@ -1083,13 +1119,15 @@ class TestRenderDashboardViewPy:
             name="inventory",
             title="Inventory",
             alerts=[
-                AlertCard(label="Zero", count_expression="Item.objects.filter(qty=0).count()"),
+                AlertCard(
+                    label="Zero", count_expression="Item.objects.filter(qty=0).count()"
+                ),
             ],
         )
         self._compile_view(arch)
         source = render_dashboard_view_py(arch)
         assert "class InventoryDashboardView" in source
-        assert '_alert_0 = Item.objects.filter(qty=0).count()' in source
+        assert "_alert_0 = Item.objects.filter(qty=0).count()" in source
         assert 'context["alerts"]' in source
 
     def test_alerts_with_urls(self) -> None:
@@ -1127,7 +1165,7 @@ class TestRenderDashboardViewPy:
         assert 'context["section_0_title"]' in source
         assert 'context["section_0_rows"]' in source
         assert 'context["section_0_empty_message"]' in source
-        assert 'Event.objects.all()' in source
+        assert "Event.objects.all()" in source
 
     def test_multiple_sections(self) -> None:
         arch = DashboardArchetype(
@@ -1143,9 +1181,9 @@ class TestRenderDashboardViewPy:
         )
         self._compile_view(arch)
         source = render_dashboard_view_py(arch)
-        assert 'section_0_title' in source
-        assert 'section_1_title' in source
-        assert 'section_1_rows' in source
+        assert "section_0_title" in source
+        assert "section_1_title" in source
+        assert "section_1_rows" in source
 
     def test_no_alerts(self) -> None:
         arch = DashboardArchetype(
@@ -1196,14 +1234,14 @@ class TestRenderDashboardTemplateHtml:
             ],
         )
         html = render_dashboard_template_html(arch)
-        assert 'section_0_title' in html
-        assert 'section_0_rows' in html
-        assert 'section_0_empty_message' in html
-        assert '<th>Name</th>' in html
-        assert '<th>Crop</th>' in html
+        assert "section_0_title" in html
+        assert "section_0_rows" in html
+        assert "section_0_empty_message" in html
+        assert "<th>Name</th>" in html
+        assert "<th>Crop</th>" in html
         assert '{{ row.name|default:"—" }}' in html
-        assert '{{ row.crop }}' in html
-        assert 'data-table' in html
+        assert "{{ row.crop }}" in html
+        assert "data-table" in html
 
     def test_section_limit_shown(self) -> None:
         arch = DashboardArchetype(
@@ -1220,7 +1258,7 @@ class TestRenderDashboardTemplateHtml:
         )
         html = render_dashboard_template_html(arch)
         # The limit appears in the view source ([:10]), not the template.
-        assert 'section_0_rows' in html
+        assert "section_0_rows" in html
 
     def test_back_link(self) -> None:
         arch = DashboardArchetype(
@@ -1230,8 +1268,8 @@ class TestRenderDashboardTemplateHtml:
             back_url_label="Back to Home",
         )
         html = render_dashboard_template_html(arch)
-        assert 'Back to Home' in html
-        assert 'reverse' not in html  # URL resolution happens in view, not template
+        assert "Back to Home" in html
+        assert "reverse" not in html  # URL resolution happens in view, not template
 
     def test_empty_alerts(self) -> None:
         arch = DashboardArchetype(
@@ -1270,10 +1308,10 @@ class TestRenderDashboardTemplateHtml:
             ],
         )
         html = render_dashboard_template_html(arch)
-        assert 'section_0_title' in html
-        assert 'section_0_rows' in html
-        assert 'section_1_title' in html
-        assert 'section_1_rows' in html
+        assert "section_0_title" in html
+        assert "section_0_rows" in html
+        assert "section_1_title" in html
+        assert "section_1_rows" in html
 
 
 class TestRenderDashboardUrlPattern:
@@ -1290,14 +1328,14 @@ class TestRenderDashboardUrlPattern:
         assert len(lines) == 1
         assert 'path("inventory/"' in lines[0]
         assert 'name="dashboard_inventory"' in lines[0]
-        assert 'InventoryDashboardView' in lines[0]
+        assert "InventoryDashboardView" in lines[0]
 
     def test_no_url_empty(self) -> None:
         arch = DashboardArchetype(name="inventory", title="Inventory")
         # No explicit url_path means defaults are set via __post_init__.
         lines = render_dashboard_url_pattern(arch)
         assert len(lines) == 1
-        assert 'inventory/' in lines[0]
+        assert "inventory/" in lines[0]
 
 
 class TestRenderDashboardViewsAuto:
@@ -1308,7 +1346,10 @@ class TestRenderDashboardViewsAuto:
             name="inventory",
             title="Inventory",
             alerts=[
-                AlertCard(label="Zero", count_expression="InventoryLedger.objects.filter(qty=0).count()"),
+                AlertCard(
+                    label="Zero",
+                    count_expression="InventoryLedger.objects.filter(qty=0).count()",
+                ),
                 AlertCard(label="Low", count_expression="LowStock.objects.count()"),
             ],
         )
@@ -1321,11 +1362,13 @@ class TestRenderDashboardViewsAuto:
 
     def test_multiple_archetypes(self) -> None:
         a1 = DashboardArchetype(
-            name="inv", title="Inv",
+            name="inv",
+            title="Inv",
             alerts=[AlertCard(label="Z", count_expression="X.objects.count()")],
         )
         a2 = DashboardArchetype(
-            name="sea", title="Sea",
+            name="sea",
+            title="Sea",
             alerts=[AlertCard(label="P", count_expression="Y.objects.count()")],
         )
         source = render_dashboard_views_auto_py([a1, a2])
@@ -1346,16 +1389,18 @@ class TestRenderDashboardUrlsAuto:
         )
         source = render_dashboard_urls_auto_py([arch])
         compile(source, "<test>", "exec")
-        assert "path(\"inv/\"" in source
+        assert 'path("inv/"' in source
         assert "InventoryDashboardView" in source
 
     def test_multiple(self) -> None:
         a1 = DashboardArchetype(
-            name="inv", title="Inv",
+            name="inv",
+            title="Inv",
             alerts=[AlertCard(label="Z", count_expression="1")],
         )
         a2 = DashboardArchetype(
-            name="season", title="Season",
+            name="season",
+            title="Season",
             alerts=[AlertCard(label="P", count_expression="1")],
         )
         source = render_dashboard_urls_auto_py([a1, a2])
@@ -1415,7 +1460,9 @@ class TestGenerateViewsCommandDashboard:
         assert (out_dir / "urls_auto.py").exists()
         views_source = (out_dir / "views_auto.py").read_text(encoding="utf-8")
         assert "class InventoryDashboardView" in views_source
-        template_source = (out_dir / "generated" / "dashboard_inventory.html").read_text(encoding="utf-8")
+        template_source = (
+            out_dir / "generated" / "dashboard_inventory.html"
+        ).read_text(encoding="utf-8")
         assert "Inventory Dashboard" in template_source
 
 

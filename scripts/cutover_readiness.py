@@ -30,7 +30,9 @@ def check_vizcarra_import(out_lines: list[str]) -> bool:
 
     out = StringIO()
     try:
-        call_command("import_domain", "build/bundle", validate_only=True, stdout=out, stderr=out)
+        call_command(
+            "import_domain", "build/bundle", validate_only=True, stdout=out, stderr=out
+        )
         output = out.getvalue()
         has_errors = "error=" in output.split("TOTALS:")[-1]
         out_lines.append(check("Import pipeline runs (validate-only)", not has_errors))
@@ -43,9 +45,12 @@ def check_vizcarra_import(out_lines: list[str]) -> bool:
 def check_vizcarra_tests(out_lines: list[str]) -> bool:
     """Run the test suite."""
     import subprocess
+
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "--tb=short"],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True,
+        text=True,
+        timeout=120,
         cwd=Path(__file__).parent.parent,
     )
     passed = result.returncode == 0
@@ -58,17 +63,24 @@ def check_vizcarra_tests(out_lines: list[str]) -> bool:
 
 def check_vizcarra_views(out_lines: list[str]) -> bool:
     """Verify generated views module is valid Python."""
-    views_path = Path(__file__).parent.parent / "backend" / "apps" / "domain" / "views_auto.py"
+    views_path = (
+        Path(__file__).parent.parent / "backend" / "apps" / "domain" / "views_auto.py"
+    )
     if not views_path.is_file():
-        out_lines.append(check("Generated views exist", False, f"not found at {views_path}"))
+        out_lines.append(
+            check("Generated views exist", False, f"not found at {views_path}")
+        )
         return False
     source = views_path.read_text()
     try:
         compile(source, str(views_path), "exec")
         # Count view classes
         import re
+
         classes = re.findall(r"^class (\w+)", source, re.MULTILINE)
-        out_lines.append(check("Generated views load", True, f"{len(classes)} view classes"))
+        out_lines.append(
+            check("Generated views load", True, f"{len(classes)} view classes")
+        )
         return True
     except SyntaxError as e:
         out_lines.append(check("Generated views load", False, str(e)))
@@ -91,16 +103,28 @@ def check_farm_import(out_lines: list[str]) -> bool:
 
     out = StringIO()
     try:
-        call_command("import_core", str(bundle_dir), validate_only=True, stdout=out, stderr=out)
+        call_command(
+            "import_core", str(bundle_dir), validate_only=True, stdout=out, stderr=out
+        )
         output = out.getvalue()
-        lines = [line_text.strip() for line_text in output.splitlines() if line_text.strip().startswith(("ok ", "warn "))]
+        lines = [
+            line_text.strip()
+            for line_text in output.splitlines()
+            if line_text.strip().startswith(("ok ", "warn "))
+        ]
         error_models = []
         for line in lines:
             m = __import__("re").search(r"error=(\d+)", line)
             if m and int(m.group(1)) > 0:
                 error_models.append(line)
         all_ok = len(error_models) == 0
-        out_lines.append(check("Import pipeline 0 errors", all_ok, f"{len(error_models)} models with errors" if error_models else ""))
+        out_lines.append(
+            check(
+                "Import pipeline 0 errors",
+                all_ok,
+                f"{len(error_models)} models with errors" if error_models else "",
+            )
+        )
         return all_ok
     except Exception as e:
         out_lines.append(check("Import pipeline runs", False, str(e)))
@@ -110,13 +134,19 @@ def check_farm_import(out_lines: list[str]) -> bool:
 def check_farm_tests(out_lines: list[str]) -> bool:
     """Run the test suite (excluding syntax-error file)."""
     import subprocess
+
     result = subprocess.run(
         [
-            sys.executable, "-m", "pytest", "-q",
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
             "--ignore=backend/apps/core/tests/test_bprs_scaffold.py",
             "--tb=short",
         ],
-        capture_output=True, text=True, timeout=300,
+        capture_output=True,
+        text=True,
+        timeout=300,
         cwd=Path(__file__).parent.parent,
     )
     lines = result.stdout.strip().splitlines()
@@ -133,11 +163,21 @@ def check_farm_tests(out_lines: list[str]) -> bool:
 def check_farm_views(out_lines: list[str]) -> bool:
     """Verify generated views_auto.py is valid Python."""
     views_path = (
-        Path(__file__).parent.parent / "build" / "_out" / "generated_views" / "views_auto.py"
+        Path(__file__).parent.parent
+        / "build"
+        / "_out"
+        / "generated_views"
+        / "views_auto.py"
     )
     if not views_path.is_file():
         # Try build/_out/generated_views
-        alt_path = Path(__file__).parent.parent / "build" / "_out" / "generated_views" / "views_auto.py"
+        alt_path = (
+            Path(__file__).parent.parent
+            / "build"
+            / "_out"
+            / "generated_views"
+            / "views_auto.py"
+        )
         if not alt_path.is_file():
             out_lines.append(check("Generated views exist", False, "not found"))
             return False
@@ -146,8 +186,11 @@ def check_farm_views(out_lines: list[str]) -> bool:
     try:
         compile(source, str(views_path), "exec")
         import re
+
         classes = re.findall(r"^class (\w+)", source, re.MULTILINE)
-        out_lines.append(check("Generated views load", True, f"{len(classes)} view classes"))
+        out_lines.append(
+            check("Generated views load", True, f"{len(classes)} view classes")
+        )
         return True
     except SyntaxError as e:
         out_lines.append(check("Generated views load", False, str(e)))
@@ -158,7 +201,9 @@ def check_farm_views(out_lines: list[str]) -> bool:
 
 
 def main():
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.apps.domain.tests.settings_test")
+    os.environ.setdefault(
+        "DJANGO_SETTINGS_MODULE", "backend.apps.domain.tests.settings_test"
+    )
     repo = sys.argv[1] if len(sys.argv) > 1 else "all"
 
     report_dir = Path(__file__).parent.parent / "build" / "_out"

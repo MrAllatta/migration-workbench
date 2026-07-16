@@ -49,7 +49,7 @@ class DetailColumn:
             return f"{{{{ row.{self.field} }}}}"
         if self.format == "choice_display":
             return f"{{{{ row.get_{self.field}_display }}}}"
-        return f"{{{{ row.{self.field}|default:\"—\" }}}}"
+        return f'{{{{ row.{self.field}|default:"—" }}}}'
 
 
 @dataclass

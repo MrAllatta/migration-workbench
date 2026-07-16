@@ -69,7 +69,9 @@ def _flag_fk_columns(columns: list[dict], table_name: str | None = None) -> None
         name = col.get("suggested_field_name", "")
         if name.endswith("_id"):
             target = _to_pascal_case(name[:-3])
-            if table_name and _to_pascal_case(table_name).lower().startswith(target.lower()):
+            if table_name and _to_pascal_case(table_name).lower().startswith(
+                target.lower()
+            ):
                 continue
             col["suggested_fk_target"] = target
             col["review_note"] = f"Auto-detected FK: {target}"

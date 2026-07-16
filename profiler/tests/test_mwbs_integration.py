@@ -508,22 +508,22 @@ class TestMwbsPipelineIntegration:
         workflow_ids = [wf.id for wf in spec.workflows]
         # Field_blocks is referenced from the formula graph edge
         graph_inferred = [wf_id for wf_id in workflow_ids if "field_blocks" in wf_id]
-        assert (
-            len(graph_inferred) >= 1
-        ), f"No graph-inferred workflow found among: {workflow_ids}"
+        assert len(graph_inferred) >= 1, (
+            f"No graph-inferred workflow found among: {workflow_ids}"
+        )
 
         # FK edges should also produce workflow candidates
         fk_inferred = [wf_id for wf_id in workflow_ids if "planting_tracker" in wf_id]
-        assert (
-            len(fk_inferred) >= 1
-        ), f"No FK-inferred workflow found among: {workflow_ids}"
+        assert len(fk_inferred) >= 1, (
+            f"No FK-inferred workflow found among: {workflow_ids}"
+        )
 
         # --- Events created per tab with provenance ---
         assert len(spec.events) >= 1
         for event in spec.events:
-            assert (
-                event.provenance is not None
-            ), f"Event '{event.id}' missing provenance"
+            assert event.provenance is not None, (
+                f"Event '{event.id}' missing provenance"
+            )
             rule_ids = [
                 signal.get("rule_id", "")
                 for signal in event.provenance.inference_signals
@@ -579,9 +579,9 @@ class TestMwbsPipelineIntegration:
         for dim_name in dim_names:
             assert hasattr(report, dim_name), f"Missing dimension: {dim_name}"
             value = getattr(report, dim_name)
-            assert isinstance(
-                value, float
-            ), f"{dim_name} should be float, got {type(value).__name__}"
+            assert isinstance(value, float), (
+                f"{dim_name} should be float, got {type(value).__name__}"
+            )
             assert 0.0 <= value <= 1.0, f"{dim_name}={value} is outside [0.0, 1.0]"
 
         # ---- completion_gate_passed is bool ----

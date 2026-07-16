@@ -132,8 +132,8 @@ def render_toggle_handler_py(archetype: ChecklistArchetype) -> str:
         f"    obj = get_object_or_404({model_name}, pk=pk)",
         f"    {setter}",
         f"    obj.save(update_fields=[{field_name!r}])",
-        f'    return HttpResponse('
-        f'f\'<td colspan="4">Updated {{ {display_attr} }}</td>\'',
+        f"    return HttpResponse("
+        f"f'<td colspan=\"4\">Updated {{ {display_attr} }}</td>'",
         "    )",
         "",
     ]

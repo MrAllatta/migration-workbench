@@ -31,7 +31,12 @@ from deployment.manifest import (
 
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     """Perform a dry-run deployment."""
-    from deployment.wb_cli import ERROR_CODES, _get_git_sha, _render_output, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        ERROR_CODES,
+        _get_git_sha,
+        _render_output,
+        _setup_django,
+    )  # noqa: PLC0415
 
     manifest_path = Path(args.manifest)
     try:
@@ -113,9 +118,16 @@ def _deploy_dry_run(args: argparse.Namespace) -> int:
         },
         args.json,
     )
+
+
 def _deploy_live(args: argparse.Namespace) -> int:
     """Perform a live deploy: validate manifest, deploy, health-check, record."""
-    from deployment.wb_cli import ERROR_CODES, _get_git_sha, _render_output, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        ERROR_CODES,
+        _get_git_sha,
+        _render_output,
+        _setup_django,
+    )  # noqa: PLC0415
     from deployment.health import wait_for_healthy
     from deployment.release_store import record_release_event
 
@@ -333,9 +345,7 @@ def build_deploy_parser(sub: argparse._SubParsersAction) -> None:
     deploy_cmd.add_argument(
         "--manifest", default="deploy/spaces.yml", help="Path to spaces manifest"
     )
-    deploy_cmd.add_argument(
-        "--json", action="store_true", help="Output as JSON"
-    )
+    deploy_cmd.add_argument("--json", action="store_true", help="Output as JSON")
     # The deploy subcommand has special dispatch in main() for --live; the
     # default handler is dry-run, and main() swaps in _deploy_live for --live.
     deploy_cmd.set_defaults(func=_deploy_dry_run)

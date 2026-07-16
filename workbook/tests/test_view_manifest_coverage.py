@@ -19,8 +19,6 @@ from django.core.management import call_command
 from workbook.codegen.list_generator import ListArchetype, render_list_view_py
 
 
-
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -175,7 +173,9 @@ class TestViewManifestLoader:
 class TestManifestToArchetype:
     """manifest_to_list_archetype: manifest entry + contract → ListArchetype."""
 
-    def test_entry_with_filters_produces_list_archetype(self, sample_manifest_path: Path):
+    def test_entry_with_filters_produces_list_archetype(
+        self, sample_manifest_path: Path
+    ):
         """A crop-info manifest entry with filterable_by produces a ListArchetype
         with filters matching filterable_by."""
         from workbook.codegen.manifest_loader import (
@@ -271,7 +271,9 @@ class TestManifestToArchetype:
         archetype = manifest_to_list_archetype(bad_entry)
         assert archetype.model == "UnknownEntity"
 
-    def test_coverage_counts(self, sample_manifest_path: Path, sample_contract_path: Path):
+    def test_coverage_counts(
+        self, sample_manifest_path: Path, sample_contract_path: Path
+    ):
         """All manifest entries can produce a ListArchetype given a contract."""
         from workbook.codegen.manifest_loader import (
             load_view_manifest,
@@ -279,7 +281,11 @@ class TestManifestToArchetype:
         )
 
         views = load_view_manifest(sample_manifest_path)
-        model_map = {"crop": "Crop", "field_block": "FieldBlock", "sales_plan": "SalesPlan"}
+        model_map = {
+            "crop": "Crop",
+            "field_block": "FieldBlock",
+            "sales_plan": "SalesPlan",
+        }
 
         archetypes = []
         for entry in views:

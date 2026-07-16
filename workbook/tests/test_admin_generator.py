@@ -2617,9 +2617,9 @@ def test_admin_output_differs_with_codegen_manifest():
     source_with_cg = render_admin_py(
         contract, manifest, app_label="core", codegen_manifest=codegen
     )
-    assert (
-        source_no_cg != source_with_cg
-    ), "Admin output must differ when codegen manifest is provided"
+    assert source_no_cg != source_with_cg, (
+        "Admin output must differ when codegen manifest is provided"
+    )
     _check_compiles(source_with_cg)
     _check_compiles(source_no_cg)
 

@@ -10,7 +10,6 @@ import time
 from typing import Pattern
 
 
-
 def execute_with_retry(request, max_retries: int = 8):
     """Execute a Google API request with exponential backoff retry on transient failures.
 

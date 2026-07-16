@@ -34,7 +34,7 @@ def _sluggify(name: str) -> str:
 def _responsibility_to_model_name(responsibility: str) -> str:
     """Heuristic: first noun-like token in a responsibility string becomes
     the Django model name hint.
-    
+
     Examples:
         "Open tasks this week" → "Task"
         "Current plantings" → "Planting"
@@ -44,10 +44,22 @@ def _responsibility_to_model_name(responsibility: str) -> str:
     parts = responsibility.split()
     if not parts:
         return "Record"
-    
+
     # Skip generic leading adjectives and remove possessive apostrophes
-    skip = {"open", "current", "low", "pending", "active", "closed", "past",
-            "upcoming", "recent", "overdue", "new", "all"}
+    skip = {
+        "open",
+        "current",
+        "low",
+        "pending",
+        "active",
+        "closed",
+        "past",
+        "upcoming",
+        "recent",
+        "overdue",
+        "new",
+        "all",
+    }
     model_part = None
     for p in parts:
         cleaned = p.strip("'s").lower()
@@ -57,13 +69,13 @@ def _responsibility_to_model_name(responsibility: str) -> str:
             break
     if not model_part:
         model_part = parts[-1].replace("'", "").replace("`", "")
-    
+
     # Capitalize first letter
     model_name = model_part[0].upper() + model_part[1:] if model_part else "Record"
-    
+
     # Remove trailing punctuation
     model_name = model_name.rstrip(".")
-    
+
     return model_name
 
 
@@ -91,7 +103,7 @@ def _responsibility_to_count_expression(
                 model_name = model_name_overrides[word]
                 break
     low = responsibility.lower()
-    
+
     # Detect year/week filtering pattern
     week_filters = []
     if "this week" in low or "current week" in low:
@@ -99,19 +111,19 @@ def _responsibility_to_count_expression(
         week_filters.append("planned_week=current_week")
     if "today" in low or "current day" in low:
         week_filters.append("planned_date=current_date")
-    
+
     # Detect status filtering
     status_filter = ""
     for token in ("open", "pending", "active", "overdue", "closed", "completed"):
         if token in low:
             status_filter = f"status='{token}'"
             break
-    
+
     parts = []
     if status_filter:
         parts.append(status_filter)
     parts.extend(week_filters)
-    
+
     if parts:
         filter_args = ", ".join(parts)
         return f"{model_name}.objects.filter({filter_args}).count()"
@@ -196,7 +208,7 @@ def _parse_filter_hints(system_provides: list[str]) -> list[str]:
     for hint in system_provides:
         low = hint.lower()
         if low.startswith("filter by "):
-            remainder = low[len("filter by "):]
+            remainder = low[len("filter by ") :]
             for token in re.split(r"[,/]|\band\b|\bor\b", remainder):
                 token = token.strip()
                 if token:
@@ -230,10 +242,21 @@ def list_from_workflow_step(
         if "list" in hint.lower() or "browse" in hint.lower():
             # Extract field-like tokens
             tokens = re.findall(r"[A-Z][a-z]+|[a-z]+", hint)
-            columns.extend(t.lower() for t in tokens if t.lower() not in {
-                "with", "and", "by", "list", "browse", "filter", "the",
-                "status",
-            })
+            columns.extend(
+                t.lower()
+                for t in tokens
+                if t.lower()
+                not in {
+                    "with",
+                    "and",
+                    "by",
+                    "list",
+                    "browse",
+                    "filter",
+                    "the",
+                    "status",
+                }
+            )
 
     if not columns:
         columns = ["name"]
@@ -245,13 +268,13 @@ def list_from_workflow_step(
     for hint in step.system_provides:
         low = hint.lower()
         if low.startswith("ordered by "):
-            field_part = low[len("ordered by "):].strip()
+            field_part = low[len("ordered by ") :].strip()
             for token in re.split(r"[,/]|\band\b|\bor\b", field_part):
                 token = token.strip()
                 if token:
                     ordering.append(_sluggify(token))
         elif low.startswith("sort by "):
-            field_part = low[len("sort by "):].strip()
+            field_part = low[len("sort by ") :].strip()
             for token in re.split(r"[,/]|\band\b|\bor\b", field_part):
                 token = token.strip()
                 if token:

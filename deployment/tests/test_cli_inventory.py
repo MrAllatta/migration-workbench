@@ -114,9 +114,7 @@ def _commands_module_handler_names() -> set[str]:
     try:
         import deployment.commands
 
-        for _, name, _ in pkgutil.iter_modules(
-            deployment.commands.__path__
-        ):
+        for _, name, _ in pkgutil.iter_modules(deployment.commands.__path__):
             mod = importlib.import_module(f"deployment.commands.{name}")
             for attr_name in dir(mod):
                 if attr_name.startswith("_"):
@@ -154,7 +152,9 @@ def test_inventory_handlers_exist_in_codebase() -> None:
                         referenced.add(hh)
 
     missing = referenced - defined
-    assert not missing, f"Inventory references handlers not found in codebase: {sorted(missing)}"
+    assert not missing, (
+        f"Inventory references handlers not found in codebase: {sorted(missing)}"
+    )
 
 
 def test_wb_cli_baseline_line_count() -> None:

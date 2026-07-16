@@ -43,7 +43,7 @@ def render_landing_view_py(archetype: LandingArchetype) -> str:
             card_dicts.append(
                 f'            {{"label": "{card.label}", "value": {var_name}'
                 f', "url": reverse("{card.link_url_name}")'
-                f'{css}}},'
+                f"{css}}},"
             )
         else:
             card_dicts.append(

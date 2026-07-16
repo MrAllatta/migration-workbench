@@ -98,8 +98,7 @@ def resolve(label: str) -> str:
     if label in _BUILTINS:
         return _BUILTINS[label]
     raise KeyError(
-        f"Unknown archetype: {label!r}. "
-        f"Registered: {', '.join(sorted(labels()))}"
+        f"Unknown archetype: {label!r}. Registered: {', '.join(sorted(labels()))}"
     )
 
 

@@ -71,13 +71,15 @@ def render_dashboard_view_py(archetype: DashboardArchetype) -> str:
         limit_expr = f"[:{section.limit}]" if section.limit else ""
         lines.append(
             f'        context["section_{idx}_rows"] = '
-            f'{section.queryset_expression}{limit_expr}'
+            f"{section.queryset_expression}{limit_expr}"
         )
         lines.append(
             f'        context["section_{idx}_empty_message"] = '
-            f'{section.empty_message!r}'
+            f"{section.empty_message!r}"
         )
-        lines.append(f'        context["section_{idx}_colspan"] = {len(section.columns)}')
+        lines.append(
+            f'        context["section_{idx}_colspan"] = {len(section.columns)}'
+        )
 
     lines.append("        return context")
     lines.append("")

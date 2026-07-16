@@ -997,9 +997,9 @@ class TestVersionIndependence:
         """Assert PipelineState.version is a valid semver string."""
         import re
 
-        assert re.match(
-            r"^\d+\.\d+\.\d+$", PipelineState.version
-        ), f"PipelineState.version ({PipelineState.version}) is not valid semver"
+        assert re.match(r"^\d+\.\d+\.\d+$", PipelineState.version), (
+            f"PipelineState.version ({PipelineState.version}) is not valid semver"
+        )
 
     def test_pipeline_state_version_not_tied_to_pyproject(self) -> None:
         """Assert PipelineState.version is independent of pyproject.toml."""
@@ -1775,9 +1775,9 @@ class TestFormulaDependencyWiring:
         # (the enrich function requires every cell in a column to be a formula).
         assert "computed_fields" in entry
         computed_headers = {cf["header"] for cf in entry["computed_fields"]}
-        assert (
-            "Total" in computed_headers
-        ), f"Expected 'Total' in computed_fields, got {computed_headers}"
+        assert "Total" in computed_headers, (
+            f"Expected 'Total' in computed_fields, got {computed_headers}"
+        )
         assert "GrandTotal" not in computed_headers, (
             f"Expected GrandTotal NOT in computed_fields since it has mixed "
             f"empty/formula cells, got {computed_headers}"

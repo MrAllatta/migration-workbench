@@ -145,9 +145,9 @@ class TestValidateBehavioralSpecCommand:
 
         # Load the checkpoint to get the original coverage_report
         original_state = PipelineState.load(checkpoint_path)
-        assert (
-            original_state.coverage_report is not None
-        ), "coverage_report must be populated by validate_behavioral_spec"
+        assert original_state.coverage_report is not None, (
+            "coverage_report must be populated by validate_behavioral_spec"
+        )
         original_coverage_report = original_state.coverage_report
 
         with pytest.raises(CommandError):

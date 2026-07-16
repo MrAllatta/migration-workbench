@@ -264,8 +264,7 @@ def render_computed_property(
     if expression:
         expr_lines = expression.strip().split("\n")
         has_statement = any(
-            line.strip() and not line.strip().startswith("#")
-            for line in expr_lines
+            line.strip() and not line.strip().startswith("#") for line in expr_lines
         )
         if not has_statement:
             lines.append(f"{pad * 2}return None  # TODO: {name}")

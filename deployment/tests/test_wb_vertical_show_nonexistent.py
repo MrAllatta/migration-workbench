@@ -28,17 +28,17 @@ def test_wb_vertical_show_nonexistent_clear_error():
     )
     output = result.stdout
     # Should contain clear error message, not traceback
-    assert (
-        "WB-VERTICAL-4001" in output
-    ), f"Expected error code WB-VERTICAL-4001, got: {output}"
-    assert (
-        "Vertical template 'nonexistent' not found." in output
-    ), f"Expected clear error message, got: {output}"
+    assert "WB-VERTICAL-4001" in output, (
+        f"Expected error code WB-VERTICAL-4001, got: {output}"
+    )
+    assert "Vertical template 'nonexistent' not found." in output, (
+        f"Expected clear error message, got: {output}"
+    )
     # Should not contain traceback-like content
     assert "Traceback" not in output, f"Should not contain traceback, got: {output}"
-    assert (
-        "FileNotFoundError" not in output
-    ), f"Should not contain FileNotFoundError, got: {output}"
+    assert "FileNotFoundError" not in output, (
+        f"Should not contain FileNotFoundError, got: {output}"
+    )
 
 
 def test_wb_vertical_show_nonexistent_json_returns_error():
@@ -50,9 +50,9 @@ def test_wb_vertical_show_nonexistent_json_returns_error():
     )
     payload = json.loads(result.stdout)
     assert payload["ok"] is False, f"Expected ok=False, got: {payload}"
-    assert (
-        payload.get("error_code") == "WB-VERTICAL-4001"
-    ), f"Expected error_code WB-VERTICAL-4001, got: {payload.get('error_code')}"
-    assert (
-        "Vertical template 'nonexistent' not found." in payload["message"]
-    ), f"Expected clear error message in JSON, got: {payload['message']}"
+    assert payload.get("error_code") == "WB-VERTICAL-4001", (
+        f"Expected error_code WB-VERTICAL-4001, got: {payload.get('error_code')}"
+    )
+    assert "Vertical template 'nonexistent' not found." in payload["message"], (
+        f"Expected clear error message in JSON, got: {payload['message']}"
+    )

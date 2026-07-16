@@ -522,7 +522,9 @@ def test_build_contract_coda_relation_column_upgrades_to_fk():
     )
     tasks_table = contract["tables"][0]
     assert tasks_table["bundle_worksheet_title"] == "Tasks"
-    proj_col = next(c for c in tasks_table["columns"] if c["source_column"] == "Project")
+    proj_col = next(
+        c for c in tasks_table["columns"] if c["source_column"] == "Project"
+    )
     assert proj_col["django_field_class"] == "models.ForeignKey"
     assert proj_col["django_field_kwargs"]["to"] == "Projects"
     assert "coda_relation:lookup" in proj_col["notes"]
@@ -648,4 +650,6 @@ def test_build_contract_coda_relation_missing_target_uses_todo():
     assert parent_col["django_field_kwargs"]["to"] == "TODO_Parent"
     assert "fk_resolutions" in table
     fk = table["fk_resolutions"]
-    assert any(f["field"] == "parent" and f["target_model"] == "TODO_Parent" for f in fk)
+    assert any(
+        f["field"] == "parent" and f["target_model"] == "TODO_Parent" for f in fk
+    )

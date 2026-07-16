@@ -72,9 +72,7 @@ def test_wb_manifest_lint_still_works_via_wb_cli() -> None:
     from deployment.wb_cli import build_parser
 
     parser = build_parser()
-    args = parser.parse_args(
-        ["--manifest", str(_valid_manifest()), "manifest", "lint"]
-    )
+    args = parser.parse_args(["--manifest", str(_valid_manifest()), "manifest", "lint"])
     assert args.manifest_command == "lint"
     assert callable(args.func)
     result = args.func(args)

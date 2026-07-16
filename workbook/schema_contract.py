@@ -406,7 +406,9 @@ def build_contract(
         formula_classifications: list[dict[str, Any]] = []
 
         if tp:
-            _, col_meta, relation_columns, formula_classifications = index_table_profile(tp)
+            _, col_meta, relation_columns, formula_classifications = (
+                index_table_profile(tp)
+            )
         elif title in doc_tables:
             col_meta = dict(doc_tables[title]["by_name"])
         else:
@@ -500,7 +502,9 @@ def build_contract(
                             "field": field_name,
                             "target_model": target,
                             "target_field": "id",
-                            "confidence": "high" if rel.get("target_table_name") else "medium",
+                            "confidence": "high"
+                            if rel.get("target_table_name")
+                            else "medium",
                             "source": "coda_relation_column",
                         }
                     )
@@ -520,16 +524,17 @@ def build_contract(
                         if not n.startswith("relation_target_todo")
                     ]
                 col_def["notes"].append(relation_note)
-                field_name = (
-                    col_def.get("suggested_field_name")
-                    or suggested_field_name(col_name)
-                )
+                field_name = col_def.get(
+                    "suggested_field_name"
+                ) or suggested_field_name(col_name)
                 fk_resolutions.append(
                     {
                         "field": field_name,
                         "target_model": target,
                         "target_field": "id",
-                        "confidence": "high" if rel.get("target_table_name") else "medium",
+                        "confidence": "high"
+                        if rel.get("target_table_name")
+                        else "medium",
                         "source": "coda_relation_column",
                     }
                 )
