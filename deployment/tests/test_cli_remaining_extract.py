@@ -46,8 +46,16 @@ def test_generate_parser_registers_five_subcommands() -> None:
     parser = argparse.ArgumentParser(prog="wb")
     sub = parser.add_subparsers(dest="command")
     m.build_generate_parser(sub)
+    # Each generate subcommand has different required args; provide stubs.
+    cmd_args = {
+        "models": ["--contract", "/dev/null"],
+        "admin": ["--contract", "/dev/null"],
+        "import": ["--contract", "/dev/null"],
+        "manifest": ["--contract", "/dev/null"],
+        "views": ["--contract", "/dev/null", "--out-dir", "/tmp"],
+    }
     for cmd in ["models", "admin", "import", "manifest", "views"]:
-        parsed = parser.parse_args(["generate", cmd])
+        parsed = parser.parse_args(["generate", cmd] + cmd_args[cmd])
         assert hasattr(parsed, "func") and callable(parsed.func)
 
 
@@ -93,9 +101,9 @@ def test_deploy_parser_registers_subcommand() -> None:
     parser = argparse.ArgumentParser(prog="wb")
     sub = parser.add_subparsers(dest="command")
     m.build_deploy_parser(sub)
-    parsed = parser.parse_args(["deploy", "test-space", "--dry-run"])
+    parsed = parser.parse_args(["deploy", "test-space", "--env", "production", "--dry-run"])
     assert parsed.space == "test-space"
-    assert hasattr(parsed, "func")
+    assert hasattr(parsed, "func") and callable(parsed.func)
 
 
 def test_deploy_dry_run_returns_int() -> None:
@@ -148,9 +156,10 @@ def test_vertical_parser_registers_list_and_show() -> None:
     parser = argparse.ArgumentParser(prog="wb")
     sub = parser.add_subparsers(dest="command")
     m.build_vertical_parser(sub)
-    for cmd in ["list", "show"]:
-        parsed = parser.parse_args(["vertical", cmd])
-        assert hasattr(parsed, "func") and callable(parsed.func)
+    parsed = parser.parse_args(["vertical", "list"])
+    assert hasattr(parsed, "func") and callable(parsed.func)
+    parsed = parser.parse_args(["vertical", "show", "test-vertical"])
+    assert hasattr(parsed, "func") and callable(parsed.func)
 
 
 def test_vertical_list_returns_int() -> None:
@@ -249,8 +258,8 @@ def test_all_commands_still_dispatch_via_wb_cli() -> None:
     assert args.generate_command == "models"
 
     # deploy
-    args = parser.parse_args(["deploy", "test-space", "--dry-run",
-                               "--manifest", _deploy_manifest()])
+    args = parser.parse_args(["deploy", "test-space", "--env", "production",
+                               "--dry-run", "--manifest", _deploy_manifest()])
     assert args.space == "test-space"
 
     # vertical
