@@ -3,7 +3,7 @@
 
 id: e03
 title: "cli-router-split"
-status: not_started
+status: shipped
 target_version: "0.9.7"
 test_target: workbench
 canonical: "docs/roadmap.md#097-cli-router-split"
@@ -16,30 +16,40 @@ stories:
   - id: e03s01
     title: "Inventory wb_cli.py subcommands and groups"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Identify command groups and their boundary seams"
         verify: "wc -l deployment/wb_cli.py"   # baseline before split
+        status: passing
   - id: e03s02
     title: "Extract manifest commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Move manifest subcommands to deployment/commands/manifest.py"
         verify: "make chassis-gate"
+        status: passing
   - id: e03s03
     title: "Extract contract commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Move contract subcommands to deployment/commands/contract.py"
         verify: "make chassis-gate"
+        status: passing
   - id: e03s04
     title: "Extract generate, deploy, vertical, ecosystem, drift commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Move remaining command groups to their own modules"
         verify: "make chassis-gate"
+        status: passing
   - id: e03s05
     title: "Reduce wb_cli.py to a router"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "wb_cli.py dispatches to command modules by name"
         verify: "make chassis-gate"
+        status: passing

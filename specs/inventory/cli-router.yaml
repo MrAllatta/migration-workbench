@@ -1,0 +1,180 @@
+# Inventory: deployment/wb_cli.py
+# Story: e03s01 (cli-router-split)
+# Baseline: 1420 lines, captured at commit 8901f33 (pre-split).
+# Final: 232 lines (clean router) at commit b1622ff.
+#
+# All 7 command groups extracted to deployment/commands/*.py.
+# wb_cli.py is now a thin router: imports + utilities + build_parser() + main().
+
+#: Total command groups: 7
+#: Total subcommands: 16 (deploy is single-command with flags)
+#: Total handler functions: 17 (deploy has _deploy_dry_run and _deploy_live)
+#: Shared helpers: _setup_django, _get_git_sha, _render_output
+#: Total reduction: 1420 → 232 lines (-1188 / 84%)
+
+# ── manifest ───────────────────────────────────────────────────────
+# Line 120–143 of wb_cli.py.
+# Single subcommand. Lowest coupling — pure schema validation.
+# → future module: deployment/commands/manifest.py
+manifest:
+  status: extracted  # → deployment/commands/manifest.py
+  description: "Manifest operations (deployment space manifest validation)"
+  handlers:
+    - _manifest_lint
+  subcommands:
+    - name: lint
+      handler: _manifest_lint
+      description: "Validate deploy/spaces.yml against the full manifest schema."
+
+# ── contract ───────────────────────────────────────────────────────
+# Lines 144–395 of wb_cli.py.
+# Four subcommands. Schema contract review/diff/safety/validate.
+# → future module: deployment/commands/contract.py
+contract:
+  status: extracted  # → deployment/commands/contract.py
+  description: "Schema contract review, diff, safety, and validation"
+  handlers:
+    - _contract_review
+    - _contract_diff
+    - _contract_safety
+    - _contract_validate
+  subcommands:
+    - name: review
+      handler: _contract_review
+      description: "Run design-review checklist on a schema contract YAML."
+    - name: diff
+      handler: _contract_diff
+      description: "Compare two schema contracts and show differences."
+    - name: safety
+      handler: _contract_safety
+      description: "Check contract changes for migration safety risks."
+    - name: validate
+      handler: _contract_validate
+      description: "Validate a schema contract (structural checks)."
+
+# ── drift ──────────────────────────────────────────────────────────
+# Line 1062–1136 of wb_cli.py.
+# Single subcommand. Compares two contracts for drift.
+# → future module: deployment/commands/drift.py
+drift:
+  status: extracted  # → deployment/commands/drift.py
+  description: "Drift detection between two schema contracts"
+  handlers:
+    - _drift_check
+  subcommands:
+    - name: check
+      handler: _drift_check
+      description: "Check for drift between two schema contracts."
+
+# ── deploy ─────────────────────────────────────────────────────────
+# Lines 487–1061 of wb_cli.py. The largest command group.
+# Single subcommand with two handler functions (dry-run and live).
+# Special-cased in main() because --dry-run and --live are mutually
+# exclusive. The live handler is selected at runtime in main().
+# → future module: deployment/commands/deploy.py
+deploy:
+  status: extracted  # → deployment/commands/deploy.py
+  description: "Deploy operations (dry-run and live)"
+  handlers:
+    - _deploy_dry_run
+    - _deploy_live
+  subcommands:
+    - name: deploy
+      handlers: [_deploy_dry_run, _deploy_live]
+      description: |
+        Deploy a space. Requires --dry-run or --live (mutually exclusive).
+        The main() function dispatches to _deploy_dry_run or _deploy_live
+        based on the chosen flag.
+
+# ── generate ───────────────────────────────────────────────────────
+# Lines 396–486 (handlers) + 1137–1191 (parser builder).
+# Five subcommands for codegen: models, admin, import, manifest, views.
+# Currently parsed by _build_generate_parser() helper. Will become
+# the largest extracted module after deploy.
+# → future module: deployment/commands/generate.py
+generate:
+  status: extracted  # → deployment/commands/generate.py
+  description: "Generate code from a schema contract (codegen commands)"
+  handlers:
+    - _generate_models
+    - _generate_admin
+    - _generate_import
+    - _generate_manifest
+    - _generate_views
+  subcommands:
+    - name: models
+      handler: _generate_models
+      description: "Generate Django models.py"
+    - name: admin
+      handler: _generate_admin
+      description: "Generate Django admin.py"
+    - name: import
+      handler: _generate_import
+      description: "Generate Django import command"
+    - name: manifest
+      handler: _generate_manifest
+      description: "Generate view manifest"
+    - name: views
+      handler: _generate_views
+      description: "Generate Django views, templates, and URLs"
+
+# ── vertical ───────────────────────────────────────────────────────
+# Lines 570–722 of wb_cli.py.
+# Two subcommands for vertical template discovery.
+# → future module: deployment/commands/vertical.py
+vertical:
+  status: extracted  # → deployment/commands/vertical.py
+  description: "Vertical template operations"
+  handlers:
+    - _vertical_list
+    - _vertical_show
+  subcommands:
+    - name: list
+      handler: _vertical_list
+      description: "List available vertical templates."
+    - name: show
+      handler: _vertical_show
+      description: "Show details of a vertical template."
+
+# ── ecosystem ─────────────────────────────────────────────────────
+# Lines 723–874 of wb_cli.py.
+# Two subcommands for queue protocol operations.
+# → future module: deployment/commands/ecosystem.py
+ecosystem:
+  status: extracted  # → deployment/commands/ecosystem.py
+  description: "Ecosystem protocol operations (queue health and ack)"
+  handlers:
+    - _ecosystem_health
+    - _ecosystem_ack
+  subcommands:
+    - name: health
+      handler: _ecosystem_health
+      description: "Check queue protocol health."
+    - name: ack
+      handler: _ecosystem_ack
+      description: "Acknowledge a queue entry (mark as consumed or active)."
+
+# ── Extraction order (planned) ─────────────────────────────────────
+# e03s02: manifest (smallest, lowest risk — proof of pattern)
+# e03s03: contract (multi-subcommand, similar pattern to manifest)
+# e03s04: generate + vertical + ecosystem + drift + deploy (big groups)
+# e03s05: reduce wb_cli.py to a router
+
+extraction_order:
+  - id: e03s02
+    target_module: deployment/commands/manifest.py
+    status: extracted
+  - id: e03s03
+    target_module: deployment/commands/contract.py
+    status: extracted
+  - id: e03s04
+    target_modules:
+      - deployment/commands/generate.py
+      - deployment/commands/vertical.py
+      - deployment/commands/ecosystem.py
+      - deployment/commands/drift.py
+      - deployment/commands/deploy.py
+    status: extracted
+  - id: e03s05
+    target_module: deployment/wb_cli.py   # becomes a router
+    status: extracted  # 232 lines, clean router architecture
