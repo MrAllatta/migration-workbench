@@ -16,9 +16,11 @@ stories:
   - id: e03s01
     title: "Inventory wb_cli.py subcommands and groups"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Identify command groups and their boundary seams"
         verify: "wc -l deployment/wb_cli.py"   # baseline before split
+        status: passing
   - id: e03s02
     title: "Extract manifest commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
