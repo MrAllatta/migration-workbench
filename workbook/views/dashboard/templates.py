@@ -56,9 +56,9 @@ def render_dashboard_template_html(archetype: DashboardArchetype) -> str:
             "    <tr>",
             body,
             "    </tr>",
-            f"    {{% empty %}}",
+            "    {% empty %}",
             f'    <tr><td colspan="{cols}">{{{{ section_{idx}_empty_message }}}}</td></tr>',
-            f"    {{% endfor %}}",
+            "    {% endfor %}",
             "  </tbody>",
             "</table>",
         ]

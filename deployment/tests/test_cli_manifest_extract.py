@@ -68,7 +68,6 @@ def test_manifest_lint_handler_returns_int() -> None:
 
 def test_wb_manifest_lint_still_works_via_wb_cli() -> None:
     """``wb manifest lint`` must still dispatch correctly through wb_cli.build_parser()."""
-    import argparse
 
     from deployment.wb_cli import build_parser
 

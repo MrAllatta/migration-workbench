@@ -116,7 +116,6 @@ def render_toggle_handler_py(archetype: ChecklistArchetype) -> str:
     model_name = archetype.model
     setter = _resolve_status_setter(archetype)
     field_name = archetype.toggle_field
-    title = archetype.title
     display_attr = (
         f"obj.get_{field_name}_display()"
         if field_name == archetype.status_field

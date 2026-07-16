@@ -93,7 +93,7 @@ def check_farm_import(out_lines: list[str]) -> bool:
     try:
         call_command("import_core", str(bundle_dir), validate_only=True, stdout=out, stderr=out)
         output = out.getvalue()
-        lines = [l.strip() for l in output.splitlines() if l.strip().startswith(("ok ", "warn "))]
+        lines = [line_text.strip() for line_text in output.splitlines() if line_text.strip().startswith(("ok ", "warn "))]
         error_models = []
         for line in lines:
             m = __import__("re").search(r"error=(\d+)", line)
@@ -139,7 +139,7 @@ def check_farm_views(out_lines: list[str]) -> bool:
         # Try build/_out/generated_views
         alt_path = Path(__file__).parent.parent / "build" / "_out" / "generated_views" / "views_auto.py"
         if not alt_path.is_file():
-            out_lines.append(check("Generated views exist", False, f"not found"))
+            out_lines.append(check("Generated views exist", False, "not found"))
             return False
         views_path = alt_path
     source = views_path.read_text()
@@ -165,7 +165,7 @@ def main():
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "cutover-readiness.md"
 
-    lines = ["# Cutover Readiness Report", "", f"Generated: 2026-07-13", "", ""]
+    lines = ["# Cutover Readiness Report", "", "Generated: 2026-07-13", "", ""]
 
     if repo in ("all", "vizcarra"):
         lines.append("## Vizcarra Guitars (Coda → Django)")

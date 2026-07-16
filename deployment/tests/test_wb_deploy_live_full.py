@@ -78,9 +78,9 @@ def _manifest() -> dict:
 
 
 @pytest.mark.django_db
-@patch("deployment.wb_cli.subprocess.run")
+@patch("deployment.commands.deploy.subprocess.run")
 @patch("deployment.health.wait_for_healthy")
-@patch("deployment.wb_cli.shutil.which")
+@patch("deployment.commands.deploy.shutil.which")
 def test_deploy_live_full_success(mock_which, mock_health, mock_run, tmp_path):
     mock_which.return_value = "/usr/local/bin/fly"
     """Happy path: fly succeeds, health check passes, release events written."""
@@ -108,8 +108,8 @@ def test_deploy_live_full_success(mock_which, mock_health, mock_run, tmp_path):
 
 
 @pytest.mark.django_db
-@patch("deployment.wb_cli.subprocess.run")
-@patch("deployment.wb_cli.shutil.which")
+@patch("deployment.commands.deploy.subprocess.run")
+@patch("deployment.commands.deploy.shutil.which")
 def test_deploy_live_fly_fails(mock_which, mock_run, tmp_path):
     mock_which.return_value = "/usr/local/bin/fly"
     """fly deploy failure records deploy_failed event and exits non-zero."""
@@ -134,7 +134,7 @@ def test_deploy_live_fly_fails(mock_which, mock_run, tmp_path):
     assert result != 0
 
 
-@patch("deployment.wb_cli.subprocess.run")
+@patch("deployment.commands.deploy.subprocess.run")
 def test_deploy_live_invalid_manifest(mock_run, tmp_path):
     """Invalid manifest is rejected before any deploy attempt."""
     manifest_path = tmp_path / "bad.yml"

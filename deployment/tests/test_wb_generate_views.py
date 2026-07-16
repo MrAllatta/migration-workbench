@@ -5,7 +5,6 @@ These tests verify that the wb CLI correctly forwards arguments to the
 """
 
 import argparse
-from pathlib import Path
 from unittest.mock import patch
 
 

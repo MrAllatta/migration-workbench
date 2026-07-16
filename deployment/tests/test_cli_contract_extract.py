@@ -137,7 +137,6 @@ def test_contract_validate_returns_int() -> None:
 
 def test_contract_commands_still_work_via_wb_cli() -> None:
     """All four contract commands must dispatch through wb_cli.build_parser()."""
-    import argparse
 
     from deployment.wb_cli import build_parser
 
@@ -157,7 +156,6 @@ def test_contract_commands_still_work_via_wb_cli() -> None:
 
 def test_reimport_preserves_handler_identity() -> None:
     """The contract handlers via wb_cli must live in deployment.commands.contract."""
-    import deployment.commands.contract as contract_mod
 
     from deployment.wb_cli import (
         _contract_diff,

@@ -13,12 +13,11 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
-import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +31,7 @@ from deployment.manifest import (
 
 def _deploy_dry_run(args: argparse.Namespace) -> int:
     """Perform a dry-run deployment."""
-    from deployment.wb_cli import ERROR_CODES, _render_output, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import ERROR_CODES, _get_git_sha, _render_output, _setup_django  # noqa: PLC0415
 
     manifest_path = Path(args.manifest)
     try:

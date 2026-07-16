@@ -66,7 +66,6 @@ def parse_page_markdown_for_tables(markdown_text: str) -> list[dict[str, Any]]:
     # Split the page into sections based on ## headings.
     # We store the most recent heading before each table.
     sections = []
-    last_heading = ""
     for match in _HEADING.finditer(markdown_text):
         sections.append((match.start(), match.group(1)))
 

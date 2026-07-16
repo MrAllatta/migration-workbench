@@ -9,7 +9,6 @@ from __future__ import annotations
 import builtins
 import keyword
 import re
-from typing import Any
 
 
 def to_snake_case(pascal: str) -> str:

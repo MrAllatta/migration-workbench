@@ -11,20 +11,14 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Any
 
 import pytest
 import yaml
 from django.core.management import call_command
 
 from workbook.codegen.list_generator import ListArchetype, render_list_view_py
-from typing import Any
 
-import pytest
-import yaml
-from django.core.management import call_command
 
-from workbook.codegen.list_generator import ListArchetype, render_list_view_py
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -271,7 +265,7 @@ class TestManifestToArchetype:
             manifest_to_list_archetype,
         )
 
-        views = load_view_manifest(sample_manifest_path)
+        _ = load_view_manifest(sample_manifest_path)
         bad_entry = {"name": "mystery", "entity": "unknown_entity"}
 
         archetype = manifest_to_list_archetype(bad_entry)

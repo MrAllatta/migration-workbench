@@ -13,7 +13,6 @@ import importlib
 import re
 from pathlib import Path
 
-import pytest
 import yaml
 
 INVENTORY_PATH = Path("specs/inventory/cli-router.yaml")
@@ -164,7 +163,7 @@ def test_wb_cli_baseline_line_count() -> None:
     This guard lets e03s02-e03s05 detect a successful split: the line
     count of wb_cli.py must drop below the baseline.
     """
-    baseline = 232
+    baseline = 231
     actual = sum(1 for _ in WB_CLI_PATH.open())
     assert actual == baseline, (
         f"wb_cli.py is {actual} lines; expected {baseline} baseline. "

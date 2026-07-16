@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import ast
 
-import pytest
 
 from profiler.tools.behavioral_spec import Actor, Report, WorkflowStep
 from workbook.codegen.mwbs_to_archetype import landing_from_actor, list_from_workflow_step

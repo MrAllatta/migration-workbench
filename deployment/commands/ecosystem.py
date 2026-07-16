@@ -11,7 +11,16 @@ Extracted from deployment/wb_cli as part of e03s04
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import getpass
+
+
+try:
+    from workbook.tools.queue_protocol import QUEUE_LABELS as _QUEUE_LABELS
+except ImportError:
+    _QUEUE_LABELS: dict[str, str] = {}
+
+
+_QUEUE_LABELS: dict[str, str]
 
 
 def _ecosystem_health(args: argparse.Namespace) -> int:
@@ -19,7 +28,7 @@ def _ecosystem_health(args: argparse.Namespace) -> int:
 
     Reports entry counts, stale entries, and malformed entries per queue.
     """
-    from deployment.wb_cli import ERROR_CODES, _render_output  # noqa: PLC0415
+    from deployment.wb_cli import _render_output  # noqa: PLC0415
 
     from workbook.tools.queue_protocol import check_queue_health
 
@@ -100,6 +109,7 @@ def _ecosystem_ack(args: argparse.Namespace) -> int:
 
     Usage: wb ecosystem ack <queue> <filename> [--status active|consumed]
     """
+    from deployment.wb_cli import _render_output  # noqa: PLC0415
     from workbook.tools.queue_protocol import (
         acknowledge_activation,
         acknowledge_consumption,

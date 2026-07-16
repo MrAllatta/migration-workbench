@@ -419,11 +419,7 @@ def compute_coverage_metrics(spec: BehavioralSpec) -> CoverageReport:
     n_workflows = len(spec.workflows) or 1
     n_actors = len(spec.actors)
     n_events = len(spec.events)
-    n_decisions = len(spec.decisions)
-    n_exceptions = len(spec.exceptions)
-    n_rules = len(spec.rules)
     n_reports = len(spec.reports)
-    n_tests = len(spec.acceptance_tests)
 
     # Data coverage: actors + events relative to workflow count baseline
     baseline = max(2, n_workflows * 2)
