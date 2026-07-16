@@ -3,7 +3,7 @@
 
 id: e04
 title: "contract-layer-split"
-status: not_started
+status: shipped
 target_version: "0.9.8"
 test_target: workbench
 canonical: "docs/roadmap.md#098-contract-layer-split"
@@ -15,31 +15,43 @@ verify: "make chassis-gate"
 stories:
   - id: e04s01
     title: "Identify contract layer seams"
+    status: passing
     tasks:
       - description: "Find loading, accessor, validation, and diff responsibilities"
         verify: "wc -l workbook/codegen/contract.py"
+        status: passing
   - id: e04s02
     title: "Extract workbook/contract/loading.py"
+    status: passing
     tasks:
       - description: "YAML loading and bundle parsing"
         verify: "make chassis-gate"
+        status: passing
   - id: e04s03
     title: "Extract workbook/contract/accessors.py"
+    status: passing
     tasks:
       - description: "Field and model lookup helpers"
         verify: "make chassis-gate"
+        status: passing
   - id: e04s04
     title: "Extract workbook/contract/validation.py"
+    status: passing
     tasks:
       - description: "Contract validation rules"
         verify: "make chassis-gate"
+        status: passing
   - id: e04s05
     title: "Extract workbook/contract/diff.py"
+    status: passing
     tasks:
       - description: "Drift detection between contract versions"
         verify: "make chassis-gate"
+        status: passing
   - id: e04s06
     title: "Reduce contract.py to re-exports"
+    status: passing
     tasks:
       - description: "Backwards-compatible shim"
         verify: "make chassis-gate"
+        status: passing
