@@ -286,6 +286,11 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.9.7 (local)
+
+- `cli-router-split` — wb_cli.py 1420 → 232 lines. 7 command groups
+  extracted to `deployment/commands/*.py`. 1841 tests pass. (2026-07-16)
+
 ### 0.9.6 (local)
 
 - **View Archetype Registry:** Introduced `workbook/views/registry.py` with
