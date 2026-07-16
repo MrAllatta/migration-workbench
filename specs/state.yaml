@@ -34,5 +34,5 @@ handoff:
   - specs/product/SCOPE_LATEST.yaml
   - specs/adr/002-consultancy-as-proving-ground.md
   next_skill: develop-tdd
-  story_id: e03s01
+  story_id: e03s02
   baseline_tests: 1789
