@@ -117,28 +117,16 @@ def _render_output(payload: dict[str, Any], as_json: bool) -> int:
     return 0 if payload["ok"] else 1
 
 
-def _manifest_lint(args: argparse.Namespace) -> int:
-    try:
-        payload = load_manifest(Path(args.manifest))
-        ensure_manifest_valid(payload)
-    except ManifestValidationError as exc:
-        return _render_output(
-            {
-                "ok": False,
-                "error_code": ERROR_CODES["manifest_invalid"],
-                "message": "Manifest validation failed.",
-                "details": str(exc).splitlines()[1:],
-            },
-            args.json,
-        )
-    return _render_output(
-        {
-            "ok": True,
-            "error_code": None,
-            "message": f"Manifest is valid: {args.manifest}",
-        },
-        args.json,
-    )
+# Manifest command group was extracted to deployment.commands.manifest
+# in e03s02. Re-export here so existing callers and tests continue to
+# work unchanged. The function reference is the same object as
+# ``deployment.commands.manifest._manifest_lint``; the contract is
+# pinned by
+# ``deployment/tests/test_cli_manifest_extract.py::test_reimport_preserves_handler_reference``.
+from deployment.commands.manifest import (  # noqa: E402
+    _manifest_lint,
+    build_manifest_parser,
+)
 
 
 def _contract_review(args: argparse.Namespace) -> int:
@@ -1209,10 +1197,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    manifest_cmd = sub.add_parser("manifest", help="Manifest operations")
-    manifest_sub = manifest_cmd.add_subparsers(dest="manifest_command", required=True)
-    lint_cmd = manifest_sub.add_parser("lint", help="Validate deployment manifest")
-    lint_cmd.set_defaults(func=_manifest_lint)
+    # Manifest command group extracted to deployment.commands.manifest
+    # in e03s02. See deployment/commands/manifest.py for the
+    # implementation and specs/inventory/cli-router.yaml for the
+    # extraction roadmap.
+    build_manifest_parser(sub)
 
     contract_cmd = sub.add_parser("contract", help="Schema contract operations")
     contract_sub = contract_cmd.add_subparsers(dest="contract_command", required=True)

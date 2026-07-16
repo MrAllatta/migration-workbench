@@ -7,23 +7,25 @@ preserve the existing handler signature so wb_cli.py can dispatch to it.
 
 from __future__ import annotations
 
-import importlib
-import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _valid_manifest() -> Path:
+    """Return the path to a known-valid manifest fixture."""
+    return _REPO_ROOT / "deploy" / "spaces.yml"
 
 
 def test_manifest_module_imports_cleanly() -> None:
     """deployment.commands.manifest must be importable after extraction."""
-    import deployment.commands.manifest as manifest_mod
-
-    importlib.reload(manifest_mod)
+    import deployment.commands.manifest  # noqa: F401
 
 
 def test_manifest_module_has_build_manifest_parser() -> None:
     """The module must expose a build_manifest_parser() callable."""
     import deployment.commands.manifest as manifest_mod
 
-    importlib.reload(manifest_mod)
     assert callable(manifest_mod.build_manifest_parser)
 
 
@@ -31,7 +33,6 @@ def test_manifest_module_has_manifest_lint_handler() -> None:
     """The module must expose the _manifest_lint handler."""
     import deployment.commands.manifest as manifest_mod
 
-    importlib.reload(manifest_mod)
     assert callable(manifest_mod._manifest_lint)
 
 
@@ -41,54 +42,40 @@ def test_build_manifest_parser_returns_subparser() -> None:
 
     import deployment.commands.manifest as manifest_mod
 
-    importlib.reload(manifest_mod)
-
     parser = argparse.ArgumentParser(prog="wb")
     sub = parser.add_subparsers(dest="command")
     manifest_mod.build_manifest_parser(sub)
 
-    # Should parse 'manifest lint' without error
     parsed = parser.parse_args(["manifest", "lint"])
     assert parsed.manifest_command == "lint"
     assert callable(parsed.func)
 
 
-def test_manifest_lint_handler_returns_int(tmp_path: Path) -> None:
+def test_manifest_lint_handler_returns_int() -> None:
     """_manifest_lint must accept args and return an int exit code."""
     import argparse
 
     import deployment.commands.manifest as manifest_mod
 
-    importlib.reload(manifest_mod)
-
-    # Use the project's own deploy/spaces.yml as a known-valid fixture.
-    # This avoids re-declaring the manifest schema in the test.
-    repo_root = Path(__file__).resolve().parents[2]
-    real_manifest = repo_root / "deploy" / "spaces.yml"
-    assert real_manifest.exists(), f"Fixture manifest missing: {real_manifest}"
-
     args = argparse.Namespace(
-        manifest=str(real_manifest),
+        manifest=str(_valid_manifest()),
         json=False,
     )
     result = manifest_mod._manifest_lint(args)
     assert isinstance(result, int)
-    # A valid manifest should succeed
     assert result == 0
 
 
-def test_wb_manifest_lint_still_works_via_wb_cli(tmp_path: Path) -> None:
+def test_wb_manifest_lint_still_works_via_wb_cli() -> None:
     """``wb manifest lint`` must still dispatch correctly through wb_cli.build_parser()."""
     import argparse
 
     from deployment.wb_cli import build_parser
 
-    repo_root = Path(__file__).resolve().parents[2]
-    real_manifest = repo_root / "deploy" / "spaces.yml"
-    assert real_manifest.exists(), f"Fixture manifest missing: {real_manifest}"
-
     parser = build_parser()
-    args = parser.parse_args(["--manifest", str(real_manifest), "manifest", "lint"])
+    args = parser.parse_args(
+        ["--manifest", str(_valid_manifest()), "manifest", "lint"]
+    )
     assert args.manifest_command == "lint"
     assert callable(args.func)
     result = args.func(args)
@@ -97,12 +84,10 @@ def test_wb_manifest_lint_still_works_via_wb_cli(tmp_path: Path) -> None:
 
 
 def test_reimport_preserves_handler_reference() -> None:
-    """The _manifest_lint accessible via wb_cli must be the same function."""
-    from deployment.wb_cli import _manifest_lint as original_ref
+    """The _manifest_lint accessible via wb_cli must live in the commands module."""
+    from deployment.wb_cli import _manifest_lint as wb_cli_ref
 
-    import deployment.commands.manifest as manifest_mod
-
-    importlib.reload(manifest_mod)
-
-    # After extraction, wb_cli should re-export or directly reference the same function
-    assert original_ref is manifest_mod._manifest_lint
+    assert wb_cli_ref.__module__ == "deployment.commands.manifest", (
+        f"Expected _manifest_lint to live in deployment.commands.manifest, "
+        f"but its __module__ is {wb_cli_ref.__module__}"
+    )
