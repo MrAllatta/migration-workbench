@@ -35,8 +35,6 @@ can parse results without screen-scraping.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
-import getpass
 import json
 import os
 from pathlib import Path
@@ -44,7 +42,6 @@ import shutil
 import subprocess
 import sys
 from typing import Any
-import uuid
 
 from deployment.commands.contract import (
     _contract_diff,
@@ -78,19 +75,6 @@ from deployment.commands.vertical import (
     _vertical_show,
     build_vertical_parser,
 )
-
-from deployment.manifest import (
-    ManifestValidationError,
-    ensure_manifest_valid,
-    load_manifest,
-)
-
-from workbook.tools.vertical_registry import discover_verticals, load_vertical
-
-try:
-    from workbook.tools.queue_protocol import QUEUE_LABELS as _QUEUE_LABELS
-except ImportError:
-    _QUEUE_LABELS = {}
 
 ERROR_CODES = {
     "manifest_invalid": "WB-MANIFEST-1001",
@@ -150,25 +134,7 @@ def _render_output(payload: dict[str, Any], as_json: bool) -> int:
     return 0 if payload["ok"] else 1
 
 
-# Command groups extracted to deployment.commands.* during the
-# cli-router-split epic (e03). Re-export here so existing callers and
-# tests continue to work unchanged. The function references are the
-# same objects as those in the commands modules.
-from deployment.commands.contract import (  # noqa: E402
-    _contract_diff,
-    _contract_review,
-    _contract_safety,
-    _contract_validate,
-    build_contract_parser,
-)
-from deployment.commands.manifest import (  # noqa: E402
-    _manifest_lint,
-    build_manifest_parser,
-)
 
-
-
-# Contract command group extracted to deployment.commands.contract in e03s03.
 
 
 

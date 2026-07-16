@@ -1,6 +1,6 @@
 active_flow: build_epic
 active_epic_id: e03
-active_story_id: e03s04
+active_story_id: done
 active_bug_id: null
 release:
   target_version: 0.9.7
@@ -14,15 +14,19 @@ epic_cycle:
   - e03s01
   - e03s02
   - e03s03
+  - e03s04
+  - e03s05
+  status: complete
 bug_cycle:
   current_step: null
   completed_steps: []
 git:
   branch: feat/e03-cli-router-split
-  hash: e2b1cb5
+  hash: b1622ff
 handoff:
-  last_step_completed: 'e03s03 GREEN: contract commands extracted to deployment/commands/contract.py;
-    1812 tests pass; wb_cli.py 1108 lines (down from 1409)'
+  last_step_completed: "e03 DONE: cli-router-split complete. wb_cli.py 1420\u2192\
+    232 lines (-1188/84%). 7 command groups \u2192 7 modules in deployment/commands/.\
+    \ 1841 tests pass."
   open_decisions:
   - Define vertical template ladder priority order (3-5 archetypes)
   - Set services vs. product investment ratio glide path

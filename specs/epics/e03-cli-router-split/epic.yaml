@@ -3,7 +3,7 @@
 
 id: e03
 title: "cli-router-split"
-status: not_started
+status: shipped
 target_version: "0.9.7"
 test_target: workbench
 canonical: "docs/roadmap.md#097-cli-router-split"
@@ -40,12 +40,16 @@ stories:
   - id: e03s04
     title: "Extract generate, deploy, vertical, ecosystem, drift commands"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "Move remaining command groups to their own modules"
         verify: "make chassis-gate"
+        status: passing
   - id: e03s05
     title: "Reduce wb_cli.py to a router"
     canonical: "docs/roadmap.md#097-cli-router-split"
+    status: passing
     tasks:
       - description: "wb_cli.py dispatches to command modules by name"
         verify: "make chassis-gate"
+        status: passing
