@@ -9,18 +9,20 @@ extraction phase (e03s02-e03s05).
 
 from __future__ import annotations
 
+import importlib
 import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 INVENTORY_PATH = Path("specs/inventory/cli-router.yaml")
 WB_CLI_PATH = Path("deployment/wb_cli.py")
 
 #: Top-level command groups present in build_parser() at the time
-#: of the cli-router-split epic. Each entry has a parser name, the
-#: handler(s) it dispatches to, and the subcommands it owns.
-EXPECTED_GROUPS = {
+#: of the cli-router-split epic. Each entry lists the parser name,
+#: the subcommands it owns, and the handler functions it dispatches to.
+EXPECTED_GROUPS: dict[str, dict[str, list[str]]] = {
     "manifest": {
         "subcommands": ["lint"],
         "handlers": ["_manifest_lint"],
@@ -39,7 +41,7 @@ EXPECTED_GROUPS = {
         "handlers": ["_drift_check"],
     },
     "deploy": {
-        "subcommands": ["<args>"],
+        "subcommands": ["deploy"],
         "handlers": ["_deploy_dry_run", "_deploy_live"],
     },
     "generate": {
@@ -63,31 +65,23 @@ EXPECTED_GROUPS = {
 }
 
 
-def _read_inventory() -> str:
-    """Read the inventory YAML file. Asserts file exists."""
+def _load_inventory() -> dict:
+    """Load and parse the inventory YAML file.
+
+    Returns the parsed YAML as a dict. Asserts the file exists and
+    is parseable.
+    """
     assert INVENTORY_PATH.exists(), (
         f"Inventory file missing: {INVENTORY_PATH}. "
         "e03s01 requires the inventory before e03s02-e03s05 can begin."
     )
-    return INVENTORY_PATH.read_text()
+    return yaml.safe_load(INVENTORY_PATH.read_text())
 
 
-def _extract_top_level_groups(inventory_text: str) -> set[str]:
-    """Parse the top-level command group keys from the inventory.
-
-    Recognises a simple top-level key list: lines that start with
-    two-space indent followed by a non-`-` non-`"` character and a
-    colon. Good enough for the inventory format this story produces.
-    """
-    groups: set[str] = set()
-    for line in inventory_text.splitlines():
-        stripped = line.rstrip()
-        if stripped.startswith("  ") and not stripped.startswith("   "):
-            key = stripped.strip().rstrip(":")
-            # Top-level keys are simple identifiers (no leading `-` or `"`)
-            if key and re.fullmatch(r"[a-z_]+", key):
-                groups.add(key)
-    return groups
+def _defined_handlers() -> set[str]:
+    """Return the set of every ``def _xxx(`` defined in wb_cli.py."""
+    source = WB_CLI_PATH.read_text()
+    return set(re.findall(r"^def\s+(_[a-z_][a-z0-9_]*)\s*\(", source, re.MULTILINE))
 
 
 def test_inventory_file_exists() -> None:
@@ -95,36 +89,46 @@ def test_inventory_file_exists() -> None:
     assert INVENTORY_PATH.exists(), f"Inventory missing: {INVENTORY_PATH}"
 
 
-def test_inventory_has_yaml_extension() -> None:
-    """Inventory must be a YAML file (machine-readable)."""
+def test_inventory_is_valid_yaml() -> None:
+    """Inventory must be a parseable YAML file (machine-readable)."""
     assert INVENTORY_PATH.suffix == ".yaml"
+    data = yaml.safe_load(INVENTORY_PATH.read_text())
+    assert isinstance(data, dict), "Inventory root must be a mapping"
 
 
 def test_inventory_covers_all_command_groups() -> None:
-    """Every top-level command group from build_parser() must be in the inventory."""
-    inventory_text = _read_inventory()
-    listed_groups = _extract_top_level_groups(inventory_text)
+    """Every top-level command group from build_parser() must be a key in the inventory."""
+    data = _load_inventory()
+    listed = set(data.keys())
 
     expected = set(EXPECTED_GROUPS.keys())
-    missing = expected - listed_groups
+    missing = expected - listed
     assert not missing, f"Inventory missing command groups: {sorted(missing)}"
 
 
 def test_inventory_handlers_exist_in_wb_cli() -> None:
     """Every handler named in the inventory must be defined in wb_cli.py."""
-    inventory_text = _read_inventory()
-    wb_cli_source = WB_CLI_PATH.read_text()
+    data = _load_inventory()
+    defined = _defined_handlers()
 
-    # Find every ``def _xxx(`` line in wb_cli.py
-    defined = set(re.findall(r"^def\s+(_[a-z_][a-z0-9_]*)\s*\(", wb_cli_source, re.MULTILINE))
+    # Gather every handler reference from the inventory's groups
+    referenced: set[str] = set()
+    for group_data in data.values():
+        if not isinstance(group_data, dict):
+            continue
+        for handler in group_data.get("handlers", []):
+            if isinstance(handler, str):
+                referenced.add(handler)
+        for sub in group_data.get("subcommands", []):
+            if isinstance(sub, dict):
+                h = sub.get("handler")
+                if isinstance(h, str):
+                    referenced.add(h)
+                for hh in sub.get("handlers", []):
+                    if isinstance(hh, str):
+                        referenced.add(hh)
 
-    # Find every handler reference in the inventory (rough but sufficient)
-    referenced = set(re.findall(r"_(?:[a-z]+_[a-z_]+)\b", inventory_text))
-    # Only keep the ones that look like handlers (start with underscore + lowercase)
-    handler_like = {h for h in referenced if h.startswith("_") and h[1:].islower()}
-
-    # Cross-check: any handler mentioned in inventory that does NOT exist in wb_cli.py
-    missing = handler_like - defined
+    missing = referenced - defined
     assert not missing, f"Inventory references handlers not defined in wb_cli.py: {sorted(missing)}"
 
 
@@ -143,13 +147,11 @@ def test_wb_cli_baseline_line_count() -> None:
 
 
 def test_wb_cli_still_works_after_inventory() -> None:
-    """Sanity: ``python -c "import deployment.wb_cli"`` still imports cleanly.
+    """Sanity: ``import deployment.wb_cli`` still imports cleanly.
 
     The inventory is a documentation artifact. It must not change
     runtime behaviour.
     """
-    import importlib
-
     mod = importlib.import_module("deployment.wb_cli")
     importlib.reload(mod)
     assert callable(mod.main)
