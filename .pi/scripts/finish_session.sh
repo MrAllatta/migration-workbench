@@ -17,6 +17,24 @@ fi
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+# Check if run from a worktree
+if [[ "$(pwd)" == *".worktrees/"* ]]; then
+  echo "WARNING: running finish from a worktree."
+  echo "Merging should happen from the main checkout."
+  echo ""
+  echo "To merge this worktree's work:"
+  echo "  cd $REPO_ROOT"
+  echo "  git merge --squash $(pwd)"
+  echo "  git commit -m \"\$MSG\""
+  echo "  git worktree remove $(pwd)"
+  echo ""
+  echo "Continue with finish in worktree? (y/n)"
+  read -r answer
+  if [ "$answer" != "y" ]; then
+    exit 1
+  fi
+fi
+
 # 1. Planning docs must be staged if modified.
 UNSTAGED_PI="$(git diff --name-only -- '.pi/' || true)"
 if [ -n "$UNSTAGED_PI" ]; then

@@ -52,9 +52,25 @@ if [ "$current" != "master" ]; then
   echo "  NOTE: on branch '$current', not 'master'"
 fi
 
+# 6. Worktree model enforcement — check main checkout branch
+main_branch=$(git worktree list 2>/dev/null | grep -v ".worktrees/" | head -1 | awk '{print $3}' | tr -d '[]')
+if [ -n "$main_branch" ] && [ "$main_branch" != "master" ]; then
+  echo "  VIOLATION: main checkout is on '$main_branch', not 'master'"
+  echo "  ~/projects/migration-workbench must always have master checked out."
+  err=1
+fi
+
+# 7. Active worktree status
+worktree_count=$(git worktree list 2>/dev/null | grep -c ".worktrees/" || true)
+if [ "$worktree_count" -gt 0 ]; then
+  echo "  ACTIVE WORKTREES: $worktree_count"
+  git worktree list 2>/dev/null | grep ".worktrees/" | sed 's/^/    /'
+fi
+
 if [ "$err" -eq 0 ]; then
   echo "  All clean."
 else
   echo "  Run 'make finish' to clean up, or address items manually."
+  echo "  Worktree model: all development happens in .worktrees/wt-<slug>"
   exit 1
 fi

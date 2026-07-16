@@ -4,6 +4,121 @@
 
 This is **migration-workbench** — a Python package (PyPI: `migration-workbench`) providing five Django apps (connectors, profiler, importer, workbook, deployment) that scaffolded product repos install as a dependency. The root `manage.py` and `migration_workbench/settings.py` are for development and CI. Product repos bring their own.
 
+## Worktree Model
+
+`~/projects/migration-workbench` always has `master` checked out. Period.
+Every feature, bugfix, or mission gets its own worktree under `.worktrees/`.
+
+### Lifecycle
+
+1. **Create:** `git worktree add .worktrees/wt-<slug> -b feat/<slug>`
+   - Worktree name: `wt-<slug>` (matches mission/brief slug)
+   - Branch name: `feat/<slug>` (Conventional Commits prefix)
+   - Slug comes from brief filename or mission name
+
+2. **Work:** All development, testing, and gating happens inside the worktree.
+   - Run `make chassis-gate` from the worktree
+   - Commit checkpoints on the feature branch
+   - Never touch `~/projects/migration-workbench` directly
+
+3. **Merge:** Squash-merge back to master when gate is green.
+   ```bash
+   cd ~/projects/migration-workbench
+   git merge --squash .worktrees/wt-<slug>
+   git commit -m "<conventional message>"
+   ```
+
+4. **Cleanup:** Remove worktree and branch after merge.
+   ```bash
+   git worktree remove .worktrees/wt-<slug>
+   git branch -D feat/<slug>   # -D required: squash merge creates a new commit hash
+   ```
+
+   Note: `git branch -d` will refuse because the branch's commits are not ancestrally
+   connected to `master` — only their *content* was squashed. `-D` is correct here. See
+   [git-merge(1) --squash](https://git-scm.com/docs/git-merge#_squash_mode).
+
+### Rules
+
+- No exceptions. Even "quick fixes" get a worktree.
+- If `.worktrees/wt-<slug>` already exists, check for stale worktrees first.
+- Never commit directly to `master` from a worktree.
+- Never push from a worktree without explicit human delegation.
+
+## Quality Gates
+
+`make chassis-gate` is the authoritative gate. PRs must pass it.
+
+### Gates
+
+| Gate | Command | When |
+|------|---------|------|
+| Full CI | `make chassis-gate` | Before every merge to master |
+| Single test | `.venv/bin/python -m pytest <path>::<name>` | During development |
+| Doc coverage | `make doc-coverage` | Before merge (80% enforced) |
+| Format | `make format` | Before commit |
+
+### Rules
+
+- Never merge to master if gate is red.
+- Never tag a commit the public CI has not seen pass.
+- If gate fails, fix it before `make finish`.
+- For known-red WIP, use `git commit` with `[WIP]` prefix, not `make finish`.
+
+## Versioning
+
+Two versions, never one. They move independently.
+
+| Version | Location | Signals |
+|---------|----------|---------|
+| Package release | `pyproject.toml` `version` | PyPI release |
+| Schema checkpoint | `PipelineState.version` | Format change requiring migration |
+
+### Rules
+
+- Never conflate the two. A schema version bump ≠ package version bump.
+- Patch = unit-tested, gate green. Not validated against real data.
+- Minor = product capability proven end-to-end against real data.
+- 1.0.0 = both engagements retired, consultant playbook proven.
+- Merge to master = release. Every merge that changes user-facing behavior gets a tag.
+- Changelog: updated at bottom of `README.md`.
+
+## Push Authority
+
+The human owns the push to `origin/master` and release tags.
+
+### Rules
+
+- Agents commit, merge, and tag locally. Never push without explicit delegation.
+- If human delegates push authority for a specific release, agent may push.
+- Feature branches may be pushed freely as backup (not PRs).
+- PyPI uploads blocked until 1.0.0 (PyPI blocks `<= 0.9.3`).
+
+## Architecture
+
+Five Django apps. This repo is upstream. Product repos consume via PyPI.
+
+### Apps
+
+| App | Responsibility | Entry points |
+|-----|---------------|--------------|
+| connectors | Provider adapters (Google Sheets, Coda) | `connectors/base.py`, `connectors/router.py` |
+| profiler | Read-only source inspection, PipelineState | `profiler/tools/pipeline_state.py` |
+| importer | `BaseImportCommand` chassis, preflight/apply | `importer/base.py`, `importer/chassis.py` |
+| workbook | Schema contract, codegen, view manifest | `workbook/management/commands/` |
+| deployment | Manifest validation, `wb` CLI, release store | `deployment/wb_cli.py`, `deployment/manifest.py` |
+
+### Patching Boundary
+
+| Situation | Where to fix |
+|-----------|-------------|
+| Bug in workbench command, template, or utility | **Here** |
+| Missing feature another product would need | **Here** |
+| Product-specific display logic or admin config | **Product repo** |
+| Product-specific data validation or business rules | **Product repo** |
+
+Never vendor workbench code into a product repo. Fix upstream, release to PyPI, bump the pin.
+
 ## Interface contract
 
 The Makefile loads `.env` via `-include .env` and uses bare `export` (line 2), which makes **all** `.env` variables available in recipe shells. This is the load-and-export contract: the Makefile is responsible for making variables available to its recipes, and it fails clearly when a required variable is missing.
@@ -22,99 +137,7 @@ set -a; . .env; set +a; python manage.py <command>
 
 Or use `make bash` to enter a shell with `.env` loaded.
 
-## Development workflow
-
-```bash
-make install         # venv + dev dependencies
-make hygiene         # session-start: check branches, portfolio, worktrees
-make finish          # session-end: gate + commit
-make chassis-gate    # the full CI gate: migrate, test, lint, smoke commands
-```
-
-Session rituals are documented in `.pi/OPERATORS_CONTRACT.md`.
-
-`make chassis-gate` is the authoritative gate. PRs must pass it. See `docs/contributing.md` for individual test commands.
-
-## Ecosystem
-
-This repo operates as a one-person team with an agent harness. The human owns
-the roadmap and the product specs. The agent executes autonomously, reports
-outcomes, and keeps the commit log clean.
-
-The harness must provide:
-
-- **Portfolio** — "What am I working on across all repos?"
-- **Brief** — "Build this." Human writes; agent executes.
-- **Journal** — "What happened." Agent appends only.
-
-No state machines, no done manifests, no orchestration scripts. Markdown files
-and git branches are enough. The harness decides how these artifacts are stored
-and discovered.
-
-## Five apps
-
-| App | Responsibility | Entry points |
-|-----|---------------|--------------|
-| connectors | Provider adapters (Google Sheets, Coda) | `connectors/base.py`, `connectors/router.py` |
-| profiler | Read-only source inspection, PipelineState | `profiler/tools/pipeline_state.py`, `profiler/management/commands/run_pipeline_state.py` |
-| importer | `BaseImportCommand` chassis, preflight/apply | `importer/base.py`, `importer/chassis.py` |
-| workbook | Schema contract, codegen, view manifest | Management commands under `workbook/management/commands/` |
-| deployment | Manifest validation, `wb` CLI, release store | `deployment/wb_cli.py`, `deployment/manifest.py` |
-
-Each app has a `README.md` and a `tests/` directory. Read those before modifying.
-
-## Testing discipline
-
-- Write tests alongside the code in the app's `tests/` directory.
-- Run the full gate before PRs: `make chassis-gate`
-- Run a single test: `.venv/bin/python -m pytest profiler/tests/test_profile_commands.py::test_name`
-- Doctest coverage enforced at 80%: `make doc-coverage`
-
 ## Naming & style
-
-- **Docstrings:** Google-style (`Args:`, `Returns:`, `Raises:`). Enforced by `interrogate` at 80%.
-- **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `ci:`).
-- **Versioning:** Semver. Breaking changes allowed on `0.x`; pin ranges in product repos.
-- **Schema versions:** Internal checkpoint/model schema versions (e.g. `PipelineState.version`) are independent of the package version in `pyproject.toml`. A schema version bump signals a format change requiring migration; a package version bump signals a release. Never conflate the two.
-- **Changelog:** Updated at the bottom of `README.md`.
-
-## Solo release hygiene
-
-This repo is maintained by one operator with agent assistance. The rules are
-deliberately minimal — just enough to prevent the common failure modes.
-
-**Feature branches insulate `master`.** Every mission gets a branch:
-`feat/<slug>`. The agent commits checkpoints on the branch, hammers out edge
-cases there, and only lands on `master` when `make chassis-gate` is green.
-No long-lived branches. Branches older than one week are either merged or
-deleted.
-
-**Commit messages are the agent's summary.** The agent writes the final
-squash commit message. It must tell a story, not read like a transcript of
-checkpoints. The human owns the roadmap; the agent owns the wording of the
-commit that implements it.
-
-**Merge = release.** Every merge to `master` that changes user-facing behavior
-gets a tag and a PyPI release. If it passes `make chassis-gate`, it ships.
-
-**Two versions, never one.** `pyproject.toml` version is the package release.
-`PipelineState.version` is the checkpoint schema. They move independently.
-
-**Release in three commands:**
-```bash
-# 1. Bump version in pyproject.toml and add ### x.y.z to README.md changelog
-# 2. Commit and tag
-git commit -am "release: 0.1.0"
-git tag -a v0.1.0 -m "release: 0.1.0"
-git push origin master && git push origin v0.1.0
-```
-
-**Pre-releases for risky changes.** If a feature branch needs testing in a
-product repo before you commit to a stable release, tag it `v0.1.0a1`. Product
-repos pin exactly (`==0.1.0a1`) to opt in.
-
-**Agents do not push.** The agent commits, merges, and tags locally. The human
-pushes. If the human delegates push authority explicitly, the agent may push.
 
 ### Naming rules
 
@@ -139,29 +162,10 @@ Never use single-letter names, alphabetic slice labels, or abstract positional p
 | View/workflow | `view_manifest`, `view_entry`, `workflow_hints`, `discovery_interview`, `discovery_summary` |
 | Pipeline state | `pipeline_state`, `checkpoint`, `discovery_state`, `deep_profile_index`, `domain_knowledge`, `schema_contract`, `interaction_contract` |
 
-## Patching boundary
+### Style
 
-This repo is upstream. Product repos (farm, vizcarra-guitars, etc.) consume it via PyPI. When a product repo finds a gap or bug:
-
-| Situation | Where to fix |
-|-----------|-------------|
-| Bug in a workbench command, template, or utility | **Here** |
-| Missing feature another product would also need | **Here** |
-| Column type inference misfire | **Here** |
-| Import transform pipeline missing a hook point | **Here** |
-| Codegen output malformed or incomplete | **Here** |
-| Product-specific display logic or admin config | **Product repo** |
-| Product-specific data validation or business rules | **Product repo** |
-| One-off import transform for a unique source quirk | **Product repo** |
-
-Never vendor workbench code into a product repo. Fix upstream, release to PyPI, bump the version pin.
-
-### Workflow
-
-1. Fix here, in the workbench checkout.
-2. Run `make chassis-gate` — must pass before PR.
-3. Open PR at https://github.com/anomalyco/migration-workbench.
-4. After release, bump the lower bound in the product repo's `pyproject.toml`.
+- **Docstrings:** Google-style (`Args:`, `Returns:`, `Raises:`). Enforced by `interrogate` at 80%.
+- **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `ci:`).
 
 ## Human judgment points
 
