@@ -16,7 +16,6 @@ from typing import Any
 from workbook.contract.accessors import get_fields, get_model_name
 
 
-
 def diff_contracts(
     old: dict[str, Any],
     new: dict[str, Any],
@@ -330,5 +329,3 @@ def _diff_meta(
 def _field_class_short(raw: str) -> str:
     """Strip the ``models.`` prefix from a field class string."""
     return raw.removeprefix("models.")
-
-

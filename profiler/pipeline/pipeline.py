@@ -84,9 +84,7 @@ class CorpusPipelineDispatcher:
             )
         if provider == self.PROVIDER_CODA:
             if session is None:
-                raise ValueError(
-                    "session is required for provider='coda'"
-                )
+                raise ValueError("session is required for provider='coda'")
             return CodaCorpusAdapter(
                 session=session,
                 resume_from_table_selection=resume_from_table_selection,

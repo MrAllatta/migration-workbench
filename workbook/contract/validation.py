@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from workbook.codegen.validation_pipeline import ValidationResult
 
 
-
 def _validate_table_exceptions(table: dict[str, Any]) -> list[str]:
     """Validate exception blocks on a single contract table.
 

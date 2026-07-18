@@ -257,9 +257,7 @@ class CodaCorpusAdapter(CorpusPipeline):
                 f"{table_selection_path}; none found"
             )
         try:
-            existing = json.loads(
-                table_selection_path.read_text(encoding="utf-8")
-            )
+            existing = json.loads(table_selection_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise CommandError(
                 f"Could not parse {table_selection_path}: {exc}"
@@ -337,8 +335,7 @@ class CodaCorpusAdapter(CorpusPipeline):
                     (
                         t
                         for t in tables_in_doc
-                        if t.get("name") == table_name
-                        or t.get("id") == table_name
+                        if t.get("name") == table_name or t.get("id") == table_name
                     ),
                     None,
                 )
@@ -358,9 +355,7 @@ class CodaCorpusAdapter(CorpusPipeline):
                     continue
                 try:
                     columns = list_columns(self.session, doc_id, tid)
-                    rows = list_rows(
-                        self.session, doc_id, tid, max_rows=max_rows_deep
-                    )
+                    rows = list_rows(self.session, doc_id, tid, max_rows=max_rows_deep)
                     grid = rows_to_grid(columns, rows)
                     summary = summarize_coda_table(
                         doc_title,
@@ -413,9 +408,7 @@ class CodaCorpusAdapter(CorpusPipeline):
                     deep_results.append(
                         {
                             "doc_name": doc_display_name,
-                            "table_name": str(
-                                match_tb.get("name") or table_name
-                            ),
+                            "table_name": str(match_tb.get("name") or table_name),
                             "out_json": None,
                             "exit_code": 1,
                             "error": f"{type(exc).__name__}: {exc}",
@@ -635,18 +628,14 @@ class CodaCorpusAdapter(CorpusPipeline):
         self.enrich_columns(candidate_columns)
 
         # Relationship summary
-        relationship_path = (
-            out_dir / f"coda_relationship_summary_{date_stamp}.json"
-        )
+        relationship_path = out_dir / f"coda_relationship_summary_{date_stamp}.json"
         write_json(
             relationship_path,
             finalize_relationship_summary(relationship_edges),
         )
 
         # Canvas (optional Coda-specific phase)
-        canvas_path = self.build_canvas(
-            config, discovery_docs, out_dir, date_stamp
-        )
+        canvas_path = self.build_canvas(config, discovery_docs, out_dir, date_stamp)
 
         # Column deduplication and final selection
         column_min_score = int(config.get("column_min_score", 3))
@@ -658,7 +647,10 @@ class CodaCorpusAdapter(CorpusPipeline):
                 candidate["proposed_canonical_field"],
             )
             previous = deduped.get(key)
-            if previous is None or candidate["priority_score"] > previous["priority_score"]:  # noqa: E501
+            if (
+                previous is None
+                or candidate["priority_score"] > previous["priority_score"]
+            ):  # noqa: E501
                 deduped[key] = candidate
 
         selected_columns = sorted(
@@ -675,9 +667,7 @@ class CodaCorpusAdapter(CorpusPipeline):
             ),
         )
 
-        column_shortlist_path = (
-            out_dir / f"column_shortlist_{date_stamp}.json"
-        )
+        column_shortlist_path = out_dir / f"column_shortlist_{date_stamp}.json"
         write_json(
             column_shortlist_path,
             {
@@ -688,9 +678,7 @@ class CodaCorpusAdapter(CorpusPipeline):
             },
         )
 
-        column_selection_path = (
-            out_dir / f"column_selection_{date_stamp}.json"
-        )
+        column_selection_path = out_dir / f"column_selection_{date_stamp}.json"
         write_json(
             column_selection_path,
             {

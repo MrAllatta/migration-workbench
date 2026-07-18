@@ -10,7 +10,6 @@ from collections import defaultdict
 
 from django.core.management.base import CommandError
 
-
 TAB_SELECTION_OVERRIDE_KEYS = frozenset({"add", "remove", "replace", "tabs"})
 
 

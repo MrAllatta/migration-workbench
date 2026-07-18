@@ -19,7 +19,11 @@ from typing import Any
 def _contract_review(args: argparse.Namespace) -> int:
     """Run design-review checklist on *args.contract*."""
     # Lazy imports avoid circular dependency with deployment.wb_cli
-    from deployment.wb_cli import _render_output, ERROR_CODES, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        _render_output,
+        ERROR_CODES,
+        _setup_django,
+    )  # noqa: PLC0415
 
     _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import load_contract, review_contract
@@ -100,7 +104,11 @@ def _fmt_value(val: Any) -> str:
 
 def _contract_diff(args: argparse.Namespace) -> int:
     """Compare two schema contracts and show differences."""
-    from deployment.wb_cli import _render_output, ERROR_CODES, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        _render_output,
+        ERROR_CODES,
+        _setup_django,
+    )  # noqa: PLC0415
 
     _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import diff_contracts, load_contract
@@ -184,7 +192,11 @@ def _contract_diff(args: argparse.Namespace) -> int:
 
 def _contract_safety(args: argparse.Namespace) -> int:
     """Check contract changes for migration safety risks."""
-    from deployment.wb_cli import _render_output, ERROR_CODES, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        _render_output,
+        ERROR_CODES,
+        _setup_django,
+    )  # noqa: PLC0415
 
     _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import (
@@ -210,9 +222,11 @@ def _contract_safety(args: argparse.Namespace) -> int:
             {
                 "ok": len(issues) == 0,
                 "error_code": None,
-                "message": f"{len(issues)} migration risk(s) found."
-                if issues
-                else "No migration risks detected.",
+                "message": (
+                    f"{len(issues)} migration risk(s) found."
+                    if issues
+                    else "No migration risks detected."
+                ),
                 "details": issues,
             },
             args.json,

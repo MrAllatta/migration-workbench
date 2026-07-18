@@ -78,7 +78,8 @@ class TestLandingFromActor:
 
     def test_responsibility_parses_to_orm_count_expression(self):
         """A responsibility like 'Open tasks this week' becomes an ORM
-        count expression like ``TaskPlan.objects.filter(status='open', ...).count()``."""
+        count expression like ``TaskPlan.objects.filter(status='open', ...).count()``.
+        """
         actor = Actor(
             id="planner_manager",
             name="Planner",

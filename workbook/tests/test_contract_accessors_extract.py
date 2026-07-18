@@ -19,6 +19,7 @@ def _example_contract() -> str:
 def _load_contract() -> dict:
     """Return a loaded contract for accessor testing."""
     from workbook.codegen.contract import load_contract
+
     return load_contract(_example_contract())
 
 
@@ -50,12 +51,14 @@ ACCESSOR_NAMES = [
 
 def test_all_accessors_present() -> None:
     import workbook.contract.accessors as m
+
     for name in ACCESSOR_NAMES:
         assert callable(getattr(m, name)), f"{name} not callable"
 
 
 def test_get_model_name_returns_string() -> None:
     from workbook.contract.accessors import get_model_name
+
     result = get_model_name({"model_name": "TestModel"})
     assert result == "TestModel"
 
@@ -63,12 +66,14 @@ def test_get_model_name_returns_string() -> None:
 def test_get_model_name_raises_keyerror() -> None:
     from workbook.contract.accessors import get_model_name
     import pytest
+
     with pytest.raises(KeyError):
         get_model_name({"other": "value"})
 
 
 def test_get_enums_returns_dict() -> None:
     from workbook.contract.accessors import get_enums
+
     contract = _load_contract()
     result = get_enums(contract)
     assert isinstance(result, dict)
@@ -96,6 +101,7 @@ def test_reimport_identity() -> None:
         get_import_config as m_import,
         resolve_field_mapping as m_resolve,
     )
+
     assert get_model_name is m_name
     assert get_db_table_name is m_db
     assert get_enums is m_enums

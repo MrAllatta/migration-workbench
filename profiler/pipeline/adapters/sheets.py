@@ -150,9 +150,7 @@ class SheetsCorpusAdapter(CorpusPipeline):
         workbook_id_re = _corpus_regex_from_config(
             config, "workbook_id_regex", DEFAULT_WORKBOOK_ID_PATTERN
         )
-        year_re = _corpus_regex_from_config(
-            config, "year_regex", DEFAULT_YEAR_PATTERN
-        )
+        year_re = _corpus_regex_from_config(config, "year_regex", DEFAULT_YEAR_PATTERN)
         records = build_cohort_corpus_index(
             discovery,
             in_scope_codes,
@@ -368,7 +366,10 @@ class SheetsCorpusAdapter(CorpusPipeline):
             wb = record["workbook_code"]
             yr = record.get("year") or 0
             for tab_title in approved_tabs.get(wb, []):
-                if known_tabs and (record["spreadsheet_id"], tab_title) not in known_tabs:
+                if (
+                    known_tabs
+                    and (record["spreadsheet_id"], tab_title) not in known_tabs
+                ):
                     continue
                 if domain_context is not None:
                     is_exception = domain_context.is_deduplication_exception(tab_title)
@@ -402,7 +403,10 @@ class SheetsCorpusAdapter(CorpusPipeline):
                     except json.JSONDecodeError:
                         cached_grid_payload = None
                         cached_tab_summary = None
-                    if cached_grid_payload is not None and cached_tab_summary is not None:
+                    if (
+                        cached_grid_payload is not None
+                        and cached_tab_summary is not None
+                    ):
                         resolved_out_json = str(out_path.relative_to(out_dir.parent))
                         deep_results.append(
                             {
@@ -608,9 +612,7 @@ class SheetsCorpusAdapter(CorpusPipeline):
                 tab_selection_path.read_text(encoding="utf-8")
             )
         except json.JSONDecodeError as exc:
-            raise CommandError(
-                f"Could not parse {tab_selection_path}: {exc}"
-            ) from exc
+            raise CommandError(f"Could not parse {tab_selection_path}: {exc}") from exc
         approved_tabs = existing_selection_payload.get("approved_tabs")
         if not isinstance(approved_tabs, dict) or not all(
             isinstance(workbook_code, str)
@@ -630,9 +632,7 @@ class SheetsCorpusAdapter(CorpusPipeline):
             raise CommandError(f"Could not parse {index_path}: {exc}") from exc
         index_records = workbook_index_payload.get("records")
         if not isinstance(index_records, list) or not index_records:
-            raise CommandError(
-                f"{index_path} must contain a non-empty 'records' list"
-            )
+            raise CommandError(f"{index_path} must contain a non-empty 'records' list")
         required_index_keys = (
             "spreadsheet_id",
             "workbook_code",
@@ -698,9 +698,7 @@ class SheetsCorpusAdapter(CorpusPipeline):
             raise CommandError(f"Could not parse {index_path}: {exc}") from exc
         index_records = workbook_index_payload.get("records")
         if not isinstance(index_records, list) or not index_records:
-            raise CommandError(
-                f"{index_path} must contain a non-empty 'records' list"
-            )
+            raise CommandError(f"{index_path} must contain a non-empty 'records' list")
         return index_records, inventory_rows, known_tabs
 
     def run(
@@ -768,8 +766,8 @@ class SheetsCorpusAdapter(CorpusPipeline):
             )
 
         elif self.resume_from_broad:
-            index_records, inventory_rows, known_tabs = self._load_broad_resume_artifacts(
-                config, out_dir, date_stamp
+            index_records, inventory_rows, known_tabs = (
+                self._load_broad_resume_artifacts(config, out_dir, date_stamp)
             )
             broad_for_select = {"inventory_rows": inventory_rows}
             index_for_select = {"records": index_records}
@@ -914,8 +912,12 @@ class SheetsCorpusAdapter(CorpusPipeline):
             deep_coverage_path,
             {
                 "job_count": len(deep_results),
-                "success_count": sum(1 for row in deep_results if row["exit_code"] == 0),
-                "failure_count": sum(1 for row in deep_results if row["exit_code"] != 0),
+                "success_count": sum(
+                    1 for row in deep_results if row["exit_code"] == 0
+                ),
+                "failure_count": sum(
+                    1 for row in deep_results if row["exit_code"] != 0
+                ),
                 "results": deep_results,
                 "dedup_trace": dedup_trace,
             },
@@ -931,7 +933,10 @@ class SheetsCorpusAdapter(CorpusPipeline):
                 candidate["proposed_canonical_field"],
             )
             previous = deduped.get(key)
-            if previous is None or candidate["priority_score"] > previous["priority_score"]:
+            if (
+                previous is None
+                or candidate["priority_score"] > previous["priority_score"]
+            ):
                 deduped[key] = candidate
         column_heuristics = _normalize_column_heuristics(column_score_heuristics)
         default_min = 0 if not column_heuristics.get("domain_keyword_tokens") else 4

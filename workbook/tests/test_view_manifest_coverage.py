@@ -18,7 +18,6 @@ from django.core.management import call_command
 
 from workbook.codegen.list_generator import ListArchetype, render_list_view_py
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 

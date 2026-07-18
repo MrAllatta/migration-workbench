@@ -502,9 +502,9 @@ def build_contract(
                             "field": field_name,
                             "target_model": target,
                             "target_field": "id",
-                            "confidence": "high"
-                            if rel.get("target_table_name")
-                            else "medium",
+                            "confidence": (
+                                "high" if rel.get("target_table_name") else "medium"
+                            ),
                             "source": "coda_relation_column",
                         }
                     )
@@ -532,9 +532,9 @@ def build_contract(
                         "field": field_name,
                         "target_model": target,
                         "target_field": "id",
-                        "confidence": "high"
-                        if rel.get("target_table_name")
-                        else "medium",
+                        "confidence": (
+                            "high" if rel.get("target_table_name") else "medium"
+                        ),
                         "source": "coda_relation_column",
                     }
                 )

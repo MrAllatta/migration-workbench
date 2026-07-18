@@ -31,7 +31,7 @@ def test_contract_baseline_line_count() -> None:
     """Record the pre-split line count for tracking."""
     source = _REPO_ROOT / "workbook" / "codegen" / "contract.py"
     lines = len(source.read_text().splitlines())
-    baseline = 256
+    baseline = 255
     assert lines == baseline, (
         f"contract.py is {lines} lines; expected {baseline} baseline. "
         "If you intentionally changed the file, update the baseline."
@@ -41,6 +41,7 @@ def test_contract_baseline_line_count() -> None:
 def test_load_contract_is_importable() -> None:
     """Core loading API must still be importable from the canonical location."""
     from workbook.codegen.contract import load_contract
+
     assert callable(load_contract)
 
 
@@ -60,6 +61,7 @@ def test_all_major_apis_smoke() -> None:
         assign_import_tiers,
         resolve_field_mapping,
     )
+
     for name, fn in locals().items():
         if name.startswith("test_"):
             continue

@@ -22,22 +22,26 @@ def test_loading_module_imports() -> None:
 
 def test_loading_module_has_make_contract_loader() -> None:
     import workbook.contract.loading as m
+
     assert callable(m._make_contract_loader)
 
 
 def test_loading_module_has_load_contract_unvalidated() -> None:
     import workbook.contract.loading as m
+
     assert callable(m.load_contract_unvalidated)
 
 
 def test_loading_module_has_load_contract() -> None:
     import workbook.contract.loading as m
+
     assert callable(m.load_contract)
 
 
 def test_load_contract_unvalidated_returns_dict() -> None:
     """Smoke test: load a valid contract via the extracted module."""
     import workbook.contract.loading as m
+
     contract = m.load_contract_unvalidated(_example_contract())
     assert isinstance(contract, dict)
     assert "tables" in contract
@@ -47,6 +51,7 @@ def test_load_contract_unvalidated_returns_dict() -> None:
 def test_load_contract_returns_dict() -> None:
     """Smoke test: load and validate a contract via the extracted module."""
     import workbook.contract.loading as m
+
     contract = m.load_contract(_example_contract())
     assert isinstance(contract, dict)
     assert "tables" in contract
@@ -62,5 +67,6 @@ def test_reimport_identity_loading_apis() -> None:
         load_contract as m_load,
         load_contract_unvalidated as m_load_unvalidated,
     )
+
     assert load_contract is m_load
     assert load_contract_unvalidated is m_load_unvalidated

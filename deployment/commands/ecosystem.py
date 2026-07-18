@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import getpass
 
-
 try:
     from workbook.tools.queue_protocol import QUEUE_LABELS as _QUEUE_LABELS
 except ImportError:

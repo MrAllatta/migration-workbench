@@ -1918,7 +1918,8 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
         ) as mock_walk,
         patch("profiler.pipeline.adapters.sheets.list_tabs") as mock_list_tabs,
         patch(
-            "profiler.pipeline.adapters.sheets.fetch_tab_grid", return_value={"sheets": []}
+            "profiler.pipeline.adapters.sheets.fetch_tab_grid",
+            return_value={"sheets": []},
         ),
         patch(
             "profiler.pipeline.adapters.sheets.summarize_tab",

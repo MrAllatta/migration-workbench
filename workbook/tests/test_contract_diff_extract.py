@@ -20,6 +20,7 @@ def _example_contract() -> str:
 def _load_contract_validated() -> dict:
     """Return a loaded and validated contract."""
     from workbook.contract.loading import load_contract
+
     return load_contract(_example_contract())
 
 
@@ -40,6 +41,7 @@ DIFF_FUNC_NAMES = [
 
 def test_all_diff_functions_present() -> None:
     import workbook.contract.diff as m
+
     for name in DIFF_FUNC_NAMES:
         assert callable(getattr(m, name)), f"{name} not callable"
 
@@ -47,6 +49,7 @@ def test_all_diff_functions_present() -> None:
 def test_diff_contracts_returns_diff() -> None:
     """Smoke test: diff two identical contracts returns empty result."""
     import workbook.contract.diff as m
+
     contract = _load_contract_validated()
     result = m.diff_contracts(contract, contract)
     assert isinstance(result, dict)
@@ -54,6 +57,7 @@ def test_diff_contracts_returns_diff() -> None:
 
 def test_diff_contracts_detects_no_diff_on_identical() -> None:
     import workbook.contract.diff as m
+
     contract = _load_contract_validated()
     result = m.diff_contracts(contract, contract)
     # Expected: no tables changed, no meta changed, etc.
@@ -62,6 +66,7 @@ def test_diff_contracts_detects_no_diff_on_identical() -> None:
 
 def test_migration_safety_checks_returns_list() -> None:
     import workbook.contract.diff as m
+
     result = m.migration_safety_checks({})
     assert isinstance(result, list)
 
@@ -73,5 +78,6 @@ def test_reimport_identity() -> None:
         diff_contracts as d_diff,
         migration_safety_checks as d_safety,
     )
+
     assert diff_contracts is d_diff
     assert migration_safety_checks is d_safety

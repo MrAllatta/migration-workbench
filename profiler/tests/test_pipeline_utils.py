@@ -69,19 +69,19 @@ class TestNormalizeTabHeuristics:
         assert result["match_mode"] == "substring"
 
     def test_exclude_patterns_compiled(self):
-        result = normalize_tab_heuristics({
-            "tab_exclude_patterns": [
-                {"pattern": "^_", "exclude": True, "penalty": -10}
-            ]
-        })
+        result = normalize_tab_heuristics(
+            {
+                "tab_exclude_patterns": [
+                    {"pattern": "^_", "exclude": True, "penalty": -10}
+                ]
+            }
+        )
         assert len(result["tab_exclude_regexes"]) == 1
 
     def test_exclude_patterns_penalty_applied(self):
-        result = normalize_tab_heuristics({
-            "tab_exclude_patterns": [
-                {"pattern": "temp", "penalty": -5}
-            ]
-        })
+        result = normalize_tab_heuristics(
+            {"tab_exclude_patterns": [{"pattern": "temp", "penalty": -5}]}
+        )
         assert len(result["exclude_patterns"]) == 1
         assert result["exclude_patterns"][0]["penalty"] == -5
 
@@ -92,7 +92,7 @@ class TestNormalizeColumnHeuristics:
         assert result["domain_keyword_tokens"] == []
 
     def test_tokens_lowercased(self):
-        result = normalize_column_heuristics({
-            "domain_keyword_tokens": ["Crop", "FIELD"]
-        })
+        result = normalize_column_heuristics(
+            {"domain_keyword_tokens": ["Crop", "FIELD"]}
+        )
         assert result["domain_keyword_tokens"] == ["crop", "field"]

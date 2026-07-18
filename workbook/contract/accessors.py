@@ -365,5 +365,3 @@ def get_fields(table: dict[str, Any]) -> list[dict[str, Any]]:
         fields.append({"name": fname, "class": fclass, "kwargs": fkwargs})
 
     return fields
-
-

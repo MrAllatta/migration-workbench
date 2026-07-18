@@ -51,7 +51,6 @@ from workbook.codegen.view_generator import (
     render_views_auto_py,
 )
 
-
 # -- fixtures ---------------------------------------------------------------
 
 

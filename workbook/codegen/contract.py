@@ -253,4 +253,3 @@ def assign_import_tiers(
             result[name] = tier_map.get(name, 99)
 
     return result
-

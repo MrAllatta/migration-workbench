@@ -68,7 +68,10 @@ from deployment.commands.generate import (  # noqa: F401
     _generate_views,
     build_generate_parser,
 )
-from deployment.commands.manifest import _manifest_lint, build_manifest_parser  # noqa: F401
+from deployment.commands.manifest import (
+    _manifest_lint,  # noqa: F401
+    build_manifest_parser,
+)
 from deployment.commands.vertical import (  # noqa: F401
     _vertical_list,
     _vertical_show,

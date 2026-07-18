@@ -19,7 +19,11 @@ def _drift_check(args: argparse.Namespace) -> int:
     structural changes and migration risks between the two contracts.
     """
     # Lazy imports avoid circular dependency with deployment.wb_cli
-    from deployment.wb_cli import ERROR_CODES, _render_output, _setup_django  # noqa: PLC0415
+    from deployment.wb_cli import (
+        ERROR_CODES,
+        _render_output,
+        _setup_django,
+    )  # noqa: PLC0415
 
     _setup_django(settings_module=getattr(args, "django_settings", None))
     from workbook.codegen.contract import (
