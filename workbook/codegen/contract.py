@@ -12,12 +12,12 @@ from typing import Any
 
 import networkx as nx
 
-from workbook.contract.loading import (  # noqa: E402
+from workbook.contract.loading import (  # noqa: E402, F401
     _make_contract_loader,
     load_contract_unvalidated,
     load_contract,
 )
-from workbook.contract.accessors import (  # noqa: E402
+from workbook.contract.accessors import (  # noqa: E402, F401
     _apply_field_override,
     _normalise_field_class,
     _resolve_fk_target,
@@ -38,12 +38,12 @@ from workbook.contract.accessors import (  # noqa: E402
     get_fields,
     resolve_field_mapping,
 )
-from workbook.contract.validation import (  # noqa: E402
+from workbook.contract.validation import (  # noqa: E402, F401
     _validate_table_exceptions,
     validate_contract_tables,
     strict_validate_contract,
 )
-from workbook.contract.diff import (  # noqa: E402
+from workbook.contract.diff import (  # noqa: E402, F401
     MIGRATION_SEVERITY_DANGER,
     MIGRATION_SEVERITY_WARNING,
     _diff_fields,

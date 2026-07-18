@@ -183,7 +183,7 @@ def test_run_signature_matches_cohort_corpus():
     hints = typing.get_type_hints(SheetsCorpusAdapter.run)
     assert hints["config"] == dict[str, Any]
     assert hints["out_dir"] == Path
-    assert hints["date_stamp"] == str
+    assert hints["date_stamp"] is str
 
 
 def test_discover_signature():

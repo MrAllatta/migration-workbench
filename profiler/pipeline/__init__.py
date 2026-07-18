@@ -4,7 +4,12 @@ Provides the provider-agnostic :class:`CorpusPipeline` base class that
 both Sheets and Coda adapters implement.
 """
 
+from typing import TYPE_CHECKING
+
 from profiler.pipeline.base import CorpusPipeline
+
+if TYPE_CHECKING:
+    from profiler.pipeline.pipeline import CorpusPipelineDispatcher
 
 
 def get_dispatcher() -> "CorpusPipelineDispatcher":

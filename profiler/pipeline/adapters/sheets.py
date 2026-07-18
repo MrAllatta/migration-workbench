@@ -40,7 +40,6 @@ from profiler.pipeline.selection import (
 from profiler.pipeline.utils import (
     make_slug,
     normalize_column_heuristics as _normalize_column_heuristics,
-    normalize_tab_heuristics as _normalize_tab_heuristics,
     write_json,
 )
 from profiler.tools.cohort_corpus import (
@@ -49,7 +48,6 @@ from profiler.tools.cohort_corpus import (
     _corpus_regex_from_config,
     build_cohort_corpus_index,
     derive_column_candidates,
-    deduplicate_index_records,
     enrich_computed_fields,
     enrich_entity_groupings,
     enrich_fk_candidates,
@@ -59,9 +57,9 @@ from profiler.tools.cohort_corpus import (
 )
 from profiler.tools.domain_context import (
     DomainContext,
+    deduplicate_index_records,
     has_meaningful_vocabulary,
     load_domain_context,
-    merge_vocabulary,
 )
 
 logger = logging.getLogger(__name__)
@@ -754,9 +752,7 @@ class SheetsCorpusAdapter(CorpusPipeline):
             )
 
         heuristics_config = config.get("heuristics") or {}
-        tab_score_heuristics = heuristics_config.get("tab_score") or {}
         column_score_heuristics = heuristics_config.get("column_score") or {}
-        domain_context = self._load_domain_context(config)
 
         discovery_path = out_dir / f"drive_discovery_{date_stamp}.json"
         index_path = out_dir / f"in_scope_workbook_index_{date_stamp}.json"

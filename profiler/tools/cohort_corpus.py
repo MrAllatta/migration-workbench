@@ -30,14 +30,10 @@ non-destructive.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 import re as _re
 import logging
-import sys
-import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,9 +47,6 @@ from connectors.spreadsheet import (
 
 from profiler.tools.domain_context import (
     DomainContext,
-    deduplicate_index_records,
-    has_meaningful_vocabulary,
-    load_domain_context,
     merge_vocabulary,
 )
 from profiler.tools.enrichment_utils import (

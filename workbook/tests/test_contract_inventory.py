@@ -46,7 +46,7 @@ def test_load_contract_is_importable() -> None:
 
 def test_all_major_apis_smoke() -> None:
     """All public API functions must be importable from contract.py."""
-    from workbook.codegen.contract import (
+    from workbook.codegen.contract import (  # noqa: F401
         load_contract,
         load_contract_unvalidated,
         get_model_name,

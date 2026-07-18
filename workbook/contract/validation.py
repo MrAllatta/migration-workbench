@@ -12,9 +12,12 @@ Owns:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from workbook.contract.accessors import get_fields, get_import_config, get_model_name
+
+if TYPE_CHECKING:
+    from workbook.codegen.validation_pipeline import ValidationResult
 
 
 

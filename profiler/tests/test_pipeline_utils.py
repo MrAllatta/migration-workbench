@@ -1,7 +1,5 @@
 """Tests for shared corpus pipeline utilities."""
 
-from pathlib import Path
-
 from profiler.pipeline.utils import (
     make_slug,
     normalize_column_heuristics,
