@@ -171,6 +171,10 @@ class TestFindOmoRoot:
         with pytest.raises(FileNotFoundError, match="No .omo/ directory found"):
             find_omo_root(start_path=tmp_path)
 
+    @pytest.mark.skipif(
+        not (Path.cwd() / ".omo").is_dir(),
+        reason="requires harness .omo/ directory",
+    )
     def test_finds_omo_root_from_repo_root(self):
         """find_omo_root locates the .omo/ directory from the repo root."""
         omo = find_omo_root()

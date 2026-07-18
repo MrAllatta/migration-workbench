@@ -1,9 +1,6 @@
-# mirror — docs/roadmap.md is canonical
-# Bigpowers stub: epic title and reference for bigpowers skills.
-
 id: e05
 title: "corpus-pipeline-abstraction"
-status: not_started
+status: in_progress
 target_version: "0.9.9"
 test_target: workbench
 canonical: "docs/roadmap.md#099-corpus-pipeline-abstraction"
@@ -14,27 +11,78 @@ verify: "make chassis-gate"
 
 stories:
   - id: e05s01
-    title: "Identify CorpusPipeline interface"
+    title: "Analyze shared patterns across corpus implementations"
     tasks:
-      - description: "Find common operations across Sheets and Coda corpora"
+      - description: "Read profiler/tools/cohort_corpus.py and profiler/tools/coda_corpus.py to understand the common operations"
         verify: "wc -l profiler/tools/cohort_corpus.py profiler/tools/coda_corpus.py"
+      - description: "Write an analysis document at specs/epics/e05-corpus-pipeline-abstraction/analysis.md documenting the shared interface surface, including: methods common to both, methods unique to each, and the adapter shape"
+        verify: "test -f specs/epics/e05-corpus-pipeline-abstraction/analysis.md"
+
   - id: e05s02
     title: "Implement CorpusPipeline protocol"
     tasks:
       - description: "Define the abstract interface in profiler/pipeline/"
         verify: "make chassis-gate"
+
   - id: e05s03
-    title: "Refactor cohort_corpus.py to Sheets adapter"
+    title: "Create Sheets adapter skeleton"
+    context:
+      - profiler/pipeline/base.py
+      - profiler/pipeline/__init__.py
+      - specs/epics/e05-corpus-pipeline-abstraction/analysis.md
     tasks:
-      - description: "Sheets-specific logic stays in the adapter"
-        verify: "make chassis-gate"
+      - description: "Create profiler/pipeline/adapters/__init__.py"
+        verify: "test -f profiler/pipeline/adapters/__init__.py"
+      - description: "Create profiler/pipeline/adapters/sheets.py with SheetsCorpusAdapter class that implements CorpusAdapter. Include constructor that accepts drive_service and sheets_service. Implement run() method that mirrors run_cohort_corpus signature. Add TODO placeholders for each phase method."
+        verify: "grep -q class SheetsCorpusAdapter profiler/pipeline/adapters/sheets.py"
+
   - id: e05s04
-    title: "Refactor coda_corpus.py to Coda adapter"
+    title: "Refactor cohort_corpus.py to delegate to Sheets adapter"
+    context:
+      - profiler/pipeline/base.py
+      - profiler/pipeline/adapters/sheets.py
+      - specs/epics/e05-corpus-pipeline-abstraction/analysis.md
     tasks:
-      - description: "Coda-specific logic stays in the adapter"
-        verify: "make chassis-gate"
+      - description: "Refactor profiler/tools/cohort_corpus.py's run_cohort_corpus() to create SheetsCorpusAdapter and call adapter.run(). Keep all shared scoring/selection utilities in cohort_corpus.py."
+        verify: "python3 -c \"from profiler.tools.cohort_corpus import run_cohort_corpus; print('OK')\""
+      - description: "Update test patches in profiler/tests/test_cohort_corpus_tools.py: change profiler.tools.cohort_corpus.fetch_tab_grid to profiler.pipeline.adapters.sheets.fetch_tab_grid and same for summarize_tab, list_tabs, walk_folder"
+        verify: "make chassis-gate 2>&1 | tail -3"
+
   - id: e05s05
-    title: "Wire adapters into CorpusPipeline"
+    title: "Create Coda adapter skeleton"
+    context:
+      - profiler/pipeline/base.py
+      - profiler/pipeline/adapters/sheets.py
+      - specs/epics/e05-corpus-pipeline-abstraction/analysis.md
     tasks:
-      - description: "Pipeline dispatches to adapter by provider type"
-        verify: "make chassis-gate"
+      - description: "Create profiler/pipeline/adapters/coda.py with CodaCorpusAdapter class that implements CorpusAdapter. Include constructor that accepts coda_api. Implement run() method that mirrors coda_corpus main function signature."
+        verify: "grep -q class CodaCorpusAdapter profiler/pipeline/adapters/coda.py"
+      - description: "Update profiler/pipeline/adapters/__init__.py to export both adapters"
+        verify: "grep -q CodaCorpusAdapter profiler/pipeline/adapters/__init__.py"
+
+  - id: e05s06
+    title: "Refactor coda_corpus.py to delegate to Coda adapter"
+    context:
+      - profiler/pipeline/base.py
+      - profiler/pipeline/adapters/coda.py
+      - specs/epics/e05-corpus-pipeline-abstraction/analysis.md
+    tasks:
+      - description: "Refactor profiler/tools/coda_corpus.py's main function to create CodaCorpusAdapter and call adapter.run(). Keep shared utilities in coda_corpus.py."
+        verify: "python3 -c \"from profiler.tools.coda_corpus import run; print('OK')\""
+      - description: "Update test patches if any exist for coda_corpus functions"
+        verify: "make chassis-gate 2>&1 | tail -3"
+
+  - id: e05s07
+    title: "Wire adapters into CorpusPipeline"
+    context:
+      - profiler/pipeline/base.py
+      - profiler/pipeline/adapters/__init__.py
+      - profiler/pipeline/adapters/sheets.py
+      - profiler/pipeline/adapters/coda.py
+    tasks:
+      - description: "Create profiler/pipeline/pipeline.py with CorpusPipeline class that dispatches to the correct adapter by provider type (sheets vs coda)"
+        verify: "grep -q class CorpusPipeline profiler/pipeline/pipeline.py"
+      - description: "Update profiler/pipeline/__init__.py to export CorpusPipeline"
+        verify: "grep -q CorpusPipeline profiler/pipeline/__init__.py"
+      - description: "Run make chassis-gate and verify no existing tests broke"
+        verify: "make chassis-gate 2>&1 | grep -q 'passed'"

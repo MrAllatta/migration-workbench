@@ -7,11 +7,9 @@
 # in the canonical docs and git log.
 
 active:
-  epic_id: e03
-  story_id: null
-  status: not_started
-  started_at: null
-  blocked_reason: null
+  epic_id: e05
+  story_id: e05s07
+  status: completed
 
 epics:
   - id: e01
@@ -22,13 +20,13 @@ epics:
     status: shipped                     # 0.9.6 on master
   - id: e03
     title: "cli-router-split"
-    status: not_started
+    status: shipped
   - id: e04
     title: "contract-layer-split"
-    status: not_started
+    status: shipped
   - id: e05
     title: "corpus-pipeline-abstraction"
-    status: not_started
+    status: in_progress
   - id: e06
     title: "pipeline-state-decoupling"
     status: not_started

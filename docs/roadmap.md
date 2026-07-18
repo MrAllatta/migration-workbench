@@ -360,7 +360,7 @@ stages:
 
 ## Tracking
 
-Mission briefs live in `.pi/missions/<slug>/brief.md` in this repo and the
+Mission briefs live in `specs/missions/<slug>/brief.md` in this repo and the
 equivalent coordination directory in product repos (the harness chooses the
 path; see AGENTS.md). This document is updated when milestones ship or
 priorities shift.

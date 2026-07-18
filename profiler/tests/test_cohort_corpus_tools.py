@@ -434,7 +434,7 @@ def test_run_cohort_corpus_stop_before_deep_returns_early(tmp_path: Path):
 
     with (
         patch(
-            "profiler.management.commands.profile_drive_folder.walk_folder",
+            "profiler.pipeline.adapters.sheets.walk_folder",
             return_value={
                 "folders": [],
                 "spreadsheets": [
@@ -448,16 +448,16 @@ def test_run_cohort_corpus_stop_before_deep_returns_early(tmp_path: Path):
             },
         ) as mock_walk,
         patch(
-            "profiler.tools.cohort_corpus.list_tabs",
+            "profiler.pipeline.adapters.sheets.list_tabs",
             return_value=[
                 {"sheet_id": 1, "rows": 100, "cols": 20, "title": "Plan Board"}
             ],
         ) as mock_list_tabs,
         patch(
-            "profiler.tools.cohort_corpus.fetch_tab_grid",
+            "profiler.pipeline.adapters.sheets.fetch_tab_grid",
         ) as mock_fetch_grid,
         patch(
-            "profiler.tools.cohort_corpus.summarize_tab",
+            "profiler.pipeline.adapters.sheets.summarize_tab",
         ) as mock_summarize,
     ):
         outputs = run_cohort_corpus(
@@ -623,9 +623,9 @@ def test_run_cohort_corpus_resume_from_broad_skips_api_calls(tmp_path: Path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
-        patch("profiler.tools.cohort_corpus.fetch_tab_grid") as mock_fetch_grid,
-        patch("profiler.tools.cohort_corpus.summarize_tab") as mock_summarize,
+        patch("profiler.pipeline.adapters.sheets.list_tabs") as mock_list_tabs,
+        patch("profiler.pipeline.adapters.sheets.fetch_tab_grid") as mock_fetch_grid,
+        patch("profiler.pipeline.adapters.sheets.summarize_tab") as mock_summarize,
     ):
         outputs = run_cohort_corpus(
             drive_service=mock_drive,
@@ -746,7 +746,7 @@ def test_run_cohort_corpus_resume_from_broad_re_scores_with_new_heuristics(
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        patch("profiler.pipeline.adapters.sheets.list_tabs") as mock_list_tabs,
     ):
         _outputs = run_cohort_corpus(
             drive_service=mock_drive,
@@ -851,13 +851,13 @@ def test_run_cohort_corpus_429_aborts_after_max_cooldowns(tmp_path: Path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as _mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as _mock_list_tabs,
+        patch("profiler.pipeline.adapters.sheets.list_tabs") as _mock_list_tabs,
         patch(
-            "profiler.tools.cohort_corpus.fetch_tab_grid",
+            "profiler.pipeline.adapters.sheets.fetch_tab_grid",
             mock_fetch,
         ),
         patch(
-            "profiler.tools.cohort_corpus.summarize_tab",
+            "profiler.pipeline.adapters.sheets.summarize_tab",
         ),
     ):
         _outputs = run_cohort_corpus(
@@ -986,9 +986,9 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        patch("profiler.pipeline.adapters.sheets.list_tabs") as mock_list_tabs,
         patch(
-            "profiler.tools.cohort_corpus.fetch_tab_grid",
+            "profiler.pipeline.adapters.sheets.fetch_tab_grid",
             return_value={
                 "sheets": [
                     {
@@ -1004,7 +1004,7 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(
             },
         ),
         patch(
-            "profiler.tools.cohort_corpus.summarize_tab",
+            "profiler.pipeline.adapters.sheets.summarize_tab",
             return_value={"formula_cell_count": 0, "functions_used": []},
         ),
     ):
@@ -1028,6 +1028,11 @@ def test_run_cohort_corpus_resume_from_broad_continues_to_deep_without_stop(
     assert deep_path.exists()
     deep_payload = json.loads(deep_path.read_text(encoding="utf-8"))
     assert deep_payload["success_count"] >= 1
+
+
+def test_run_cohort_corpus_resume_from_tab_selection_skips_drive_walk(
+    tmp_path: Path,
+):
     """Resume loads index rows from disk and must not crawl Drive anew."""
     corpus_out_dir = tmp_path / "corpus_run"
     corpus_out_dir.mkdir(parents=True, exist_ok=True)
@@ -1911,12 +1916,12 @@ def test_run_cohort_corpus_deep_loop_dedup_skips_old_years(tmp_path: Path):
         patch(
             "profiler.management.commands.profile_drive_folder.walk_folder"
         ) as mock_walk,
-        patch("profiler.tools.cohort_corpus.list_tabs") as mock_list_tabs,
+        patch("profiler.pipeline.adapters.sheets.list_tabs") as mock_list_tabs,
         patch(
-            "profiler.tools.cohort_corpus.fetch_tab_grid", return_value={"sheets": []}
+            "profiler.pipeline.adapters.sheets.fetch_tab_grid", return_value={"sheets": []}
         ),
         patch(
-            "profiler.tools.cohort_corpus.summarize_tab",
+            "profiler.pipeline.adapters.sheets.summarize_tab",
             return_value={"formula_cell_count": 0},
         ),
     ):

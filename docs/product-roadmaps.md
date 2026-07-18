@@ -261,6 +261,6 @@ Rough mapping:
 2. When a milestone ships, move it to a *Shipped* section and tag the
    workbench version that validated it.
 3. When a product gap requires a workbench change, add a workbench
-   dependency and create a mission brief under `.pi/missions/`.
+   dependency and create a mission brief under `specs/missions/`.
 4. When both engagements are retired, revise the 1.0.0 definition and
    retire this document into a post-1.0 case-study.

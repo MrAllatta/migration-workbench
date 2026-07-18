@@ -200,6 +200,7 @@ def test_run_pipeline_state_resume(mock_run_cohort_corpus, tmp_path: Path):
             ],
         },
     ]
+    state.completed_phases.append("deep_profile")
     state.save_checkpoint(checkpoint)
 
     out = StringIO()

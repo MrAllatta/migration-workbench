@@ -1,37 +1,9 @@
-active_flow: build_epic
-active_epic_id: e04
-active_story_id: e04s01
-active_bug_id: null
-release:
-  target_version: 0.9.8
-  last_tag: v0.9.7
-  last_publish: null
-epic_cycle:
-  current_step: develop-tdd
-  next_skill: develop-tdd
-  completed_steps: []
-  status: in_progress
-bug_cycle:
-  current_step: null
-  completed_steps: []
-git:
-  branch: feat/e03-cli-router-split
-  hash: b1622ff
-handoff:
-  last_step_completed: Starting e04s01 (contract-layer-split inventory)
-  open_decisions:
-  - Define vertical template ladder priority order (3-5 archetypes)
-  - Set services vs. product investment ratio glide path
-  - Determine partner playbook scope and certification level
-  - "AGENTS.md says 'no state machines' \u2014 add learned-preferences fence or let\
-    \ specs/ sit as read-only mirror?"
-  required_reading:
-  - AGENTS.md
-  - docs/roadmap.md
-  - specs/release-plan.yaml
-  - specs/execution-status.yaml
-  - specs/product/SCOPE_LATEST.yaml
-  - specs/adr/002-consultancy-as-proving-ground.md
-  next_skill: develop-tdd
-  story_id: e03s02
-  baseline_tests: 1789
+active_epic_id: e05
+active_story_id: e05s01
+
+# Session harness — use this file to set active epic and story.
+# The orchestrate.js script reads active_epic_id from here.
+# The agent reads active.story_id from specs/execution-status.yaml.
+#
+# Previously this file held bigpowers build_epic state. That flow is
+# retired — the session harness replaces it.

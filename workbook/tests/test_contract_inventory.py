@@ -31,7 +31,7 @@ def test_contract_baseline_line_count() -> None:
     """Record the pre-split line count for tracking."""
     source = _REPO_ROOT / "workbook" / "codegen" / "contract.py"
     lines = len(source.read_text().splitlines())
-    baseline = 259
+    baseline = 256
     assert lines == baseline, (
         f"contract.py is {lines} lines; expected {baseline} baseline. "
         "If you intentionally changed the file, update the baseline."

@@ -1,0 +1,9 @@
+{
+  "name": "session-harness",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "file:../../../../../.nvm/versions/node/v23.10.0/lib/node_modules/@earendil-works/pi-coding-agent",
+    "yaml": "^2.5.0"
+  }
+}

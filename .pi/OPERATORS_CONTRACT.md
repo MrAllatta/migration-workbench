@@ -30,8 +30,8 @@ green, version bumped, changelog honest, ready to be cited.
 
 ### 3. Planning docs are public working memory
 
-`.pi/portfolio.md`, `.pi/missions/*/brief.md`, and
-`.pi/missions/*/journal.md` are committed, current, and honest. A visitor
+`.pi/portfolio.md`, `specs/missions/<slug>/brief.md`, and
+`specs/missions/<slug>/journal.md` are committed, current, and honest. A visitor
 reading the portfolio sees the real state. A stale portfolio is a
 credibility leak.
 

@@ -321,3 +321,36 @@ fly-deploy: docker-build
 	flyctl deploy --app $(FLY_APP)
 
 deploy: fly-launch fly-volume fly-secrets fly-deploy
+
+# ---------------------------------------------------------------------------
+# Session harness — opencode (.opencode) and pi (.pi)
+# Usage: make story ID=e05s03             (opencode, default)
+#        make chain                        (opencode, default)
+#        make story-pi ID=e05s03           (pi, legacy)
+#        make chain-pi                     (pi, legacy)
+# ---------------------------------------------------------------------------
+
+STORY_FLAGS =
+ifdef MODEL
+STORY_FLAGS += --model $(MODEL)
+endif
+
+# Opencode harness (default)
+story:
+	python .opencode/extensions/session-harness/orchestrate.py $(ID) $(STORY_FLAGS)
+
+chain:
+	python .opencode/extensions/session-harness/orchestrate.py $(STORY_FLAGS)
+
+story-dry-run:
+	python .opencode/extensions/session-harness/orchestrate.py $(ID) --dry-run
+
+# Pi harness (legacy)
+story-pi:
+	cd .pi/extensions/session-harness && node orchestrate.js $(ID) $(STORY_FLAGS)
+
+chain-pi:
+	cd .pi/extensions/session-harness && node orchestrate.js $(STORY_FLAGS)
+
+chain-tmux:
+	.pi/extensions/session-harness/orchestrate.sh

@@ -71,7 +71,7 @@ or migrations for them.
 - PyPI upload (blocked until 1.0.0).
 
 ## Artifacts
-- `.pi/missions/vizcarra-views-deploy/journal.md`
+- `specs/missions/vizcarra-views-deploy/journal.md`
 - `vizcarra-guitars/build/_out/schema-contract-*.yaml` (one per table)
 - `vizcarra-guitars/backend/apps/domain/models_auto.py`
 - `vizcarra-guitars/backend/apps/domain/admin_auto.py`
