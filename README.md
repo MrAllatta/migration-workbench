@@ -286,6 +286,15 @@ Manual upload: `python -m build` then `twine upload dist/`*, or `make publish` w
 > `0.2.0` / `0.1.0`). Their prose is preserved — untagged, in approximate
 > chronological order — under **Pre-reset untagged feature work** below.
 
+### 0.9.8 (local)
+
+- **Pipeline abstraction (Phase 4):** New `profiler/pipeline/` package
+  with a pluggable adapter architecture for corpus profiling. Base adapter
+  defines the interface; `SheetsAdapter` and `CodaAdapter` implement
+  provider-specific extraction. Selection logic and utilities extracted
+  from the monolithic `cohort_corpus` module. 715 tests for sheets, 100
+  for selection, 100 for utils, 137 for base. (2026-07-18)
+
 ### 0.9.7 (local)
 
 - `cli-router-split` — wb_cli.py 1420 → 232 lines. 7 command groups
