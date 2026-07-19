@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -206,6 +207,9 @@ Execute story {story['id']}. Work in small, tested steps.
   - Set active.story_id to {story['id']}
   - Set active.status to done
   - Set active.completed_at to the current ISO timestamp.
+- Commit all changes to the worktree before marking the story done.
+  Use a conventional commit message: `{story['id']}: <short description>`.
+  Include `last-prompt.md` in the commit — it records the original intent.
 - Do NOT start another story in this session.
 
 Begin."""
@@ -243,6 +247,24 @@ def run_story(
     prompt_path = epic_dir / "last-prompt.md"
     prompt_path.write_text(prompt)
     print(f"[harness] Prompt written to {prompt_path}")
+
+    # Commit the prompt so we record what the author intended
+    try:
+        subprocess.run(
+            ["git", "add", str(prompt_path)],
+            cwd=project_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", f"chore(harness): dispatch {story['id']}"],
+            cwd=project_dir,
+            check=True,
+            capture_output=True,
+        )
+        print(f"[harness] Committed last-prompt.md")
+    except subprocess.CalledProcessError as exc:
+        print(f"[harness] Warning: could not commit last-prompt.md: {exc}")
 
     if dry_run:
         print("\n--- PROMPT ---")
