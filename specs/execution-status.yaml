@@ -7,9 +7,10 @@
 # in the canonical docs and git log.
 
 active:
-  epic_id: e05
-  story_id: e05s07
-  status: completed
+  epic_id: e06
+  story_id: e06s04
+  status: done
+  completed_at: "2026-07-19T19:15:30Z"
 
 epics:
   - id: e01
@@ -26,10 +27,10 @@ epics:
     status: shipped
   - id: e05
     title: "corpus-pipeline-abstraction"
-    status: in_progress
+    status: shipped
   - id: e06
     title: "pipeline-state-decoupling"
-    status: not_started
+    status: shipped
   - id: e07
     title: "reference-archetype"
     status: not_started

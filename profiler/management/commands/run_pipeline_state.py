@@ -37,6 +37,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
 
+from profiler.pipeline.phases._base import _build_google_services
 from profiler.tools.pipeline_state import (
     PipelineState,
     _PHASE_ORDER,
@@ -335,7 +336,7 @@ class Command(BaseCommand):
             return
 
         self.stdout.write("Running Phase 0/1: Discovery and tab selection...")
-        drive_service, sheets_service = self._build_services()
+        drive_service, sheets_service = _build_google_services()
         state.discover(drive_service, sheets_service)
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(self.style.SUCCESS(f"discover complete — {checkpoint_path}"))
@@ -388,7 +389,7 @@ class Command(BaseCommand):
             return
 
         self.stdout.write("Running deep_profile...")
-        _drive, sheets_service = self._build_services()
+        _drive, sheets_service = _build_google_services()
         state.deep_profile(sheets_service)
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
@@ -443,7 +444,7 @@ class Command(BaseCommand):
             return
 
         self.stdout.write("Running scan_formulas...")
-        _drive, sheets_service = self._build_services()
+        _drive, sheets_service = _build_google_services()
         state.scan_formulas(sheets_service=sheets_service)
         state.save_checkpoint(checkpoint_path)
         self.stdout.write(
@@ -485,32 +486,3 @@ class Command(BaseCommand):
 
         parts.append(f"{len(state.decisions)} decisions")
         return ", ".join(parts)
-
-    def _build_services(self):
-        """Build Google Drive and Sheets API service objects.
-
-        Returns
-        -------
-        tuple[googleapiclient.discovery.Resource | None, googleapiclient.discovery.Resource | None]
-            ``(drive_service, sheets_service)`` — returns ``(None, None)``
-            if the required packages are not installed.
-        """
-        try:
-            from connectors.google_sheets import (
-                DRIVE_READONLY_SCOPE,
-                SHEETS_READONLY_SCOPE,
-                build_google_service,
-            )
-        except ImportError:
-            self.stdout.write(
-                self.style.WARNING(
-                    "connectors.google_sheets not available — "
-                    "Google API calls will fail"
-                )
-            )
-            return None, None
-
-        scopes = [SHEETS_READONLY_SCOPE, DRIVE_READONLY_SCOPE]
-        drive_service = build_google_service("drive", "v3", scopes)
-        sheets_service = build_google_service("sheets", "v4", scopes)
-        return drive_service, sheets_service

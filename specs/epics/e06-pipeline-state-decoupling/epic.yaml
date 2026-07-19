@@ -3,7 +3,7 @@
 
 id: e06
 title: "pipeline-state-decoupling"
-status: not_started
+status: shipped
 target_version: "0.9.10"
 test_target: workbench
 canonical: "docs/roadmap.md#0910-pipeline-state-decoupling"

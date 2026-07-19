@@ -211,6 +211,9 @@ Execute story {story['id']}. Work in small, tested steps.
   Use a conventional commit message: `{story['id']}: <short description>`.
   Include `last-prompt.md` in the commit — it records the original intent.
 - Do NOT start another story in this session.
+- Commit all changes to the worktree before marking the story done.
+  Use a conventional commit message: `{story['id']}: <short description>`.
+  Include `last-prompt.md` in the commit — it records the original intent.
 
 Begin."""
 

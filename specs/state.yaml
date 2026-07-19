@@ -1,5 +1,5 @@
-active_epic_id: e05
-active_story_id: e05s01
+active_epic_id: e06
+active_story_id: e06s01
 
 # Session harness — use this file to set active epic and story.
 # The orchestrate.js script reads active_epic_id from here.
